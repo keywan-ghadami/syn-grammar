@@ -1,9 +1,5 @@
 use syn::{Ident, Type, LitStr, Lit};
 use proc_macro2::{TokenStream, Span};
-// 'use syn::spanned::Spanned;' entfernt, da vom Compiler als unused markiert
-// (Die Methoden sind durch 'syn' Features oft inhärent oder implizit verfügbar, 
-// oder wir nutzen Spanned::span explizit, falls nötig. Hier: Pattern::span nutzt es.)
-use syn::spanned::Spanned; 
 
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
@@ -44,8 +40,9 @@ pub enum Pattern {
 impl Pattern {
     pub fn span(&self) -> Span {
         match self {
-            Pattern::Lit(l) => l.span(),
-            Pattern::RuleCall { rule_name, .. } => rule_name.span(),
+            // Wir nutzen hier Fully Qualified Syntax, um keinen Import zu brauchen
+            Pattern::Lit(l) => syn::spanned::Spanned::span(l),
+            Pattern::RuleCall { rule_name, .. } => syn::spanned::Spanned::span(rule_name),
             Pattern::Group(alts) => {
                 alts.first()
                     .and_then(|seq| seq.first())
@@ -58,4 +55,3 @@ impl Pattern {
         }
     }
 }
-
