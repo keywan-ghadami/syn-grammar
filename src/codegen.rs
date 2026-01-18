@@ -1,8 +1,8 @@
 use crate::model::*;
 use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
-use syn::spanned::Spanned;
-use std::collections::{HashMap, HashSet};
+use syn::spanned::Spanned; // Wird für pattern.span() benötigt
+use std::collections::HashMap; // HashSet entfernt
 
 pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let mut output = TokenStream::new();
@@ -32,8 +32,6 @@ fn generate_rule(rule: &Rule, first_sets: &FirstSetComputer) -> TokenStream {
     let vis = if rule.is_pub { quote!(pub) } else { quote!() };
 
     // Body generieren
-    // Wir übergeben 'true' für is_top_level, damit am Ende ein Error geworfen wird,
-    // falls keine Variante matcht.
     let body = generate_variants(&rule.variants, first_sets, true); 
 
     quote! {
@@ -43,8 +41,6 @@ fn generate_rule(rule: &Rule, first_sets: &FirstSetComputer) -> TokenStream {
     }
 }
 
-// Generiert Code für eine Liste von Varianten.
-// Nutzt Peek-Optimierung wo möglich, sonst echtes Backtracking via Fork.
 fn generate_variants(
     variants: &[RuleVariant], 
     first_sets: &FirstSetComputer,
@@ -58,35 +54,25 @@ fn generate_variants(
         let first = first_sets.compute_sequence(&variant.pattern);
 
         if let Some(token_check) = first.to_peek_check() {
-            // Optimierter Pfad: LL(1) Lookahead
             checks.extend(quote! {
                 if #token_check {
                     return { #logic };
                 }
             });
         } else {
-            // Fallback: Echtes Backtracking (Speculative Parsing)
-            // Wir nutzen eine Closure, die 'input' verschattet. 
-            // So kann der generierte Code in '#logic' weiterhin 'input.parse()' aufrufen,
-            // operiert aber tatsächlich auf dem Fork.
-            
-            // Wenn dies die allerletzte Variante ist UND wir top-level sind,
-            // brauchen wir nicht forken, sondern können den Fehler direkt propagieren lassen.
             if i == variant_count - 1 && is_top_level {
                 checks.extend(logic);
             } else {
                 checks.extend(quote! {
                     let fork = input.fork();
-                    // Closure nimmt 'input' entgegen -> Shadowing!
                     let attempt = |input: ParseStream| -> Result<_> {
                         #logic
                     };
                     
                     if let Ok(res) = attempt(&fork) {
-                        input.advance_to(&fork); // Erfolg: Haupt-Cursor nachziehen
+                        input.advance_to(&fork);
                         return Ok(res);
                     }
-                    // Bei Fehler: Fork verwerfen, weiter zur nächsten Variante
                 });
             }
         }
@@ -95,7 +81,6 @@ fn generate_variants(
     if is_top_level && checks.is_empty() {
          quote! { Err(input.error("No rule variants defined")) }
     } else if is_top_level {
-         // Wenn wir hier ankommen, hat keine Variante gematcht (und die letzte war kein Fallback)
          quote! { 
              #checks
              Err(input.error("No matching rule variant found")) 
@@ -155,9 +140,6 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
                     }
                 }
             } else {
-                // Optional ohne klares Start-Token ist schwierig in LL(1).
-                // Mit Backtracking müsste man hier auch forken, 
-                // aber für Stage 0 lassen wir es bei Peek oder ignorieren es.
                 quote_spanned! {span=> 
                     // Optional check failed or ambiguous 
                 }
@@ -180,8 +162,6 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
         Pattern::Plus(inner) => {
             let inner_logic = generate_pattern_step(inner, first_sets);
             let first = first_sets.compute_first(inner);
-            // Plus ist: Einmal ausführen, dann While
-            // Hier bräuchte man eigentlich einen Do-While oder expliziten ersten Call
              if let Some(check) = first.to_peek_check() {
                  quote_spanned! {span=>
                     if !#check {
@@ -196,10 +176,6 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
              }
         },
         Pattern::Group(alts) => {
-            // ( A | B )
-            // Da Gruppen im aktuellen Modell keine eigene 'Action' haben und keine Rückgabewerte binden,
-            // behandeln wir sie rein als Parsing-Check (consumen Tokens).
-            // Wir bauen temporäre RuleVariants ohne Action
             let temp_variants: Vec<RuleVariant> = alts.iter().map(|pat_seq| {
                 RuleVariant { pattern: pat_seq.clone(), action: quote!({}) }
             }).collect();
@@ -207,7 +183,6 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
             let variant_logic = generate_variants(&temp_variants, first_sets, false);
             
             quote_spanned! {span=>
-                // Group logic block
                 {
                     #variant_logic
                 }
@@ -216,7 +191,6 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
     }
 }
 
-// --- Dynamic Token Mapping ---
 fn resolve_token_type(lit: &syn::LitStr) -> syn::Type {
     let s = lit.value();
     let type_str = format!("Token![{}]", s);
@@ -237,7 +211,6 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
     }
 }
 
-// --- First Set Analysis ---
 struct FirstSetComputer<'a> {
     rules: HashMap<String, &'a Rule>,
 }
@@ -271,18 +244,13 @@ impl<'a> FirstSetComputer<'a> {
                         _ => FirstSet::Unknown
                     };
                 }
-                // Simple Rekursionstiefe 1 für First-Set
                 if let Some(rule) = self.rules.get(&rule_name.to_string()) {
                      if let Some(first_var) = rule.variants.first() {
-                         // Achtung: Wenn die Regel mit einer anderen Regel beginnt, 
-                         // müsste man hier weiter absteigen. 
-                         // Für Stage 0 nehmen wir an, dass Regeln oft mit Token beginnen.
                          if let Some(first_pat) = first_var.pattern.first() {
-                             // Verhindere Endlosrekursion bei direkter Linksrekursion (Simpel)
-                             if let Pattern::RuleCall{ rule_name: ref inner_name, .. } = first_pat {
+                             // FIX: 'ref' entfernt für Rust 2024 Kompatibilität
+                             if let Pattern::RuleCall{ rule_name: inner_name, .. } = first_pat {
                                  if inner_name == rule_name { return FirstSet::Unknown; }
                              }
-                             // Hier könnte man rekursiv aufrufen
                              return FirstSet::Unknown; 
                          }
                      }
