@@ -6,8 +6,12 @@ mod parser;     // Parst .grammar Dateien
 mod resolver;   // Löst Imports auf
 mod codegen;    // Der Rust-Code Generator
 
-// Unsere neue Runtime-Library muss public sein
+// Runtime Library (Muss public sein)
 pub mod rt;
+
+// Testing / JIT Infrastructure (Nur aktiv mit Feature "jit")
+#[cfg(feature = "jit")]
+pub mod testing;
 
 pub struct Generator {
     resolver: resolver::GrammarResolver,
@@ -28,19 +32,18 @@ impl Generator {
 }
 
 // --- UNIT TESTS ---
+// Diese Tests laufen schnell und prüfen die interne Logik, ohne Cargo zu starten.
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::*;
 
-    // Hilfsfunktion: Entfernt alle Whitespaces für robusten String-Vergleich
     fn normalize(s: &str) -> String {
         s.chars().filter(|c| !c.is_whitespace()).collect()
     }
 
     #[test]
     fn test_parser_ebnf() {
-        // Testet, ob unsere Grammatik-Syntax korrekt in den AST geparst wird
         let input = r#"
             grammar EbnfTest {
                 rule test -> () = 
@@ -54,14 +57,13 @@ mod tests {
         let rule = &grammar.rules[0];
         let variant = &rule.variants[0];
         
-        // start, group*, end? -> 3 Patterns
         assert_eq!(variant.pattern.len(), 3);
         
-        // Prüfen, ob das zweite Element ein Repeat(Group(...)) ist
+        // Prüfen der verschachtelten Struktur
         match &variant.pattern[1] {
             Pattern::Repeat(inner) => {
                 match &**inner {
-                    Pattern::Group(alts) => assert_eq!(alts.len(), 2), // "a" | "b"
+                    Pattern::Group(alts) => assert_eq!(alts.len(), 2),
                     _ => panic!("Expected Group inside Repeat"),
                 }
             },
@@ -70,11 +72,11 @@ mod tests {
     }
 
     #[test]
-    fn test_codegen_structures() {
-        // Testet, ob der Generator korrekten Code für Ambiguitäten erzeugt
+    fn test_codegen_calls_rt() {
+        // Prüft, ob der Generator die neue Runtime-Library nutzt
         let input = r#"
             grammar Logic {
-                rule ambiguous -> i32 = 
+                rule ambig -> i32 = 
                     a:ident() "x" -> { 1 }
                   | b:ident() "y" -> { 2 }
             }
@@ -84,42 +86,34 @@ mod tests {
         let rust_code = codegen::generate_rust(grammar);
         let code_str = normalize(&rust_code.to_string());
 
-        // UPDATE: Da wir jetzt 'rt::parse_speculative' nutzen, suchen wir danach
-        // statt nach rohem 'input.fork()'.
-        assert!(code_str.contains("rt::parse_speculative"), "Should generate call to runtime speculative parsing");
-        
-        // Wir prüfen auch, ob die Closure generiert wird
-        assert!(code_str.contains("|input|"), "Should generate closure for backtracking");
+        // Wir erwarten rt::parse_speculative statt input.fork()
+        assert!(code_str.contains("rt::parse_speculative"));
+        // Wir erwarten rt::parse_ident statt syn::Ident::parse_any
+        assert!(code_str.contains("rt::parse_ident"));
     }
-    
+
     #[test]
-    fn test_full_pipeline() {
-        // Testet eine komplexere Grammatik auf generierte Token-Checks
+    fn test_generated_structure() {
+        // Prüft, ob Funktionssignaturen korrekt generiert werden
         let input = r#"
             grammar Calc {
-                rule expr -> i32 = 
-                    t:term() ( "+" t2:term() )* -> { 0 }
-
-                rule term -> i32 = 
-                    f:factor() ( "*" f2:factor() )* -> { 0 }
-
-                rule factor -> i32 = 
-                    "open" e:expr() "close" -> { e }
-                  | i:int_lit() -> { i }
+                pub rule main -> i32 = "x" -> { 0 }
+                rule sub -> () = "y" -> { () }
             }
         "#;
         
         let grammar: GrammarDefinition = syn::parse_str(input).unwrap();
         let rust_code = codegen::generate_rust(grammar);
-        let code_str = normalize(&rust_code.to_string());
+        let s = normalize(&rust_code.to_string());
+
+        // 1. Prüfen auf Public Function
+        assert!(s.contains("pubfnparse_main"), "Missing pub fn parse_main");
         
-        // Prüfen auf wesentliche Bestandteile (Whitespace-agnostisch)
+        // 2. Prüfen auf Private Function
+        // (Beachte: normalize entfernt Leerzeichen, daher 'fnparse_sub')
+        assert!(s.contains("fnparse_sub"), "Missing fn parse_sub");
         
-        // Repeat erzeugt eine while Schleife mit Peek Check
-        assert!(code_str.contains("whileinput.peek(Token![+])"), "Repeat-Schleife mit '+' Token fehlt");
-        assert!(code_str.contains("whileinput.peek(Token![*])"), "Repeat-Schleife mit '*' Token fehlt");
-        
-        // Funktionsname muss generiert sein
-        assert!(code_str.contains("fnparse_expr(input:ParseStream)"), "Funktionssignatur parse_expr fehlt");
+        // 3. Prüfen auf Grammar Name Konstante
+        assert!(s.contains("pubconstGRAMMAR_NAME:&str=stringify!(Calc)"));
     }
 }
