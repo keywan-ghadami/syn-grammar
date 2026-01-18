@@ -8,7 +8,6 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let grammar_name = &grammar.name;
     let custom_keywords = collect_custom_keywords(&grammar);
 
-    // Header mit Allow-Attributes für sauberen Build
     output.extend(quote! {
         #![allow(unused_imports, unused_variables, dead_code)]
         
@@ -19,7 +18,10 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
         use syn::Result;
         use syn::Token;
         use syn::ext::IdentExt; 
-        use syn::parse::discouraged::Speculative;
+        
+        // Wir nutzen jetzt unsere Runtime Library!
+        // Annahme: Das generierte Crate hat Zugriff auf 'syn_grammar'.
+        use syn_grammar::rt; 
     });
 
     if !custom_keywords.is_empty() {
@@ -49,6 +51,8 @@ fn generate_rule(rule: &Rule, first_sets: &FirstSetComputer, custom_keywords: &H
     let name = &rule.name;
     let fn_name = format_ident!("parse_{}", name);
     let ret_type = &rule.return_type;
+    
+    // VISIBILITY FIX: Wenn die Regel public ist, generieren wir "pub"
     let vis = if rule.is_pub { quote!(pub) } else { quote!() };
 
     let body = generate_variants(&rule.variants, first_sets, true, custom_keywords); 
@@ -105,15 +109,13 @@ fn generate_variants(
                 }
             };
         } else {
+            // RUNTIME FIX: Statt fork code zu generieren, rufen wir rt::parse_speculative auf.
+            // Das ist sauberer, kürzer und typsicherer.
             current_code = quote! {
-                let fork = input.fork();
-                let attempt = |input: ParseStream| -> Result<_> {
+                if let Some(res) = rt::parse_speculative(input, |input| {
                     #logic
-                };
-                
-                if let Ok(res) = attempt(&fork) {
-                    input.advance_to(&fork);
-                    Ok(res) // FIX: Hier muss Ok() stehen, damit der Typ stimmt!
+                })? {
+                    res
                 } else {
                     #current_code
                 }
@@ -315,14 +317,15 @@ fn is_builtin(name: &syn::Ident) -> bool {
 
 fn map_builtin(name: &syn::Ident) -> TokenStream {
     match name.to_string().as_str() {
-        "ident" => quote! { input.call(syn::Ident::parse_any)? },
-        "int_lit" => quote! { input.parse::<syn::LitInt>()?.base10_parse::<i32>()? },
+        // RUNTIME FIX: Aufrufe an syn_grammar::rt
+        "ident" => quote! { rt::parse_ident(input)? },
+        "int_lit" => quote! { rt::parse_int::<i32>(input)? },
         "string_lit" => quote! { input.parse::<syn::LitStr>()?.value() },
         _ => panic!("Unknown builtin"),
     }
 }
 
-// --- First Set Analysis ---
+// --- First Set Analysis (Unverändert) ---
 
 struct FirstSetComputer<'a> {
     rules: HashMap<String, &'a Rule>,
