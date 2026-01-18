@@ -8,7 +8,10 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let grammar_name = &grammar.name;
     let custom_keywords = collect_custom_keywords(&grammar);
 
+    // Header mit Allow-Attributes für sauberen Build des generierten Codes
     output.extend(quote! {
+        #![allow(unused_imports, unused_variables, dead_code)]
+        
         /// Auto-generated parser for grammar: #grammar_name
         pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);
 
@@ -57,9 +60,6 @@ fn generate_rule(rule: &Rule, first_sets: &FirstSetComputer, custom_keywords: &H
     }
 }
 
-// FIX: Kompletter Rewrite dieser Funktion
-// Statt linear "return" Statements zu generieren, bauen wir eine Expression-Chain (if-else tree)
-// rückwärts auf. Das funktioniert sowohl Top-Level als auch in Gruppen.
 fn generate_variants(
     variants: &[RuleVariant], 
     first_sets: &FirstSetComputer,
@@ -70,20 +70,16 @@ fn generate_variants(
         .map(|v| first_sets.compute_sequence(&v.pattern))
         .collect();
 
-    // 1. Der "Fallback" (ganz am Ende der if-else Kette)
-    // Wenn nichts matcht, werfen wir einen Fehler.
     let mut current_code = if is_top_level {
         quote! { Err(input.error("No matching rule variant found")) }
     } else {
         quote! { Err(input.error("No matching variant in group")) }
     };
 
-    // 2. Wir iterieren RÜCKWÄRTS und wickeln den aktuellen Code in ein "else { ... }"
     for (i, variant) in variants.iter().enumerate().rev() {
         let logic = generate_sequence(&variant.pattern, &variant.action, first_sets, custom_keywords);
         let current_first = &all_firsts[i];
 
-        // Ambiguity Check (nach vorne schauen)
         let mut is_ambiguous = false;
         for other_first in all_firsts.iter().skip(i + 1) {
             if current_first.overlaps(other_first) {
@@ -94,15 +90,12 @@ fn generate_variants(
 
         let can_peek = current_first.to_peek_check().is_some() && !is_ambiguous;
 
-        // Spezialfall: Letzte Variante in einer Top-Level Regel
-        // Hier können wir blind probieren (ohne Fork), wenn wir eh am Ende sind.
         if i == variants.len() - 1 && is_top_level {
             current_code = logic;
             continue;
         }
 
         if can_peek {
-            // PFAD A: Peek (LL(1))
             let check = current_first.to_peek_check().unwrap();
             current_code = quote! {
                 if #check {
@@ -112,9 +105,6 @@ fn generate_variants(
                 }
             };
         } else {
-            // PFAD B: Fork (Speculative)
-            // Wir versuchen es, wenn es klappt geben wir das Ergebnis zurück (ohne return keyword, als Expression),
-            // sonst führen wir den bisherigen 'current_code' (else-Zweig) aus.
             current_code = quote! {
                 let fork = input.fork();
                 let attempt = |input: ParseStream| -> Result<_> {
@@ -208,8 +198,6 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: 
             let temp_variants: Vec<RuleVariant> = alts.iter().map(|pat_seq| {
                 RuleVariant { pattern: pat_seq.clone(), action: quote!({}) }
             }).collect();
-            // Hier ist is_top_level = false. generate_variants generiert jetzt einen Expression-Tree,
-            // der Result<(), Error> zurückgibt. Wir nutzen das ? um Fehler zu propagieren.
             let variant_logic = generate_variants(&temp_variants, first_sets, false, kws);
             quote_spanned! {span=> { #variant_logic }?; }
         },
@@ -251,8 +239,6 @@ fn generate_sequence_no_action(patterns: &[Pattern], first_sets: &FirstSetComput
     steps
 }
 
-
-// --- Token / Keyword Logic ---
 
 fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> syn::Type {
     let s = lit.value();
@@ -330,13 +316,12 @@ fn is_builtin(name: &syn::Ident) -> bool {
 fn map_builtin(name: &syn::Ident) -> TokenStream {
     match name.to_string().as_str() {
         "ident" => quote! { input.call(syn::Ident::parse_any)? },
-        "int_lit" => quote! { input.parse::<syn::LitInt>()?.base10_parse()? },
+        // FIX: Konkreter Typ für int_lit um Type-Inference Fehler zu vermeiden
+        "int_lit" => quote! { input.parse::<syn::LitInt>()?.base10_parse::<i32>()? },
         "string_lit" => quote! { input.parse::<syn::LitStr>()?.value() },
         _ => panic!("Unknown builtin"),
     }
 }
-
-// --- First Set Analysis ---
 
 struct FirstSetComputer<'a> {
     rules: HashMap<String, &'a Rule>,
