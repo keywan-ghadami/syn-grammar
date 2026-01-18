@@ -11,8 +11,15 @@ quote = "1.0"
 proc-macro2 = "1.0"
 thiserror = "2.0"
 
+# Optional Dependencies für die JIT/Test-Umgebung
+tempfile = { version = "3.10", optional = true }
+
 [dev-dependencies]
 insta = "1.34"
-tempfile = "3.10"
-assert_cmd = "2.0"
-predicates = "3.1"
+# Im Dev-Modus aktivieren wir das Feature immer
+syn-grammar = { path = ".", features = ["jit"] } 
+
+[features]
+default = []
+# Aktiviert die Test-Umgebung / JIT-Compiler
+jit = ["dep:tempfile"]
