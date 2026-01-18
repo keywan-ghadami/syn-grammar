@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let mut output = TokenStream::new();
     let grammar_name = &grammar.name;
-
     let custom_keywords = collect_custom_keywords(&grammar);
 
     output.extend(quote! {
@@ -17,7 +16,6 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
         use syn::Result;
         use syn::Token;
         use syn::ext::IdentExt; 
-        // WICHTIG: Für Backtracking (fork/advance_to)
         use syn::parse::discouraged::Speculative;
     });
 
@@ -27,16 +25,12 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
             quote! { syn::custom_keyword!(#ident); }
         });
         output.extend(quote! {
-            pub mod kw {
-                #(#kw_defs)*
-            }
+            pub mod kw { #(#kw_defs)* }
         });
     }
 
     if let Some(parent) = &grammar.inherits {
-        output.extend(quote! {
-            use super::#parent::*;
-        });
+        output.extend(quote! { use super::#parent::*; });
     }
 
     let first_sets = FirstSetComputer::new(&grammar, &custom_keywords);
@@ -102,10 +96,7 @@ fn generate_variants(
         } else {
             checks.extend(quote! {
                 let fork = input.fork();
-                let attempt = |input: ParseStream| -> Result<_> {
-                    #logic
-                };
-                
+                let attempt = |input: ParseStream| -> Result<_> { #logic };
                 if let Ok(res) = attempt(&fork) {
                     input.advance_to(&fork);
                     return Ok(res);
@@ -117,10 +108,7 @@ fn generate_variants(
     if is_top_level && checks.is_empty() {
          quote! { Err(input.error("No rule variants defined")) }
     } else if is_top_level {
-         quote! { 
-             #checks
-             Err(input.error("No matching rule variant found")) 
-         }
+         quote! { #checks Err(input.error("No matching rule variant found")) }
     } else {
         quote! { #checks }
     }
@@ -170,9 +158,7 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: 
             let inner_logic = generate_pattern_step(inner, first_sets, kws);
             let first = first_sets.compute_first(inner);
             if let Some(check) = first.to_peek_check() {
-                quote_spanned! {span=>
-                    if #check { #inner_logic }
-                }
+                quote_spanned! {span=> if #check { #inner_logic } }
             } else {
                  quote_spanned! {span=> }
             }
@@ -181,9 +167,7 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: 
              let inner_logic = generate_pattern_step(inner, first_sets, kws);
              let first = first_sets.compute_first(inner);
              if let Some(check) = first.to_peek_check() {
-                 quote_spanned! {span=>
-                    while #check { #inner_logic }
-                 }
+                 quote_spanned! {span=> while #check { #inner_logic } }
              } else {
                  quote!() 
              }
@@ -206,19 +190,65 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: 
             }).collect();
             let variant_logic = generate_variants(&temp_variants, first_sets, false, kws);
             quote_spanned! {span=> { #variant_logic } }
-        }
+        },
+        
+        // --- NEU: Generierung für syn::bracketed!, braced!, parenthesized! ---
+        Pattern::Bracketed(seq) => {
+            let inner_logic = generate_sequence_no_action(seq, first_sets, kws);
+            quote_spanned! {span=>
+                let content;
+                let _ = syn::bracketed!(content in input);
+                let input = &content; // Shadowing: 'input' ist jetzt der innere Buffer
+                #inner_logic
+            }
+        },
+        Pattern::Braced(seq) => {
+            let inner_logic = generate_sequence_no_action(seq, first_sets, kws);
+            quote_spanned! {span=>
+                let content;
+                let _ = syn::braced!(content in input);
+                let input = &content;
+                #inner_logic
+            }
+        },
+        Pattern::Parenthesized(seq) => {
+            let inner_logic = generate_sequence_no_action(seq, first_sets, kws);
+            quote_spanned! {span=>
+                let content;
+                let _ = syn::parenthesized!(content in input);
+                let input = &content;
+                #inner_logic
+            }
+        },
     }
 }
 
+// Hilfsfunktion: Sequenz generieren ohne Action-Return (für Gruppeninhalte)
+fn generate_sequence_no_action(patterns: &[Pattern], first_sets: &FirstSetComputer, kws: &HashSet<String>) -> TokenStream {
+    let mut steps = TokenStream::new();
+    for pattern in patterns {
+        steps.extend(generate_pattern_step(pattern, first_sets, kws));
+    }
+    steps
+}
+
+
+// --- Token / Keyword Logic ---
+
 fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> syn::Type {
     let s = lit.value();
+    
+    // WICHTIG: Wir verbieten Literale für Klammern, weil diese jetzt strukturell sein müssen
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
-         panic!("Invalid usage of delimiter '{}' as a literal token.", s);
+         // Panic ist hier gewollt, damit der User weiß, dass er "[ ... ]" statt ""[" ... "]"" schreiben soll
+         panic!("Invalid usage of delimiter '{}' as a literal token. Use structural syntax like [ ... ] or {{ ... }} in your grammar.", s);
     }
+
     if custom_keywords.contains(&s) {
         let ident = format_ident!("{}", s);
         return syn::parse_quote!(kw::#ident);
     }
+
     let type_str = format!("Token![{}]", s);
     syn::parse_str::<syn::Type>(&type_str)
         .unwrap_or_else(|_| panic!("Invalid token literal: '{}'. Not a Rust keyword and not an identifier.", s))
@@ -245,6 +275,10 @@ fn collect_from_patterns(patterns: &[Pattern], kws: &mut HashSet<String>) {
             },
             Pattern::Group(alts) => {
                 for alt in alts { collect_from_patterns(alt, kws); }
+            },
+            // Rekursion für die neuen Typen
+            Pattern::Bracketed(seq) | Pattern::Braced(seq) | Pattern::Parenthesized(seq) => {
+                collect_from_patterns(seq, kws);
             },
             Pattern::Optional(inner) | Pattern::Repeat(inner) | Pattern::Plus(inner) => {
                 collect_from_patterns(&[ *inner.clone() ], kws); 
@@ -286,6 +320,8 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
     }
 }
 
+// --- First Set Analysis ---
+
 struct FirstSetComputer<'a> {
     rules: HashMap<String, &'a Rule>,
     custom_keywords: &'a HashSet<String>,
@@ -317,6 +353,12 @@ impl<'a> FirstSetComputer<'a> {
     fn compute_first_recursive(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> FirstSet {
         match pattern {
             Pattern::Lit(l) => FirstSet::Token(resolve_token_type(l, self.custom_keywords)),
+            
+            // First Sets für Container: Das First-Set ist das Token des Delimiters
+            Pattern::Bracketed(_) => FirstSet::Token(syn::parse_quote!(syn::token::Bracket)),
+            Pattern::Braced(_) => FirstSet::Token(syn::parse_quote!(syn::token::Brace)),
+            Pattern::Parenthesized(_) => FirstSet::Token(syn::parse_quote!(syn::token::Paren)),
+            
             Pattern::RuleCall { rule_name, .. } => {
                 if is_builtin(rule_name) {
                     return match rule_name.to_string().as_str() {
