@@ -3,6 +3,7 @@ use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
 use std::collections::HashSet;
 use syn::Result;
+use proc_macro_error::{abort, abort_call_site};
 
 pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let mut output = TokenStream::new();
@@ -60,36 +61,33 @@ fn generate_variants(
     is_top_level: bool,
     custom_keywords: &HashSet<String>
 ) -> Result<TokenStream> {
-    // Fallback Code (Ende der Kette)
+    // 1. Fallback Error Message
     let mut current_code = if is_top_level {
         quote! { Err(input.error("No matching rule variant found")) }
     } else {
         quote! { Err(input.error("No matching variant in group")) }
     };
 
-    // Wir bauen die Kette rückwärts
+    // 2. Rückwärts aufbauen: if try_match(A) { A } else { if try_match(B) { B } else { Error } }
     for (i, variant) in variants.iter().enumerate().rev() {
         let logic = generate_sequence(&variant.pattern, &variant.action, custom_keywords)?;
         
-        // Optimierung: Einfacher Lookahead
-        // Wir prüfen NUR das allererste Element des Patterns.
-        // Wenn es ein Literal oder eine Klammer ist, können wir peeken.
-        // Wenn es ein RuleCall ist, wissen wir es nicht -> Speculative Fallback.
+        // Optimierung: Simple Peek Check für den Start
         let peek_token = if let Some(first) = variant.pattern.first() {
-            get_peek_token(first, custom_keywords)?
+            get_simple_peek(first, custom_keywords)?
         } else {
             None
         };
 
-        // Wenn wir in der letzten Variante Top-Level sind, brauchen wir keinen Check,
-        // wir probieren es einfach (oder failen).
+        // Wenn wir am Ende sind (erste Option im Code, letzte in der Iteration) 
+        // und es Top-Level ist, brauchen wir keinen Guard, wir führen es einfach aus.
         if i == variants.len() - 1 && is_top_level {
             current_code = logic;
             continue;
         }
 
         if let Some(token) = peek_token {
-            // LL(1) Optimierung
+            // LL(1) Optimization: Wir wissen sicher, womit es anfängt
             current_code = quote! {
                 if input.peek(#token) {
                     #logic
@@ -98,9 +96,9 @@ fn generate_variants(
                 }
             };
         } else {
-            // Robuster Fallback: Speculative Parsing via Runtime
+            // Combinator Pattern: Speculative Execution via Runtime
             current_code = quote! {
-                if let Some(res) = rt::parse_speculative(input, |input| {
+                if let Some(res) = rt::parse_try(input, |input| {
                     #logic
                 })? {
                     res
@@ -156,28 +154,55 @@ fn generate_pattern_step(pattern: &Pattern, kws: &HashSet<String>) -> Result<Tok
         },
         Pattern::Optional(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
-            // Optional braucht Peek! Wenn wir nicht peeken können, ist das Pattern ungültig.
-            let peek = get_peek_token(inner, kws)?.ok_or_else(|| 
-                syn::Error::new(span, "Optional pattern must start with a literal or token"))?;
-            
-            Ok(quote_spanned! {span=> if input.peek(#peek) { #inner_logic } })
+            // Optional benötigt zwingend ein Peek-Token, sonst ist es mehrdeutig ohne Backtracking
+            if let Some(peek) = get_simple_peek(inner, kws)? {
+                 Ok(quote_spanned! {span=> if input.peek(#peek) { #inner_logic } })
+            } else {
+                // Fallback für komplexe Optionals: Try Parse
+                Ok(quote_spanned! {span=> 
+                    if let Some(_) = rt::parse_try(input, |input| { #inner_logic; Ok(()) })? { 
+                        // logic was executed inside try
+                    } 
+                })
+            }
         },
         Pattern::Repeat(inner) => {
              let inner_logic = generate_pattern_step(inner, kws)?;
-             let peek = get_peek_token(inner, kws)?.ok_or_else(|| 
-                syn::Error::new(span, "Repeat pattern must start with a literal or token"))?;
-
-             Ok(quote_spanned! {span=> while input.peek(#peek) { #inner_logic } })
+             if let Some(peek) = get_simple_peek(inner, kws)? {
+                 Ok(quote_spanned! {span=> while input.peek(#peek) { #inner_logic } })
+             } else {
+                 // Repeat ohne klares Start-Token ist gefährlich (Endlosschleife), 
+                 // wir nutzen Try-Parse Loop
+                 Ok(quote_spanned! {span=> 
+                    loop {
+                        if let Some(_) = rt::parse_try(input, |input| { #inner_logic; Ok(()) })? {
+                            continue;
+                        }
+                        break;
+                    }
+                 })
+             }
         },
         Pattern::Plus(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
-            let peek = get_peek_token(inner, kws)?.ok_or_else(|| 
-                syn::Error::new(span, "Plus pattern must start with a literal or token"))?;
-
-             Ok(quote_spanned! {span=>
-                if !input.peek(#peek) { return Err(input.error("Expected at least one occurrence")); }
-                while input.peek(#peek) { #inner_logic }
-             })
+            if let Some(peek) = get_simple_peek(inner, kws)? {
+                Ok(quote_spanned! {span=>
+                    if !input.peek(#peek) { return Err(input.error("Expected at least one occurrence")); }
+                    while input.peek(#peek) { #inner_logic }
+                })
+            } else {
+                // Fallback Loop
+                 Ok(quote_spanned! {span=>
+                    if rt::parse_try(input, |input| { #inner_logic; Ok(()) })?.is_none() {
+                        return Err(input.error("Expected at least one occurrence"));
+                    }
+                    loop {
+                        if rt::parse_try(input, |input| { #inner_logic; Ok(()) })?.is_none() {
+                            break;
+                        }
+                    }
+                 })
+            }
         },
         Pattern::Group(alts) => {
             let temp_variants: Vec<RuleVariant> = alts.iter().map(|pat_seq| {
@@ -226,8 +251,8 @@ fn generate_sequence_no_action(patterns: &[Pattern], kws: &HashSet<String>) -> R
 
 // --- Helpers ---
 
-// Bestimmt das Start-Token für einfache Patterns. Gibt None zurück für komplexe/rekursive Patterns.
-fn get_peek_token(pattern: &Pattern, kws: &HashSet<String>) -> Result<Option<TokenStream>> {
+// Bestimmt simple Lookaheads (nur Tokens/Klammern). Kein Deep-Analysis mehr!
+fn get_simple_peek(pattern: &Pattern, kws: &HashSet<String>) -> Result<Option<TokenStream>> {
     match pattern {
         Pattern::Lit(lit) => {
             let t = resolve_token_type(lit, kws)?;
@@ -236,7 +261,7 @@ fn get_peek_token(pattern: &Pattern, kws: &HashSet<String>) -> Result<Option<Tok
         Pattern::Bracketed(_) => Ok(Some(quote!(syn::token::Bracket))),
         Pattern::Braced(_) => Ok(Some(quote!(syn::token::Brace))),
         Pattern::Parenthesized(_) => Ok(Some(quote!(syn::token::Paren))),
-        // Für RuleCall, Group etc. geben wir None zurück -> Fallback auf Speculative Parsing
+        // Alles andere (RuleCalls, Groups, Optionals) ist zu komplex für static peek -> Runtime fallback
         _ => Ok(None)
     }
 }
@@ -244,7 +269,7 @@ fn get_peek_token(pattern: &Pattern, kws: &HashSet<String>) -> Result<Option<Tok
 fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> Result<syn::Type> {
     let s = lit.value();
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
-         return Err(syn::Error::new(lit.span(), "Invalid usage of delimiter as literal"));
+         abort!(lit.span(), "Invalid usage of delimiter as literal. Use [ ... ] syntax.");
     }
     if custom_keywords.contains(&s) {
         let ident = format_ident!("{}", s);
