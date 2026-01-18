@@ -12,16 +12,20 @@ mod kw {
 // 1. Grammar Definition
 #[derive(Parse)]
 pub struct GrammarDefinition {
-    #[syn(parenthesized)]
-    pub _paren: Option<token::Paren>, // Optional wrapper
+    // KEIN #[syn(parenthesized)] hier.
+    
     pub _kw_gram: kw::grammar,
     pub name: Ident,
-    #[syn(peek = Token![:])]
-    pub inherits: Option<InheritanceSpec>, // Helper struct für optionale Vererbung
-    #[syn(brace)]
+    
+    // Optionales ': Parent'
+    #[peek(Token![:])]
+    pub inherits: Option<InheritanceSpec>, 
+    
+    #[brace]
     pub _brace: token::Brace,
-    #[syn(in = _brace)]
-    #[parse(ParseRule::parse_list)] // Eigene Helper Funktion für Liste von Regeln
+    
+    #[inside(_brace)]
+    #[call(ParseRule::parse_list)] 
     pub rules: Vec<Rule>,
 }
 
@@ -31,7 +35,6 @@ pub struct InheritanceSpec {
     pub name: Ident,
 }
 
-// Helper für Vec<Rule>
 struct ParseRule;
 impl ParseRule {
     fn parse_list(input: ParseStream) -> Result<Vec<Rule>> {
@@ -46,14 +49,16 @@ impl ParseRule {
 // 2. Rule
 #[derive(Parse)]
 pub struct Rule {
-    #[syn(peek = Token![pub])]
+    #[peek(Token![pub])]
     pub is_pub: Option<Token![pub]>,
+    
     pub _kw_rule: kw::rule,
     pub name: Ident,
     pub _arrow: Token![->],
     pub return_type: syn::Type,
     pub _eq: Token![=],
-    #[parse(ParseVariant::parse_list)]
+    
+    #[call(ParseVariant::parse_list)]
     pub variants: Vec<RuleVariant>,
 }
 
@@ -86,7 +91,7 @@ impl ParseVariant {
     }
 }
 
-// 3. Patterns (Manuell, da komplexe Precedence für Suffixes)
+// 3. Patterns (Bleibt manuell, da komplexe Precedence für Suffixes nötig ist)
 impl Parse for Pattern {
     fn parse(input: ParseStream) -> Result<Self> {
         // A. Base Pattern
@@ -133,11 +138,8 @@ impl Parse for Pattern {
                     }
                 }
             } else {
-                // Erlaube rule calls ohne Klammern () falls keine Args da sind? 
-                // Deine Grammatik nutzt "ident()", also Klammern sind Pflicht laut bisherigem Parser.
-                // Wir erzwingen hier Klammern für Konsistenz mit alter Logik.
                 let content;
-                let _ = syn::parenthesized!(content in input); // Erwarte ()
+                let _ = syn::parenthesized!(content in input); // Erwarte leere ()
             }
 
             Pattern::RuleCall { binding, rule_name, args }
