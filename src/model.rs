@@ -30,7 +30,6 @@ pub enum Pattern {
         rule_name: Ident,
         args: Vec<Lit>, 
     },
-    // EBNF Erweiterungen
     Group(Vec<Vec<Pattern>>), // ( A | B )
     Optional(Box<Pattern>),   // A?
     Repeat(Box<Pattern>),     // A*
@@ -40,14 +39,13 @@ pub enum Pattern {
 impl Pattern {
     pub fn span(&self) -> Span {
         match self {
-            // Wir nutzen hier Fully Qualified Syntax, um keinen Import zu brauchen
             Pattern::Lit(l) => syn::spanned::Spanned::span(l),
             Pattern::RuleCall { rule_name, .. } => syn::spanned::Spanned::span(rule_name),
             Pattern::Group(alts) => {
                 alts.first()
                     .and_then(|seq| seq.first())
                     .map(|p| p.span())
-                    .unwrap_or_else(|| Span::call_site())
+                    .unwrap_or_else(Span::call_site)
             },
             Pattern::Optional(p) => p.span(),
             Pattern::Repeat(p) => p.span(),
