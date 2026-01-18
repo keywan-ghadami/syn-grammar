@@ -1,10 +1,11 @@
 use crate::model::*;
 use syn::parse::{Parse, ParseStream};
-use syn::{braced, parenthesized, token, Ident, Token, Result, LitStr};
+use syn::{braced, bracketed, parenthesized, token, Ident, Token, Result, LitStr};
 
 mod kw {
     syn::custom_keyword!(grammar);
     syn::custom_keyword!(rule);
+    syn::custom_keyword!(paren); // Für explizite Token-Klammern
 }
 
 impl Parse for GrammarDefinition {
@@ -12,7 +13,6 @@ impl Parse for GrammarDefinition {
         let _ = input.parse::<kw::grammar>()?;
         let name: Ident = input.parse()?;
         
-        // Optional: : Parent
         let inherits = if input.peek(Token![:]) {
             let _ = input.parse::<Token![:]>()?;
             Some(input.parse()?)
@@ -43,26 +43,21 @@ impl Parse for Rule {
         let return_type: syn::Type = input.parse()?;
         let _ = input.parse::<Token![=]>()?;
 
-        // Hier parsen wir jetzt ECHTE Varianten mit | Separator
         let mut variants = Vec::new();
 
         loop {
-            // 1. Pattern-Sequenz parsen
             let mut pattern = Vec::new();
-            // Wir lesen solange Patterns, bis wir auf '->' (Action) oder '|' (nächste Variante) oder Ende stoßen
             while !input.peek(Token![->]) && !input.peek(Token![|]) && !input.is_empty() {
                 pattern.push(input.parse()?);
             }
 
-            // 2. Action parsen (-> { ... })
             let _ = input.parse::<Token![->]>()?;
             let content;
             let _ = braced!(content in input);
-            let action = content.parse()?; // TokenStream
+            let action = content.parse()?;
 
             variants.push(RuleVariant { pattern, action });
 
-            // Gibt es eine weitere Variante?
             if input.peek(Token![|]) {
                 let _ = input.parse::<Token![|]>()?;
             } else {
@@ -76,18 +71,35 @@ impl Parse for Rule {
 
 impl Parse for Pattern {
     fn parse(input: ParseStream) -> Result<Self> {
-        // Schritt 1: Das "Atom" parsen (Literal, Gruppe oder RuleCall)
+        // Schritt 1: Atom
         let mut base_pattern = if input.peek(LitStr) {
-            // Fall A: String Literal "fn"
             Pattern::Lit(input.parse()?)
 
+        } else if input.peek(token::Bracket) {
+            // [ ... ] -> syn::bracketed!
+            let content;
+            let _ = bracketed!(content in input);
+            let mut seq = Vec::new();
+            while !content.is_empty() {
+                seq.push(content.parse()?);
+            }
+            Pattern::Bracketed(seq)
+
+        } else if input.peek(token::Brace) {
+            // { ... } -> syn::braced!
+            let content;
+            let _ = braced!(content in input);
+            let mut seq = Vec::new();
+            while !content.is_empty() {
+                seq.push(content.parse()?);
+            }
+            Pattern::Braced(seq)
+
         } else if input.peek(token::Paren) {
-            // Fall B: Gruppierung ( "a" | "b" )
+            // ( ... ) -> Logisches Grouping (Standard EBNF Verhalten)
             let content;
             let _ = parenthesized!(content in input);
             
-            // Innerhalb der Klammern parsen wir Alternativen ( | getrennt)
-            // Jede Alternative ist eine Sequenz von Patterns
             let mut alternatives = Vec::new();
             loop {
                 let mut seq = Vec::new();
@@ -103,10 +115,20 @@ impl Parse for Pattern {
                 }
             }
             Pattern::Group(alternatives)
+            
+        } else if input.peek(kw::paren) {
+             // paren( ... ) -> Echte Token-Klammern syn::parenthesized!
+             let _ = input.parse::<kw::paren>()?;
+             let content;
+             let _ = parenthesized!(content in input);
+             let mut seq = Vec::new();
+             while !content.is_empty() {
+                 seq.push(content.parse()?);
+             }
+             Pattern::Parenthesized(seq)
 
         } else {
-            // Fall C: Rule Call name:ident()
-            // Check binding: v:int_lit()
+            // Rule Call
             let binding = if input.peek2(Token![:]) {
                 let b: Ident = input.parse()?;
                 let _ = input.parse::<Token![:]>()?;
@@ -117,18 +139,22 @@ impl Parse for Pattern {
 
             let rule_name: Ident = input.parse()?;
             
-            // Args (...)
             let args_content;
             let _ = syn::parenthesized!(args_content in input);
-            // Argumente parsen (für Stage 0 leer/ignoriert oder simple Literale)
-            // Hier könnten wir später args_content.parse_terminated(...) einbauen
             
-            Pattern::RuleCall { binding, rule_name, args: vec![] }
+            // Argumente (vereinfacht: Literale)
+            let mut args = Vec::new();
+            while !args_content.is_empty() {
+                args.push(args_content.parse()?);
+                if args_content.peek(Token![,]) {
+                    let _ = args_content.parse::<Token![,]>()?;
+                }
+            }
+            
+            Pattern::RuleCall { binding, rule_name, args }
         };
 
-        // Schritt 2: Suffix-Operatoren parsen (?, *, +)
-        // Wir loopen hier, um theoretisch Dinge wie rule()*? zu erlauben (obwohl das semantisch oft Quatsch ist)
-        // oder um Pattern-Precedence korrekt abzubilden (Postfix bindet stark).
+        // Schritt 2: Suffix
         loop {
             if input.peek(Token![?]) {
                 let _ = input.parse::<Token![?]>()?;
@@ -147,4 +173,3 @@ impl Parse for Pattern {
         Ok(base_pattern)
     }
 }
-
