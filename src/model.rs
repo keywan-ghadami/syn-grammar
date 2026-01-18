@@ -30,7 +30,14 @@ pub enum Pattern {
         rule_name: Ident,
         args: Vec<Lit>, 
     },
-    Group(Vec<Vec<Pattern>>), // ( A | B )
+    // Logisches Grouping ( a | b ) ohne Token-Konsumierung
+    Group(Vec<Vec<Pattern>>), 
+    
+    // Echte Delimiter-Gruppen (erzeugen syn::bracketed! etc.)
+    Bracketed(Vec<Pattern>), // [ ... ]
+    Braced(Vec<Pattern>),    // { ... }
+    Parenthesized(Vec<Pattern>), // paren( ... ) - explizit, da ( ) für Group belegt ist
+
     Optional(Box<Pattern>),   // A?
     Repeat(Box<Pattern>),     // A*
     Plus(Box<Pattern>),       // A+
@@ -46,6 +53,9 @@ impl Pattern {
                     .and_then(|seq| seq.first())
                     .map(|p| p.span())
                     .unwrap_or_else(Span::call_site)
+            },
+            Pattern::Bracketed(seq) | Pattern::Braced(seq) | Pattern::Parenthesized(seq) => {
+                 seq.first().map(|p| p.span()).unwrap_or_else(Span::call_site)
             },
             Pattern::Optional(p) => p.span(),
             Pattern::Repeat(p) => p.span(),
