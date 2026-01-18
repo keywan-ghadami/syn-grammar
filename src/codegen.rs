@@ -148,3 +148,11 @@ fn map_literal_to_token(lit: &syn::LitStr) -> TokenStream {
     }
 }
 
+fn find_first_token(patterns: &[Pattern]) -> Option<TokenStream> {
+    if let Some(first) = patterns.first() {
+        if let Pattern::Lit(lit) = first {
+            return Some(map_literal_to_token(lit));
+        }
+    }
+    None
+}
