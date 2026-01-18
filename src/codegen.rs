@@ -1,26 +1,21 @@
 use crate::model::*;
 use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+use syn::Result;
 
-pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
+pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let mut output = TokenStream::new();
     let grammar_name = &grammar.name;
     let custom_keywords = collect_custom_keywords(&grammar);
 
     output.extend(quote! {
         #![allow(unused_imports, unused_variables, dead_code)]
-        
-        /// Auto-generated parser for grammar: #grammar_name
         pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);
-
         use syn::parse::{Parse, ParseStream};
         use syn::Result;
         use syn::Token;
         use syn::ext::IdentExt; 
-        
-        // Wir nutzen jetzt unsere Runtime Library!
-        // Annahme: Das generierte Crate hat Zugriff auf 'syn_grammar'.
         use syn_grammar::rt; 
     });
 
@@ -38,79 +33,72 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
         output.extend(quote! { use super::#parent::*; });
     }
 
-    let first_sets = FirstSetComputer::new(&grammar, &custom_keywords);
-
     for rule in &grammar.rules {
-        output.extend(generate_rule(rule, &first_sets, &custom_keywords));
+        output.extend(generate_rule(rule, &custom_keywords)?);
     }
 
-    output
+    Ok(output)
 }
 
-fn generate_rule(rule: &Rule, first_sets: &FirstSetComputer, custom_keywords: &HashSet<String>) -> TokenStream {
+fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<TokenStream> {
     let name = &rule.name;
     let fn_name = format_ident!("parse_{}", name);
     let ret_type = &rule.return_type;
-    
-    // VISIBILITY FIX: Wenn die Regel public ist, generieren wir "pub"
     let vis = if rule.is_pub { quote!(pub) } else { quote!() };
 
-    let body = generate_variants(&rule.variants, first_sets, true, custom_keywords); 
+    let body = generate_variants(&rule.variants, true, custom_keywords)?; 
 
-    quote! {
+    Ok(quote! {
         #vis fn #fn_name(input: ParseStream) -> Result<#ret_type> {
             #body
         }
-    }
+    })
 }
 
 fn generate_variants(
     variants: &[RuleVariant], 
-    first_sets: &FirstSetComputer,
     is_top_level: bool,
     custom_keywords: &HashSet<String>
-) -> TokenStream {
-    let all_firsts: Vec<FirstSet> = variants.iter()
-        .map(|v| first_sets.compute_sequence(&v.pattern))
-        .collect();
-
+) -> Result<TokenStream> {
+    // Fallback Code (Ende der Kette)
     let mut current_code = if is_top_level {
         quote! { Err(input.error("No matching rule variant found")) }
     } else {
         quote! { Err(input.error("No matching variant in group")) }
     };
 
+    // Wir bauen die Kette rückwärts
     for (i, variant) in variants.iter().enumerate().rev() {
-        let logic = generate_sequence(&variant.pattern, &variant.action, first_sets, custom_keywords);
-        let current_first = &all_firsts[i];
+        let logic = generate_sequence(&variant.pattern, &variant.action, custom_keywords)?;
+        
+        // Optimierung: Einfacher Lookahead
+        // Wir prüfen NUR das allererste Element des Patterns.
+        // Wenn es ein Literal oder eine Klammer ist, können wir peeken.
+        // Wenn es ein RuleCall ist, wissen wir es nicht -> Speculative Fallback.
+        let peek_token = if let Some(first) = variant.pattern.first() {
+            get_peek_token(first, custom_keywords)?
+        } else {
+            None
+        };
 
-        let mut is_ambiguous = false;
-        for other_first in all_firsts.iter().skip(i + 1) {
-            if current_first.overlaps(other_first) {
-                is_ambiguous = true;
-                break;
-            }
-        }
-
-        let can_peek = current_first.to_peek_check().is_some() && !is_ambiguous;
-
+        // Wenn wir in der letzten Variante Top-Level sind, brauchen wir keinen Check,
+        // wir probieren es einfach (oder failen).
         if i == variants.len() - 1 && is_top_level {
             current_code = logic;
             continue;
         }
 
-        if can_peek {
-            let check = current_first.to_peek_check().unwrap();
+        if let Some(token) = peek_token {
+            // LL(1) Optimierung
             current_code = quote! {
-                if #check {
+                if input.peek(#token) {
                     #logic
                 } else {
                     #current_code
                 }
             };
         } else {
-            // RUNTIME FIX: Statt fork code zu generieren, rufen wir rt::parse_speculative auf.
-            // Das ist sauberer, kürzer und typsicherer.
+            // Robuster Fallback: Speculative Parsing via Runtime
             current_code = quote! {
                 if let Some(res) = rt::parse_speculative(input, |input| {
                     #logic
@@ -123,30 +111,30 @@ fn generate_variants(
         }
     }
 
-    current_code
+    Ok(current_code)
 }
 
-fn generate_sequence(patterns: &[Pattern], action: &TokenStream, first_sets: &FirstSetComputer, kws: &HashSet<String>) -> TokenStream {
+fn generate_sequence(patterns: &[Pattern], action: &TokenStream, kws: &HashSet<String>) -> Result<TokenStream> {
     let mut steps = TokenStream::new();
     for pattern in patterns {
-        steps.extend(generate_pattern_step(pattern, first_sets, kws));
+        steps.extend(generate_pattern_step(pattern, kws)?);
     }
-    quote! {
+    Ok(quote! {
         {
             #steps
             Ok(#action)
         }
-    }
+    })
 }
 
-fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: &HashSet<String>) -> TokenStream {
+fn generate_pattern_step(pattern: &Pattern, kws: &HashSet<String>) -> Result<TokenStream> {
     let span = pattern.span();
     match pattern {
         Pattern::Lit(lit) => {
-            let token_type = resolve_token_type(lit, kws);
-            quote_spanned! {span=> 
+            let token_type = resolve_token_type(lit, kws)?;
+            Ok(quote_spanned! {span=> 
                 let _ = input.parse::<#token_type>()?; 
-            }
+            })
         },
         Pattern::RuleCall { binding, rule_name, args } => {
             let func_call = if is_builtin(rule_name) {
@@ -161,102 +149,111 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: 
             };
             
             if let Some(bind) = binding {
-                quote_spanned! {span=> let #bind = #func_call; }
+                Ok(quote_spanned! {span=> let #bind = #func_call; })
             } else {
-                quote_spanned! {span=> let _ = #func_call; }
+                Ok(quote_spanned! {span=> let _ = #func_call; })
             }
         },
         Pattern::Optional(inner) => {
-            let inner_logic = generate_pattern_step(inner, first_sets, kws);
-            let first = first_sets.compute_first(inner);
-            if let Some(check) = first.to_peek_check() {
-                quote_spanned! {span=> if #check { #inner_logic } }
-            } else {
-                 quote_spanned! {span=> }
-            }
+            let inner_logic = generate_pattern_step(inner, kws)?;
+            // Optional braucht Peek! Wenn wir nicht peeken können, ist das Pattern ungültig.
+            let peek = get_peek_token(inner, kws)?.ok_or_else(|| 
+                syn::Error::new(span, "Optional pattern must start with a literal or token"))?;
+            
+            Ok(quote_spanned! {span=> if input.peek(#peek) { #inner_logic } })
         },
         Pattern::Repeat(inner) => {
-             let inner_logic = generate_pattern_step(inner, first_sets, kws);
-             let first = first_sets.compute_first(inner);
-             if let Some(check) = first.to_peek_check() {
-                 quote_spanned! {span=> while #check { #inner_logic } }
-             } else {
-                 quote!() 
-             }
+             let inner_logic = generate_pattern_step(inner, kws)?;
+             let peek = get_peek_token(inner, kws)?.ok_or_else(|| 
+                syn::Error::new(span, "Repeat pattern must start with a literal or token"))?;
+
+             Ok(quote_spanned! {span=> while input.peek(#peek) { #inner_logic } })
         },
         Pattern::Plus(inner) => {
-            let inner_logic = generate_pattern_step(inner, first_sets, kws);
-            let first = first_sets.compute_first(inner);
-             if let Some(check) = first.to_peek_check() {
-                 quote_spanned! {span=>
-                    if !#check { return Err(input.error("Expected at least one occurrence")); }
-                    while #check { #inner_logic }
-                 }
-             } else {
-                 quote!()
-             }
+            let inner_logic = generate_pattern_step(inner, kws)?;
+            let peek = get_peek_token(inner, kws)?.ok_or_else(|| 
+                syn::Error::new(span, "Plus pattern must start with a literal or token"))?;
+
+             Ok(quote_spanned! {span=>
+                if !input.peek(#peek) { return Err(input.error("Expected at least one occurrence")); }
+                while input.peek(#peek) { #inner_logic }
+             })
         },
         Pattern::Group(alts) => {
             let temp_variants: Vec<RuleVariant> = alts.iter().map(|pat_seq| {
                 RuleVariant { pattern: pat_seq.clone(), action: quote!({}) }
             }).collect();
-            let variant_logic = generate_variants(&temp_variants, first_sets, false, kws);
-            quote_spanned! {span=> { #variant_logic }?; }
+            let variant_logic = generate_variants(&temp_variants, false, kws)?;
+            Ok(quote_spanned! {span=> { #variant_logic }?; })
         },
         Pattern::Bracketed(seq) => {
-            let inner_logic = generate_sequence_no_action(seq, first_sets, kws);
-            quote_spanned! {span=>
+            let inner_logic = generate_sequence_no_action(seq, kws)?;
+            Ok(quote_spanned! {span=>
                 let content;
                 let _ = syn::bracketed!(content in input);
                 let input = &content; 
                 #inner_logic
-            }
+            })
         },
         Pattern::Braced(seq) => {
-            let inner_logic = generate_sequence_no_action(seq, first_sets, kws);
-            quote_spanned! {span=>
+            let inner_logic = generate_sequence_no_action(seq, kws)?;
+            Ok(quote_spanned! {span=>
                 let content;
                 let _ = syn::braced!(content in input);
                 let input = &content;
                 #inner_logic
-            }
+            })
         },
         Pattern::Parenthesized(seq) => {
-            let inner_logic = generate_sequence_no_action(seq, first_sets, kws);
-            quote_spanned! {span=>
+            let inner_logic = generate_sequence_no_action(seq, kws)?;
+            Ok(quote_spanned! {span=>
                 let content;
                 let _ = syn::parenthesized!(content in input);
                 let input = &content;
                 #inner_logic
-            }
+            })
         },
     }
 }
 
-fn generate_sequence_no_action(patterns: &[Pattern], first_sets: &FirstSetComputer, kws: &HashSet<String>) -> TokenStream {
+fn generate_sequence_no_action(patterns: &[Pattern], kws: &HashSet<String>) -> Result<TokenStream> {
     let mut steps = TokenStream::new();
     for pattern in patterns {
-        steps.extend(generate_pattern_step(pattern, first_sets, kws));
+        steps.extend(generate_pattern_step(pattern, kws)?);
     }
-    steps
+    Ok(steps)
 }
 
+// --- Helpers ---
 
-fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> syn::Type {
-    let s = lit.value();
-    
-    if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
-         panic!("Invalid usage of delimiter '{}' as a literal token. Use structural syntax like [ ... ] or {{ ... }} in your grammar.", s);
+// Bestimmt das Start-Token für einfache Patterns. Gibt None zurück für komplexe/rekursive Patterns.
+fn get_peek_token(pattern: &Pattern, kws: &HashSet<String>) -> Result<Option<TokenStream>> {
+    match pattern {
+        Pattern::Lit(lit) => {
+            let t = resolve_token_type(lit, kws)?;
+            Ok(Some(quote!(#t)))
+        },
+        Pattern::Bracketed(_) => Ok(Some(quote!(syn::token::Bracket))),
+        Pattern::Braced(_) => Ok(Some(quote!(syn::token::Brace))),
+        Pattern::Parenthesized(_) => Ok(Some(quote!(syn::token::Paren))),
+        // Für RuleCall, Group etc. geben wir None zurück -> Fallback auf Speculative Parsing
+        _ => Ok(None)
     }
+}
 
+fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> Result<syn::Type> {
+    let s = lit.value();
+    if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
+         return Err(syn::Error::new(lit.span(), "Invalid usage of delimiter as literal"));
+    }
     if custom_keywords.contains(&s) {
         let ident = format_ident!("{}", s);
-        return syn::parse_quote!(kw::#ident);
+        return Ok(syn::parse_quote!(kw::#ident));
     }
-
     let type_str = format!("Token![{}]", s);
-    syn::parse_str::<syn::Type>(&type_str)
-        .unwrap_or_else(|_| panic!("Invalid token literal: '{}'. Not a Rust keyword and not an identifier.", s))
+    syn::parse_str::<syn::Type>(&type_str).map_err(|_| 
+        syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s))
+    )
 }
 
 fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {
@@ -317,121 +314,9 @@ fn is_builtin(name: &syn::Ident) -> bool {
 
 fn map_builtin(name: &syn::Ident) -> TokenStream {
     match name.to_string().as_str() {
-        // RUNTIME FIX: Aufrufe an syn_grammar::rt
         "ident" => quote! { rt::parse_ident(input)? },
         "int_lit" => quote! { rt::parse_int::<i32>(input)? },
         "string_lit" => quote! { input.parse::<syn::LitStr>()?.value() },
         _ => panic!("Unknown builtin"),
-    }
-}
-
-// --- First Set Analysis (Unverändert) ---
-
-struct FirstSetComputer<'a> {
-    rules: HashMap<String, &'a Rule>,
-    custom_keywords: &'a HashSet<String>,
-}
-
-impl<'a> FirstSetComputer<'a> {
-    fn new(grammar: &'a GrammarDefinition, kws: &'a HashSet<String>) -> Self {
-        let mut rules = HashMap::new();
-        for r in &grammar.rules {
-            rules.insert(r.name.to_string(), r);
-        }
-        Self { rules, custom_keywords: kws }
-    }
-
-    fn compute_sequence(&self, patterns: &[Pattern]) -> FirstSet {
-        let mut visited = HashSet::new();
-        if let Some(first) = patterns.first() {
-            self.compute_first_recursive(first, &mut visited)
-        } else {
-            FirstSet::Unknown 
-        }
-    }
-
-    fn compute_first(&self, pattern: &Pattern) -> FirstSet {
-        let mut visited = HashSet::new();
-        self.compute_first_recursive(pattern, &mut visited)
-    }
-
-    fn compute_first_recursive(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> FirstSet {
-        match pattern {
-            Pattern::Lit(l) => FirstSet::Token(resolve_token_type(l, self.custom_keywords)),
-            
-            Pattern::Bracketed(_) => FirstSet::Token(syn::parse_quote!(syn::token::Bracket)),
-            Pattern::Braced(_) => FirstSet::Token(syn::parse_quote!(syn::token::Brace)),
-            Pattern::Parenthesized(_) => FirstSet::Token(syn::parse_quote!(syn::token::Paren)),
-            
-            Pattern::RuleCall { rule_name, .. } => {
-                if is_builtin(rule_name) {
-                    return match rule_name.to_string().as_str() {
-                        "ident" => FirstSet::Raw(quote!(syn::Ident).to_string()),
-                        "int_lit" => FirstSet::Raw(quote!(syn::LitInt).to_string()),
-                        "string_lit" => FirstSet::Raw(quote!(syn::LitStr).to_string()),
-                        _ => FirstSet::Unknown
-                    };
-                }
-                
-                let rule_key = rule_name.to_string();
-                if visited.contains(&rule_key) {
-                    return FirstSet::Unknown;
-                }
-                visited.insert(rule_key.clone());
-
-                let Some(rule) = self.rules.get(&rule_key) else { return FirstSet::Unknown; };
-                let Some(first_var) = rule.variants.first() else { return FirstSet::Unknown; };
-                let Some(first_pat) = first_var.pattern.first() else { return FirstSet::Unknown; };
-
-                let result = self.compute_first_recursive(first_pat, visited);
-                visited.remove(&rule_key); 
-                result
-            },
-            Pattern::Group(alts) => {
-                if let Some(first_alt) = alts.first() {
-                    if let Some(p) = first_alt.first() {
-                        self.compute_first_recursive(p, visited)
-                    } else {
-                        FirstSet::Unknown
-                    }
-                } else {
-                    FirstSet::Unknown
-                }
-            },
-            Pattern::Optional(inner) | Pattern::Repeat(inner) | Pattern::Plus(inner) => {
-                self.compute_first_recursive(inner, visited)
-            },
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum FirstSet {
-    Token(syn::Type),
-    Raw(String), 
-    Unknown,
-}
-
-impl FirstSet {
-    fn to_peek_check(&self) -> Option<TokenStream> {
-        match self {
-            FirstSet::Token(t) => Some(quote! { input.peek(#t) }),
-            FirstSet::Raw(s) => {
-                let t: syn::Type = syn::parse_str(s).ok()?;
-                Some(quote! { input.peek(#t) })
-            },
-            FirstSet::Unknown => None,
-        }
-    }
-
-    fn overlaps(&self, other: &FirstSet) -> bool {
-        match (self, other) {
-            (FirstSet::Unknown, _) | (_, FirstSet::Unknown) => true,
-            (FirstSet::Raw(a), FirstSet::Raw(b)) => a == b,
-            (FirstSet::Token(a), FirstSet::Token(b)) => {
-                quote!(#a).to_string() == quote!(#b).to_string()
-            }
-            _ => false
-        }
     }
 }
