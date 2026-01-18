@@ -5,7 +5,7 @@ use syn_grammar::Generator;
 
 pub struct TestEnv {
     _temp_dir: tempfile::TempDir,
-    #[allow(dead_code)] // Wird aktuell nur gehalten, damit das TempDir existiert
+    #[allow(dead_code)]
     project_path: PathBuf,
     binary_path: PathBuf,
 }
@@ -25,7 +25,6 @@ impl TestEnv {
         let rust_code = generator.generate(&format!("{}.grammar", grammar_name))
             .expect("Code generation failed");
 
-        // Wrapper Code
         let main_rs = format!(r#"
             use syn::parse::Parser; 
             use proc_macro2::TokenStream;
