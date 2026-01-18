@@ -1,35 +1,40 @@
-// syn-grammar/src/codegen.rs
 use crate::model::*;
-use quote::{quote, format_ident};
+use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
+use syn::spanned::Spanned;
+use std::collections::{HashMap, HashSet};
 
 pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let mut output = TokenStream::new();
-    
-    // 1. Imports generieren (syn ist Pflicht)
+
+    // 1. Imports
     output.extend(quote! {
         use syn::parse::{Parse, ParseStream};
         use syn::Result;
         use syn::Token;
     });
 
-    // 2. Regeln generieren
-    for rule in grammar.rules {
-        output.extend(generate_rule(rule));
+    // 2. First-Set Analyse vorbereiten
+    let first_sets = FirstSetComputer::new(&grammar);
+
+    // 3. Regeln generieren
+    for rule in &grammar.rules {
+        output.extend(generate_rule(rule, &first_sets));
     }
 
     output
 }
 
-fn generate_rule(rule: Rule) -> TokenStream {
-    let name = &rule.name; // z.B. "fn_item"
-    let fn_name = format_ident!("parse_{}", name); // "parse_fn_item"
-    let ret_type = &rule.return_type; // "Item"
-    
-    let body = generate_variants(&rule.variants);
-
-    // Wir generieren eine Funktion statt Trait-Impl, um flexibler zu sein
+fn generate_rule(rule: &Rule, first_sets: &FirstSetComputer) -> TokenStream {
+    let name = &rule.name;
+    let fn_name = format_ident!("parse_{}", name);
+    let ret_type = &rule.return_type;
     let vis = if rule.is_pub { quote!(pub) } else { quote!() };
+
+    // Body generieren
+    // Wir übergeben 'true' für is_top_level, damit am Ende ein Error geworfen wird,
+    // falls keine Variante matcht.
+    let body = generate_variants(&rule.variants, first_sets, true); 
 
     quote! {
         #vis fn #fn_name(input: ParseStream) -> Result<#ret_type> {
@@ -38,89 +43,189 @@ fn generate_rule(rule: Rule) -> TokenStream {
     }
 }
 
-fn generate_variants(variants: &[RuleVariant]) -> TokenStream {
-    // Wenn es nur eine Variante gibt: Einfach generieren
-    if variants.len() == 1 {
-        return generate_sequence(&variants[0]);
-    }
-
-    // Wenn es Alternativen (|) gibt, müssen wir 'input.fork()' nutzen,
-    // um zu schauen, welcher Pfad passt (Backtracking light).
-    // Für Stage 0 vereinfachen wir: Wir nutzen input.peek().
-    // (Ein echter Generator würde hier FIRST-Sets berechnen)
-    
+// Generiert Code für eine Liste von Varianten.
+// Nutzt Peek-Optimierung wo möglich, sonst echtes Backtracking via Fork.
+fn generate_variants(
+    variants: &[RuleVariant], 
+    first_sets: &FirstSetComputer,
+    is_top_level: bool 
+) -> TokenStream {
     let mut checks = TokenStream::new();
-    
-    for variant in variants {
-        let parsing_logic = generate_sequence(variant);
-        
-        // Optimierung: Wenn das Pattern mit einem Token beginnt, generieren wir ein Peek
-        if let Some(first_token) = find_first_token(&variant.pattern) {
-             checks.extend(quote! {
-                 if input.peek(#first_token) {
-                     return { #parsing_logic };
-                 }
-             });
-        } else {
-             // Fallback: Einfach versuchen (könnte Fehler werfen)
-             checks.extend(quote! {
-                 // Hier bräuchte man echtes Speculative Parsing (Forking)
-                 // Für den Prototyp lassen wir das user-seitig via 'peek' Regeln lösen.
-             });
-        }
-    }
-    
-    quote! {
-        #checks
-        Err(input.error("No matching rule variant found"))
-    }
-}
+    let variant_count = variants.len();
 
-fn generate_sequence(variant: &RuleVariant) -> TokenStream {
-    let mut steps = TokenStream::new();
-    let action = &variant.action; // Der { ... } Block aus der Grammatik
+    for (i, variant) in variants.iter().enumerate() {
+        let logic = generate_sequence(&variant.pattern, &variant.action, first_sets);
+        let first = first_sets.compute_sequence(&variant.pattern);
 
-    for pattern in &variant.pattern {
-        match pattern {
-            Pattern::Lit(s) => {
-                // "fn" -> input.parse::<Token![fn]>()?;
-                let token_ident = map_literal_to_token(s); 
-                steps.extend(quote! { let _ = input.parse::<#token_ident>()?; });
-            },
-            Pattern::RuleCall { binding, rule_name, .. } => {
-                // name:ident() -> let name = input.parse::<Ident>()?;
-                // oder: let name = parse_other_rule(input)?;
-                
-                let parse_call = if is_builtin(rule_name) {
-                    map_builtin(rule_name) // ident() -> input.parse::<Ident>()?
-                } else {
-                    let func = format_ident!("parse_{}", rule_name);
-                    quote! { #func(input)? }
-                };
-
-                if let Some(bind) = binding {
-                    steps.extend(quote! { let #bind = #parse_call; });
-                } else {
-                    steps.extend(quote! { let _ = #parse_call; });
+        if let Some(token_check) = first.to_peek_check() {
+            // Optimierter Pfad: LL(1) Lookahead
+            checks.extend(quote! {
+                if #token_check {
+                    return { #logic };
                 }
-            },
-            // ... Repeat & Optional Logik ...
-            _ => {}
+            });
+        } else {
+            // Fallback: Echtes Backtracking (Speculative Parsing)
+            // Wir nutzen eine Closure, die 'input' verschattet. 
+            // So kann der generierte Code in '#logic' weiterhin 'input.parse()' aufrufen,
+            // operiert aber tatsächlich auf dem Fork.
+            
+            // Wenn dies die allerletzte Variante ist UND wir top-level sind,
+            // brauchen wir nicht forken, sondern können den Fehler direkt propagieren lassen.
+            if i == variant_count - 1 && is_top_level {
+                checks.extend(logic);
+            } else {
+                checks.extend(quote! {
+                    let fork = input.fork();
+                    // Closure nimmt 'input' entgegen -> Shadowing!
+                    let attempt = |input: ParseStream| -> Result<_> {
+                        #logic
+                    };
+                    
+                    if let Ok(res) = attempt(&fork) {
+                        input.advance_to(&fork); // Erfolg: Haupt-Cursor nachziehen
+                        return Ok(res);
+                    }
+                    // Bei Fehler: Fork verwerfen, weiter zur nächsten Variante
+                });
+            }
         }
     }
 
-    // Am Ende den Action-Block ausführen
-    quote! {
-        #steps
-        Ok(#action)
+    if is_top_level && checks.is_empty() {
+         quote! { Err(input.error("No rule variants defined")) }
+    } else if is_top_level {
+         // Wenn wir hier ankommen, hat keine Variante gematcht (und die letzte war kein Fallback)
+         quote! { 
+             #checks
+             Err(input.error("No matching rule variant found")) 
+         }
+    } else {
+        quote! { #checks }
     }
 }
 
-// --- Built-in Mapping (Die Standardbibliothek des Parsers) ---
+
+fn generate_sequence(patterns: &[Pattern], action: &TokenStream, first_sets: &FirstSetComputer) -> TokenStream {
+    let mut steps = TokenStream::new();
+    
+    for pattern in patterns {
+        steps.extend(generate_pattern_step(pattern, first_sets));
+    }
+
+    quote! {
+        {
+            #steps
+            Ok(#action)
+        }
+    }
+}
+
+fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> TokenStream {
+    let span = pattern.span();
+    match pattern {
+        Pattern::Lit(lit) => {
+            let token_type = resolve_token_type(lit);
+            quote_spanned! {span=> 
+                let _ = input.parse::<#token_type>()?; 
+            }
+        },
+        Pattern::RuleCall { binding, rule_name, .. } => {
+            let func = if is_builtin(rule_name) {
+                map_builtin(rule_name)
+            } else {
+                let f = format_ident!("parse_{}", rule_name);
+                quote! { #f(input)? }
+            };
+            
+            if let Some(bind) = binding {
+                quote_spanned! {span=> let #bind = #func; }
+            } else {
+                quote_spanned! {span=> let _ = #func; }
+            }
+        },
+        Pattern::Optional(inner) => {
+            let inner_logic = generate_pattern_step(inner, first_sets);
+            let first = first_sets.compute_first(inner);
+            
+            if let Some(check) = first.to_peek_check() {
+                quote_spanned! {span=>
+                    if #check {
+                        #inner_logic
+                    }
+                }
+            } else {
+                // Optional ohne klares Start-Token ist schwierig in LL(1).
+                // Mit Backtracking müsste man hier auch forken, 
+                // aber für Stage 0 lassen wir es bei Peek oder ignorieren es.
+                quote_spanned! {span=> 
+                    // Optional check failed or ambiguous 
+                }
+            }
+        },
+        Pattern::Repeat(inner) => {
+             let inner_logic = generate_pattern_step(inner, first_sets);
+             let first = first_sets.compute_first(inner);
+             
+             if let Some(check) = first.to_peek_check() {
+                 quote_spanned! {span=>
+                    while #check {
+                        #inner_logic
+                    }
+                 }
+             } else {
+                 quote!() 
+             }
+        },
+        Pattern::Plus(inner) => {
+            let inner_logic = generate_pattern_step(inner, first_sets);
+            let first = first_sets.compute_first(inner);
+            // Plus ist: Einmal ausführen, dann While
+            // Hier bräuchte man eigentlich einen Do-While oder expliziten ersten Call
+             if let Some(check) = first.to_peek_check() {
+                 quote_spanned! {span=>
+                    if !#check {
+                        return Err(input.error("Expected at least one occurrence"));
+                    }
+                    while #check {
+                        #inner_logic
+                    }
+                 }
+             } else {
+                 quote!()
+             }
+        },
+        Pattern::Group(alts) => {
+            // ( A | B )
+            // Da Gruppen im aktuellen Modell keine eigene 'Action' haben und keine Rückgabewerte binden,
+            // behandeln wir sie rein als Parsing-Check (consumen Tokens).
+            // Wir bauen temporäre RuleVariants ohne Action
+            let temp_variants: Vec<RuleVariant> = alts.iter().map(|pat_seq| {
+                RuleVariant { pattern: pat_seq.clone(), action: quote!({}) }
+            }).collect();
+            
+            let variant_logic = generate_variants(&temp_variants, first_sets, false);
+            
+            quote_spanned! {span=>
+                // Group logic block
+                {
+                    #variant_logic
+                }
+            }
+        }
+    }
+}
+
+// --- Dynamic Token Mapping ---
+fn resolve_token_type(lit: &syn::LitStr) -> syn::Type {
+    let s = lit.value();
+    let type_str = format!("Token![{}]", s);
+    syn::parse_str::<syn::Type>(&type_str)
+        .unwrap_or_else(|_| panic!("Invalid token literal in grammar: '{}'", s))
+}
 
 fn is_builtin(name: &syn::Ident) -> bool {
-    let s = name.to_string();
-    matches!(s.as_str(), "ident" | "int_lit" | "string_lit")
+    matches!(name.to_string().as_str(), "ident" | "int_lit" | "string_lit")
 }
 
 fn map_builtin(name: &syn::Ident) -> TokenStream {
@@ -132,27 +237,84 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
     }
 }
 
-fn map_literal_to_token(lit: &syn::LitStr) -> TokenStream {
-    // Mapping von "fn" -> Token![fn]
-    // Das ist etwas tricky, da man String -> Type mappen muss.
-    // In Stage 0 hardcoden wir die wichtigsten Keywords.
-    let s = lit.value();
-    match s.as_str() {
-        "fn" => quote!(Token![fn]),
-        "let" => quote!(Token![let]),
-        "struct" => quote!(Token![struct]),
-        "=" => quote!(Token![=]),
-        ";" => quote!(Token![;]),
-        // ...
-        _ => quote!(compile_error!(concat!("Unknown token: ", #s)))
+// --- First Set Analysis ---
+struct FirstSetComputer<'a> {
+    rules: HashMap<String, &'a Rule>,
+}
+
+impl<'a> FirstSetComputer<'a> {
+    fn new(grammar: &'a GrammarDefinition) -> Self {
+        let mut rules = HashMap::new();
+        for r in &grammar.rules {
+            rules.insert(r.name.to_string(), r);
+        }
+        Self { rules }
+    }
+
+    fn compute_sequence(&self, patterns: &[Pattern]) -> FirstSet {
+        if let Some(first) = patterns.first() {
+            self.compute_first(first)
+        } else {
+            FirstSet::Unknown 
+        }
+    }
+
+    fn compute_first(&self, pattern: &Pattern) -> FirstSet {
+        match pattern {
+            Pattern::Lit(l) => FirstSet::Token(resolve_token_type(l)),
+            Pattern::RuleCall { rule_name, .. } => {
+                if is_builtin(rule_name) {
+                    return match rule_name.to_string().as_str() {
+                        "ident" => FirstSet::Raw(quote!(syn::Ident)),
+                        "int_lit" => FirstSet::Raw(quote!(syn::LitInt)),
+                        "string_lit" => FirstSet::Raw(quote!(syn::LitStr)),
+                        _ => FirstSet::Unknown
+                    };
+                }
+                // Simple Rekursionstiefe 1 für First-Set
+                if let Some(rule) = self.rules.get(&rule_name.to_string()) {
+                     if let Some(first_var) = rule.variants.first() {
+                         // Achtung: Wenn die Regel mit einer anderen Regel beginnt, 
+                         // müsste man hier weiter absteigen. 
+                         // Für Stage 0 nehmen wir an, dass Regeln oft mit Token beginnen.
+                         if let Some(first_pat) = first_var.pattern.first() {
+                             // Verhindere Endlosrekursion bei direkter Linksrekursion (Simpel)
+                             if let Pattern::RuleCall{ rule_name: ref inner_name, .. } = first_pat {
+                                 if inner_name == rule_name { return FirstSet::Unknown; }
+                             }
+                             // Hier könnte man rekursiv aufrufen
+                             return FirstSet::Unknown; 
+                         }
+                     }
+                }
+                FirstSet::Unknown
+            },
+            Pattern::Group(alts) => {
+                if let Some(first_alt) = alts.first() {
+                     self.compute_sequence(first_alt)
+                } else {
+                    FirstSet::Unknown
+                }
+            },
+            Pattern::Optional(inner) | Pattern::Repeat(inner) | Pattern::Plus(inner) => {
+                self.compute_first(inner)
+            },
+        }
     }
 }
 
-fn find_first_token(patterns: &[Pattern]) -> Option<TokenStream> {
-    if let Some(first) = patterns.first() {
-        if let Pattern::Lit(lit) = first {
-            return Some(map_literal_to_token(lit));
+enum FirstSet {
+    Token(syn::Type),
+    Raw(TokenStream), 
+    Unknown,
+}
+
+impl FirstSet {
+    fn to_peek_check(&self) -> Option<TokenStream> {
+        match self {
+            FirstSet::Token(t) => Some(quote! { input.peek(#t) }),
+            FirstSet::Raw(t) => Some(quote! { input.peek(#t) }),
+            FirstSet::Unknown => None,
         }
     }
-    None
 }
