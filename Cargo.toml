@@ -2,24 +2,21 @@
 name = "syn-grammar"
 version = "0.1.0"
 edition = "2024"
-description = "A parser generator that compiles EBNF-like grammars into syn::parse::Parse implementations."
-license = "MIT OR Apache-2.0"
 
 [dependencies]
 syn = { version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
-thiserror = "2.0"
+derive-syn-parse = "0.2.0" 
 
-# Optional Dependencies für die JIT/Test-Umgebung
-tempfile = { version = "3.10", optional = true }
-
-[dev-dependencies]
-insta = "1.34"
-# Im Dev-Modus aktivieren wir das Feature immer
-syn-grammar = { path = ".", features = ["jit"] } 
+[dependencies.tempfile]
+version = "3.10"
+optional = true
 
 [features]
 default = []
-# Aktiviert die Test-Umgebung / JIT-Compiler
 jit = ["dep:tempfile"]
+
+[dev-dependencies]
+insta = "1.34"
+syn-grammar = { path = ".", features = ["jit"] } 
