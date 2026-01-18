@@ -57,23 +57,33 @@ fn generate_rule(rule: &Rule, first_sets: &FirstSetComputer, custom_keywords: &H
     }
 }
 
+// FIX: Kompletter Rewrite dieser Funktion
+// Statt linear "return" Statements zu generieren, bauen wir eine Expression-Chain (if-else tree)
+// rückwärts auf. Das funktioniert sowohl Top-Level als auch in Gruppen.
 fn generate_variants(
     variants: &[RuleVariant], 
     first_sets: &FirstSetComputer,
     is_top_level: bool,
     custom_keywords: &HashSet<String>
 ) -> TokenStream {
-    let mut checks = TokenStream::new();
-    let variant_count = variants.len();
-
     let all_firsts: Vec<FirstSet> = variants.iter()
         .map(|v| first_sets.compute_sequence(&v.pattern))
         .collect();
 
-    for (i, variant) in variants.iter().enumerate() {
+    // 1. Der "Fallback" (ganz am Ende der if-else Kette)
+    // Wenn nichts matcht, werfen wir einen Fehler.
+    let mut current_code = if is_top_level {
+        quote! { Err(input.error("No matching rule variant found")) }
+    } else {
+        quote! { Err(input.error("No matching variant in group")) }
+    };
+
+    // 2. Wir iterieren RÜCKWÄRTS und wickeln den aktuellen Code in ein "else { ... }"
+    for (i, variant) in variants.iter().enumerate().rev() {
         let logic = generate_sequence(&variant.pattern, &variant.action, first_sets, custom_keywords);
         let current_first = &all_firsts[i];
 
+        // Ambiguity Check (nach vorne schauen)
         let mut is_ambiguous = false;
         for other_first in all_firsts.iter().skip(i + 1) {
             if current_first.overlaps(other_first) {
@@ -82,36 +92,46 @@ fn generate_variants(
             }
         }
 
-        if let Some(token_check) = current_first.to_peek_check() && !is_ambiguous {
-            checks.extend(quote! {
-                if #token_check {
-                    return { #logic };
-                }
-            });
-            continue; 
+        let can_peek = current_first.to_peek_check().is_some() && !is_ambiguous;
+
+        // Spezialfall: Letzte Variante in einer Top-Level Regel
+        // Hier können wir blind probieren (ohne Fork), wenn wir eh am Ende sind.
+        if i == variants.len() - 1 && is_top_level {
+            current_code = logic;
+            continue;
         }
-        
-        if i == variant_count - 1 && is_top_level {
-            checks.extend(logic);
+
+        if can_peek {
+            // PFAD A: Peek (LL(1))
+            let check = current_first.to_peek_check().unwrap();
+            current_code = quote! {
+                if #check {
+                    #logic
+                } else {
+                    #current_code
+                }
+            };
         } else {
-            checks.extend(quote! {
+            // PFAD B: Fork (Speculative)
+            // Wir versuchen es, wenn es klappt geben wir das Ergebnis zurück (ohne return keyword, als Expression),
+            // sonst führen wir den bisherigen 'current_code' (else-Zweig) aus.
+            current_code = quote! {
                 let fork = input.fork();
-                let attempt = |input: ParseStream| -> Result<_> { #logic };
+                let attempt = |input: ParseStream| -> Result<_> {
+                    #logic
+                };
+                
                 if let Ok(res) = attempt(&fork) {
                     input.advance_to(&fork);
-                    return Ok(res);
+                    res
+                } else {
+                    #current_code
                 }
-            });
+            };
         }
     }
 
-    if is_top_level && checks.is_empty() {
-         quote! { Err(input.error("No rule variants defined")) }
-    } else if is_top_level {
-         quote! { #checks Err(input.error("No matching rule variant found")) }
-    } else {
-        quote! { #checks }
-    }
+    current_code
 }
 
 fn generate_sequence(patterns: &[Pattern], action: &TokenStream, first_sets: &FirstSetComputer, kws: &HashSet<String>) -> TokenStream {
@@ -188,17 +208,17 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: 
             let temp_variants: Vec<RuleVariant> = alts.iter().map(|pat_seq| {
                 RuleVariant { pattern: pat_seq.clone(), action: quote!({}) }
             }).collect();
+            // Hier ist is_top_level = false. generate_variants generiert jetzt einen Expression-Tree,
+            // der Result<(), Error> zurückgibt. Wir nutzen das ? um Fehler zu propagieren.
             let variant_logic = generate_variants(&temp_variants, first_sets, false, kws);
-            quote_spanned! {span=> { #variant_logic } }
+            quote_spanned! {span=> { #variant_logic }?; }
         },
-        
-        // --- NEU: Generierung für syn::bracketed!, braced!, parenthesized! ---
         Pattern::Bracketed(seq) => {
             let inner_logic = generate_sequence_no_action(seq, first_sets, kws);
             quote_spanned! {span=>
                 let content;
                 let _ = syn::bracketed!(content in input);
-                let input = &content; // Shadowing: 'input' ist jetzt der innere Buffer
+                let input = &content; 
                 #inner_logic
             }
         },
@@ -223,7 +243,6 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer, kws: 
     }
 }
 
-// Hilfsfunktion: Sequenz generieren ohne Action-Return (für Gruppeninhalte)
 fn generate_sequence_no_action(patterns: &[Pattern], first_sets: &FirstSetComputer, kws: &HashSet<String>) -> TokenStream {
     let mut steps = TokenStream::new();
     for pattern in patterns {
@@ -238,9 +257,7 @@ fn generate_sequence_no_action(patterns: &[Pattern], first_sets: &FirstSetComput
 fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> syn::Type {
     let s = lit.value();
     
-    // WICHTIG: Wir verbieten Literale für Klammern, weil diese jetzt strukturell sein müssen
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
-         // Panic ist hier gewollt, damit der User weiß, dass er "[ ... ]" statt ""[" ... "]"" schreiben soll
          panic!("Invalid usage of delimiter '{}' as a literal token. Use structural syntax like [ ... ] or {{ ... }} in your grammar.", s);
     }
 
@@ -276,7 +293,6 @@ fn collect_from_patterns(patterns: &[Pattern], kws: &mut HashSet<String>) {
             Pattern::Group(alts) => {
                 for alt in alts { collect_from_patterns(alt, kws); }
             },
-            // Rekursion für die neuen Typen
             Pattern::Bracketed(seq) | Pattern::Braced(seq) | Pattern::Parenthesized(seq) => {
                 collect_from_patterns(seq, kws);
             },
@@ -354,7 +370,6 @@ impl<'a> FirstSetComputer<'a> {
         match pattern {
             Pattern::Lit(l) => FirstSet::Token(resolve_token_type(l, self.custom_keywords)),
             
-            // First Sets für Container: Das First-Set ist das Token des Delimiters
             Pattern::Bracketed(_) => FirstSet::Token(syn::parse_quote!(syn::token::Bracket)),
             Pattern::Braced(_) => FirstSet::Token(syn::parse_quote!(syn::token::Brace)),
             Pattern::Parenthesized(_) => FirstSet::Token(syn::parse_quote!(syn::token::Paren)),
