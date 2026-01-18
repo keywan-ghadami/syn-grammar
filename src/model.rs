@@ -1,5 +1,6 @@
 use syn::{Ident, Type, LitStr, Lit};
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, Span};
+use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
@@ -28,9 +29,30 @@ pub enum Pattern {
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
-        args: Vec<Lit>, // Für Builtins wie int_lit()
+        args: Vec<Lit>, 
     },
-    // Für Stage 0 vereinfachen wir Repeat/Optional erstmal, 
-    // um den Parser einfach zu halten.
+    // EBNF Erweiterungen
+    Group(Vec<Vec<Pattern>>), // ( A | B )
+    Optional(Box<Pattern>),   // A?
+    Repeat(Box<Pattern>),     // A*
+    Plus(Box<Pattern>),       // A+
 }
 
+impl Pattern {
+    pub fn span(&self) -> Span {
+        match self {
+            Pattern::Lit(l) => l.span(),
+            Pattern::RuleCall { rule_name, .. } => rule_name.span(),
+            Pattern::Group(alts) => {
+                // Span vom ersten bis zum letzten Element der Gruppe (vereinfacht: erstes Element)
+                alts.first()
+                    .and_then(|seq| seq.first())
+                    .map(|p| p.span())
+                    .unwrap_or_else(|| Span::call_site())
+            },
+            Pattern::Optional(p) => p.span(),
+            Pattern::Repeat(p) => p.span(),
+            Pattern::Plus(p) => p.span(),
+        }
+    }
+}
