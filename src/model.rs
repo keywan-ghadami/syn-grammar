@@ -1,8 +1,8 @@
-use syn::{Ident, Type, LitStr, Lit};
+use syn::{Ident, Type, LitStr, Lit, Token};
 use proc_macro2::{TokenStream, Span};
 
 #[derive(Debug, Clone)]
-pub struct GrammarDefinition {
+pub struct GrammarDefinition {   
     pub name: Ident,
     pub inherits: Option<Ident>, 
     pub rules: Vec<Rule>,
@@ -30,17 +30,13 @@ pub enum Pattern {
         rule_name: Ident,
         args: Vec<Lit>, 
     },
-    // Logisches Grouping ( a | b ) ohne Token-Konsumierung
     Group(Vec<Vec<Pattern>>), 
-    
-    // Echte Delimiter-Gruppen (erzeugen syn::bracketed! etc.)
-    Bracketed(Vec<Pattern>), // [ ... ]
-    Braced(Vec<Pattern>),    // { ... }
-    Parenthesized(Vec<Pattern>), // paren( ... ) - explizit, da ( ) für Group belegt ist
-
-    Optional(Box<Pattern>),   // A?
-    Repeat(Box<Pattern>),     // A*
-    Plus(Box<Pattern>),       // A+
+    Bracketed(Vec<Pattern>),
+    Braced(Vec<Pattern>),
+    Parenthesized(Vec<Pattern>),
+    Optional(Box<Pattern>),
+    Repeat(Box<Pattern>),
+    Plus(Box<Pattern>),
 }
 
 impl Pattern {
@@ -57,9 +53,29 @@ impl Pattern {
             Pattern::Bracketed(seq) | Pattern::Braced(seq) | Pattern::Parenthesized(seq) => {
                  seq.first().map(|p| p.span()).unwrap_or_else(Span::call_site)
             },
-            Pattern::Optional(p) => p.span(),
-            Pattern::Repeat(p) => p.span(),
-            Pattern::Plus(p) => p.span(),
+            Pattern::Optional(p) | Pattern::Repeat(p) | Pattern::Plus(p) => p.span(),
+        }
+    }
+}
+
+// Konvertierung vom Parser-Output zum sauberen Model
+impl From<crate::parser::GrammarDefinition> for GrammarDefinition {
+    fn from(p: crate::parser::GrammarDefinition) -> Self {
+        GrammarDefinition {
+            name: p.name,
+            inherits: p.inherits.map(|i| i.name),
+            rules: p.rules.into_iter().map(|r| r.into()).collect(),
+        }
+    }
+}
+
+impl From<crate::parser::Rule> for Rule {
+    fn from(p: crate::parser::Rule) -> Self {
+        Rule {
+            is_pub: p.is_pub.is_some(),
+            name: p.name,
+            return_type: p.return_type,
+            variants: p.variants,
         }
     }
 }
