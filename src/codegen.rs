@@ -66,25 +66,25 @@ fn generate_variants(
         let current_first = &all_firsts[i];
 
         // CHECK: Ist dieses First-Set eindeutig gegenüber allen FOLGENDEN Varianten?
-        // Wenn current_first == some_later_first, dann können wir input.peek() nicht trauen.
         let mut is_ambiguous = false;
-        for (j, other_first) in all_firsts.iter().enumerate().skip(i + 1) {
+        
+        // FIX: .enumerate() entfernt, da 'j' ungenutzt war. Wir iterieren nur über die Restlichen.
+        for other_first in all_firsts.iter().skip(i + 1) {
             if current_first.overlaps(other_first) {
                 is_ambiguous = true;
                 break;
             }
         }
 
-        if let Some(token_check) = current_first.to_peek_check() {
-            if !is_ambiguous {
-                // Pfad A: Eindeutiger Peek (LL(1))
-                checks.extend(quote! {
-                    if #token_check {
-                        return { #logic };
-                    }
-                });
-                continue; // Weiter zum nächsten (obwohl return generiert wurde, für Struktur)
-            }
+        // FIX: Collapsed if (if let ... && !bool) für modernere Rust Syntax
+        if let Some(token_check) = current_first.to_peek_check() && !is_ambiguous {
+            // Pfad A: Eindeutiger Peek (LL(1))
+            checks.extend(quote! {
+                if #token_check {
+                    return { #logic };
+                }
+            });
+            continue; 
         }
         
         // Pfad B: Ambiguity oder kein Peek möglich -> Forking / Backtracking
@@ -321,8 +321,6 @@ impl<'a> FirstSetComputer<'a> {
     }
 }
 
-// Wir vergleichen Strings/Typen grob, um Overlap zu prüfen.
-// 'Raw' speichert nun den String-Repräsentation des Typs für einfachen Vergleich.
 #[derive(Debug, PartialEq, Eq)]
 enum FirstSet {
     Token(syn::Type),
@@ -335,7 +333,6 @@ impl FirstSet {
         match self {
             FirstSet::Token(t) => Some(quote! { input.peek(#t) }),
             FirstSet::Raw(s) => {
-                // Parse string back to type to use in quote
                 let t: syn::Type = syn::parse_str(s).ok()?;
                 Some(quote! { input.peek(#t) })
             },
@@ -343,12 +340,10 @@ impl FirstSet {
         }
     }
 
-    // Prüft, ob sich zwei First-Sets überlappen (für Ambiguity Check)
     fn overlaps(&self, other: &FirstSet) -> bool {
         match (self, other) {
-            (FirstSet::Unknown, _) | (_, FirstSet::Unknown) => true, // Im Zweifel annehmen wir Overlap
+            (FirstSet::Unknown, _) | (_, FirstSet::Unknown) => true,
             (FirstSet::Raw(a), FirstSet::Raw(b)) => a == b,
-            // Bei Token-Typen ist Vergleich schwierig (AST), wir machen Best-Effort via Debug/String TokenStream
             (FirstSet::Token(a), FirstSet::Token(b)) => {
                 quote!(#a).to_string() == quote!(#b).to_string()
             }
