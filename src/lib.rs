@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 
 mod model;      // Dein (generischer) Meta-AST
 mod parser;     // Parst die .grammar Dateien
-mod resolver;   // Löst Imports/Vererbung auf (unverändert)
+mod resolver;   // Löst Imports/Vererbung auf
 mod codegen;    // Der Generator
 
 pub struct Generator {
@@ -30,7 +30,7 @@ impl Generator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::parse_quote;
+    // Unused import 'syn::parse_quote' removed
     use crate::model::*;
 
     // Test 1: Parser Test für EBNF Features
@@ -69,8 +69,7 @@ mod tests {
     fn test_codegen_structures() {
         let input = r#"
             grammar Logic {
-                // Das hier erfordert Backtracking (Fork), da beide mit "ident" anfangen könnten
-                // wenn wir nicht genau hinschauen (oder für den Testfall erzwingen wir es)
+                // Das hier erfordert Backtracking (Fork), da beide mit "ident" anfangen
                 rule ambiguous -> i32 = 
                     a:ident() "x" -> { 1 }
                   | b:ident() "y" -> { 2 }
@@ -81,8 +80,12 @@ mod tests {
         let rust_code = codegen::generate_rust(grammar);
         let code_str = rust_code.to_string();
 
+        // Debug output falls der Test failed
+        // println!("{}", code_str);
+
         // 1. Wir erwarten, dass input.fork() generiert wird
-        assert!(code_str.contains("input . fork ()"), "Should generate forking code");
+        // Da 'ident' bei beiden Regeln der Start ist, MUSS geforkt werden.
+        assert!(code_str.contains("input . fork ()"), "Should generate forking code because of ambiguity");
         
         // 2. Wir erwarten Closures für die Versuche
         assert!(code_str.contains("| input : ParseStream |"), "Should generate closure for backtracking");
@@ -91,16 +94,19 @@ mod tests {
     // Test 3: Integration Snapshot
     #[test]
     fn test_full_pipeline() {
+        // HINWEIS: Wir vermeiden hier "(" und ")", da syn diese nicht als einzelne 
+        // Tokens parsen kann (Token![paren] gibt es nicht für Parsing).
+        // Stattdessen nutzen wir "open" und "close" dummies oder Operatoren.
         let input = r#"
             grammar Calc {
                 rule expr -> i32 = 
-                    t:term() ( "+" t2:term() )* -> { 0 } // Vereinfachte Action
+                    t:term() ( "+" t2:term() )* -> { 0 }
 
                 rule term -> i32 = 
                     f:factor() ( "*" f2:factor() )* -> { 0 }
 
                 rule factor -> i32 = 
-                    "(" e:expr() ")" -> { e }
+                    "open" e:expr() "close" -> { e }
                   | i:int_lit() -> { i }
             }
         "#;
@@ -108,13 +114,10 @@ mod tests {
         let grammar: GrammarDefinition = syn::parse_str(input).unwrap();
         let rust_code = codegen::generate_rust(grammar);
         
-        // Mit 'insta' prüfen wir, ob der Output stabil bleibt
-        // (Insta muss in Cargo.toml dev-dependencies sein, sonst auskommentieren)
-        // insta::assert_display_snapshot!(rust_code);
-        
-        // Fallback Assert, falls kein insta:
         let s = rust_code.to_string();
         assert!(s.contains("while input . peek (Token ! [ + ])"));
         assert!(s.contains("fn parse_expr"));
+        // Prüfen ob literals korrekt aufgelöst wurden
+        assert!(s.contains("Token ! [ * ]"));
     }
 }
