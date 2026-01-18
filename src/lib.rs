@@ -30,10 +30,13 @@ impl Generator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Unused import 'syn::parse_quote' removed
     use crate::model::*;
 
-    // Test 1: Parser Test für EBNF Features
+    // Hilfsfunktion: Entfernt alle Whitespaces für robusten Vergleich
+    fn normalize(s: &str) -> String {
+        s.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
     #[test]
     fn test_parser_ebnf() {
         let input = r#"
@@ -49,14 +52,12 @@ mod tests {
         let rule = &grammar.rules[0];
         let variant = &rule.variants[0];
         
-        // Check: 3 Patterns (start, group*, end?)
         assert_eq!(variant.pattern.len(), 3);
         
-        // Prüfen, ob Pattern 2 ein Repeat ist
         match &variant.pattern[1] {
             Pattern::Repeat(inner) => {
                 match &**inner {
-                    Pattern::Group(alts) => assert_eq!(alts.len(), 2), // "a" | "b"
+                    Pattern::Group(alts) => assert_eq!(alts.len(), 2),
                     _ => panic!("Expected Group inside Repeat"),
                 }
             },
@@ -64,12 +65,10 @@ mod tests {
         }
     }
 
-    // Test 2: Codegen Test - Prüfen auf Control Flow und Forking
     #[test]
     fn test_codegen_structures() {
         let input = r#"
             grammar Logic {
-                // Das hier erfordert Backtracking (Fork), da beide mit "ident" anfangen
                 rule ambiguous -> i32 = 
                     a:ident() "x" -> { 1 }
                   | b:ident() "y" -> { 2 }
@@ -78,25 +77,15 @@ mod tests {
         
         let grammar: GrammarDefinition = syn::parse_str(input).unwrap();
         let rust_code = codegen::generate_rust(grammar);
-        let code_str = rust_code.to_string();
+        let code_str = normalize(&rust_code.to_string());
 
-        // Debug output falls der Test failed
-        // println!("{}", code_str);
-
-        // 1. Wir erwarten, dass input.fork() generiert wird
-        // Da 'ident' bei beiden Regeln der Start ist, MUSS geforkt werden.
-        assert!(code_str.contains("input . fork ()"), "Should generate forking code because of ambiguity");
-        
-        // 2. Wir erwarten Closures für die Versuche
-        assert!(code_str.contains("| input : ParseStream |"), "Should generate closure for backtracking");
+        // Wir prüfen auf normalisierte Strings (ohne Leerzeichen)
+        assert!(code_str.contains("input.fork()"), "Should generate forking code");
+        assert!(code_str.contains("|input:ParseStream|"), "Should generate closure");
     }
     
-    // Test 3: Integration Snapshot
     #[test]
     fn test_full_pipeline() {
-        // HINWEIS: Wir vermeiden hier "(" und ")", da syn diese nicht als einzelne 
-        // Tokens parsen kann (Token![paren] gibt es nicht für Parsing).
-        // Stattdessen nutzen wir "open" und "close" dummies oder Operatoren.
         let input = r#"
             grammar Calc {
                 rule expr -> i32 = 
@@ -113,11 +102,11 @@ mod tests {
         
         let grammar: GrammarDefinition = syn::parse_str(input).unwrap();
         let rust_code = codegen::generate_rust(grammar);
+        let code_str = normalize(&rust_code.to_string());
         
-        let s = rust_code.to_string();
-        assert!(s.contains("while input . peek (Token ! [ + ])"));
-        assert!(s.contains("fn parse_expr"));
-        // Prüfen ob literals korrekt aufgelöst wurden
-        assert!(s.contains("Token ! [ * ]"));
+        // Prüfen auf wesentliche Bestandteile (Whitespace-agnostisch)
+        assert!(code_str.contains("whileinput.peek(Token![+])"), "Repeat-Schleife mit '+' Token fehlt");
+        assert!(code_str.contains("whileinput.peek(Token![*])"), "Repeat-Schleife mit '*' Token fehlt");
+        assert!(code_str.contains("fnparse_expr(input:ParseStream)"), "Funktionssignatur parse_expr fehlt");
     }
 }
