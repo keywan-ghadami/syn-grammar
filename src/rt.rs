@@ -1,21 +1,26 @@
-pub struct ParserContext<'a> {
-    input: &'a syn::parse::ParseBuffer<'a>,
+use syn::parse::{ParseStream};
+use syn::Result;
+
+/// Kapselt einen spekulativen Parse-Versuch. 
+/// Erlaubt es dem Generator, Backtracking als Einzeiler zu schreiben.
+pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
+    let fork = input.fork();
+    match parser(&fork) {
+        Ok(res) => {
+            input.advance_to(&fork);
+            Ok(Some(res))
+        }
+        Err(_) => Ok(None),
+    }
 }
 
-impl<'a> ParserContext<'a> {
-    pub fn new(input: &'a syn::parse::ParseBuffer<'a>) -> Self {
-        Self { input }
-    }
+/// Helper für Identifier (erlaubt Keywords)
+pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
+    input.call(syn::Ident::parse_any)
+}
 
-    /// Deklaratives Backtracking
-    pub fn try_parse<T>(&self, f: impl Fn(syn::parse::ParseStream) -> syn::Result<T>) -> syn::Result<Option<T>> {
-        let fork = self.input.fork();
-        match f(&fork) {
-            Ok(res) => {
-                self.input.advance_to(&fork);
-                Ok(Some(res))
-            }
-            Err(_) => Ok(None),
-        }
-    }
+/// Helper für typisierte Integer
+pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T> 
+where T::Err: std::fmt::Display {
+    input.parse::<syn::LitInt>()?.base10_parse()
 }
