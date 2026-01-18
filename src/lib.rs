@@ -23,17 +23,23 @@ impl Generator {
     }
 
     pub fn generate(&self, root_file: &str) -> Result<TokenStream, Box<dyn std::error::Error>> {
-        // Resolver gibt Parser-Output zurück
+        // 1. Auflösen
         let grammar_ast = self.resolver.resolve(root_file)?;
         
-        // Konvertieren ins saubere Modell
+        // 2. Konvertieren (Parser -> Model)
         let model: model::GrammarDefinition = grammar_ast.into();
         
+        // 3. Generieren (mit Result Fehlerbehandlung)
+        // proc_macro_error::abort! würde hier panic-en, wenn wir in einem Makro wären.
+        // Da wir in einer lib sind, fangen wir Panics idealerweise ab oder nutzen Result.
+        // Aktuell gibt codegen::generate_rust ein Result zurück.
         let code = codegen::generate_rust(model)?;
+        
         Ok(code)
     }
 }
 
+// Unit Tests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44,16 +50,19 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_conversion() {
+    fn test_codegen_uses_combinators() {
         let input = r#"
             grammar Test {
-                pub rule main -> () = "x" -> { () }
+                rule a -> () = "start" "end" -> { () }
             }
         "#;
-        let p_ast: parser::GrammarDefinition = syn::parse_str(input).unwrap();
-        let m_ast: GrammarDefinition = p_ast.into();
         
-        assert_eq!(m_ast.rules.len(), 1);
-        assert!(m_ast.rules[0].is_pub);
+        let p_ast: parser::GrammarDefinition = syn::parse_str(input).unwrap();
+        let model: GrammarDefinition = p_ast.into();
+        let code = codegen::generate_rust(model).unwrap();
+        let s = normalize(&code.to_string());
+        
+        // Wir erwarten Peek Checks für Literale
+        assert!(s.contains("input.peek(Token![start])"));
     }
 }
