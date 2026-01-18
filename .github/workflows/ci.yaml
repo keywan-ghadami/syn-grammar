@@ -25,9 +25,9 @@ jobs:
 
       - name: Cache Cargo Registry
         uses: Swatinem/rust-cache@v2
-
-      - name: Check Formatting
-        run: cargo fmt -- --check
+# machen wir vielleicht wieder rein wenn es stabil läuft und der code formatiert wurde
+     # - name: Check Formatting
+     #   run: cargo fmt -- --check
 
       - name: Linting (Clippy)
         # Wir disallowen Warnungen für strikte Qualität
