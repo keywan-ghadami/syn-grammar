@@ -5,6 +5,7 @@ use syn_grammar::Generator;
 
 pub struct TestEnv {
     _temp_dir: tempfile::TempDir,
+    #[allow(dead_code)] // Wird aktuell nur gehalten, damit das TempDir existiert
     project_path: PathBuf,
     binary_path: PathBuf,
 }
@@ -29,7 +30,7 @@ impl TestEnv {
             use syn::parse::Parser; 
             use proc_macro2::TokenStream;
             use quote::{{quote, ToTokens}};
-            use std::io::Read; // WICHTIG für read_to_string
+            use std::io::Read;
 
             // --- GENERATED CODE START ---
             {}
@@ -96,7 +97,7 @@ impl TestEnv {
     }
 }
 
-fn setup_cargo_project(path: &Path, name: &str) {
+fn setup_cargo_project(path: &Path, _name: &str) {
     let src_dir = path.join("src");
     fs::create_dir_all(&src_dir).unwrap();
 
