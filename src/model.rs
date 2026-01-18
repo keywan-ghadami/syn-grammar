@@ -40,7 +40,8 @@ pub enum Pattern {
     Plus(Box<Pattern>),
 }
 
-// Manuelle Konvertierung für Enums (da ModelConvert nur Structs kann)
+// Da ModelConvert nur auf Structs arbeitet, mappen wir das Enum manuell,
+// was aber durch .into() Aufrufe in den Struct-Mappings unterstützt wird.
 impl From<crate::parser::Pattern> for Pattern {
     fn from(p: crate::parser::Pattern) -> Self {
         match p {
@@ -64,6 +65,7 @@ impl Pattern {
         match self {
             Pattern::Lit(l) => syn::spanned::Spanned::span(l),
             Pattern::RuleCall { rule_name, .. } => syn::spanned::Spanned::span(rule_name),
+            Pattern::Optional(p) | Pattern::Repeat(p) | Pattern::Plus(p) => p.span(),
             _ => Span::call_site(),
         }
     }
