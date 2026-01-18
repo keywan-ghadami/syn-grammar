@@ -8,7 +8,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let grammar_name = &grammar.name;
     let custom_keywords = collect_custom_keywords(&grammar);
 
-    // Header mit Allow-Attributes für sauberen Build des generierten Codes
+    // Header mit Allow-Attributes für sauberen Build
     output.extend(quote! {
         #![allow(unused_imports, unused_variables, dead_code)]
         
@@ -113,7 +113,7 @@ fn generate_variants(
                 
                 if let Ok(res) = attempt(&fork) {
                     input.advance_to(&fork);
-                    res
+                    Ok(res) // FIX: Hier muss Ok() stehen, damit der Typ stimmt!
                 } else {
                     #current_code
                 }
@@ -316,12 +316,13 @@ fn is_builtin(name: &syn::Ident) -> bool {
 fn map_builtin(name: &syn::Ident) -> TokenStream {
     match name.to_string().as_str() {
         "ident" => quote! { input.call(syn::Ident::parse_any)? },
-        // FIX: Konkreter Typ für int_lit um Type-Inference Fehler zu vermeiden
         "int_lit" => quote! { input.parse::<syn::LitInt>()?.base10_parse::<i32>()? },
         "string_lit" => quote! { input.parse::<syn::LitStr>()?.value() },
         _ => panic!("Unknown builtin"),
     }
 }
+
+// --- First Set Analysis ---
 
 struct FirstSetComputer<'a> {
     rules: HashMap<String, &'a Rule>,
