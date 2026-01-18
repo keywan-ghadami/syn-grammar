@@ -1,8 +1,7 @@
 use crate::model::*;
 use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
-use syn::spanned::Spanned; // Wird für pattern.span() benötigt
-use std::collections::HashMap; // HashSet entfernt
+use std::collections::HashMap;
 
 pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let mut output = TokenStream::new();
@@ -54,27 +53,28 @@ fn generate_variants(
         let first = first_sets.compute_sequence(&variant.pattern);
 
         if let Some(token_check) = first.to_peek_check() {
+            // Fall 1: Wir können peeken (LL(1))
             checks.extend(quote! {
                 if #token_check {
                     return { #logic };
                 }
             });
+        } else if i == variant_count - 1 && is_top_level {
+            // Fall 2: Letzte Variante & Top-Level -> Kein Fork nötig, Fehler wird durchgereicht
+            checks.extend(logic);
         } else {
-            if i == variant_count - 1 && is_top_level {
-                checks.extend(logic);
-            } else {
-                checks.extend(quote! {
-                    let fork = input.fork();
-                    let attempt = |input: ParseStream| -> Result<_> {
-                        #logic
-                    };
-                    
-                    if let Ok(res) = attempt(&fork) {
-                        input.advance_to(&fork);
-                        return Ok(res);
-                    }
-                });
-            }
+            // Fall 3: Backtracking nötig (Fork)
+            checks.extend(quote! {
+                let fork = input.fork();
+                let attempt = |input: ParseStream| -> Result<_> {
+                    #logic
+                };
+                
+                if let Ok(res) = attempt(&fork) {
+                    input.advance_to(&fork);
+                    return Ok(res);
+                }
+            });
         }
     }
 
@@ -247,7 +247,6 @@ impl<'a> FirstSetComputer<'a> {
                 if let Some(rule) = self.rules.get(&rule_name.to_string()) {
                      if let Some(first_var) = rule.variants.first() {
                          if let Some(first_pat) = first_var.pattern.first() {
-                             // FIX: 'ref' entfernt für Rust 2024 Kompatibilität
                              if let Pattern::RuleCall{ rule_name: inner_name, .. } = first_pat {
                                  if inner_name == rule_name { return FirstSet::Unknown; }
                              }
