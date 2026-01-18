@@ -20,8 +20,6 @@ fn test_complex_grammar_features() {
                 | paren( e:expr() ) -> { format!("({})", e) } 
                 | "nop" -> { "Nop".to_string() }
 
-            // KORREKTUR: Hier nutzen wir [ und ] OHNE Anführungszeichen.
-            // Das triggert Pattern::Bracketed im Parser statt Pattern::Lit.
             rule list -> String = 
                 [ 
                     head:ident() 
@@ -46,7 +44,6 @@ fn test_complex_grammar_features() {
     assert!(success);
     assert!(out.contains("Expr: Add(...)")); 
 
-    // Hier nutzen wir echte Bracket-Syntax im Input
     let (out, _, success) = env.parse("[ myId, otherId ]");
     assert!(success, "List parsing failed");
     assert!(out.contains("List: List[head=myId]"));
