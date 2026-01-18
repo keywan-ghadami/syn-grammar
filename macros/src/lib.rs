@@ -22,17 +22,21 @@ pub fn derive_model_convert(input: TokenStream) -> TokenStream {
         let f_name = f.ident.as_ref().unwrap();
         let s_name = f_name.to_string();
         
+        // Felder, die mit '_' beginnen, sind Token-Boilerplate im Parser
+        // und existieren nicht im sauberen Modell.
         if s_name.starts_with('_') {
             None
         } else if s_name == "is_pub" {
-            // Speziallogik für Sichtbarkeit (Option<Token![pub]> -> bool)
+            // Konvertiert Option<Token![pub]> (Parser) zu bool (Model)
             Some(quote! { is_pub: p.is_pub.is_some() })
         } else if s_name == "inherits" {
-            // Speziallogik für Vererbung
+            // Konvertiert Option<InheritanceSpec> zu Option<Ident>
             Some(quote! { inherits: p.inherits.map(|i| i.name) })
         } else {
-            // Standard: Rekursives .into()
-            Some(quote! { #f_name: p.#f_name.into_iter().map(Into::into).collect() })
+            // Standard: Nutzt .into() (funktioniert für Vec<T> durch impl From für Pattern)
+            Some(quote! { 
+                #f_name: p.#f_name.into_iter().map(Into::into).collect() 
+            })
         }
     });
 
@@ -50,11 +54,15 @@ pub fn derive_model_convert(input: TokenStream) -> TokenStream {
 #[proc_macro]
 #[proc_macro_error]
 pub fn grammar(input: TokenStream) -> TokenStream {
-    // Wandelt den Input (TokenStream) in einen Parser-AST um und dann in ein Model
+    // FIX: Konvertierung von proc_macro zu proc_macro2 für quote! Kompatibilität
+    let input2 = proc_macro2::TokenStream::from(input);
+    
     quote! {
         {
-            let p_ast: syn_grammar::parser::GrammarDefinition = syn::parse_quote! { #input };
-            let m_ast: syn_grammar::model::GrammarDefinition = p_ast.into();
+            // Nutzt syn::parse_quote, um den TokenStream zur Compile-Zeit des Tests
+            // in einen Parser-AST zu wandeln und diesen dann zu konvertieren.
+            let p_ast: crate::parser::GrammarDefinition = syn::parse_quote! { #input2 };
+            let m_ast: crate::model::GrammarDefinition = p_ast.into();
             m_ast
         }
     }.into()
