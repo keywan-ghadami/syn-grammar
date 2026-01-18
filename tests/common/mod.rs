@@ -25,20 +25,31 @@ impl TestEnv {
         let rust_code = generator.generate(&format!("{}.grammar", grammar_name))
             .expect("Code generation failed");
 
+        // Wrapper Code
+        // FIX: Wir generieren den Parser in ein eigenes Modul 'generated'.
+        // Das erlaubt die Nutzung von inner attributes (#![allow...]) im generierten Code
+        // und verhindert Namenskonflikte.
         let main_rs = format!(r#"
+            #![allow(unused_imports, dead_code)] // Unterdrückt Warnungen im Wrapper selbst
+
             use syn::parse::Parser; 
             use proc_macro2::TokenStream;
-            use quote::{{quote, ToTokens}};
             use std::io::Read;
 
             // --- GENERATED CODE START ---
-            {}
+            mod generated {{
+                {}
+            }}
             // --- GENERATED CODE END ---
+
+            // Importiere den Einstiegspunkt aus dem Modul
+            use generated::parse_main;
 
             fn main() {{
                 let mut content = String::new();
                 std::io::stdin().read_to_string(&mut content).unwrap();
 
+                // Tokenisierung
                 let stream: TokenStream = match syn::parse_str(&content) {{
                     Ok(ts) => ts,
                     Err(e) => {{
@@ -47,6 +58,7 @@ impl TestEnv {
                     }}
                 }};
 
+                // Parsing
                 match parse_main.parse2(stream) {{
                     Ok(ast) => println!("{{:?}}", ast),
                     Err(e) => {{
