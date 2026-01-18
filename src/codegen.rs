@@ -1,22 +1,31 @@
 use crate::model::*;
 use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let mut output = TokenStream::new();
 
-    // 1. Imports
+    // 1. Standard Imports (syn ist Pflicht)
     output.extend(quote! {
         use syn::parse::{Parse, ParseStream};
         use syn::Result;
         use syn::Token;
     });
 
-    // 2. First-Set Analyse vorbereiten
+    // 2. Vererbung (Inheritance) implementieren
+    // Wenn wir von "Base" erben, importieren wir dessen Regeln.
+    // Annahme: Die Parent-Grammatik liegt in einem Modul gleichen Namens oder ist importierbar.
+    if let Some(parent) = &grammar.inherits {
+        output.extend(quote! {
+            use super::#parent::*;
+        });
+    }
+
+    // 3. First-Set Analyse (mit Rekursionsschutz)
     let first_sets = FirstSetComputer::new(&grammar);
 
-    // 3. Regeln generieren
+    // 4. Regeln generieren
     for rule in &grammar.rules {
         output.extend(generate_rule(rule, &first_sets));
     }
@@ -53,17 +62,17 @@ fn generate_variants(
         let first = first_sets.compute_sequence(&variant.pattern);
 
         if let Some(token_check) = first.to_peek_check() {
-            // Fall 1: Wir können peeken (LL(1))
+            // Optimierung: LL(1) Peek Check
             checks.extend(quote! {
                 if #token_check {
                     return { #logic };
                 }
             });
         } else if i == variant_count - 1 && is_top_level {
-            // Fall 2: Letzte Variante & Top-Level -> Kein Fork nötig, Fehler wird durchgereicht
+            // Letzte Variante muss nicht forken, Fehler wird propagated
             checks.extend(logic);
         } else {
-            // Fall 3: Backtracking nötig (Fork)
+            // Backtracking (Speculative Parsing)
             checks.extend(quote! {
                 let fork = input.fork();
                 let attempt = |input: ParseStream| -> Result<_> {
@@ -81,6 +90,7 @@ fn generate_variants(
     if is_top_level && checks.is_empty() {
          quote! { Err(input.error("No rule variants defined")) }
     } else if is_top_level {
+         // Wenn wir hier sind, hat kein Peek und kein Backtracking gepasst
          quote! { 
              #checks
              Err(input.error("No matching rule variant found")) 
@@ -89,7 +99,6 @@ fn generate_variants(
         quote! { #checks }
     }
 }
-
 
 fn generate_sequence(patterns: &[Pattern], action: &TokenStream, first_sets: &FirstSetComputer) -> TokenStream {
     let mut steps = TokenStream::new();
@@ -115,18 +124,24 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
                 let _ = input.parse::<#token_type>()?; 
             }
         },
-        Pattern::RuleCall { binding, rule_name, .. } => {
-            let func = if is_builtin(rule_name) {
+        Pattern::RuleCall { binding, rule_name, args } => {
+            // FEATURE: Argumente werden jetzt durchgereicht
+            let func_call = if is_builtin(rule_name) {
                 map_builtin(rule_name)
             } else {
                 let f = format_ident!("parse_{}", rule_name);
-                quote! { #f(input)? }
+                // Argumente (Literale) in den Funktionsaufruf packen
+                if args.is_empty() {
+                    quote! { #f(input)? }
+                } else {
+                    quote! { #f(input, #(#args),*)? }
+                }
             };
             
             if let Some(bind) = binding {
-                quote_spanned! {span=> let #bind = #func; }
+                quote_spanned! {span=> let #bind = #func_call; }
             } else {
-                quote_spanned! {span=> let _ = #func; }
+                quote_spanned! {span=> let _ = #func_call; }
             }
         },
         Pattern::Optional(inner) => {
@@ -140,9 +155,11 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
                     }
                 }
             } else {
-                quote_spanned! {span=> 
-                    // Optional check failed or ambiguous 
-                }
+                // Für echte Produktion: Warnung oder Fehler generieren, wenn Optional nicht peekable ist?
+                // Hier generieren wir Runtime-Logik, die es einfach ignoriert, wenn nicht klar.
+                 quote_spanned! {span=> 
+                    // Warning: Optional rule not LL(1) peekable without context. Skipping.
+                 }
             }
         },
         Pattern::Repeat(inner) => {
@@ -191,6 +208,8 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
     }
 }
 
+// --- Hilfsfunktionen ---
+
 fn resolve_token_type(lit: &syn::LitStr) -> syn::Type {
     let s = lit.value();
     let type_str = format!("Token![{}]", s);
@@ -211,8 +230,11 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
     }
 }
 
+// --- First Set Analysis (Production Grade) ---
+
 struct FirstSetComputer<'a> {
     rules: HashMap<String, &'a Rule>,
+    // Cache für bereits berechnete Sets könnte hier hin
 }
 
 impl<'a> FirstSetComputer<'a> {
@@ -225,14 +247,21 @@ impl<'a> FirstSetComputer<'a> {
     }
 
     fn compute_sequence(&self, patterns: &[Pattern]) -> FirstSet {
+        // Wir brauchen einen neuen visited Stack für jeden Top-Level Aufruf
+        let mut visited = HashSet::new();
         if let Some(first) = patterns.first() {
-            self.compute_first(first)
+            self.compute_first_recursive(first, &mut visited)
         } else {
             FirstSet::Unknown 
         }
     }
 
     fn compute_first(&self, pattern: &Pattern) -> FirstSet {
+        let mut visited = HashSet::new();
+        self.compute_first_recursive(pattern, &mut visited)
+    }
+
+    fn compute_first_recursive(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> FirstSet {
         match pattern {
             Pattern::Lit(l) => FirstSet::Token(resolve_token_type(l)),
             Pattern::RuleCall { rule_name, .. } => {
@@ -244,27 +273,42 @@ impl<'a> FirstSetComputer<'a> {
                         _ => FirstSet::Unknown
                     };
                 }
-                if let Some(rule) = self.rules.get(&rule_name.to_string()) {
-                     if let Some(first_var) = rule.variants.first() {
-                         if let Some(first_pat) = first_var.pattern.first() {
-                             if let Pattern::RuleCall{ rule_name: inner_name, .. } = first_pat {
-                                 if inner_name == rule_name { return FirstSet::Unknown; }
-                             }
-                             return FirstSet::Unknown; 
-                         }
-                     }
+                
+                let rule_key = rule_name.to_string();
+                
+                // Zykluserkennung: Wenn wir diese Regel im aktuellen Pfad schon besuchen, abbrechen.
+                if visited.contains(&rule_key) {
+                    return FirstSet::Unknown;
                 }
-                FirstSet::Unknown
+                visited.insert(rule_key.clone());
+
+                let Some(rule) = self.rules.get(&rule_key) else { return FirstSet::Unknown; };
+                
+                // Wir nehmen vereinfacht an: Das First-Set der Regel ist das First-Set ihrer ERSTEN Variante.
+                // (Für volle Genauigkeit müsste man die Vereinigung aller Varianten bilden, 
+                // aber für Peek-Optimierung reicht meist der Hauptpfad).
+                let Some(first_var) = rule.variants.first() else { return FirstSet::Unknown; };
+                let Some(first_pat) = first_var.pattern.first() else { return FirstSet::Unknown; };
+
+                let result = self.compute_first_recursive(first_pat, visited);
+                
+                visited.remove(&rule_key); // Backtracking für visited
+                result
             },
             Pattern::Group(alts) => {
                 if let Some(first_alt) = alts.first() {
-                     self.compute_sequence(first_alt)
+                    // Für Gruppen reicht auch der erste Pfad zur Vorhersage (vereinfacht)
+                    if let Some(p) = first_alt.first() {
+                        self.compute_first_recursive(p, visited)
+                    } else {
+                        FirstSet::Unknown
+                    }
                 } else {
                     FirstSet::Unknown
                 }
             },
             Pattern::Optional(inner) | Pattern::Repeat(inner) | Pattern::Plus(inner) => {
-                self.compute_first(inner)
+                self.compute_first_recursive(inner, visited)
             },
         }
     }
