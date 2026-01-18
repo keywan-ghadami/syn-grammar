@@ -6,8 +6,6 @@ use std::collections::{HashMap, HashSet};
 pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
     let mut output = TokenStream::new();
     
-    // FIX: Wir nutzen den Grammatik-Namen jetzt aktiv für Metadaten.
-    // Das behebt den "field never read" Fehler und fügt Reflection-Capabilities hinzu.
     let grammar_name = &grammar.name;
 
     // 1. Header & Imports
@@ -20,17 +18,14 @@ pub fn generate_rust(grammar: GrammarDefinition) -> TokenStream {
         use syn::Token;
     });
 
-    // 2. Vererbung (Inheritance)
     if let Some(parent) = &grammar.inherits {
         output.extend(quote! {
             use super::#parent::*;
         });
     }
 
-    // 3. First-Set Analyse
     let first_sets = FirstSetComputer::new(&grammar);
 
-    // 4. Regeln generieren
     for rule in &grammar.rules {
         output.extend(generate_rule(rule, &first_sets));
     }
@@ -61,17 +56,40 @@ fn generate_variants(
     let mut checks = TokenStream::new();
     let variant_count = variants.len();
 
+    // Wir berechnen vorab alle First-Sets, um Ambiguitäten zu erkennen
+    let all_firsts: Vec<FirstSet> = variants.iter()
+        .map(|v| first_sets.compute_sequence(&v.pattern))
+        .collect();
+
     for (i, variant) in variants.iter().enumerate() {
         let logic = generate_sequence(&variant.pattern, &variant.action, first_sets);
-        let first = first_sets.compute_sequence(&variant.pattern);
+        let current_first = &all_firsts[i];
 
-        if let Some(token_check) = first.to_peek_check() {
-            checks.extend(quote! {
-                if #token_check {
-                    return { #logic };
-                }
-            });
-        } else if i == variant_count - 1 && is_top_level {
+        // CHECK: Ist dieses First-Set eindeutig gegenüber allen FOLGENDEN Varianten?
+        // Wenn current_first == some_later_first, dann können wir input.peek() nicht trauen.
+        let mut is_ambiguous = false;
+        for (j, other_first) in all_firsts.iter().enumerate().skip(i + 1) {
+            if current_first.overlaps(other_first) {
+                is_ambiguous = true;
+                break;
+            }
+        }
+
+        if let Some(token_check) = current_first.to_peek_check() {
+            if !is_ambiguous {
+                // Pfad A: Eindeutiger Peek (LL(1))
+                checks.extend(quote! {
+                    if #token_check {
+                        return { #logic };
+                    }
+                });
+                continue; // Weiter zum nächsten (obwohl return generiert wurde, für Struktur)
+            }
+        }
+        
+        // Pfad B: Ambiguity oder kein Peek möglich -> Forking / Backtracking
+        if i == variant_count - 1 && is_top_level {
+            // Letzte Variante muss nicht forken, Fehler wird propagated
             checks.extend(logic);
         } else {
             checks.extend(quote! {
@@ -153,9 +171,7 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
                     }
                 }
             } else {
-                 quote_spanned! {span=> 
-                    // Warning: Optional rule not LL(1) peekable.
-                 }
+                 quote_spanned! {span=> }
             }
         },
         Pattern::Repeat(inner) => {
@@ -208,9 +224,14 @@ fn generate_pattern_step(pattern: &Pattern, first_sets: &FirstSetComputer) -> To
 
 fn resolve_token_type(lit: &syn::LitStr) -> syn::Type {
     let s = lit.value();
+    // Safety check: syn does not allow parsing "(" or ")" as linear tokens.
+    if s == "(" || s == ")" || s == "[" || s == "]" || s == "{" || s == "}" {
+        panic!("Invalid usage of delimiter '{}' as a literal token. In syn, delimiters (parens, brackets, braces) cannot be parsed as standalone tokens using `Token!`. Use grouping constructs or different tokens.", s);
+    }
+
     let type_str = format!("Token![{}]", s);
     syn::parse_str::<syn::Type>(&type_str)
-        .unwrap_or_else(|_| panic!("Invalid token literal in grammar: '{}'", s))
+        .unwrap_or_else(|_| panic!("Invalid token literal in grammar: '{}'. Ensure it is a valid syn Token.", s))
 }
 
 fn is_builtin(name: &syn::Ident) -> bool {
@@ -261,9 +282,9 @@ impl<'a> FirstSetComputer<'a> {
             Pattern::RuleCall { rule_name, .. } => {
                 if is_builtin(rule_name) {
                     return match rule_name.to_string().as_str() {
-                        "ident" => FirstSet::Raw(quote!(syn::Ident)),
-                        "int_lit" => FirstSet::Raw(quote!(syn::LitInt)),
-                        "string_lit" => FirstSet::Raw(quote!(syn::LitStr)),
+                        "ident" => FirstSet::Raw(quote!(syn::Ident).to_string()),
+                        "int_lit" => FirstSet::Raw(quote!(syn::LitInt).to_string()),
+                        "string_lit" => FirstSet::Raw(quote!(syn::LitStr).to_string()),
                         _ => FirstSet::Unknown
                     };
                 }
@@ -300,9 +321,12 @@ impl<'a> FirstSetComputer<'a> {
     }
 }
 
+// Wir vergleichen Strings/Typen grob, um Overlap zu prüfen.
+// 'Raw' speichert nun den String-Repräsentation des Typs für einfachen Vergleich.
+#[derive(Debug, PartialEq, Eq)]
 enum FirstSet {
     Token(syn::Type),
-    Raw(TokenStream), 
+    Raw(String), 
     Unknown,
 }
 
@@ -310,8 +334,25 @@ impl FirstSet {
     fn to_peek_check(&self) -> Option<TokenStream> {
         match self {
             FirstSet::Token(t) => Some(quote! { input.peek(#t) }),
-            FirstSet::Raw(t) => Some(quote! { input.peek(#t) }),
+            FirstSet::Raw(s) => {
+                // Parse string back to type to use in quote
+                let t: syn::Type = syn::parse_str(s).ok()?;
+                Some(quote! { input.peek(#t) })
+            },
             FirstSet::Unknown => None,
+        }
+    }
+
+    // Prüft, ob sich zwei First-Sets überlappen (für Ambiguity Check)
+    fn overlaps(&self, other: &FirstSet) -> bool {
+        match (self, other) {
+            (FirstSet::Unknown, _) | (_, FirstSet::Unknown) => true, // Im Zweifel annehmen wir Overlap
+            (FirstSet::Raw(a), FirstSet::Raw(b)) => a == b,
+            // Bei Token-Typen ist Vergleich schwierig (AST), wir machen Best-Effort via Debug/String TokenStream
+            (FirstSet::Token(a), FirstSet::Token(b)) => {
+                quote!(#a).to_string() == quote!(#b).to_string()
+            }
+            _ => false
         }
     }
 }
