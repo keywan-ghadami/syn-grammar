@@ -1,134 +1,117 @@
 use crate::model::*;
 use syn::parse::{Parse, ParseStream};
-use syn::{braced, bracketed, parenthesized, token, Ident, Token, Result, LitStr};
+use syn::{Result, Token, token, LitStr, Ident};
+use derive_syn_parse::Parse;
 
 mod kw {
     syn::custom_keyword!(grammar);
     syn::custom_keyword!(rule);
-    syn::custom_keyword!(paren); // Für explizite Token-Klammern
+    syn::custom_keyword!(paren);
 }
 
-impl Parse for GrammarDefinition {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let _ = input.parse::<kw::grammar>()?;
-        let name: Ident = input.parse()?;
-        
-        let inherits = if input.peek(Token![:]) {
-            let _ = input.parse::<Token![:]>()?;
-            Some(input.parse()?)
-        } else {
-            None
-        };
+// 1. Grammar Definition
+#[derive(Parse)]
+pub struct GrammarDefinition {
+    #[syn(parenthesized)]
+    pub _paren: Option<token::Paren>, // Optional wrapper
+    pub _kw_gram: kw::grammar,
+    pub name: Ident,
+    #[syn(peek = Token![:])]
+    pub inherits: Option<InheritanceSpec>, // Helper struct für optionale Vererbung
+    #[syn(brace)]
+    pub _brace: token::Brace,
+    #[syn(in = _brace)]
+    #[parse(ParseRule::parse_list)] // Eigene Helper Funktion für Liste von Regeln
+    pub rules: Vec<Rule>,
+}
 
-        let content;
-        let _ = braced!(content in input);
-        
+#[derive(Parse)]
+pub struct InheritanceSpec {
+    pub _colon: Token![:],
+    pub name: Ident,
+}
+
+// Helper für Vec<Rule>
+struct ParseRule;
+impl ParseRule {
+    fn parse_list(input: ParseStream) -> Result<Vec<Rule>> {
         let mut rules = Vec::new();
-        while !content.is_empty() {
-            rules.push(content.parse()?);
+        while !input.is_empty() {
+            rules.push(input.parse()?);
         }
-
-        Ok(GrammarDefinition { name, inherits, rules })
+        Ok(rules)
     }
 }
 
-impl Parse for Rule {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let is_pub = input.peek(Token![pub]);
-        if is_pub { let _ = input.parse::<Token![pub]>()?; }
+// 2. Rule
+#[derive(Parse)]
+pub struct Rule {
+    #[syn(peek = Token![pub])]
+    pub is_pub: Option<Token![pub]>,
+    pub _kw_rule: kw::rule,
+    pub name: Ident,
+    pub _arrow: Token![->],
+    pub return_type: syn::Type,
+    pub _eq: Token![=],
+    #[parse(ParseVariant::parse_list)]
+    pub variants: Vec<RuleVariant>,
+}
 
-        let _ = input.parse::<kw::rule>()?;
-        let name: Ident = input.parse()?;
-        let _ = input.parse::<Token![->]>()?;
-        let return_type: syn::Type = input.parse()?;
-        let _ = input.parse::<Token![=]>()?;
-
+struct ParseVariant;
+impl ParseVariant {
+    fn parse_list(input: ParseStream) -> Result<Vec<RuleVariant>> {
         let mut variants = Vec::new();
-
         loop {
+            // Pattern Parsen bis -> oder |
             let mut pattern = Vec::new();
             while !input.peek(Token![->]) && !input.peek(Token![|]) && !input.is_empty() {
                 pattern.push(input.parse()?);
             }
 
-            let _ = input.parse::<Token![->]>()?;
+            let _arrow: Token![->] = input.parse()?;
+            
             let content;
-            let _ = braced!(content in input);
-            let action = content.parse()?;
+            let _ = syn::braced!(content in input);
+            let action: proc_macro2::TokenStream = content.parse()?;
 
             variants.push(RuleVariant { pattern, action });
 
             if input.peek(Token![|]) {
-                let _ = input.parse::<Token![|]>()?;
+                let _pipe: Token![|] = input.parse()?;
             } else {
                 break;
             }
         }
-
-        Ok(Rule { is_pub, name, return_type, variants })
+        Ok(variants)
     }
 }
 
+// 3. Patterns (Manuell, da komplexe Precedence für Suffixes)
 impl Parse for Pattern {
     fn parse(input: ParseStream) -> Result<Self> {
-        // Schritt 1: Atom
-        let mut base_pattern = if input.peek(LitStr) {
+        // A. Base Pattern
+        let mut base = if input.peek(LitStr) {
             Pattern::Lit(input.parse()?)
-
         } else if input.peek(token::Bracket) {
-            // [ ... ] -> syn::bracketed!
             let content;
-            let _ = bracketed!(content in input);
-            let mut seq = Vec::new();
-            while !content.is_empty() {
-                seq.push(content.parse()?);
-            }
-            Pattern::Bracketed(seq)
-
+            let _ = syn::bracketed!(content in input);
+            Pattern::Bracketed(ParsePatternList::parse(&content)?)
         } else if input.peek(token::Brace) {
-            // { ... } -> syn::braced!
             let content;
-            let _ = braced!(content in input);
-            let mut seq = Vec::new();
-            while !content.is_empty() {
-                seq.push(content.parse()?);
-            }
-            Pattern::Braced(seq)
-
+            let _ = syn::braced!(content in input);
+            Pattern::Braced(ParsePatternList::parse(&content)?)
         } else if input.peek(token::Paren) {
-            // ( ... ) -> Logisches Grouping (Standard EBNF Verhalten)
             let content;
-            let _ = parenthesized!(content in input);
-            
-            let mut alternatives = Vec::new();
-            loop {
-                let mut seq = Vec::new();
-                while !content.is_empty() && !content.peek(Token![|]) {
-                    seq.push(content.parse()?);
-                }
-                alternatives.push(seq);
-
-                if content.peek(Token![|]) {
-                    let _ = content.parse::<Token![|]>()?;
-                } else {
-                    break;
-                }
-            }
-            Pattern::Group(alternatives)
-            
+            let _ = syn::parenthesized!(content in input);
+            // In ( ... ) können Alternativen | stehen -> Group
+            Pattern::Group(ParseGroupContent::parse(&content)?)
         } else if input.peek(kw::paren) {
-             // paren( ... ) -> Echte Token-Klammern syn::parenthesized!
-             let _ = input.parse::<kw::paren>()?;
-             let content;
-             let _ = parenthesized!(content in input);
-             let mut seq = Vec::new();
-             while !content.is_empty() {
-                 seq.push(content.parse()?);
-             }
-             Pattern::Parenthesized(seq)
-
+            let _ = input.parse::<kw::paren>()?;
+            let content;
+            let _ = syn::parenthesized!(content in input);
+            Pattern::Parenthesized(ParsePatternList::parse(&content)?)
         } else {
-            // Rule Call
+            // Rule Call: name:rule(arg)
             let binding = if input.peek2(Token![:]) {
                 let b: Ident = input.parse()?;
                 let _ = input.parse::<Token![:]>()?;
@@ -139,37 +122,75 @@ impl Parse for Pattern {
 
             let rule_name: Ident = input.parse()?;
             
-            let args_content;
-            let _ = syn::parenthesized!(args_content in input);
-            
-            // Argumente (vereinfacht: Literale)
             let mut args = Vec::new();
-            while !args_content.is_empty() {
-                args.push(args_content.parse()?);
-                if args_content.peek(Token![,]) {
-                    let _ = args_content.parse::<Token![,]>()?;
+            if input.peek(token::Paren) {
+                let content;
+                let _ = syn::parenthesized!(content in input);
+                while !content.is_empty() {
+                    args.push(content.parse()?);
+                    if content.peek(Token![,]) {
+                        let _ = content.parse::<Token![,]>()?;
+                    }
                 }
+            } else {
+                // Erlaube rule calls ohne Klammern () falls keine Args da sind? 
+                // Deine Grammatik nutzt "ident()", also Klammern sind Pflicht laut bisherigem Parser.
+                // Wir erzwingen hier Klammern für Konsistenz mit alter Logik.
+                let content;
+                let _ = syn::parenthesized!(content in input); // Erwarte ()
             }
-            
+
             Pattern::RuleCall { binding, rule_name, args }
         };
 
-        // Schritt 2: Suffix
+        // B. Suffixes (*, +, ?)
         loop {
             if input.peek(Token![?]) {
                 let _ = input.parse::<Token![?]>()?;
-                base_pattern = Pattern::Optional(Box::new(base_pattern));
+                base = Pattern::Optional(Box::new(base));
             } else if input.peek(Token![*]) {
                 let _ = input.parse::<Token![*]>()?;
-                base_pattern = Pattern::Repeat(Box::new(base_pattern));
+                base = Pattern::Repeat(Box::new(base));
             } else if input.peek(Token![+]) {
                 let _ = input.parse::<Token![+]>()?;
-                base_pattern = Pattern::Plus(Box::new(base_pattern));
+                base = Pattern::Plus(Box::new(base));
             } else {
                 break;
             }
         }
 
-        Ok(base_pattern)
+        Ok(base)
+    }
+}
+
+// Helpers
+struct ParsePatternList;
+impl ParsePatternList {
+    fn parse(input: ParseStream) -> Result<Vec<Pattern>> {
+        let mut seq = Vec::new();
+        while !input.is_empty() {
+            seq.push(input.parse()?);
+        }
+        Ok(seq)
+    }
+}
+
+struct ParseGroupContent;
+impl ParseGroupContent {
+    fn parse(input: ParseStream) -> Result<Vec<Vec<Pattern>>> {
+        let mut alts = Vec::new();
+        loop {
+            let mut seq = Vec::new();
+            while !input.is_empty() && !input.peek(Token![|]) {
+                seq.push(input.parse()?);
+            }
+            alts.push(seq);
+            if input.peek(Token![|]) {
+                let _ = input.parse::<Token![|]>()?;
+            } else {
+                break;
+            }
+        }
+        Ok(alts)
     }
 }
