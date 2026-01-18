@@ -1,8 +1,8 @@
-use syn::{Ident, Type, LitStr, Lit, Token};
+use syn::{Ident, Type, LitStr, Lit};
 use proc_macro2::{TokenStream, Span};
 
 #[derive(Debug, Clone)]
-pub struct GrammarDefinition {   
+pub struct GrammarDefinition {
     pub name: Ident,
     pub inherits: Option<Ident>, 
     pub rules: Vec<Rule>,
@@ -10,7 +10,7 @@ pub struct GrammarDefinition {
 
 #[derive(Debug, Clone)]
 pub struct Rule {
-    pub is_pub: bool,
+    pub is_pub: bool, 
     pub name: Ident,
     pub return_type: Type,
     pub variants: Vec<RuleVariant>,
@@ -54,28 +54,6 @@ impl Pattern {
                  seq.first().map(|p| p.span()).unwrap_or_else(Span::call_site)
             },
             Pattern::Optional(p) | Pattern::Repeat(p) | Pattern::Plus(p) => p.span(),
-        }
-    }
-}
-
-// Konvertierung vom Parser-Output zum sauberen Model
-impl From<crate::parser::GrammarDefinition> for GrammarDefinition {
-    fn from(p: crate::parser::GrammarDefinition) -> Self {
-        GrammarDefinition {
-            name: p.name,
-            inherits: p.inherits.map(|i| i.name),
-            rules: p.rules.into_iter().map(|r| r.into()).collect(),
-        }
-    }
-}
-
-impl From<crate::parser::Rule> for Rule {
-    fn from(p: crate::parser::Rule) -> Self {
-        Rule {
-            is_pub: p.is_pub.is_some(),
-            name: p.name,
-            return_type: p.return_type,
-            variants: p.variants,
         }
     }
 }
