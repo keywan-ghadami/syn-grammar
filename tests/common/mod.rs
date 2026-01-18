@@ -25,31 +25,23 @@ impl TestEnv {
         let rust_code = generator.generate(&format!("{}.grammar", grammar_name))
             .expect("Code generation failed");
 
-        // Wrapper Code
-        // FIX: Wir generieren den Parser in ein eigenes Modul 'generated'.
-        // Das erlaubt die Nutzung von inner attributes (#![allow...]) im generierten Code
-        // und verhindert Namenskonflikte.
         let main_rs = format!(r#"
-            #![allow(unused_imports, dead_code)] // Unterdrückt Warnungen im Wrapper selbst
+            #![allow(unused_imports, dead_code)] 
 
             use syn::parse::Parser; 
             use proc_macro2::TokenStream;
             use std::io::Read;
 
-            // --- GENERATED CODE START ---
             mod generated {{
                 {}
             }}
-            // --- GENERATED CODE END ---
 
-            // Importiere den Einstiegspunkt aus dem Modul
             use generated::parse_main;
 
             fn main() {{
                 let mut content = String::new();
                 std::io::stdin().read_to_string(&mut content).unwrap();
 
-                // Tokenisierung
                 let stream: TokenStream = match syn::parse_str(&content) {{
                     Ok(ts) => ts,
                     Err(e) => {{
@@ -58,7 +50,6 @@ impl TestEnv {
                     }}
                 }};
 
-                // Parsing
                 match parse_main.parse2(stream) {{
                     Ok(ast) => println!("{{:?}}", ast),
                     Err(e) => {{
@@ -112,6 +103,11 @@ fn setup_cargo_project(path: &Path, _name: &str) {
     let src_dir = path.join("src");
     fs::create_dir_all(&src_dir).unwrap();
 
+    // Pfad zum aktuellen Projekt ermitteln (für die Dependency)
+    let current_dir = std::env::current_dir().unwrap();
+    let current_dir_str = current_dir.to_string_lossy();
+
+    // WICHTIG: Dependency zu syn-grammar hinzufügen!
     let cargo_toml = format!(r#"
 [package]
 name = "test_parser"
@@ -122,7 +118,8 @@ edition = "2024"
 syn = {{ version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }}
 quote = "1.0"
 proc-macro2 = "1.0"
-    "#);
+syn-grammar = {{ path = "{}" }}
+    "#, current_dir_str);
 
     fs::write(path.join("Cargo.toml"), cargo_toml).unwrap();
 }
