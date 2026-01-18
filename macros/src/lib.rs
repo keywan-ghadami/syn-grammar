@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, Fields, Ident};
+use syn::{parse_macro_input, DeriveInput, Data, Fields};
 use proc_macro_error::{proc_macro_error, abort};
 
 #[proc_macro_derive(ModelConvert)]
