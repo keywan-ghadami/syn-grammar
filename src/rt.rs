@@ -1,27 +1,25 @@
 use syn::parse::{ParseBuffer, ParseStream};
 use syn::Result;
 
-/// Parsed einen Identifier, akzeptiert aber auch Rust-Keywords (z.B. "fn" als Name).
-/// Ersetzt: input.call(syn::Ident::parse_any)
+// --- Basic Parsers ---
+
 pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
     input.call(syn::Ident::parse_any)
 }
 
-/// Parsed ein Integer-Literal in einen typisierten Wert (z.B. i32).
-/// Ersetzt: input.parse::<LitInt>()?.base10_parse()
 pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T>
 where T::Err: std::fmt::Display {
     let lit = input.parse::<syn::LitInt>()?;
     lit.base10_parse()
 }
 
-/// Spekulatives Parsing (Backtracking).
-/// Versucht `parser` auszuführen.
-/// - Bei Erfolg: Konsumiert Tokens und gibt Some(Ergebnis) zurück.
-/// - Bei Fehler: Konsumiert NICHTS und gibt Ok(None) zurück (Fehler wird verworfen).
-/// 
-/// Das vereinfacht den Generator massiv, da wir keine "let fork = ..." Strings mehr bauen müssen.
-pub fn parse_speculative<T>(
+// --- Combinators ---
+
+/// Versucht einen Parser auszuführen.
+/// - Erfolg: Gibt `Ok(Some(T))` zurück und konsumiert Tokens.
+/// - Fehler: Gibt `Ok(None)` zurück, setzt den Input zurück (Backtracking) und verwirft den Fehler.
+/// - Fataler Fehler: Kann durchgeschleift werden, wenn wir Result<Option<T>> nutzen.
+pub fn parse_try<T>(
     input: ParseStream,
     parser: impl Fn(ParseStream) -> Result<T>,
 ) -> Result<Option<T>> {
@@ -32,8 +30,23 @@ pub fn parse_speculative<T>(
             Ok(Some(result))
         }
         Err(_) => {
-            // Fehler ignorieren, Fork verwerfen
+            // Fehler ignorieren (soft fail), Input nicht konsumieren
             Ok(None)
         }
     }
+}
+
+/// Auswahl (Alternative). Versucht erst A, wenn das fehlschlägt (soft), dann B.
+/// Dies ist eine Runtime-Funktion, die wir nutzen könnten, wenn wir Closures generieren.
+/// Aktuell generiert der Codegen aber if-else Kaskaden mit parse_try, was flexibler für Typen ist.
+pub fn select<T>(
+    input: ParseStream,
+    attempts: &[fn(ParseStream) -> Result<Option<T>>]
+) -> Result<T> {
+    for attempt in attempts {
+        if let Some(res) = attempt(input)? {
+            return Ok(res);
+        }
+    }
+    Err(input.error("No matching rule variant found"))
 }
