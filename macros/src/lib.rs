@@ -22,20 +22,34 @@ pub fn derive_model_convert(input: TokenStream) -> TokenStream {
         let f_name = f.ident.as_ref().unwrap();
         let s_name = f_name.to_string();
         
-        // Felder, die mit '_' beginnen, sind Token-Boilerplate im Parser
-        // und existieren nicht im sauberen Modell.
+        // 1. Überspringe Boilerplate-Felder (beginnen mit '_')
         if s_name.starts_with('_') {
-            None
-        } else if s_name == "is_pub" {
-            // Konvertiert Option<Token![pub]> (Parser) zu bool (Model)
-            Some(quote! { is_pub: p.is_pub.is_some() })
-        } else if s_name == "inherits" {
-            // Konvertiert Option<InheritanceSpec> zu Option<Ident>
-            Some(quote! { inherits: p.inherits.map(|i| i.name) })
-        } else {
-            // Standard: Nutzt .into() (funktioniert für Vec<T> durch impl From für Pattern)
+            return None;
+        }
+
+        // 2. Spezialfälle (Logik für is_pub und inherits)
+        if s_name == "is_pub" {
+            return Some(quote! { is_pub: p.is_pub.is_some() });
+        }
+        if s_name == "inherits" {
+            return Some(quote! { inherits: p.inherits.map(|i| i.name) });
+        }
+
+        // 3. Typ-basierte Entscheidung
+        // Wir entscheiden anhand des Feldnamens, ob es eine Liste ist.
+        // Listen müssen iteriert werden, Einzelwerte einfach konvertiert.
+        let is_collection = matches!(s_name.as_str(), "rules" | "variants" | "pattern");
+
+        if is_collection {
+            // Für Vec<T>: map(Into::into).collect()
             Some(quote! { 
                 #f_name: p.#f_name.into_iter().map(Into::into).collect() 
+            })
+        } else {
+            // Für Ident, Type, TokenStream: einfaches .into()
+            // Das behebt den Fehler "Ident is not an iterator"
+            Some(quote! { 
+                #f_name: p.#f_name.into() 
             })
         }
     });
@@ -54,13 +68,10 @@ pub fn derive_model_convert(input: TokenStream) -> TokenStream {
 #[proc_macro]
 #[proc_macro_error]
 pub fn grammar(input: TokenStream) -> TokenStream {
-    // FIX: Konvertierung von proc_macro zu proc_macro2 für quote! Kompatibilität
     let input2 = proc_macro2::TokenStream::from(input);
     
     quote! {
         {
-            // Nutzt syn::parse_quote, um den TokenStream zur Compile-Zeit des Tests
-            // in einen Parser-AST zu wandeln und diesen dann zu konvertieren.
             let p_ast: crate::parser::GrammarDefinition = syn::parse_quote! { #input2 };
             let m_ast: crate::model::GrammarDefinition = p_ast.into();
             m_ast
