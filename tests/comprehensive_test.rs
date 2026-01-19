@@ -18,7 +18,6 @@ fn test_basic_sequence() {
 
     let res_fail = env.parse("hello universe");
     res_fail.assert_failure();
-    // Wir prüfen nur, ob überhaupt ein Fehler kam und ob er sinnvoll aussieht
     assert!(!res_fail.stderr.is_empty());
 }
 
@@ -47,7 +46,6 @@ fn test_backtracking_priority() {
 fn test_complex_groups() {
     let grammar = r#"
         grammar Complex {
-            // ("A" "B")? "C"
             rule main -> String = ("A" "B")? "C" -> { "OK".to_string() }
         }
     "#;
@@ -57,8 +55,6 @@ fn test_complex_groups() {
     env.parse("A B C").assert_success();
     env.parse("C").assert_success();
 
-    // Input "A C": ("A" "B") startet, scheitert. Backtracking zu Start.
-    // Dann erwartet "C", findet "A". Fehler.
     let res_fail = env.parse("A C");
     res_fail.assert_failure();
 }
@@ -77,10 +73,12 @@ fn test_math_expression() {
                 f:factor "*" t:term -> { f * t }
               | f:factor            -> { f }
 
-            // FIX: Verwende paren(...) statt "(" ... ")"
+            // FIX: Use explicit tokens "(" and ")" instead of paren(...).
+            // paren(...) creates a scope, so 'e' would die inside the block.
+            // "(" e:expr ")" keeps 'e' in the current scope.
             rule factor -> i32 = 
-                paren(e:expr)  -> { e }
-              | i:int_lit      -> { i }
+                "(" e:expr ")"  -> { e }
+              | i:int_lit       -> { i }
         }
     "#;
 
@@ -103,9 +101,11 @@ fn test_math_expression() {
 fn test_repetition() {
     let grammar = r#"
         grammar Repeat {
-            // FIX: Verwende bracketed[...] statt "[" ... "]"
-            rule main -> usize = bracketed[ content:elems ] -> { content }
+            // FIX: Use "[" ... "]" tokens instead of bracketed[...]
+            // This ensures 'content' is available in the action block.
+            rule main -> usize = "[" content:elems "]" -> { content }
 
+            // With the codegen update, 'rest:elem*' now accumulates into a Vec<()>.
             rule elems -> usize = 
                 first:elem rest:elem* -> { 1 + rest.len() }
             
