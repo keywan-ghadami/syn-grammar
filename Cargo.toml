@@ -1,20 +1,23 @@
 [package]
-name = "syn-grammar-macros"
+name = "syn-grammar"
 version = "0.1.0"
 edition = "2021"
-lib = { proc-macro = true }
+
+# Wir definieren einen Workspace, damit Cargo das Makro-Unterverzeichnis korrekt mitbaut
+[workspace]
+members = ["macros"]
 
 [dependencies]
-# Kern-Abhängigkeiten für Makros
-syn = { version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }
-quote = "1.0"
+# 1. Das Makro selbst (lokaler Pfad)
+syn-grammar-macros = { path = "./macros" }
+
+# 2. Runtime-Abhängigkeiten
+# Diese werden vom generierten Code verwendet (z.B. ParseStream, Token!, etc.)
+# Wir brauchen hier NICHT "full", das spart Kompilierzeit beim Endnutzer.
+syn = { version = "2.0", features = ["parsing", "printing", "clone-impls", "derive"] }
 proc-macro2 = "1.0"
+quote = "1.0"
 
-# Unverzichtbar für deine parser.rs (spart manuelles Parsen)
-derive-syn-parse = "0.2" 
-
-# Für einfaches Error-Reporting (abort!)
-proc-macro-error = "1.0"
-
-# Hilfreich für codegen.rs (z.B. collect_vec, join)
-itertools = "0.14"
+[dev-dependencies]
+# Für die Tests brauchen wir "full", um komplexere Syntax (wie in den Actions) zu parsen
+syn = { version = "2.0", features = ["full", "extra-traits"] }
