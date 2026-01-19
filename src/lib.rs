@@ -53,7 +53,7 @@ mod tests {
     fn test_codegen_uses_combinators() {
         let input = r#"
             grammar Test {
-                rule a -> () = "start" "end" -> { () }
+                rule a -> () = "start" "+" "end" -> { () }
             }
         "#;
         
@@ -62,7 +62,10 @@ mod tests {
         let code = codegen::generate_rust(model).unwrap();
         let s = normalize(&code.to_string());
         
-        // Wir erwarten Peek Checks für Literale
-        assert!(s.contains("input.peek(Token![start])"));
+        // 1. "start" ist ein Identifier -> wird zu custom keyword kw::start
+        assert!(s.contains("input.peek(kw::start)"));
+        
+        // 2. "+" ist ein Operator -> wird zu Token![+]
+        assert!(s.contains("input.peek(Token![+])"));
     }
 }
