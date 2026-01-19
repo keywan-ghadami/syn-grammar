@@ -1,8 +1,9 @@
-use crate::model::*;
 use syn::parse::{Parse, ParseStream};
-use syn::{Result, Token, token, LitStr, Ident, Type, parenthesized, bracketed, braced};
+use syn::{Result, Token, token, LitStr, Ident, Type, parenthesized, bracketed, braced, Lit};
 use derive_syn_parse::Parse;
+use proc_macro2::TokenStream;
 
+// Lokale Keywords für den Parser
 mod kw {
     syn::custom_keyword!(grammar);
     syn::custom_keyword!(rule);
@@ -42,7 +43,7 @@ pub struct Rule {
 }
 
 impl Rule {
-    fn parse_all(input: ParseStream) -> Result<Vec<Self>> {
+    pub fn parse_all(input: ParseStream) -> Result<Vec<Self>> {
         let mut rules = Vec::new();
         while !input.is_empty() {
             rules.push(input.parse()?);
@@ -53,7 +54,7 @@ impl Rule {
 
 pub struct RuleVariant {
     pub pattern: Vec<Pattern>,
-    pub action: proc_macro2::TokenStream,
+    pub action: TokenStream,
 }
 
 impl RuleVariant {
@@ -61,7 +62,7 @@ impl RuleVariant {
         let mut variants = Vec::new();
         loop {
             let mut pattern = Vec::new();
-            // Parsen bis zum Action-Pfeil oder der nächsten Variante
+            // Parsen bis zum Action-Pfeil '->' oder der nächsten Variante '|'
             while !input.peek(Token![->]) && !input.peek(Token![|]) {
                 pattern.push(input.parse()?);
             }
@@ -83,12 +84,29 @@ impl RuleVariant {
     }
 }
 
-// Pattern ist das Herzstück: Atom + Suffixe
+#[derive(Debug, Clone)]
+pub enum Pattern {
+    Lit(LitStr),
+    RuleCall {
+        binding: Option<Ident>,
+        rule_name: Ident,
+        args: Vec<Lit>, 
+    },
+    Group(Vec<Vec<Pattern>>), 
+    Bracketed(Vec<Pattern>),
+    Braced(Vec<Pattern>),
+    Parenthesized(Vec<Pattern>),
+    Optional(Box<Pattern>),
+    Repeat(Box<Pattern>),
+    Plus(Box<Pattern>),
+}
+
+// Implementierung der Parse-Logik für Pattern (Atom + Suffixe)
 impl Parse for Pattern {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut pat = parse_atom(input)?;
 
-        // Suffix-Loop für *, +, ?
+        // Suffix-Handling für Wiederholungen und Optionalität
         loop {
             if input.peek(Token![*]) {
                 input.parse::<Token![*]>()?;
@@ -107,7 +125,7 @@ impl Parse for Pattern {
     }
 }
 
-/// Parsed den "Kern" eines Patterns ohne Suffixe
+/// Hilfsfunktion zum Parsen eines "Atoms" (kleinste Einheit ohne Suffix)
 fn parse_atom(input: ParseStream) -> Result<Pattern> {
     if input.peek(LitStr) {
         Ok(Pattern::Lit(input.parse()?))
@@ -129,7 +147,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         parenthesized!(content in input);
         Ok(Pattern::Group(parse_group_content(&content)?))
     } else {
-        // RuleCall oder Binding
+        // RuleCall: Ident oder binding:Ident
         let binding = if input.peek2(Token![:]) {
             let id: Ident = input.parse()?;
             input.parse::<Token![:]>()?;
@@ -140,7 +158,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
 
         let rule_name: Ident = input.parse()?;
         
-        // Optionale Argumente in ()
+        // Optionale Argumente in runden Klammern
         let mut args = Vec::new();
         if input.peek(token::Paren) {
             let content;
