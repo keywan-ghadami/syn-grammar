@@ -3,6 +3,7 @@ use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
 use std::collections::HashSet;
 use syn::{Result, parse_quote};
+// FIX: Trait muss aus dem Untermodul importiert werden
 use syn::spanned::Spanned;
 use itertools::Itertools; 
 
@@ -71,6 +72,8 @@ fn generate_variants(
 
     let arms = variants.iter().map(|variant| {
         let logic = generate_sequence(&variant.pattern, &variant.action, custom_keywords)?;
+        
+        // Nutzt ModelPattern für den Lookahead-Check
         let peek_token = variant.pattern.first()
             .and_then(|f| get_simple_peek(f, custom_keywords).ok().flatten());
 
@@ -80,7 +83,11 @@ fn generate_variants(
         })
     }).collect::<Result<Vec<_>>>()?;
 
-    let error_msg = if is_top_level { "No matching rule variant found" } else { "No matching variant in group" };
+    let error_msg = if is_top_level { 
+        "No matching rule variant found" 
+    } else { 
+        "No matching variant in group" 
+    };
 
     // Baut die if-else if-else Kette
     Ok(quote! {
@@ -90,12 +97,12 @@ fn generate_variants(
     })
 }
 
-fn generate_sequence(patterns: &[Pattern], action: &TokenStream, kws: &HashSet<String>) -> Result<TokenStream> {
+fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, kws: &HashSet<String>) -> Result<TokenStream> {
     let steps = generate_sequence_steps(patterns, kws)?;
     Ok(quote! { { #steps Ok(#action) } })
 }
 
-fn generate_pattern_step(pattern: &Pattern, kws: &HashSet<String>) -> Result<TokenStream> {
+fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<TokenStream> {
     let span = pattern.span();
 
     // Lokales Hilfsmakro für Suffixe (*, +)
@@ -110,11 +117,11 @@ fn generate_pattern_step(pattern: &Pattern, kws: &HashSet<String>) -> Result<Tok
     }
 
     match pattern {
-        Pattern::Lit(lit) => {
+        ModelPattern::Lit(lit) => {
             let token_type = resolve_token_type(lit, kws)?;
             Ok(quote_spanned! {span=> let _ = input.parse::<#token_type>()?; })
         },
-        Pattern::RuleCall { binding, rule_name, args } => {
+        ModelPattern::RuleCall { binding, rule_name, args } => {
             let func_call = if is_builtin(rule_name) {
                 map_builtin(rule_name)
             } else {
@@ -127,30 +134,30 @@ fn generate_pattern_step(pattern: &Pattern, kws: &HashSet<String>) -> Result<Tok
                 quote_spanned! {span=> let _ = #func_call; }
             })
         },
-        Pattern::Optional(inner) => {
+        ModelPattern::Optional(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
             Ok(match get_simple_peek(inner, kws)? {
                 Some(peek) => quote_spanned! {span=> if input.peek(#peek) { #inner_logic } },
                 None => quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; }
             })
         },
-        Pattern::Repeat(inner) => Ok(attempt_op!(inner, while)),
-        Pattern::Plus(inner) => {
+        ModelPattern::Repeat(inner) => Ok(attempt_op!(inner, while)),
+        ModelPattern::Plus(inner) => {
             let first = generate_pattern_step(inner, kws)?;
             let rest = attempt_op!(inner, while);
             Ok(quote_spanned! {span=> #first #rest })
         },
-        Pattern::Group(alts) => {
+        ModelPattern::Group(alts) => {
             let temp_variants = alts.iter()
                 .map(|pat_seq| RuleVariant { pattern: pat_seq.clone(), action: quote!({}) })
                 .collect_vec();
             let variant_logic = generate_variants(&temp_variants, false, kws)?;
             Ok(quote_spanned! {span=> { #variant_logic }?; })
         },
-        Pattern::Bracketed(s) | Pattern::Braced(s) | Pattern::Parenthesized(s) => {
+        ModelPattern::Bracketed(s) | ModelPattern::Braced(s) | ModelPattern::Parenthesized(s) => {
             let macro_name = match pattern {
-                Pattern::Bracketed(_) => quote!(bracketed),
-                Pattern::Braced(_) => quote!(braced),
+                ModelPattern::Bracketed(_) => quote!(bracketed),
+                ModelPattern::Braced(_) => quote!(braced),
                 _ => quote!(parenthesized),
             };
             let inner_logic = generate_sequence_steps(s, kws)?;
@@ -164,22 +171,23 @@ fn generate_pattern_step(pattern: &Pattern, kws: &HashSet<String>) -> Result<Tok
     }
 }
 
-fn generate_sequence_steps(patterns: &[Pattern], kws: &HashSet<String>) -> Result<TokenStream> {
+fn generate_sequence_steps(patterns: &[ModelPattern], kws: &HashSet<String>) -> Result<TokenStream> {
     patterns.iter()
         .map(|p| generate_pattern_step(p, kws))
         .collect::<Result<TokenStream>>()
 }
 
-fn get_simple_peek(pattern: &Pattern, kws: &HashSet<String>) -> Result<Option<TokenStream>> {
+fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<Option<TokenStream>> {
     match pattern {
-        Pattern::Lit(lit) => {
+        ModelPattern::Lit(lit) => {
             let token_type = resolve_token_type(lit, kws)?;
             Ok(Some(quote!(#token_type)))
         },
-        Pattern::Bracketed(_) => Ok(Some(quote!(syn::token::Bracket))),
-        Pattern::Braced(_) => Ok(Some(quote!(syn::token::Brace))),
-        Pattern::Parenthesized(_) => Ok(Some(quote!(syn::token::Paren))),
-        Pattern::Optional(inner) | Pattern::Repeat(inner) | Pattern::Plus(inner) => get_simple_peek(inner, kws),
+        ModelPattern::Bracketed(_) => Ok(Some(quote!(syn::token::Bracket))),
+        ModelPattern::Braced(_) => Ok(Some(quote!(syn::token::Brace))),
+        ModelPattern::Parenthesized(_) => Ok(Some(quote!(syn::token::Paren))),
+        ModelPattern::Optional(inner) | ModelPattern::Repeat(inner) | ModelPattern::Plus(inner) => 
+            get_simple_peek(inner, kws),
         _ => Ok(None)
     }
 }
@@ -202,16 +210,18 @@ fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {
     kws
 }
 
-fn collect_from_patterns(patterns: &[Pattern], kws: &mut HashSet<String>) {
+fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
     for p in patterns {
         match p {
-            Pattern::Lit(lit) => {
+            ModelPattern::Lit(lit) => {
                 let s = lit.value();
                 if is_identifier(&s) && !is_rust_keyword(&s) { kws.insert(s); }
             },
-            Pattern::Group(alts) => alts.iter().for_each(|alt| collect_from_patterns(alt, kws)),
-            Pattern::Bracketed(s) | Pattern::Braced(s) | Pattern::Parenthesized(s) => collect_from_patterns(s, kws),
-            Pattern::Optional(i) | Pattern::Repeat(i) | Pattern::Plus(i) => collect_from_patterns(std::slice::from_ref(i), kws),
+            ModelPattern::Group(alts) => alts.iter().for_each(|alt| collect_from_patterns(alt, kws)),
+            ModelPattern::Bracketed(s) | ModelPattern::Braced(s) | ModelPattern::Parenthesized(s) => 
+                collect_from_patterns(s, kws),
+            ModelPattern::Optional(i) | ModelPattern::Repeat(i) | ModelPattern::Plus(i) => 
+                collect_from_patterns(std::slice::from_ref(i), kws),
             _ => {}
         }
     }
