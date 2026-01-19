@@ -35,7 +35,7 @@ pub fn generate_variants_internal(
     // 1. Analyse Phase: Zähle Start-Tokens
     let mut token_counts = HashMap::new();
     for v in variants {
-        if let Some(token_str) = analysis::get_peek_token_string(&v.pattern, custom_keywords) {
+        if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
             *token_counts.entry(token_str).or_insert(0) += 1;
         }
     }
@@ -46,7 +46,7 @@ pub fn generate_variants_internal(
         let peek_token_obj = variant.pattern.first()
             .and_then(|f| analysis::get_simple_peek(f, custom_keywords).ok().flatten());
         
-        let peek_str = analysis::get_peek_token_string(&variant.pattern, custom_keywords);
+        let peek_str = analysis::get_peek_token_string(&variant.pattern);
 
         match (peek_token_obj, peek_str) {
             (Some(token_code), Some(token_key)) => {
