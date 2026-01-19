@@ -1,27 +1,20 @@
 [package]
-name = "syn-grammar"
+name = "syn-grammar-macros"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+lib = { proc-macro = true }
 
 [dependencies]
+# Kern-Abhängigkeiten für Makros
 syn = { version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
-derive-syn-parse = "0.2.0"
+
+# Unverzichtbar für deine parser.rs (spart manuelles Parsen)
+derive-syn-parse = "0.2" 
+
+# Für einfaches Error-Reporting (abort!)
 proc-macro-error = "1.0"
-thiserror = "2.0"
-itertools = "0.14.0"
-# Das Macro-Crate für die automatische AST-Konvertierung
-syn-grammar-macros = { path = "./macros" }
 
-# Optional für die JIT/Test-Umgebung
-tempfile = { version = "3.10", optional = true }
-
-[features]
-default = []
-# Aktiviert die JIT-Infrastruktur (TestEnv)
-jit = ["dep:tempfile"]
-
-[dev-dependencies]
-# In Tests aktivieren wir das JIT-Feature automatisch
-syn-grammar = { path = ".", features = ["jit"] }
+# Hilfreich für codegen.rs (z.B. collect_vec, join)
+itertools = "0.14"
