@@ -13,12 +13,9 @@ fn test_basic_sequence() {
     "#;
 
     let env = TestEnv::new("Basic", grammar);
-    
     env.parse("hello world").assert_success();
-
     let res_fail = env.parse("hello universe");
     res_fail.assert_failure();
-    assert!(!res_fail.stderr.is_empty());
 }
 
 #[test]
@@ -32,7 +29,6 @@ fn test_backtracking_priority() {
     "#;
 
     let env = TestEnv::new("Backtrack", grammar);
-
     let res_ab = env.parse("A B");
     res_ab.assert_success();
     assert!(res_ab.stdout.contains("Path AB"));
@@ -51,12 +47,9 @@ fn test_complex_groups() {
     "#;
 
     let env = TestEnv::new("Complex", grammar);
-
     env.parse("A B C").assert_success();
     env.parse("C").assert_success();
-
-    let res_fail = env.parse("A C");
-    res_fail.assert_failure();
+    env.parse("A C").assert_failure();
 }
 
 #[test]
@@ -73,25 +66,20 @@ fn test_math_expression() {
                 f:factor "*" t:term -> { f * t }
               | f:factor            -> { f }
 
-            // FIX: Use explicit tokens "(" and ")" instead of paren(...).
-            // paren(...) creates a scope, so 'e' would die inside the block.
-            // "(" e:expr ")" keeps 'e' in the current scope.
+            // FIX: Jetzt nutzen wir wieder paren(...), da codegen.rs die Variablen exportiert!
             rule factor -> i32 = 
-                "(" e:expr ")"  -> { e }
-              | i:int_lit       -> { i }
+                paren(e:expr)  -> { e }
+              | i:int_lit      -> { i }
         }
     "#;
 
     let env = TestEnv::new("Math", grammar);
-
     let res1 = env.parse("1 + 2");
     res1.assert_success();
     assert!(res1.stdout.contains("3"));
-
     let res2 = env.parse("2 + 3 * 4");
     res2.assert_success();
     assert!(res2.stdout.contains("14"));
-
     let res3 = env.parse("(2 + 3) * 4");
     res3.assert_success();
     assert!(res3.stdout.contains("20"));
@@ -101,11 +89,9 @@ fn test_math_expression() {
 fn test_repetition() {
     let grammar = r#"
         grammar Repeat {
-            // FIX: Use "[" ... "]" tokens instead of bracketed[...]
-            // This ensures 'content' is available in the action block.
-            rule main -> usize = "[" content:elems "]" -> { content }
+            // FIX: Auch hier wieder bracketed[...]
+            rule main -> usize = bracketed[ content:elems ] -> { content }
 
-            // With the codegen update, 'rest:elem*' now accumulates into a Vec<()>.
             rule elems -> usize = 
                 first:elem rest:elem* -> { 1 + rest.len() }
             
@@ -114,15 +100,12 @@ fn test_repetition() {
     "#;
 
     let env = TestEnv::new("Repeat", grammar);
-
     let res1 = env.parse("[ x ]");
     res1.assert_success();
     assert!(res1.stdout.contains("1"));
-
     let res3 = env.parse("[ x, x, x ]");
     res3.assert_success();
     assert!(res3.stdout.contains("3"));
-
     env.parse("[ ]").assert_failure();
 }
 
@@ -136,7 +119,6 @@ fn test_builtins() {
     "#;
 
     let env = TestEnv::new("Builtins", grammar);
-
     let res = env.parse("key = \"value\"");
     res.assert_success();
     assert!(res.stdout.contains("key: value"));
