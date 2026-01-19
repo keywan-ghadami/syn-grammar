@@ -3,6 +3,7 @@ use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
 use std::collections::HashSet;
 use syn::{Result, parse_quote};
+// Zeile gelöscht: use syn::spanned::Spanned;
 use itertools::Itertools; 
 
 /// Generiert den vollständigen Rust-Code für eine Grammatik-Definition.
@@ -10,7 +11,6 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let grammar_name = &grammar.name;
     let custom_keywords = collect_custom_keywords(&grammar);
 
-    // Custom Keywords Definition
     let kw_defs = (!custom_keywords.is_empty()).then(|| {
         let defs = custom_keywords.iter().map(|k| {
             let ident = format_ident!("{}", k);
@@ -19,12 +19,10 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
         quote! { pub mod kw { #(#defs)* } }
     });
 
-    // Vererbung
     let inheritance = grammar.inherits.as_ref().map(|parent| {
         quote! { use super::#parent::*; }
     });
 
-    // Regeln generieren
     let rules = grammar.rules.iter()
         .map(|r| generate_rule(r, &custom_keywords))
         .collect::<Result<Vec<_>>>()?;
@@ -75,15 +73,14 @@ fn generate_variants(
         let peek_token = variant.pattern.first()
             .and_then(|f| get_simple_peek(f, custom_keywords).ok().flatten());
 
-        // Die Logik für den spekulativen Versuch
         let attempt_block = quote! { rt::attempt(input, |input| { #logic })? };
 
         Ok(match peek_token {
             Some(token) => {
-                // OPTIMIERUNG: Wir kombinieren Peek und Attempt.
-                // 1. Check: Passt das erste Token? (Schnell)
-                // 2. Wenn ja: Starte Backtracking-Versuch (Sicher)
-                // 3. Wenn nein: Liefere None (Fallthrough zum nächsten Else)
+                // PEEK-GUARDED BACKTRACKING
+                // Wir nutzen peek nur als Vorfilter. Wenn der Peek passt, 
+                // wird trotzdem ein attempt ausgeführt, um bei Misserfolg (Backtracking)
+                // zum nächsten Zweig springen zu können.
                 quote! {
                     if let Some(res) = if input.peek(#token) { 
                         #attempt_block 
@@ -95,7 +92,6 @@ fn generate_variants(
                 }
             },
             None => {
-                // Fallback: Einfaches Backtracking ohne Peek-Schutz
                 quote! { 
                     if let Some(res) = #attempt_block { 
                         Ok(res) 
@@ -111,7 +107,6 @@ fn generate_variants(
         "No matching variant in group" 
     };
 
-    // Erzeugt eine Kette: if let ... { Ok } else if let ... { Ok } else { Err }
     Ok(quote! {
         #(#arms else)* {
             Err(input.error(#error_msg))
@@ -119,25 +114,15 @@ fn generate_variants(
     })
 }
 
-
 fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, kws: &HashSet<String>) -> Result<TokenStream> {
     let steps = generate_sequence_steps(patterns, kws)?;
     Ok(quote! { { #steps Ok(#action) } })
 }
 
 fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<TokenStream> {
+    // Hier wird die inherent method ModelPattern::span() aufgerufen.
+    // Kein Trait-Import nötig.
     let span = pattern.span();
-
-    // Lokales Hilfsmakro für Suffixe (*, +)
-    macro_rules! attempt_op {
-        ($inner:expr, $wrapper:ident) => {{
-            let inner_logic = generate_pattern_step($inner, kws)?;
-            match get_simple_peek($inner, kws)? {
-                Some(peek) => quote_spanned! {span=> $wrapper input.peek(#peek) { #inner_logic } },
-                None => quote_spanned! {span=> $wrapper let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {} }
-            }
-        }};
-    }
 
     match pattern {
         ModelPattern::Lit(lit) => {
@@ -157,18 +142,21 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 quote_spanned! {span=> let _ = #func_call; }
             })
         },
+        // Backtracking für Suffixe (sicherer Weg für komplexe Gruppen)
         ModelPattern::Optional(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
-            Ok(match get_simple_peek(inner, kws)? {
-                Some(peek) => quote_spanned! {span=> if input.peek(#peek) { #inner_logic } },
-                None => quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; }
-            })
+            Ok(quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; })
         },
-        ModelPattern::Repeat(inner) => Ok(attempt_op!(inner, while)),
+        ModelPattern::Repeat(inner) => {
+            let inner_logic = generate_pattern_step(inner, kws)?;
+            Ok(quote_spanned! {span=> while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {} })
+        },
         ModelPattern::Plus(inner) => {
-            let first = generate_pattern_step(inner, kws)?;
-            let rest = attempt_op!(inner, while);
-            Ok(quote_spanned! {span=> #first #rest })
+            let inner_logic = generate_pattern_step(inner, kws)?;
+            Ok(quote_spanned! {span=> 
+                #inner_logic
+                while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {}
+            })
         },
         ModelPattern::Group(alts) => {
             let temp_variants = alts.iter()
@@ -251,7 +239,6 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
 }
 
 fn is_identifier(s: &str) -> bool {
-    // FIX: map_or(false, ...) durch is_some_and(...) ersetzt
     s.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_') && 
     s.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
