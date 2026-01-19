@@ -45,9 +45,12 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
 }
 
 fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<TokenStream> {
-    let fn_name = format_ident!("parse_{}", rule.name);
+    let name = &rule.name;
+    let fn_name = format_ident!("parse_{}", name);
     let ret_type = &rule.return_type;
-    let vis = if rule.is_pub { quote!(pub) } else { quote!() };
+    let is_public = rule.is_pub || name == "main";
+    let vis = if is_public { quote!(pub) } else { quote!() };
+    
     let body = generate_variants(&rule.variants, true, custom_keywords)?; 
 
     Ok(quote! {
@@ -56,6 +59,7 @@ fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<Token
         }
     })
 }
+
 
 fn generate_variants(
     variants: &[RuleVariant], 
