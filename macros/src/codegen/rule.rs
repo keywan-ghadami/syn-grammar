@@ -22,11 +22,10 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     })
 }
 
-// Public für pattern.rs (für Groups), aber sonst intern
 pub fn generate_variants_internal(
     variants: &[RuleVariant], 
     is_top_level: bool,
-    custom_keywords: &HashSet<String>
+    _custom_keywords: &HashSet<String> // Wird hier aktuell nicht mehr direkt gebraucht
 ) -> Result<TokenStream> {
     if variants.is_empty() {
         return Ok(quote! { Err(input.error("No variants defined")) });
@@ -35,16 +34,19 @@ pub fn generate_variants_internal(
     // 1. Analyse Phase: Zähle Start-Tokens
     let mut token_counts = HashMap::new();
     for v in variants {
+        // Hinweis: Hier wurde 'custom_keywords' aus dem Aufruf entfernt (wie im vorherigen Fix besprochen)
         if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
             *token_counts.entry(token_str).or_insert(0) += 1;
         }
     }
 
     let arms = variants.iter().map(|variant| {
-        let logic = pattern::generate_sequence(&variant.pattern, &variant.action, custom_keywords)?;
+        // Wir übergeben weiterhin custom_keywords für die Code-Generierung der Sequenz
+        let logic = pattern::generate_sequence(&variant.pattern, &variant.action, _custom_keywords)?;
         
+        // Peek-Token holen (braucht noch kws für Typ-Auflösung)
         let peek_token_obj = variant.pattern.first()
-            .and_then(|f| analysis::get_simple_peek(f, custom_keywords).ok().flatten());
+            .and_then(|f| analysis::get_simple_peek(f, _custom_keywords).ok().flatten());
         
         let peek_str = analysis::get_peek_token_string(&variant.pattern);
 
@@ -53,20 +55,24 @@ pub fn generate_variants_internal(
                 let count = token_counts.get(&token_key).unwrap_or(&0);
                 
                 if *count == 1 {
-                    // UNIQUE PREFIX -> COMMIT (Kein attempt)
+                    // UNIQUE PREFIX -> COMMIT
+                    // Strategie: Wenn Token passt, MUSS es diese Regel sein.
+                    // Wir führen aus und returnen das Ergebnis sofort.
+                    // Fehler hier brechen die Funktion ab (gewollt).
                     Ok(quote! {
                         if input.peek(#token_code) {
-                            #logic
+                            return #logic;
                         }
                     })
                 } else {
-                    // AMBIGUOUS PREFIX -> ATTEMPT (Backtracking nötig)
+                    // AMBIGUOUS PREFIX -> ATTEMPT (Backtracking)
+                    // Strategie: Wenn Token passt, probieren wir es "sandbox"-mäßig.
+                    // Wenn es klappt -> return Ok.
+                    // Wenn nicht (None) -> machen wir NICHTS und der Code läuft weiter zur nächsten Variante.
                     Ok(quote! {
                         if input.peek(#token_code) {
                             if let Some(res) = rt::attempt(input, |input| { #logic })? {
-                                Ok(res)
-                            } else {
-                                None
+                                return Ok(res);
                             }
                         }
                     })
@@ -74,9 +80,10 @@ pub fn generate_variants_internal(
             },
             _ => {
                 // BLIND START -> ATTEMPT
+                // Kein Peek möglich, wir müssen es probieren.
                 Ok(quote! { 
                     if let Some(res) = rt::attempt(input, |input| { #logic })? { 
-                        Ok(res) 
+                        return Ok(res); 
                     } 
                 })
             }
@@ -89,10 +96,11 @@ pub fn generate_variants_internal(
         "No matching variant in group" 
     };
 
+    // ÄNDERUNG: Statt #(#arms else)* nutzen wir eine flache Liste.
+    // Da jeder Block mit 'return' endet (bei Erfolg), wirkt das wie ein "First Match Wins".
+    // Wenn nichts matcht, fallen wir unten durch in den Error.
     Ok(quote! {
-        #(#arms else)* {
-            Err(input.error(#error_msg))
-        }
+        #(#arms)*
+        Err(input.error(#error_msg))
     })
 }
-
