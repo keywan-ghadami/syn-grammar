@@ -47,7 +47,6 @@ fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<Token
     let fn_name = format_ident!("parse_{}", name);
     let ret_type = &rule.return_type;
     
-    // FIX: Regel 'main' ist automatisch public
     let is_public = rule.is_pub || name == "main";
     let vis = if is_public { quote!(pub) } else { quote!() };
     
@@ -117,6 +116,16 @@ fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, kws: &Hash
     Ok(quote! { { #steps Ok(#action) } })
 }
 
+/// Helper to generate the function call for a RuleCall without the 'let binding =' part
+fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenStream {
+    if is_builtin(rule_name) {
+        map_builtin(rule_name)
+    } else {
+        let f = format_ident!("parse_{}", rule_name);
+        if args.is_empty() { quote!(#f(input)?) } else { quote!(#f(input, #(#args),*)?) }
+    }
+}
+
 fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<TokenStream> {
     let span = pattern.span();
 
@@ -126,32 +135,93 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             Ok(quote_spanned! {span=> let _ = input.parse::<#token_type>()?; })
         },
         ModelPattern::RuleCall { binding, rule_name, args } => {
-            let func_call = if is_builtin(rule_name) {
-                map_builtin(rule_name)
-            } else {
-                let f = format_ident!("parse_{}", rule_name);
-                if args.is_empty() { quote!(#f(input)?) } else { quote!(#f(input, #(#args),*)?) }
-            };
+            let func_call = generate_rule_call_expr(rule_name, args);
             Ok(if let Some(bind) = binding {
                 quote_spanned! {span=> let #bind = #func_call; }
             } else {
                 quote_spanned! {span=> let _ = #func_call; }
             })
         },
+        
+        // --- REPEAT & PLUS with Accumulation ---
+        // If the inner pattern is a RuleCall with a binding (e.g., rest:elem*),
+        // we must generate a Vec accumulation loop.
+        ModelPattern::Repeat(inner) => {
+            if let ModelPattern::RuleCall { binding: Some(bind), rule_name, args } = &**inner {
+                 let func_call = generate_rule_call_expr(rule_name, args);
+                 // Lookahead for the loop
+                 let peek_check = if let Some(peek) = get_simple_peek(inner, kws)? {
+                     quote!(input.peek(#peek))
+                 } else {
+                     quote!(true) // Fallback (dangerous if not peekable, but handled by attempt inside)
+                 };
+
+                 // If we have a clear peek, utilize it for a while loop
+                 if get_simple_peek(inner, kws)?.is_some() {
+                     Ok(quote_spanned! {span=> 
+                        let mut #bind = Vec::new();
+                        while #peek_check {
+                            let val = #func_call;
+                            #bind.push(val);
+                        }
+                     })
+                 } else {
+                     // Fallback to attempt loop
+                     Ok(quote_spanned! {span=> 
+                        let mut #bind = Vec::new();
+                        while let Some(val) = rt::attempt(input, |input| { Ok(#func_call) })? {
+                            #bind.push(val);
+                        }
+                     })
+                 }
+            } else {
+                // Standard loop (discard result)
+                let inner_logic = generate_pattern_step(inner, kws)?;
+                Ok(quote_spanned! {span=> while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {} })
+            }
+        },
+        
+        ModelPattern::Plus(inner) => {
+             // Similar logic for Plus, but ensure one parse first
+             if let ModelPattern::RuleCall { binding: Some(bind), rule_name, args } = &**inner {
+                 let func_call = generate_rule_call_expr(rule_name, args);
+                 let peek_check = if let Some(peek) = get_simple_peek(inner, kws)? {
+                     quote!(input.peek(#peek))
+                 } else {
+                     quote!(true)
+                 };
+                 
+                 if get_simple_peek(inner, kws)?.is_some() {
+                     Ok(quote_spanned! {span=> 
+                        let mut #bind = Vec::new();
+                        // 1. Mandatory first element
+                        #bind.push(#func_call);
+                        // 2. Loop
+                        while #peek_check {
+                            #bind.push(#func_call);
+                        }
+                     })
+                 } else {
+                      Ok(quote_spanned! {span=> 
+                        let mut #bind = Vec::new();
+                        #bind.push(#func_call);
+                        while let Some(val) = rt::attempt(input, |input| { Ok(#func_call) })? {
+                            #bind.push(val);
+                        }
+                     })
+                 }
+             } else {
+                let inner_logic = generate_pattern_step(inner, kws)?;
+                Ok(quote_spanned! {span=> 
+                    #inner_logic
+                    while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {}
+                })
+             }
+        },
+
         ModelPattern::Optional(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
             Ok(quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; })
-        },
-        ModelPattern::Repeat(inner) => {
-            let inner_logic = generate_pattern_step(inner, kws)?;
-            Ok(quote_spanned! {span=> while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {} })
-        },
-        ModelPattern::Plus(inner) => {
-            let inner_logic = generate_pattern_step(inner, kws)?;
-            Ok(quote_spanned! {span=> 
-                #inner_logic
-                while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {}
-            })
         },
         ModelPattern::Group(alts) => {
             let temp_variants = alts.iter()
@@ -201,20 +271,16 @@ fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<Opti
 fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> Result<syn::Type> {
     let s = lit.value();
     
-    // 1. Check auf Custom Keywords
     if custom_keywords.contains(&s) {
         let ident = format_ident!("{}", s);
         return Ok(parse_quote!(kw::#ident));
     }
 
-    // 2. Expliziter Check auf verbotene Klammern in Token![]
-    // Klammern müssen über Pattern::Parenthesized etc. geparst werden!
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
         return Err(syn::Error::new(lit.span(), 
             format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
     }
 
-    // 3. Versuche, es als syn::Token zu parsen (z.B. Token![+])
     syn::parse_str::<syn::Type>(&format!("Token![{}]", s))
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))
 }
