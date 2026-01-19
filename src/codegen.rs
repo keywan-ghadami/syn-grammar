@@ -226,7 +226,8 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
 }
 
 fn is_identifier(s: &str) -> bool {
-    s.chars().next().map_or(false, |c| c.is_alphabetic() || c == '_') && 
+    // FIX: map_or(false, ...) durch is_some_and(...) ersetzt
+    s.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_') && 
     s.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
 
