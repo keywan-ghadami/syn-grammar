@@ -1,6 +1,6 @@
 use crate::model::*;
 use quote::{quote, quote_spanned, format_ident};
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, Ident};
 use std::collections::HashSet;
 use syn::{Result, parse_quote};
 use itertools::Itertools; 
@@ -116,7 +116,6 @@ fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, kws: &Hash
     Ok(quote! { { #steps Ok(#action) } })
 }
 
-/// Helper to generate the function call for a RuleCall without the 'let binding =' part
 fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenStream {
     if is_builtin(rule_name) {
         map_builtin(rule_name)
@@ -124,6 +123,31 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenSt
         let f = format_ident!("parse_{}", rule_name);
         if args.is_empty() { quote!(#f(input)?) } else { quote!(#f(input, #(#args),*)?) }
     }
+}
+
+/// Sammelt Bindings (Variablennamen), die innerhalb eines Patterns definiert werden.
+/// Wird genutzt, um Variablen aus Scope-Blöcken (paren, bracketed) zu exportieren.
+fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
+    let mut bindings = Vec::new();
+    for p in patterns {
+        match p {
+            ModelPattern::RuleCall { binding: Some(b), .. } => bindings.push(b.clone()),
+            // Bei Repeat/Plus wird die Variable oft lokal im Loop definiert, aber 
+            // in unserer Codegen-Logik erstellen wir ein Vec let mut binding = ... davor.
+            // Daher müssen wir diese auch erfassen.
+            ModelPattern::Repeat(inner) | ModelPattern::Plus(inner) => {
+                if let ModelPattern::RuleCall { binding: Some(b), .. } = &**inner {
+                    bindings.push(b.clone());
+                }
+            }
+            // Rekursion für verschachtelte Sequenzen
+            ModelPattern::Parenthesized(s) | ModelPattern::Bracketed(s) | ModelPattern::Braced(s) => {
+                bindings.extend(collect_bindings(s));
+            }
+            _ => {}
+        }
+    }
+    bindings
 }
 
 fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<TokenStream> {
@@ -143,20 +167,15 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             })
         },
         
-        // --- REPEAT & PLUS with Accumulation ---
-        // If the inner pattern is a RuleCall with a binding (e.g., rest:elem*),
-        // we must generate a Vec accumulation loop.
         ModelPattern::Repeat(inner) => {
             if let ModelPattern::RuleCall { binding: Some(bind), rule_name, args } = &**inner {
                  let func_call = generate_rule_call_expr(rule_name, args);
-                 // Lookahead for the loop
                  let peek_check = if let Some(peek) = get_simple_peek(inner, kws)? {
                      quote!(input.peek(#peek))
                  } else {
-                     quote!(true) // Fallback (dangerous if not peekable, but handled by attempt inside)
+                     quote!(true)
                  };
 
-                 // If we have a clear peek, utilize it for a while loop
                  if get_simple_peek(inner, kws)?.is_some() {
                      Ok(quote_spanned! {span=> 
                         let mut #bind = Vec::new();
@@ -166,7 +185,6 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         }
                      })
                  } else {
-                     // Fallback to attempt loop
                      Ok(quote_spanned! {span=> 
                         let mut #bind = Vec::new();
                         while let Some(val) = rt::attempt(input, |input| { Ok(#func_call) })? {
@@ -175,14 +193,12 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                      })
                  }
             } else {
-                // Standard loop (discard result)
                 let inner_logic = generate_pattern_step(inner, kws)?;
                 Ok(quote_spanned! {span=> while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {} })
             }
         },
         
         ModelPattern::Plus(inner) => {
-             // Similar logic for Plus, but ensure one parse first
              if let ModelPattern::RuleCall { binding: Some(bind), rule_name, args } = &**inner {
                  let func_call = generate_rule_call_expr(rule_name, args);
                  let peek_check = if let Some(peek) = get_simple_peek(inner, kws)? {
@@ -194,9 +210,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                  if get_simple_peek(inner, kws)?.is_some() {
                      Ok(quote_spanned! {span=> 
                         let mut #bind = Vec::new();
-                        // 1. Mandatory first element
                         #bind.push(#func_call);
-                        // 2. Loop
                         while #peek_check {
                             #bind.push(#func_call);
                         }
@@ -230,19 +244,37 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let variant_logic = generate_variants(&temp_variants, false, kws)?;
             Ok(quote_spanned! {span=> { #variant_logic }?; })
         },
+
+        // FIX: Exportieren von Variablen aus Klammer-Blöcken
         ModelPattern::Bracketed(s) | ModelPattern::Braced(s) | ModelPattern::Parenthesized(s) => {
             let macro_name = match pattern {
                 ModelPattern::Bracketed(_) => quote!(bracketed),
                 ModelPattern::Braced(_) => quote!(braced),
                 _ => quote!(parenthesized),
             };
+            
             let inner_logic = generate_sequence_steps(s, kws)?;
-            Ok(quote_spanned! {span=> {
-                let content;
-                let _ = syn::#macro_name!(content in input);
-                let input = &content;
-                #inner_logic
-            }})
+            let bindings = collect_bindings(s); // Alle Variablen sammeln
+
+            if bindings.is_empty() {
+                Ok(quote_spanned! {span=> {
+                    let content;
+                    let _ = syn::#macro_name!(content in input);
+                    let input = &content;
+                    #inner_logic
+                }})
+            } else {
+                // Erzeuge Tuple Return: let (a, b) = { ...; (a, b) };
+                Ok(quote_spanned! {span=> 
+                    let (#(#bindings),*) = {
+                        let content;
+                        let _ = syn::#macro_name!(content in input);
+                        let input = &content;
+                        #inner_logic
+                        (#(#bindings),*)
+                    };
+                })
+            }
         },
     }
 }
@@ -276,6 +308,8 @@ fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> R
         return Ok(parse_quote!(kw::#ident));
     }
 
+    // Wir verbieten weiterhin direkte Token-Literale für Klammern, 
+    // zwingen den User aber nun, paren/bracketed zu nutzen, was jetzt funktioniert.
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
         return Err(syn::Error::new(lit.span(), 
             format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
