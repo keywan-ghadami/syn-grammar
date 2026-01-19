@@ -129,7 +129,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             if bindings.is_empty() {
                 Ok(quote_spanned! {span=> {
                     let content;
-                    let _ = syn::#macro_name!(content in input);
+                    // FIX: Hier fehlte das '?'
+                    let _ = syn::#macro_name!(content in input)?;
                     let input = &content;
                     #inner_logic
                 }})
@@ -138,7 +139,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 Ok(quote_spanned! {span=> 
                     let #bind = {
                         let content;
-                        let _ = syn::#macro_name!(content in input);
+                        // FIX: Hier fehlte das '?'
+                        let _ = syn::#macro_name!(content in input)?;
                         let input = &content;
                         #inner_logic
                         #bind
@@ -148,7 +150,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 Ok(quote_spanned! {span=> 
                     let (#(#bindings),*) = {
                         let content;
-                        let _ = syn::#macro_name!(content in input);
+                        // FIX: Hier fehlte das '?'
+                        let _ = syn::#macro_name!(content in input)?;
                         let input = &content;
                         #inner_logic
                         (#(#bindings),*)
@@ -180,4 +183,3 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
         _ => unreachable!(),
     }
 }
-
