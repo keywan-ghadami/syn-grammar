@@ -2,7 +2,8 @@ use crate::model::*;
 use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
 use std::collections::HashSet;
-use syn::{Result, parse_quote, Spanned};
+use syn::{Result, parse_quote};
+use syn::spanned::Spanned;
 use itertools::Itertools; 
 
 /// Generiert den vollständigen Rust-Code für eine Grammatik-Definition.
