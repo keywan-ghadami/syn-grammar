@@ -1,7 +1,7 @@
 use syn::{Ident, Type, LitStr, Lit};
 use proc_macro2::{TokenStream, Span};
 use syn_grammar_macros::ModelConvert;
-use syn::spanned::Spanned;
+
 
 #[derive(Debug, Clone, ModelConvert)]
 pub struct GrammarDefinition {
