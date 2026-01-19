@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 # WICHTIG: Markiert dies als prozedurales Makro-Crate
-lib = { proc-macro = true }
+[lib]
+proc-macro = true
 
 [dependencies]
 # 1. Parsing der DSL (Wir brauchen "full" für Syntax-Checks und Parsing)
