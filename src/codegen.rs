@@ -125,22 +125,16 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenSt
     }
 }
 
-/// Sammelt Bindings (Variablennamen), die innerhalb eines Patterns definiert werden.
-/// Wird genutzt, um Variablen aus Scope-Blöcken (paren, bracketed) zu exportieren.
 fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     let mut bindings = Vec::new();
     for p in patterns {
         match p {
             ModelPattern::RuleCall { binding: Some(b), .. } => bindings.push(b.clone()),
-            // Bei Repeat/Plus wird die Variable oft lokal im Loop definiert, aber 
-            // in unserer Codegen-Logik erstellen wir ein Vec let mut binding = ... davor.
-            // Daher müssen wir diese auch erfassen.
             ModelPattern::Repeat(inner) | ModelPattern::Plus(inner) => {
                 if let ModelPattern::RuleCall { binding: Some(b), .. } = &**inner {
                     bindings.push(b.clone());
                 }
             }
-            // Rekursion für verschachtelte Sequenzen
             ModelPattern::Parenthesized(s) | ModelPattern::Bracketed(s) | ModelPattern::Braced(s) => {
                 bindings.extend(collect_bindings(s));
             }
@@ -245,7 +239,6 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             Ok(quote_spanned! {span=> { #variant_logic }?; })
         },
 
-        // FIX: Exportieren von Variablen aus Klammer-Blöcken
         ModelPattern::Bracketed(s) | ModelPattern::Braced(s) | ModelPattern::Parenthesized(s) => {
             let macro_name = match pattern {
                 ModelPattern::Bracketed(_) => quote!(bracketed),
@@ -254,7 +247,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             };
             
             let inner_logic = generate_sequence_steps(s, kws)?;
-            let bindings = collect_bindings(s); // Alle Variablen sammeln
+            let bindings = collect_bindings(s);
 
             if bindings.is_empty() {
                 Ok(quote_spanned! {span=> {
@@ -263,8 +256,20 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     let input = &content;
                     #inner_logic
                 }})
+            } else if bindings.len() == 1 {
+                // WARNUNG FIX: Bei genau einer Variable keine Tuple-Klammern (e) erzeugen
+                let bind = &bindings[0];
+                Ok(quote_spanned! {span=> 
+                    let #bind = {
+                        let content;
+                        let _ = syn::#macro_name!(content in input);
+                        let input = &content;
+                        #inner_logic
+                        #bind
+                    };
+                })
             } else {
-                // Erzeuge Tuple Return: let (a, b) = { ...; (a, b) };
+                // Tuple-Return für mehrere Variablen: let (a, b) = { ...; (a, b) };
                 Ok(quote_spanned! {span=> 
                     let (#(#bindings),*) = {
                         let content;
@@ -308,8 +313,6 @@ fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> R
         return Ok(parse_quote!(kw::#ident));
     }
 
-    // Wir verbieten weiterhin direkte Token-Literale für Klammern, 
-    // zwingen den User aber nun, paren/bracketed zu nutzen, was jetzt funktioniert.
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
         return Err(syn::Error::new(lit.span(), 
             format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
