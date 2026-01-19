@@ -71,13 +71,37 @@ fn generate_variants(
     let arms = variants.iter().map(|variant| {
         let logic = generate_sequence(&variant.pattern, &variant.action, custom_keywords)?;
         
-        // Nutzt ModelPattern für den Lookahead-Check
+        // Lookahead ermitteln
         let peek_token = variant.pattern.first()
             .and_then(|f| get_simple_peek(f, custom_keywords).ok().flatten());
 
+        // Die Logik für den spekulativen Versuch
+        let attempt_block = quote! { rt::attempt(input, |input| { #logic })? };
+
         Ok(match peek_token {
-            Some(token) => quote! { if input.peek(#token) { #logic } },
-            None => quote! { if let Some(res) = rt::attempt(input, |input| { #logic })? { Ok(res) } }
+            Some(token) => {
+                // OPTIMIERUNG: Wir kombinieren Peek und Attempt.
+                // 1. Check: Passt das erste Token? (Schnell)
+                // 2. Wenn ja: Starte Backtracking-Versuch (Sicher)
+                // 3. Wenn nein: Liefere None (Fallthrough zum nächsten Else)
+                quote! {
+                    if let Some(res) = if input.peek(#token) { 
+                        #attempt_block 
+                    } else { 
+                        None 
+                    } { 
+                        Ok(res) 
+                    }
+                }
+            },
+            None => {
+                // Fallback: Einfaches Backtracking ohne Peek-Schutz
+                quote! { 
+                    if let Some(res) = #attempt_block { 
+                        Ok(res) 
+                    } 
+                }
+            }
         })
     }).collect::<Result<Vec<_>>>()?;
 
@@ -87,13 +111,14 @@ fn generate_variants(
         "No matching variant in group" 
     };
 
-    // Baut die if-else if-else Kette
+    // Erzeugt eine Kette: if let ... { Ok } else if let ... { Ok } else { Err }
     Ok(quote! {
         #(#arms else)* {
             Err(input.error(#error_msg))
         }
     })
 }
+
 
 fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, kws: &HashSet<String>) -> Result<TokenStream> {
     let steps = generate_sequence_steps(patterns, kws)?;
