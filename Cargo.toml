@@ -10,7 +10,7 @@ proc-macro2 = "1.0"
 derive-syn-parse = "0.2.0"
 proc-macro-error = "1.0"
 thiserror = "2.0"
-itertools = "1.0"
+itertools = "0.14.0"
 # Das Macro-Crate für die automatische AST-Konvertierung
 syn-grammar-macros = { path = "./macros" }
 
