@@ -51,9 +51,11 @@ mod tests {
 
     #[test]
     fn test_codegen_uses_combinators() {
+        // Fall 1: Sequenz mit Identifier und Operator
         let input = r#"
             grammar Test {
                 rule a -> () = "start" "+" "end" -> { () }
+                rule b -> () = "?"? -> { () } 
             }
         "#;
         
@@ -62,10 +64,14 @@ mod tests {
         let code = codegen::generate_rust(model).unwrap();
         let s = normalize(&code.to_string());
         
-        // 1. "start" ist ein Identifier -> wird zu custom keyword kw::start
+        // 1. "start" ist das erste Element -> Lookahead (peek) wird generiert
         assert!(s.contains("input.peek(kw::start)"));
         
-        // 2. "+" ist ein Operator -> wird zu Token![+]
-        assert!(s.contains("input.peek(Token![+])"));
+        // 2. "+" ist ein Operator in der Mitte -> wird direkt geparst (Token![+])
+        //    Wir prüfen hier, ob das Literal korrekt in den Typ Token![+] übersetzt wurde.
+        assert!(s.contains("input.parse::<Token![+]>()")); 
+
+        // 3. "?" ist optional (rule b) -> Hier MUSS ein peek generiert werden
+        assert!(s.contains("input.peek(Token![?])"));
     }
 }
