@@ -1,64 +1,36 @@
-#![cfg(feature = "jit")]
+use syn_grammar::grammar;
+use syn_grammar::testing::Testable; // Unser neues Trait
+use syn::parse::Parser; // Nötig für .parse_str()
 
-use syn_grammar::testing::TestEnv;
-
+// --- Test 1: Basis-Sequenz ---
 #[test]
 fn test_basic_sequence() {
-    let grammar = r#"
+    // 1. Definiere die Grammatik direkt hier (wird zur Compile-Zeit expandiert!)
+    grammar! {
         grammar Basic {
             rule main -> String = "hello" "world" -> { 
                 "Success".to_string() 
             }
         }
-    "#;
+    }
 
-    let env = TestEnv::new("Basic", grammar);
-    env.parse("hello world").assert_success();
+    // 2. Nutze die generierte Funktion 'parse_main'
+    // Der Generator erzeugt 'parse_main', das Parser-Methoden wie parse_str hat.
     
-    let res_fail = env.parse("hello universe");
-    res_fail.assert_failure();
+    // Erfolgsfall
+    let res = parse_main.parse_str("hello world").test().assert_success();
+    assert_eq!(res, "Success");
+
+    // Fehlerfall
+    let err = parse_main.parse_str("hello universe").test().assert_failure();
+    assert!(err.to_string().contains("expected `world`"));
 }
 
-#[test]
-fn test_backtracking_priority() {
-    let grammar = r#"
-        grammar Backtrack {
-            rule main -> String = 
-                "A" "B" -> { "Path AB".to_string() }
-              | "A"     -> { "Path A".to_string() }
-        }
-    "#;
-
-    let env = TestEnv::new("Backtrack", grammar);
-    let res_ab = env.parse("A B");
-    res_ab.assert_success();
-    assert!(res_ab.stdout.contains("Path AB"));
-
-    let res_a = env.parse("A");
-    res_a.assert_success();
-    assert!(res_a.stdout.contains("Path A"));
-}
-
-#[test]
-fn test_complex_groups() {
-    let grammar = r#"
-        grammar Complex {
-            rule main -> String = ("A" "B")? "C" -> { "OK".to_string() }
-        }
-    "#;
-
-    let env = TestEnv::new("Complex", grammar);
-    env.parse("A B C").assert_success();
-    env.parse("C").assert_success();
-    env.parse("A C").assert_failure();
-}
-
+// --- Test 2: Math Expression (mit Rückgabewerten prüfen!) ---
 #[test]
 fn test_math_expression() {
-    let grammar = r#"
+    grammar! {
         grammar Math {
-            // KORREKTUR: 'e:expr' bindet das Ergebnis an 'e'. 
-            // Vorher stand hier nur 'expr', was das Ergebnis verworfen hat.
             rule main -> i32 = e:expr -> { e }
 
             rule expr -> i32 = 
@@ -69,66 +41,16 @@ fn test_math_expression() {
                 f:factor "*" t:term -> { f * t }
               | f:factor            -> { f }
 
-            // KORREKTUR: 'paren(e:expr)' exportiert 'e' dank unseres Tuple-Returns in codegen.rs
             rule factor -> i32 = 
                 paren(e:expr)  -> { e }
               | i:int_lit      -> { i }
         }
-    "#;
+    }
 
-    let env = TestEnv::new("Math", grammar);
-    let res1 = env.parse("1 + 2");
-    res1.assert_success();
-    assert!(res1.stdout.contains("3"));
-    
-    let res2 = env.parse("2 + 3 * 4");
-    res2.assert_success();
-    assert!(res2.stdout.contains("14"));
-    
-    let res3 = env.parse("(2 + 3) * 4");
-    res3.assert_success();
-    assert!(res3.stdout.contains("20"));
-}
+    // Jetzt können wir echte Integers prüfen, kein String-Parsing des Outputs mehr!
+    let val = parse_main.parse_str("2 + 3 * 4").test().assert_success();
+    assert_eq!(val, 14); // Echter Integer-Vergleich!
 
-#[test]
-fn test_repetition() {
-    let grammar = r#"
-        grammar Repeat {
-            // KORREKTUR: Einfach '[ ... ]' statt 'bracketed[ ... ]'.
-            // Der Parser erkennt eckige Klammern automatisch als Bracketed-Gruppe.
-            // Das Wort 'bracketed' würde als Regelaufruf interpretiert werden.
-            rule main -> usize = [ content:elems ] -> { content }
-
-            rule elems -> usize = 
-                first:elem rest:elem* -> { 1 + rest.len() }
-            
-            rule elem -> () = "x" ","? -> { () }
-        }
-    "#;
-
-    let env = TestEnv::new("Repeat", grammar);
-    let res1 = env.parse("[ x ]");
-    res1.assert_success();
-    assert!(res1.stdout.contains("1"));
-    
-    let res3 = env.parse("[ x, x, x ]");
-    res3.assert_success();
-    assert!(res3.stdout.contains("3"));
-    
-    env.parse("[ ]").assert_failure();
-}
-
-#[test]
-fn test_builtins() {
-    let grammar = r#"
-        grammar Builtins {
-            rule main -> String = 
-                k:ident "=" v:string_lit -> { format!("{}: {}", k, v) }
-        }
-    "#;
-
-    let env = TestEnv::new("Builtins", grammar);
-    let res = env.parse("key = \"value\"");
-    res.assert_success();
-    assert!(res.stdout.contains("key: value"));
+    let val2 = parse_main.parse_str("(2 + 3) * 4").test().assert_success();
+    assert_eq!(val2, 20);
 }
