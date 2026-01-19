@@ -14,6 +14,7 @@ fn test_basic_sequence() {
 
     let env = TestEnv::new("Basic", grammar);
     env.parse("hello world").assert_success();
+    
     let res_fail = env.parse("hello universe");
     res_fail.assert_failure();
 }
@@ -56,7 +57,9 @@ fn test_complex_groups() {
 fn test_math_expression() {
     let grammar = r#"
         grammar Math {
-            rule main -> i32 = expr -> { expr }
+            // KORREKTUR: 'e:expr' bindet das Ergebnis an 'e'. 
+            // Vorher stand hier nur 'expr', was das Ergebnis verworfen hat.
+            rule main -> i32 = e:expr -> { e }
 
             rule expr -> i32 = 
                 t:term "+" e:expr -> { t + e }
@@ -66,7 +69,7 @@ fn test_math_expression() {
                 f:factor "*" t:term -> { f * t }
               | f:factor            -> { f }
 
-            // FIX: Jetzt nutzen wir wieder paren(...), da codegen.rs die Variablen exportiert!
+            // KORREKTUR: 'paren(e:expr)' exportiert 'e' dank unseres Tuple-Returns in codegen.rs
             rule factor -> i32 = 
                 paren(e:expr)  -> { e }
               | i:int_lit      -> { i }
@@ -77,9 +80,11 @@ fn test_math_expression() {
     let res1 = env.parse("1 + 2");
     res1.assert_success();
     assert!(res1.stdout.contains("3"));
+    
     let res2 = env.parse("2 + 3 * 4");
     res2.assert_success();
     assert!(res2.stdout.contains("14"));
+    
     let res3 = env.parse("(2 + 3) * 4");
     res3.assert_success();
     assert!(res3.stdout.contains("20"));
@@ -89,8 +94,10 @@ fn test_math_expression() {
 fn test_repetition() {
     let grammar = r#"
         grammar Repeat {
-            // FIX: Auch hier wieder bracketed[...]
-            rule main -> usize = bracketed[ content:elems ] -> { content }
+            // KORREKTUR: Einfach '[ ... ]' statt 'bracketed[ ... ]'.
+            // Der Parser erkennt eckige Klammern automatisch als Bracketed-Gruppe.
+            // Das Wort 'bracketed' würde als Regelaufruf interpretiert werden.
+            rule main -> usize = [ content:elems ] -> { content }
 
             rule elems -> usize = 
                 first:elem rest:elem* -> { 1 + rest.len() }
@@ -103,9 +110,11 @@ fn test_repetition() {
     let res1 = env.parse("[ x ]");
     res1.assert_success();
     assert!(res1.stdout.contains("1"));
+    
     let res3 = env.parse("[ x, x, x ]");
     res3.assert_success();
     assert!(res3.stdout.contains("3"));
+    
     env.parse("[ ]").assert_failure();
 }
 
