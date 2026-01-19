@@ -1,6 +1,6 @@
 use crate::model::*;
 use syn::parse::{Parse, ParseStream};
-use syn::{Result, Token, token, LitStr, Ident};
+use syn::{Result, Token, token, LitStr, Ident, Type, parenthesized, bracketed, braced};
 use derive_syn_parse::Parse;
 
 mod kw {
@@ -9,23 +9,16 @@ mod kw {
     syn::custom_keyword!(paren);
 }
 
-// 1. Grammar Definition
 #[derive(Parse)]
 pub struct GrammarDefinition {
-    // KEIN #[syn(parenthesized)] hier.
-    
-    pub _kw_gram: kw::grammar,
+    pub _kw: kw::grammar,
     pub name: Ident,
-    
-    // Optionales ': Parent'
     #[peek(Token![:])]
-    pub inherits: Option<InheritanceSpec>, 
-    
+    pub inherits: Option<InheritanceSpec>,
     #[brace]
     pub _brace: token::Brace,
-    
     #[inside(_brace)]
-    #[call(ParseRule::parse_list)] 
+    #[call(Rule::parse_all)]
     pub rules: Vec<Rule>,
 }
 
@@ -35,9 +28,21 @@ pub struct InheritanceSpec {
     pub name: Ident,
 }
 
-struct ParseRule;
-impl ParseRule {
-    fn parse_list(input: ParseStream) -> Result<Vec<Rule>> {
+#[derive(Parse)]
+pub struct Rule {
+    #[peek(Token![pub])]
+    pub is_pub: Option<Token![pub]>,
+    pub _kw: kw::rule,
+    pub name: Ident,
+    pub _arrow: Token![->],
+    pub return_type: Type,
+    pub _eq: Token![=],
+    #[call(RuleVariant::parse_list)]
+    pub variants: Vec<RuleVariant>,
+}
+
+impl Rule {
+    fn parse_all(input: ParseStream) -> Result<Vec<Self>> {
         let mut rules = Vec::new();
         while !input.is_empty() {
             rules.push(input.parse()?);
@@ -46,43 +51,30 @@ impl ParseRule {
     }
 }
 
-// 2. Rule
-#[derive(Parse)]
-pub struct Rule {
-    #[peek(Token![pub])]
-    pub is_pub: Option<Token![pub]>,
-    
-    pub _kw_rule: kw::rule,
-    pub name: Ident,
-    pub _arrow: Token![->],
-    pub return_type: syn::Type,
-    pub _eq: Token![=],
-    
-    #[call(ParseVariant::parse_list)]
-    pub variants: Vec<RuleVariant>,
+pub struct RuleVariant {
+    pub pattern: Vec<Pattern>,
+    pub action: proc_macro2::TokenStream,
 }
 
-struct ParseVariant;
-impl ParseVariant {
-    fn parse_list(input: ParseStream) -> Result<Vec<RuleVariant>> {
+impl RuleVariant {
+    pub fn parse_list(input: ParseStream) -> Result<Vec<Self>> {
         let mut variants = Vec::new();
         loop {
-            // Pattern Parsen bis -> oder |
             let mut pattern = Vec::new();
-            while !input.peek(Token![->]) && !input.peek(Token![|]) && !input.is_empty() {
+            // Parsen bis zum Action-Pfeil oder der nächsten Variante
+            while !input.peek(Token![->]) && !input.peek(Token![|]) {
                 pattern.push(input.parse()?);
             }
 
-            let _arrow: Token![->] = input.parse()?;
-            
+            input.parse::<Token![->]>()?;
             let content;
-            let _ = syn::braced!(content in input);
-            let action: proc_macro2::TokenStream = content.parse()?;
+            braced!(content in input);
+            let action = content.parse()?;
 
             variants.push(RuleVariant { pattern, action });
 
             if input.peek(Token![|]) {
-                let _pipe: Token![|] = input.parse()?;
+                input.parse::<Token![|]>()?;
             } else {
                 break;
             }
@@ -91,108 +83,101 @@ impl ParseVariant {
     }
 }
 
-// 3. Patterns (Bleibt manuell, da komplexe Precedence für Suffixes nötig ist)
+// Pattern ist das Herzstück: Atom + Suffixe
 impl Parse for Pattern {
     fn parse(input: ParseStream) -> Result<Self> {
-        // A. Base Pattern
-        let mut base = if input.peek(LitStr) {
-            Pattern::Lit(input.parse()?)
-        } else if input.peek(token::Bracket) {
-            let content;
-            let _ = syn::bracketed!(content in input);
-            Pattern::Bracketed(ParsePatternList::parse(&content)?)
-        } else if input.peek(token::Brace) {
-            let content;
-            let _ = syn::braced!(content in input);
-            Pattern::Braced(ParsePatternList::parse(&content)?)
-        } else if input.peek(token::Paren) {
-            let content;
-            let _ = syn::parenthesized!(content in input);
-            // In ( ... ) können Alternativen | stehen -> Group
-            Pattern::Group(ParseGroupContent::parse(&content)?)
-        } else if input.peek(kw::paren) {
-            let _ = input.parse::<kw::paren>()?;
-            let content;
-            let _ = syn::parenthesized!(content in input);
-            Pattern::Parenthesized(ParsePatternList::parse(&content)?)
-        } else {
-            // Rule Call: name:rule(arg)
-            let binding = if input.peek2(Token![:]) {
-                let b: Ident = input.parse()?;
-                let _ = input.parse::<Token![:]>()?;
-                Some(b)
-            } else {
-                None
-            };
+        let mut pat = parse_atom(input)?;
 
-            let rule_name: Ident = input.parse()?;
-            
-            let mut args = Vec::new();
-            if input.peek(token::Paren) {
-                let content;
-                let _ = syn::parenthesized!(content in input);
-                while !content.is_empty() {
-                    args.push(content.parse()?);
-                    if content.peek(Token![,]) {
-                        let _ = content.parse::<Token![,]>()?;
-                    }
-                }
+        // Suffix-Loop für *, +, ?
+        loop {
+            if input.peek(Token![*]) {
+                input.parse::<Token![*]>()?;
+                pat = Pattern::Repeat(Box::new(pat));
+            } else if input.peek(Token![+]) {
+                input.parse::<Token![+]>()?;
+                pat = Pattern::Plus(Box::new(pat));
+            } else if input.peek(Token![?]) {
+                input.parse::<Token![?]>()?;
+                pat = Pattern::Optional(Box::new(pat));
             } else {
-                let content;
-                let _ = syn::parenthesized!(content in input); // Erwarte leere ()
+                break;
             }
+        }
+        Ok(pat)
+    }
+}
 
-            Pattern::RuleCall { binding, rule_name, args }
+/// Parsed den "Kern" eines Patterns ohne Suffixe
+fn parse_atom(input: ParseStream) -> Result<Pattern> {
+    if input.peek(LitStr) {
+        Ok(Pattern::Lit(input.parse()?))
+    } else if input.peek(token::Bracket) {
+        let content;
+        bracketed!(content in input);
+        Ok(Pattern::Bracketed(parse_pattern_list(&content)?))
+    } else if input.peek(token::Brace) {
+        let content;
+        braced!(content in input);
+        Ok(Pattern::Braced(parse_pattern_list(&content)?))
+    } else if input.peek(kw::paren) {
+        input.parse::<kw::paren>()?;
+        let content;
+        parenthesized!(content in input);
+        Ok(Pattern::Parenthesized(parse_pattern_list(&content)?))
+    } else if input.peek(token::Paren) {
+        let content;
+        parenthesized!(content in input);
+        Ok(Pattern::Group(parse_group_content(&content)?))
+    } else {
+        // RuleCall oder Binding
+        let binding = if input.peek2(Token![:]) {
+            let id: Ident = input.parse()?;
+            input.parse::<Token![:]>()?;
+            Some(id)
+        } else {
+            None
         };
 
-        // B. Suffixes (*, +, ?)
-        loop {
-            if input.peek(Token![?]) {
-                let _ = input.parse::<Token![?]>()?;
-                base = Pattern::Optional(Box::new(base));
-            } else if input.peek(Token![*]) {
-                let _ = input.parse::<Token![*]>()?;
-                base = Pattern::Repeat(Box::new(base));
-            } else if input.peek(Token![+]) {
-                let _ = input.parse::<Token![+]>()?;
-                base = Pattern::Plus(Box::new(base));
-            } else {
-                break;
+        let rule_name: Ident = input.parse()?;
+        
+        // Optionale Argumente in ()
+        let mut args = Vec::new();
+        if input.peek(token::Paren) {
+            let content;
+            parenthesized!(content in input);
+            while !content.is_empty() {
+                args.push(content.parse()?);
+                if content.peek(Token![,]) {
+                    content.parse::<Token![,]>()?;
+                }
             }
         }
 
-        Ok(base)
+        Ok(Pattern::RuleCall { binding, rule_name, args })
     }
 }
 
-// Helpers
-struct ParsePatternList;
-impl ParsePatternList {
-    fn parse(input: ParseStream) -> Result<Vec<Pattern>> {
+fn parse_pattern_list(input: ParseStream) -> Result<Vec<Pattern>> {
+    let mut list = Vec::new();
+    while !input.is_empty() {
+        list.push(input.parse()?);
+    }
+    Ok(list)
+}
+
+fn parse_group_content(input: ParseStream) -> Result<Vec<Vec<Pattern>>> {
+    let mut alts = Vec::new();
+    loop {
         let mut seq = Vec::new();
-        while !input.is_empty() {
+        while !input.is_empty() && !input.peek(Token![|]) {
             seq.push(input.parse()?);
         }
-        Ok(seq)
-    }
-}
-
-struct ParseGroupContent;
-impl ParseGroupContent {
-    fn parse(input: ParseStream) -> Result<Vec<Vec<Pattern>>> {
-        let mut alts = Vec::new();
-        loop {
-            let mut seq = Vec::new();
-            while !input.is_empty() && !input.peek(Token![|]) {
-                seq.push(input.parse()?);
-            }
-            alts.push(seq);
-            if input.peek(Token![|]) {
-                let _ = input.parse::<Token![|]>()?;
-            } else {
-                break;
-            }
+        alts.push(seq);
+        if input.peek(Token![|]) {
+            input.parse::<Token![|]>()?;
+        } else {
+            break;
         }
-        Ok(alts)
     }
+    Ok(alts)
 }
