@@ -66,7 +66,6 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         },
         
         ModelPattern::Plus(inner) => {
-             // (Identische Logik wie Repeat, nur mit do-while Struktur)
              if let ModelPattern::RuleCall { binding: Some(bind), rule_name, args } = &**inner {
                  let func_call = generate_rule_call_expr(rule_name, args);
                  let peek_check = if let Some(peek) = analysis::get_simple_peek(inner, kws)? {
@@ -105,10 +104,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let inner_logic = generate_pattern_step(inner, kws)?;
             Ok(quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; })
         },
-        // Zirkuläre Abhängigkeit vermeiden: Group ruft hier rule::generate_variants nicht direkt auf, 
-        // sondern wir müssten Logik teilen. Einfachheitshalber inline hier:
         ModelPattern::Group(alts) => {
-            use super::rule::generate_variants_internal; // Wir erlauben Zugriff
+            use super::rule::generate_variants_internal;
             let temp_variants = alts.iter()
                 .map(|pat_seq| RuleVariant { pattern: pat_seq.clone(), action: quote!({}) })
                 .collect::<Vec<_>>();
@@ -129,8 +126,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             if bindings.is_empty() {
                 Ok(quote_spanned! {span=> {
                     let content;
-                    // FIX: Hier fehlte das '?'
-                    let _ = syn::#macro_name!(content in input)?;
+                    // FIX: Das '?' wurde entfernt, da das Makro selbst returned
+                    let _ = syn::#macro_name!(content in input);
                     let input = &content;
                     #inner_logic
                 }})
@@ -139,8 +136,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 Ok(quote_spanned! {span=> 
                     let #bind = {
                         let content;
-                        // FIX: Hier fehlte das '?'
-                        let _ = syn::#macro_name!(content in input)?;
+                        let _ = syn::#macro_name!(content in input);
                         let input = &content;
                         #inner_logic
                         #bind
@@ -150,8 +146,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 Ok(quote_spanned! {span=> 
                     let (#(#bindings),*) = {
                         let content;
-                        // FIX: Hier fehlte das '?'
-                        let _ = syn::#macro_name!(content in input)?;
+                        let _ = syn::#macro_name!(content in input);
                         let input = &content;
                         #inner_logic
                         (#(#bindings),*)
