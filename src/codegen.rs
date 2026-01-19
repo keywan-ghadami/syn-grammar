@@ -3,8 +3,6 @@ use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
 use std::collections::HashSet;
 use syn::{Result, parse_quote};
-// FIX: Trait muss aus dem Untermodul importiert werden
-use syn::spanned::Spanned;
 use itertools::Itertools; 
 
 /// Generiert den vollständigen Rust-Code für eine Grammatik-Definition.
