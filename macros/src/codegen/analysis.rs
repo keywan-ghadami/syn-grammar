@@ -84,7 +84,7 @@ pub fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<
 }
 
 /// Helper für UPO: Liefert einen eindeutigen String-Key für das Start-Token
-pub fn get_peek_token_string(patterns: &[ModelPattern], kws: &HashSet<String>) -> Option<String> {
+pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     match patterns.first() {
         Some(ModelPattern::Lit(l)) => Some(l.value()),
         Some(ModelPattern::Bracketed(_)) => Some("Bracket".to_string()),
@@ -92,7 +92,7 @@ pub fn get_peek_token_string(patterns: &[ModelPattern], kws: &HashSet<String>) -
         Some(ModelPattern::Parenthesized(_)) => Some("Paren".to_string()),
         Some(ModelPattern::Optional(inner)) | 
         Some(ModelPattern::Repeat(inner)) | 
-        Some(ModelPattern::Plus(inner)) => get_peek_token_string(std::slice::from_ref(&**inner), kws),
+        Some(ModelPattern::Plus(inner)) => get_peek_token_string(std::slice::from_ref(&**inner)),
         _ => None
     }
 }
