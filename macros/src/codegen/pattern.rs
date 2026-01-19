@@ -1,7 +1,7 @@
 use crate::model::*;
 use super::analysis; 
 use std::collections::HashSet;
-use syn::{Result, parse_quote};
+use syn::{Result};
 use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
 
