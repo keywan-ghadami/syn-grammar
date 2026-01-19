@@ -1,7 +1,6 @@
 use crate::parser; // Zugriff auf die Syntax-Strukturen
 use syn::{Ident, Type, LitStr, Lit};
 use proc_macro2::{TokenStream, Span};
-use syn::spanned::Spanned;
 
 // --- Datenstrukturen (Das saubere "Semantic Model") ---
 
