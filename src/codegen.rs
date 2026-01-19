@@ -3,10 +3,8 @@ use quote::{quote, quote_spanned, format_ident};
 use proc_macro2::TokenStream;
 use std::collections::HashSet;
 use syn::{Result, parse_quote};
-// Zeile gelöscht: use syn::spanned::Spanned;
 use itertools::Itertools; 
 
-/// Generiert den vollständigen Rust-Code für eine Grammatik-Definition.
 pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let grammar_name = &grammar.name;
     let custom_keywords = collect_custom_keywords(&grammar);
@@ -48,6 +46,8 @@ fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<Token
     let name = &rule.name;
     let fn_name = format_ident!("parse_{}", name);
     let ret_type = &rule.return_type;
+    
+    // FIX: Regel 'main' ist automatisch public
     let is_public = rule.is_pub || name == "main";
     let vis = if is_public { quote!(pub) } else { quote!() };
     
@@ -59,7 +59,6 @@ fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<Token
         }
     })
 }
-
 
 fn generate_variants(
     variants: &[RuleVariant], 
@@ -73,7 +72,6 @@ fn generate_variants(
     let arms = variants.iter().map(|variant| {
         let logic = generate_sequence(&variant.pattern, &variant.action, custom_keywords)?;
         
-        // Lookahead ermitteln
         let peek_token = variant.pattern.first()
             .and_then(|f| get_simple_peek(f, custom_keywords).ok().flatten());
 
@@ -81,10 +79,6 @@ fn generate_variants(
 
         Ok(match peek_token {
             Some(token) => {
-                // PEEK-GUARDED BACKTRACKING
-                // Wir nutzen peek nur als Vorfilter. Wenn der Peek passt, 
-                // wird trotzdem ein attempt ausgeführt, um bei Misserfolg (Backtracking)
-                // zum nächsten Zweig springen zu können.
                 quote! {
                     if let Some(res) = if input.peek(#token) { 
                         #attempt_block 
@@ -124,8 +118,6 @@ fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, kws: &Hash
 }
 
 fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<TokenStream> {
-    // Hier wird die inherent method ModelPattern::span() aufgerufen.
-    // Kein Trait-Import nötig.
     let span = pattern.span();
 
     match pattern {
@@ -146,7 +138,6 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 quote_spanned! {span=> let _ = #func_call; }
             })
         },
-        // Backtracking für Suffixe (sicherer Weg für komplexe Gruppen)
         ModelPattern::Optional(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
             Ok(quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; })
@@ -209,10 +200,21 @@ fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<Opti
 
 fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> Result<syn::Type> {
     let s = lit.value();
+    
+    // 1. Check auf Custom Keywords
     if custom_keywords.contains(&s) {
         let ident = format_ident!("{}", s);
         return Ok(parse_quote!(kw::#ident));
     }
+
+    // 2. Expliziter Check auf verbotene Klammern in Token![]
+    // Klammern müssen über Pattern::Parenthesized etc. geparst werden!
+    if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
+        return Err(syn::Error::new(lit.span(), 
+            format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
+    }
+
+    // 3. Versuche, es als syn::Token zu parsen (z.B. Token![+])
     syn::parse_str::<syn::Type>(&format!("Token![{}]", s))
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))
 }
