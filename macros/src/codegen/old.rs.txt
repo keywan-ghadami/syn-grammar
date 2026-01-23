@@ -17,6 +17,8 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
         quote! { pub mod kw { #(#defs)* } }
     });
 
+    // Inheritance: Da wir nun in einem Modul sind, referenziert 'super' den Scope außerhalb.
+    // Wenn 'Parent' auch ein Modul im gleichen Scope ist, funktioniert 'use super::Parent::*'.
     let inheritance = grammar.inherits.as_ref().map(|parent| {
         quote! { use super::#parent::*; }
     });
@@ -25,20 +27,28 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
         .map(|r| generate_rule(r, &custom_keywords))
         .collect::<Result<Vec<_>>>()?;
 
+    // ÄNDERUNG: Wir umschließen alles mit 'pub mod #grammar_name { ... }'
     Ok(quote! {
-        #![allow(unused_imports, unused_variables, dead_code, unused_braces)]
-        pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);
+        pub mod #grammar_name {
+            #![allow(unused_imports, unused_variables, dead_code, unused_braces)]
+            
+            pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);
 
-        use syn::parse::{Parse, ParseStream};
-        use syn::Result;
-        use syn::Token;
-        use syn::ext::IdentExt; 
-        use syn_grammar::rt; 
+            use syn::parse::{Parse, ParseStream};
+            use syn::Result;
+            use syn::Token;
+            use syn::ext::IdentExt; 
+            
+            // Annahme: Die Runtime ist unter diesem Crate-Namen verfügbar.
+            // Falls du das lokal testest, muss 'syn_grammar' in deinem Test-Crate definiert 
+            // oder als Dependency vorhanden sein.
+            use syn_grammar::rt; 
 
-        #kw_defs
-        #inheritance
-        
-        #(#rules)*
+            #kw_defs
+            #inheritance
+            
+            #(#rules)*
+        }
     })
 }
 
@@ -58,6 +68,8 @@ fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<Token
         }
     })
 }
+
+// ... (Rest der Datei bleibt identisch: generate_variants, generate_sequence, etc.)
 
 fn generate_variants(
     variants: &[RuleVariant], 
@@ -257,7 +269,6 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     #inner_logic
                 }})
             } else if bindings.len() == 1 {
-                // WARNUNG FIX: Bei genau einer Variable keine Tuple-Klammern (e) erzeugen
                 let bind = &bindings[0];
                 Ok(quote_spanned! {span=> 
                     let #bind = {
@@ -269,7 +280,6 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     };
                 })
             } else {
-                // Tuple-Return für mehrere Variablen: let (a, b) = { ...; (a, b) };
                 Ok(quote_spanned! {span=> 
                     let (#(#bindings),*) = {
                         let content;

@@ -1,149 +1,74 @@
-#![cfg(feature = "jit")]
+use std::fmt::Debug;
 
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use crate::Generator;
-
-/// Kapselt das Ergebnis eines Test-Laufs
-pub struct TestResult {
-    pub stdout: String,
-    pub stderr: String,
-    pub success: bool,
+// Ein Wrapper um syn::Result, um flüssige Tests zu schreiben.
+pub struct TestResult<T> {
+    inner: syn::Result<T>,
 }
 
-impl TestResult {
-    /// Behauptet, dass der Test erfolgreich war. Falls nicht, wird ein detaillierter
-    /// Panic mit Stdout/Stderr ausgelöst.
-    pub fn assert_success(&self) {
-        if !self.success {
+impl<T: Debug> TestResult<T> {
+    pub fn new(result: syn::Result<T>) -> Self {
+        Self { inner: result }
+    }
+
+    // 1. Behauptet Erfolg und gibt den Wert zurück (wie bisher).
+    pub fn assert_success(self) -> T {
+        match self.inner {
+            Ok(val) => val,
+            Err(e) => {
+                panic!(
+                    "\n🔴 TEST FAILED (Expected Success, but got Error):\nMessage:  {}\nLocation: {:?}\n", 
+                    e, e.span()
+                );
+            }
+        }
+    }
+
+    // 2. NEU: Behauptet Erfolg UND prüft direkt den Wert.
+    // Gibt eine schöne Diff-Ausgabe, wenn die Werte nicht übereinstimmen.
+    pub fn assert_success_is<E>(self, expected: E) -> T 
+    where T: PartialEq<E>, E: Debug {
+        let val = self.assert_success();
+        if val != expected {
             panic!(
-                "\n🔴 TEST FAILED:\n\n=== STDERR ===\n{}\n\n=== STDOUT ===\n{}\n",
-                self.stderr, self.stdout
+                "\n🔴 TEST FAILED (Value Mismatch):\nExpected: {:?}\nGot:      {:?}\n", 
+                expected, val
+            );
+        }
+        val
+    }
+
+    // 3. Behauptet Fehler und gibt den Error zurück.
+    pub fn assert_failure(self) -> syn::Error {
+        match self.inner {
+            Ok(val) => {
+                panic!(
+                    "\n🔴 TEST FAILED (Expected Failure, but got Success):\nParsed Value: {:?}\n", 
+                    val
+                );
+            }
+            Err(e) => e,
+        }
+    }
+
+    // 4. Behauptet Fehler UND prüft, ob die Meldung einen Text enthält.
+    pub fn assert_failure_contains(self, expected_msg_part: &str) {
+        let err = self.assert_failure();
+        let actual_msg = err.to_string();
+        if !actual_msg.contains(expected_msg_part) {
+            panic!(
+                "\n🔴 TEST FAILED (Error Message Mismatch):\nExpected part: {:?}\nActual msg:    {:?}\nLocation:      {:?}\n", 
+                expected_msg_part, actual_msg, err.span()
             );
         }
     }
-
-    /// Behauptet, dass der Test fehlgeschlagen ist (z.B. für negative Tests).
-    pub fn assert_failure(&self) {
-        if self.success {
-            panic!("\n🔴 TEST UNEXPECTEDLY SUCCEEDED (Expected Failure)\n");
-        }
-    }
-    
-    /// Prüft, ob der Stdout einen bestimmten String enthält
-    pub fn contains(&self, needle: &str) -> bool {
-        self.stdout.contains(needle)
-    }
 }
 
-pub struct TestEnv {
-    _temp_dir: tempfile::TempDir,
-    project_path: PathBuf,
+pub trait Testable<T> {
+    fn test(self) -> TestResult<T>;
 }
 
-impl TestEnv {
-    pub fn new(grammar_name: &str, grammar_content: &str) -> Self {
-        let temp_dir = tempfile::tempdir().expect("Could not create temp dir");
-        let project_path = temp_dir.path().to_path_buf();
-        
-        setup_cargo_project(&project_path, grammar_name);
-
-        let generator = Generator::new(&project_path);
-        
-        let grammar_file_path = project_path.join(format!("{}.grammar", grammar_name));
-        fs::write(&grammar_file_path, grammar_content).expect("Failed to write grammar file");
-
-        // Hier fangen wir Errors beim Generieren ab, damit der Test aussagekräftig failt
-        let rust_code = generator.generate(&format!("{}.grammar", grammar_name))
-            .expect("❌ Code generation failed inside Generator::generate");
-
-        let main_rs = format!(r#"
-            #![allow(unused_imports, dead_code, unused_variables)]
-            use syn::parse::Parser; 
-            use proc_macro2::TokenStream;
-            use std::io::Read;
-
-            mod generated {{
-                {}
-            }}
-            use generated::parse_main; // Annahme: Einstiegspunkt ist 'main'
-
-            fn main() {{
-                let mut content = String::new();
-                std::io::stdin().read_to_string(&mut content).unwrap();
-
-                let stream: TokenStream = match syn::parse_str(&content) {{
-                    Ok(ts) => ts,
-                    Err(e) => {{
-                         eprintln!("Tokenization Error: {{}}", e);
-                         std::process::exit(1);
-                    }}
-                }};
-
-                match parse_main.parse2(stream) {{
-                    Ok(ast) => println!("{{:?}}", ast),
-                    Err(e) => {{
-                        eprintln!("Parse Error: {{}}", e);
-                        std::process::exit(1);
-                    }}
-                }}
-            }}
-        "#, rust_code);
-
-        fs::write(project_path.join("src/main.rs"), main_rs).expect("Failed to write main.rs");
-
-        Self { _temp_dir: temp_dir, project_path }
+impl<T: Debug> Testable<T> for syn::Result<T> {
+    fn test(self) -> TestResult<T> {
+        TestResult::new(self)
     }
-
-    /// Gibt nun ein TestResult zurück statt einem Tuple
-    pub fn parse(&self, input: &str) -> TestResult {
-        let mut cmd = Command::new("cargo");
-        cmd.arg("run")
-           .arg("--quiet")
-           .current_dir(&self.project_path)
-           .stdin(std::process::Stdio::piped())
-           .stdout(std::process::Stdio::piped())
-           .stderr(std::process::Stdio::piped());
-
-        let mut child = cmd.spawn().expect("Failed to spawn cargo run");
-
-        {
-            use std::io::Write;
-            let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-            stdin.write_all(input.as_bytes()).expect("Failed to write to stdin");
-        }
-
-        let output = child.wait_with_output().expect("Failed to read output");
-        
-        TestResult {
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            success: output.status.success(),
-        }
-    }
-}
-
-fn setup_cargo_project(path: &Path, _name: &str) {
-    let src_dir = path.join("src");
-    fs::create_dir_all(&src_dir).unwrap();
-
-    let current_dir = std::env::current_dir().unwrap();
-    let current_dir_str = current_dir.to_string_lossy();
-
-    // Verwende absoluten Pfad und deaktiviere JIT im Child-Projekt, um Rekursion zu vermeiden
-    let cargo_toml = format!(r#"
-[package]
-name = "jit_parser"
-version = "0.0.1"
-edition = "2024"
-
-[dependencies]
-syn = {{ version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }}
-quote = "1.0"
-proc-macro2 = "1.0"
-syn-grammar = {{ path = "{}", default-features = false }} 
-    "#, current_dir_str);
-
-    fs::write(path.join("Cargo.toml"), cargo_toml).unwrap();
 }

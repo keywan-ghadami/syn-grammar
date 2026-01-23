@@ -1,27 +1,23 @@
 [package]
 name = "syn-grammar"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+# Wir definieren einen Workspace, damit Cargo das Makro-Unterverzeichnis korrekt mitbaut
+[workspace]
+members = ["macros"]
 
 [dependencies]
-syn = { version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }
-quote = "1.0"
-proc-macro2 = "1.0"
-derive-syn-parse = "0.2.0"
-proc-macro-error = "1.0"
-thiserror = "2.0"
-itertools = "0.14.0"
-# Das Macro-Crate für die automatische AST-Konvertierung
+# 1. Das Makro selbst (lokaler Pfad)
 syn-grammar-macros = { path = "./macros" }
 
-# Optional für die JIT/Test-Umgebung
-tempfile = { version = "3.10", optional = true }
-
-[features]
-default = []
-# Aktiviert die JIT-Infrastruktur (TestEnv)
-jit = ["dep:tempfile"]
+# 2. Runtime-Abhängigkeiten
+# Diese werden vom generierten Code verwendet (z.B. ParseStream, Token!, etc.)
+# Wir brauchen hier NICHT "full", das spart Kompilierzeit beim Endnutzer.
+syn = { version = "2.0", features = ["parsing", "printing", "clone-impls", "derive"] }
+proc-macro2 = "1.0"
+quote = "1.0"
 
 [dev-dependencies]
-# In Tests aktivieren wir das JIT-Feature automatisch
-syn-grammar = { path = ".", features = ["jit"] }
+# Für die Tests brauchen wir "full", um komplexere Syntax (wie in den Actions) zu parsen
+syn = { version = "2.0", features = ["full", "extra-traits"] }
