@@ -102,6 +102,15 @@ grammar Extended : Core {
 }
 ```
 
+### Left Recursion
+Direct left recursion is supported, which simplifies writing grammars for left-associative operators.
+
+```nika
+rule expr -> i32 =
+    | l:expr "-" r:int_lit() -> { l - r }
+    | v:int_lit() -> { v }
+```
+
 ### Built-ins
 The generator provides built-in mappings to common `syn` types:
 * `ident()` -> `syn::Ident`
@@ -110,4 +119,3 @@ The generator provides built-in mappings to common `syn` types:
 
 ## License
 MIT or Apache License 2.0
-
