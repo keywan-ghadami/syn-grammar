@@ -160,16 +160,13 @@ fn test_cut_operator() {
 
     // 2. Edge Case: "let" followed by something else.
     //
-    // NOTE: Currently, the Cut operator is a No-Op in codegen.
-    // Therefore, the parser backtracks and matches the second rule ("Identifier(let)").
-    //
-    // We use just "let" here to ensure the parser consumes the whole input
-    // (parse_str enforces EOF). If we used "let something", the second rule
-    // would match "let" but leave "something" unparsed, causing an error.
+    // Since the Cut operator is implemented, matching "let" commits to the first variant.
+    // The parser will NOT backtrack to the second variant ("Identifier(let)").
+    // Instead, it will fail because "mut" is expected but not found.
     let res2 = cut_test::parse_main.parse_str("let");
     println!("Input: 'let' => {:?}", res2);
     res2.test()
-        .assert_success_is("Identifier(let)");
+        .assert_failure_contains("expected `mut`");
 }
 
 // --- Test 8: Left Recursion (Operator Precedence) ---
