@@ -15,67 +15,37 @@
 
 ## Usage
 
-### 1. Define your Grammar
-Create a file named `src/grammar/Calc.grammar`.
-
-```nika
-grammar Calc {
-    // Top-level rule returning a Rust type (e.g., i32)
-    pub rule expr -> i32 = 
-        | "add" a:int_lit() b:int_lit() -> { a + b }
-        | "sub" a:int_lit() b:int_lit() -> { a - b }
-        | v:int_lit() -> { v }
-        
-    // 'int_lit' is a built-in that maps to syn::LitInt
-}
-```
-
-### 2. Add to `build-dependencies`
+### 1. Add to `dependencies`
 In your `Cargo.toml`:
 
 ```toml
-[build-dependencies]
+[dependencies]
 syn-grammar = "0.1"
 ```
 
-### 3. Configure `build.rs`
-Use the generator to compile the grammar into a Rust file during the build.
+### 2. Define your Grammar
+You can define the grammar directly in your Rust code using the `grammar!` macro.
 
 ```rust
-// build.rs
-use syn_grammar::Generator;
-use std::env;
-use std::fs;
-use std::path::Path;
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Calc {
+        // Top-level rule returning a Rust type (e.g., i32)
+        pub rule expr -> i32 = 
+            | "add" a:int_lit() b:int_lit() -> { a + b }
+            | "sub" a:int_lit() b:int_lit() -> { a - b }
+            | v:int_lit() -> { v }
+            
+        // 'int_lit' is a built-in that maps to syn::LitInt
+    }
+}
 
 fn main() {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("calc_parser.rs");
-
-    // Initialize generator pointing to the folder containing .grammar files
-    let gen = Generator::new("src/grammar");
-    
-    // Resolve inheritance and generate code
-    let code = gen.generate("Calc.grammar").expect("Failed to generate parser");
-
-    fs::write(&dest_path, code.to_string()).unwrap();
-    println!("cargo:rerun-if-changed=src/grammar");
-}
-```
-
-### 4. Include in your Code
-Import the generated parser code in your library.
-
-```rust
-// src/lib.rs
-use syn::{parse_macro_input, parse::ParseStream};
-
-// Include the generated code (defines functions like `parse_expr`)
-include!(concat!(env!("OUT_DIR"), "/calc_parser.rs"));
-
-pub fn parse_calculation(input: ParseStream) -> syn::Result<i32> {
-    // Call the entry point rule defined in the grammar
-    parse_expr(input)
+    // The macro generates a module 'Calc' with a parser function 'parse_expr'
+    // You can use .parse_str(...) provided by syn::parse::Parser
+    let result = Calc::parse_expr.parse_str("add 1 2");
+    assert_eq!(result.unwrap(), 3);
 }
 ```
 

@@ -2,6 +2,11 @@
 name = "syn-grammar"
 version = "0.1.0"
 edition = "2021"
+description = "A parser generator for Rust that compiles EBNF-like grammars into syn::parse::Parse implementations."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/syn-grammar"
+keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
+categories = ["parsing", "development-tools"]
 
 # Wir definieren einen Workspace, damit Cargo das Makro-Unterverzeichnis korrekt mitbaut
 [workspace]
@@ -9,7 +14,7 @@ members = ["macros"]
 
 [dependencies]
 # 1. Das Makro selbst (lokaler Pfad)
-syn-grammar-macros = { path = "./macros" }
+syn-grammar-macros = { path = "./macros", version = "0.1.0" }
 
 # 2. Runtime-Abhängigkeiten
 # Diese werden vom generierten Code verwendet (z.B. ParseStream, Token!, etc.)
