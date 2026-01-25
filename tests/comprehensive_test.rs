@@ -211,7 +211,11 @@ fn test_left_recursion_field_access() {
     }
 
     // a.b.c -> (a.b).c
+    // With action format!("({}).{}", e, i):
+    // 1. a -> "a"
+    // 2. a.b -> "(a).b"
+    // 3. (a).b.c -> "((a).b).c"
     field_access::parse_expr.parse_str("a.b.c")
         .test()
-        .assert_success_is("(a.b).c".to_string());
+        .assert_success_is("((a).b).c".to_string());
 }
