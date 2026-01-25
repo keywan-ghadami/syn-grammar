@@ -100,6 +100,7 @@ impl RuleVariant {
 // --- Pattern (Der komplexe Teil) ---
 #[derive(Debug, Clone)]
 pub enum Pattern {
+    Cut,
     Lit(LitStr),
     RuleCall {
         binding: Option<Ident>,
@@ -141,7 +142,10 @@ impl Parse for Pattern {
 
 /// Parsed den "Kern" eines Patterns ohne Suffixe
 fn parse_atom(input: ParseStream) -> Result<Pattern> {
-    if input.peek(LitStr) {
+    if input.peek(Token![=>]) {
+        input.parse::<Token![=>]>()?;
+        Ok(Pattern::Cut)
+    } else if input.peek(LitStr) {
         // String Literal: "foo"
         Ok(Pattern::Lit(input.parse()?))
     } else if input.peek(token::Bracket) {
