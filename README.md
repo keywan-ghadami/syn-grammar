@@ -2,7 +2,7 @@
 
 **A parser generator for Rust that compiles EBNF-like grammars into `syn::parse::Parse` implementations.**
 
-`syn-grammar` bridges the gap between grammar-based parser generators (like `pest` or `lalrpop`) and hand-written recursive descent parsers using `syn`. It allows you to define your language syntax declaratively in `.grammar` files while embedding raw Rust code for the AST construction.
+`syn-grammar` bridges the gap between grammar-based parser generators (like `pest` or `lalrpop`) and hand-written recursive descent parsers using `syn`. It allows you to define your language syntax declaratively using the `grammar!` macro while embedding raw Rust code for the AST construction.
 
 > **Note:** This project was originally built as the Stage 0 Bootstrap tool for the **Nikaia** programming language but has been extracted into a standalone library.
 
@@ -11,7 +11,6 @@
 * **Syn-Powered:** Generates robust Rust code using `syn` and `quote`. The output depends only on `syn`, not on this library.
 * **Grammar Inheritance:** Supports modular language definition. You can define a `Core` grammar and extend it in `Advanced` grammars (`grammar Child : Parent`).
 * **Rust Actions:** Embed arbitrary Rust code in your grammar rules (`-> { ... }`) to construct your AST nodes directly.
-* **Build Integration:** Designed to run in `build.rs` to generate parsers at compile time.
 
 ## Usage
 
@@ -65,7 +64,6 @@ rule item -> Item =
 Grammars can inherit from others to reuse or override rules. This is useful for layering complex syntax on top of a core definition.
 
 ```nika
-// In Extended.grammar
 grammar Extended : Core {
     // Overrides 'expr' from Core, but can use rules defined in Core
     rule expr -> Expr = ...
