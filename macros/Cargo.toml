@@ -5,6 +5,7 @@ edition = "2021"
 description = "Procedural macros for syn-grammar"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/keywan-ghadami/syn-grammar"
+readme = "README.md"
 keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
 categories = ["parsing", "development-tools"]
 
