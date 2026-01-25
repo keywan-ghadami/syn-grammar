@@ -198,3 +198,20 @@ fn test_left_recursion() {
         .test()
         .assert_success_is(5);
 }
+
+// --- Test 9: Left Recursion (Field Access) ---
+#[test]
+fn test_left_recursion_field_access() {
+    grammar! {
+        grammar field_access {
+            rule expr -> String =
+                e:expr "." i:ident -> { format!("({}).{}", e, i) }
+              | i:ident            -> { i.to_string() }
+        }
+    }
+
+    // a.b.c -> (a.b).c
+    field_access::parse_expr.parse_str("a.b.c")
+        .test()
+        .assert_success_is("(a.b).c".to_string());
+}
