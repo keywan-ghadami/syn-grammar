@@ -2,6 +2,11 @@
 name = "syn-grammar-macros"
 version = "0.1.0"
 edition = "2021"
+description = "Procedural macros for syn-grammar"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/keywan-ghadami/syn-grammar"
+keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
+categories = ["parsing", "development-tools"]
 
 # WICHTIG: Markiert dies als prozedurales Makro-Crate
 [lib]
@@ -24,5 +29,3 @@ itertools = "0.14"
 
 # 5. Error Reporting (optional, aber gut für schöne Fehlermeldungen)
 proc-macro-error = "1.0"
-
-
