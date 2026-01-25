@@ -1,0 +1,9 @@
+{
+  "name": "Rust Workspace for syn grammar",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest"
+    }
+  }
+}
+
