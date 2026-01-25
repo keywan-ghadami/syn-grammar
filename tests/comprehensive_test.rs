@@ -6,18 +6,18 @@ use syn::parse::Parser;
 #[test]
 fn test_basic_sequence() {
     grammar! {
-        grammar Basic {
+        grammar basic {
             rule main -> String = "hello" "world" -> { "Success".to_string() }
         }
     }
 
     // NEU: .assert_success_is(...)
-    Basic::parse_main.parse_str("hello world")
+    basic::parse_main.parse_str("hello world")
         .test()
         .assert_success_is("Success");
 
     // NEU: .assert_failure_contains(...)
-    Basic::parse_main.parse_str("hello universe")
+    basic::parse_main.parse_str("hello universe")
         .test()
         .assert_failure_contains("expected `world`");
 }
@@ -26,18 +26,18 @@ fn test_basic_sequence() {
 #[test]
 fn test_backtracking_priority() {
     grammar! {
-        grammar Backtrack {
+        grammar backtrack {
             rule main -> String = 
                 "A" "B" -> { "Path AB".to_string() }
               | "A"     -> { "Path A".to_string() }
         }
     }
 
-    Backtrack::parse_main.parse_str("A B")
+    backtrack::parse_main.parse_str("A B")
         .test()
         .assert_success_is("Path AB");
 
-    Backtrack::parse_main.parse_str("A")
+    backtrack::parse_main.parse_str("A")
         .test()
         .assert_success_is("Path A");
 }
@@ -46,23 +46,23 @@ fn test_backtracking_priority() {
 #[test]
 fn test_complex_groups() {
     grammar! {
-        grammar Complex {
+        grammar complex {
             rule main -> String = ("A" "B")? "C" -> { "OK".to_string() }
         }
     }
 
-    Complex::parse_main.parse_str("A B C").test().assert_success();
-    Complex::parse_main.parse_str("C").test().assert_success();
+    complex::parse_main.parse_str("A B C").test().assert_success();
+    complex::parse_main.parse_str("C").test().assert_success();
     
     // Hier erwarten wir, dass es fehlschlägt, weil "B" fehlt
-    Complex::parse_main.parse_str("A C").test().assert_failure();
+    complex::parse_main.parse_str("A C").test().assert_failure();
 }
 
 // --- Test 4: Mathematische Ausdrücke ---
 #[test]
 fn test_math_expression() {
     grammar! {
-        grammar Math {
+        grammar math {
             rule main -> i32 = e:expr -> { e }
 
             rule expr -> i32 = 
@@ -79,11 +79,11 @@ fn test_math_expression() {
         }
     }
 
-    Math::parse_main.parse_str("2 + 3 * 4")
+    math::parse_main.parse_str("2 + 3 * 4")
         .test()
         .assert_success_is(14); 
 
-    Math::parse_main.parse_str("(2 + 3) * 4")
+    math::parse_main.parse_str("(2 + 3) * 4")
         .test()
         .assert_success_is(20);
 }
@@ -92,7 +92,7 @@ fn test_math_expression() {
 #[test]
 fn test_repetition() {
     grammar! {
-        grammar Repeat {
+        grammar repeat {
             rule main -> usize = [ content:elems ] -> { content }
 
             rule elems -> usize = 
@@ -102,14 +102,14 @@ fn test_repetition() {
         }
     }
 
-    Repeat::parse_main.parse_str("[ x ]").test().assert_success_is(1);
-    Repeat::parse_main.parse_str("[ x, x, x ]").test().assert_success_is(3);
-    Repeat::parse_main.parse_str("[ ]").test().assert_failure();
+    repeat::parse_main.parse_str("[ x ]").test().assert_success_is(1);
+    repeat::parse_main.parse_str("[ x, x, x ]").test().assert_success_is(3);
+    repeat::parse_main.parse_str("[ ]").test().assert_failure();
     
     // Fall: Fehlende schließende Klammer.
     // Wir nutzen jetzt assert_failure(), schauen uns aber den Fehler genau an,
     // falls er nicht das enthält, was wir erwarten.
-    let err = Repeat::parse_main.parse_str("[ x, x").test().assert_failure();
+    let err = repeat::parse_main.parse_str("[ x, x").test().assert_failure();
     
     // Debug-Output, damit du genau siehst, was "Got" ist:
     println!("DEBUG: Actual Error Message: '{}'", err);
@@ -124,13 +124,13 @@ fn test_repetition() {
 #[test]
 fn test_builtins() {
     grammar! {
-        grammar Builtins {
+        grammar builtins {
             rule main -> (String, String) = 
                 k:ident "=" v:string_lit -> { (k.to_string(), v) }
         }
     }
 
-    Builtins::parse_main.parse_str("config_key = \"some_value\"")
+    builtins::parse_main.parse_str("config_key = \"some_value\"")
         .test()
         .assert_success_is(("config_key".to_string(), "some_value".to_string()));
 }
@@ -139,7 +139,7 @@ fn test_builtins() {
 #[test]
 fn test_cut_operator() {
     grammar! {
-        grammar CutTest {
+        grammar cut_test {
             // Scenario: 
             // We want to distinguish a keyword "let" from an identifier "let".
             // If we match "let" literal, we CUT (=>). If the following pattern fails,
@@ -153,7 +153,7 @@ fn test_cut_operator() {
     println!("--- Debugging Cut Operator ---");
 
     // 1. Happy Path: Matches "let" then "mut"
-    let res1 = CutTest::parse_main.parse_str("let mut");
+    let res1 = cut_test::parse_main.parse_str("let mut");
     println!("Input: 'let mut' => {:?}", res1);
     res1.test()
         .assert_success_is("Variable Declaration");
@@ -163,10 +163,11 @@ fn test_cut_operator() {
     // NOTE: Currently, the Cut operator is a No-Op in codegen.
     // Therefore, the parser backtracks and matches the second rule ("Identifier(let)").
     //
-    // Once Cut is fully implemented, this assertion should be changed to:
-    // .assert_failure(); 
-    let res2 = CutTest::parse_main.parse_str("let something_else");
-    println!("Input: 'let something_else' => {:?}", res2);
+    // We use just "let" here to ensure the parser consumes the whole input
+    // (parse_str enforces EOF). If we used "let something", the second rule
+    // would match "let" but leave "something" unparsed, causing an error.
+    let res2 = cut_test::parse_main.parse_str("let");
+    println!("Input: 'let' => {:?}", res2);
     res2.test()
         .assert_success_is("Identifier(let)");
 }
