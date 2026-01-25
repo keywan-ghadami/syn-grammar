@@ -181,7 +181,7 @@ fn test_left_recursion() {
             // Parses "1 - 2 - 3" as "(1 - 2) - 3" = -4.
             // If it were right-recursive (or simple recursive descent without handling),
             // it might stack overflow or parse as "1 - (2 - 3)" = 2.
-            rule expr -> i32 = 
+            pub rule expr -> i32 = 
                 l:expr "-" r:int_lit -> { l - r }
               | i:int_lit            -> { i }
         }

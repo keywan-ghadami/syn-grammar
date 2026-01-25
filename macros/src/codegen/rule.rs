@@ -27,7 +27,12 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
         let loop_logic = generate_recursive_loop_body(&recursive, custom_keywords)?;
 
         quote! {
-            let mut lhs = #base_logic;
+            let mut lhs = {
+                let base_parser = |input: ParseStream| -> Result<#ret_type> {
+                    #base_logic
+                };
+                base_parser(input)?
+            };
             loop {
                 #loop_logic
                 break;
