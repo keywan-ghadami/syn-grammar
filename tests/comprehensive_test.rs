@@ -134,3 +134,35 @@ fn test_builtins() {
         .test()
         .assert_success_is(("config_key".to_string(), "some_value".to_string()));
 }
+
+// --- Test 7: Cut Operator (Syntax Check) ---
+#[test]
+fn test_cut_operator() {
+    grammar! {
+        grammar CutTest {
+            // Scenario: 
+            // We want to distinguish a keyword "let" from an identifier "let".
+            // If we match "let" literal, we CUT (=>). If the following pattern fails,
+            // we should NOT backtrack to parse it as an identifier.
+            rule main -> String = 
+                "let" => "mut" -> { "Variable Declaration".to_string() }
+              | "let"          -> { "Identifier(let)".to_string() }
+        }
+    }
+
+    // 1. Happy Path: Matches "let" then "mut"
+    CutTest::parse_main.parse_str("let mut")
+        .test()
+        .assert_success_is("Variable Declaration");
+
+    // 2. Edge Case: "let" followed by something else.
+    //
+    // NOTE: Currently, the Cut operator is a No-Op in codegen.
+    // Therefore, the parser backtracks and matches the second rule ("Identifier(let)").
+    //
+    // Once Cut is fully implemented, this assertion should be changed to:
+    // .assert_failure(); 
+    CutTest::parse_main.parse_str("let something_else")
+        .test()
+        .assert_success_is("Identifier(let)");
+}
