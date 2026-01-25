@@ -27,12 +27,13 @@ impl<T: Debug> TestResult<T> {
 
     // 1. Behauptet Erfolg und gibt den Wert zurück (wie bisher).
     pub fn assert_success(self) -> T {
+        let ctx = self.format_context();
         match self.inner {
             Ok(val) => val,
             Err(e) => {
                 panic!(
                     "\n🔴 TEST FAILED (Expected Success, but got Error):{}\nMessage:  {}\nLocation: {:?}\n", 
-                    self.format_context(), e, e.span()
+                    ctx, e, e.span()
                 );
             }
         }
@@ -55,11 +56,12 @@ impl<T: Debug> TestResult<T> {
 
     // 3. Behauptet Fehler und gibt den Error zurück.
     pub fn assert_failure(self) -> syn::Error {
+        let ctx = self.format_context();
         match self.inner {
             Ok(val) => {
                 panic!(
                     "\n🔴 TEST FAILED (Expected Failure, but got Success):{}\nParsed Value: {:?}\n", 
-                    self.format_context(), val
+                    ctx, val
                 );
             }
             Err(e) => e,
