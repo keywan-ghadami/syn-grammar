@@ -171,3 +171,30 @@ fn test_cut_operator() {
     res2.test()
         .assert_success_is("Identifier(let)");
 }
+
+// --- Test 8: Left Recursion (Operator Precedence) ---
+#[test]
+fn test_left_recursion() {
+    grammar! {
+        grammar left_rec {
+            // Standard left-recursive definition for subtraction.
+            // Parses "1 - 2 - 3" as "(1 - 2) - 3" = -4.
+            // If it were right-recursive (or simple recursive descent without handling),
+            // it might stack overflow or parse as "1 - (2 - 3)" = 2.
+            rule expr -> i32 = 
+                l:expr "-" r:int_lit -> { l - r }
+              | i:int_lit            -> { i }
+        }
+    }
+
+    // 1. Simple
+    left_rec::parse_expr.parse_str("10 - 2")
+        .test()
+        .assert_success_is(8);
+
+    // 2. Associativity check: 10 - 2 - 3 => (10 - 2) - 3 = 5
+    // (Right associative would be 10 - (2 - 3) = 10 - (-1) = 11)
+    left_rec::parse_expr.parse_str("10 - 2 - 3")
+        .test()
+        .assert_success_is(5);
+}

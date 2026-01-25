@@ -13,13 +13,106 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let is_public = rule.is_pub || name == "main";
     let vis = if is_public { quote!(pub) } else { quote!() };
     
-    let body = generate_variants_internal(&rule.variants, true, custom_keywords)?; 
+    // Check for direct left recursion
+    let (recursive, base) = split_left_recursive(name, &rule.variants);
+
+    let body = if recursive.is_empty() {
+        generate_variants_internal(&rule.variants, true, custom_keywords)?
+    } else {
+        if base.is_empty() {
+            return Err(syn::Error::new(name.span(), "Left-recursive rule requires at least one non-recursive base variant."));
+        }
+
+        let base_logic = generate_variants_internal(&base, true, custom_keywords)?;
+        let loop_logic = generate_recursive_loop_body(&recursive, custom_keywords)?;
+
+        quote! {
+            let mut lhs = #base_logic;
+            loop {
+                #loop_logic
+                break;
+            }
+            Ok(lhs)
+        }
+    };
 
     Ok(quote! {
         #vis fn #fn_name(input: ParseStream) -> Result<#ret_type> {
             #body
         }
     })
+}
+
+fn split_left_recursive(rule_name: &syn::Ident, variants: &[RuleVariant]) -> (Vec<RuleVariant>, Vec<RuleVariant>) {
+    let mut recursive = Vec::new();
+    let mut base = Vec::new();
+
+    for v in variants {
+        if let Some(ModelPattern::RuleCall { rule_name: r, .. }) = v.pattern.first() {
+            if r == rule_name {
+                recursive.push(v.clone());
+                continue;
+            }
+        }
+        base.push(v.clone());
+    }
+    (recursive, base)
+}
+
+fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>) -> Result<TokenStream> {
+    let arms = variants.iter().map(|variant| {
+        // Pattern without the first element (the left-recursive call)
+        let tail_pattern = &variant.pattern[1..];
+        
+        // Binding for the LHS (e.g. "l" in "l:expr + ...")
+        let lhs_binding = match &variant.pattern[0] {
+            ModelPattern::RuleCall { binding: Some(b), .. } => Some(b),
+            _ => None
+        };
+
+        let bind_stmt = if let Some(b) = lhs_binding {
+            quote! { let #b = lhs; }
+        } else {
+            quote! {}
+        };
+
+        let logic = pattern::generate_sequence(tail_pattern, &variant.action, kws)?;
+        
+        // Peek logic on the *first token of the tail*
+        let peek_token_obj = tail_pattern.first()
+            .and_then(|f| analysis::get_simple_peek(f, kws).ok().flatten());
+        
+        match peek_token_obj {
+            Some(token_code) => {
+                Ok(quote! {
+                    if input.peek(#token_code) {
+                        // Speculative attempt for the tail
+                        if let Some(new_val) = rt::attempt(input, |input| { 
+                            #bind_stmt
+                            #logic 
+                        })? {
+                            lhs = new_val;
+                            continue;
+                        }
+                    }
+                })
+            },
+            None => {
+                // Blind attempt
+                Ok(quote! {
+                    if let Some(new_val) = rt::attempt(input, |input| { 
+                        #bind_stmt
+                        #logic 
+                    })? {
+                        lhs = new_val;
+                        continue;
+                    }
+                })
+            }
+        }
+    }).collect::<Result<Vec<_>>>()?;
+
+    Ok(quote! { #(#arms)* })
 }
 
 pub fn generate_variants_internal(
