@@ -13,8 +13,9 @@ syn-grammar-macros = { path = "./macros" }
 
 # 2. Runtime-Abhängigkeiten
 # Diese werden vom generierten Code verwendet (z.B. ParseStream, Token!, etc.)
-# Wir brauchen hier NICHT "full", das spart Kompilierzeit beim Endnutzer.
-syn = { version = "2.0", features = ["parsing", "printing", "clone-impls", "derive"] }
+# Wir aktivieren "full", damit der Generator (der Teil dieser Lib ist)
+# Rust-Code-Blöcke in den Grammatik-Dateien parsen kann.
+syn = { version = "2.0", features = ["full", "extra-traits"] }
 proc-macro2 = "1.0"
 quote = "1.0"
 
