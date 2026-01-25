@@ -37,7 +37,33 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             use syn::Result;
             use syn::Token;
             use syn::ext::IdentExt; 
-            use syn_grammar::rt; 
+            
+            pub mod rt {
+                use syn::parse::ParseStream;
+                use syn::Result;
+                use syn::parse::discouraged::Speculative;
+                use syn::ext::IdentExt; 
+
+                pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
+                    let fork = input.fork();
+                    match parser(&fork) {
+                        Ok(res) => {
+                            input.advance_to(&fork);
+                            Ok(Some(res))
+                        }
+                        Err(_) => Ok(None),
+                    }
+                }
+
+                pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
+                    input.call(syn::Ident::parse_any)
+                }
+
+                pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T> 
+                where T::Err: std::fmt::Display {
+                    input.parse::<syn::LitInt>()?.base10_parse()
+                }
+            }
 
             #kw_defs
             #inheritance
