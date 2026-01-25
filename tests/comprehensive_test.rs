@@ -150,9 +150,12 @@ fn test_cut_operator() {
         }
     }
 
+    println!("--- Debugging Cut Operator ---");
+
     // 1. Happy Path: Matches "let" then "mut"
-    CutTest::parse_main.parse_str("let mut")
-        .test()
+    let res1 = CutTest::parse_main.parse_str("let mut");
+    println!("Input: 'let mut' => {:?}", res1);
+    res1.test()
         .assert_success_is("Variable Declaration");
 
     // 2. Edge Case: "let" followed by something else.
@@ -162,7 +165,8 @@ fn test_cut_operator() {
     //
     // Once Cut is fully implemented, this assertion should be changed to:
     // .assert_failure(); 
-    CutTest::parse_main.parse_str("let something_else")
-        .test()
+    let res2 = CutTest::parse_main.parse_str("let something_else");
+    println!("Input: 'let something_else' => {:?}", res2);
+    res2.test()
         .assert_success_is("Identifier(let)");
 }
