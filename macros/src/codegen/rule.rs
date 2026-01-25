@@ -139,46 +139,93 @@ pub fn generate_variants_internal(
     }
 
     let arms = variants.iter().map(|variant| {
-        // Wir übergeben weiterhin custom_keywords für die Code-Generierung der Sequenz
-        let logic = pattern::generate_sequence(&variant.pattern, &variant.action, _custom_keywords)?;
+        // Check for Cut Operator
+        let cut_index = variant.pattern.iter().position(|p| matches!(p, ModelPattern::Cut));
         
-        // Peek-Token holen (braucht noch kws für Typ-Auflösung)
+        // Peek-Token holen
         let peek_token_obj = variant.pattern.first()
             .and_then(|f| analysis::get_simple_peek(f, _custom_keywords).ok().flatten());
-        
         let peek_str = analysis::get_peek_token_string(&variant.pattern);
+        
+        // Determine if we have a unique prefix (optimization)
+        let is_unique = if let (_, Some(token_key)) = (&peek_token_obj, &peek_str) {
+            token_counts.get(token_key).map(|c| *c == 1).unwrap_or(false)
+        } else {
+            false
+        };
 
-        match (peek_token_obj, peek_str) {
-            (Some(token_code), Some(token_key)) => {
-                let count = token_counts.get(&token_key).unwrap_or(&0);
-                
-                if *count == 1 {
-                    // UNIQUE PREFIX -> COMMIT
-                    // Strategie: Wenn Token passt, MUSS es diese Regel sein.
-                    // Wir führen aus und returnen das Ergebnis sofort.
-                    // Fehler hier brechen die Funktion ab (gewollt).
-                    Ok(quote! {
-                        if input.peek(#token_code) {
-                            return #logic;
-                        }
-                    })
-                } else {
-                    // AMBIGUOUS PREFIX -> ATTEMPT (Backtracking)
-                    // Strategie: Wenn Token passt, probieren wir es "sandbox"-mäßig.
-                    // Wenn es klappt -> return Ok.
-                    // Wenn nicht (None) -> machen wir NICHTS und der Code läuft weiter zur nächsten Variante.
-                    Ok(quote! {
-                        if input.peek(#token_code) {
-                            if let Some(res) = rt::attempt(input, |input| { #logic })? {
-                                return Ok(res);
-                            }
-                        }
-                    })
+        if let Some(idx) = cut_index {
+            // --- CUT LOGIC (A => B) ---
+            let pre_cut = &variant.pattern[0..idx];
+            let post_cut = &variant.pattern[idx+1..];
+            
+            let pre_bindings = analysis::collect_bindings(pre_cut);
+            let pre_logic = pattern::generate_sequence_steps(pre_cut, _custom_keywords)?;
+            let post_logic = pattern::generate_sequence_steps(post_cut, _custom_keywords)?;
+            let action = &variant.action;
+
+            // Construct the logic block
+            let logic_block = if is_unique {
+                // If unique, we don't need speculative parsing for the pre-cut part either.
+                // Just run everything linearly.
+                quote! {
+                    {
+                        #pre_logic
+                        #post_logic
+                        return Ok(#action);
+                    }
                 }
-            },
-            _ => {
-                // BLIND START -> ATTEMPT
-                // Kein Peek möglich, wir müssen es probieren.
+            } else {
+                // Ambiguous: Speculative Pre-Cut, Fatal Post-Cut
+                quote! {
+                    // 1. Speculative Phase (Pre-Cut)
+                    let pre_result = rt::attempt(input, |input| {
+                        #pre_logic
+                        Ok(( #(#pre_bindings),* ))
+                    })?;
+
+                    if let Some(( #(#pre_bindings),* )) = pre_result {
+                        // 2. Commit Phase (Post-Cut) - Errors here are fatal!
+                        #post_logic
+                        return Ok(#action);
+                    }
+                }
+            };
+
+            // Wrap with Peek check if available
+            if let Some(token_code) = peek_token_obj {
+                Ok(quote! {
+                    if input.peek(#token_code) {
+                        #logic_block
+                    }
+                })
+            } else {
+                Ok(logic_block)
+            }
+
+        } else {
+            // --- STANDARD LOGIC (No Cut) ---
+            let logic = pattern::generate_sequence(&variant.pattern, &variant.action, _custom_keywords)?;
+
+            if is_unique {
+                // Unique Prefix -> Commit immediately
+                let token_code = peek_token_obj.as_ref().unwrap();
+                Ok(quote! {
+                    if input.peek(#token_code) {
+                        return #logic;
+                    }
+                })
+            } else if let Some(token_code) = peek_token_obj {
+                // Ambiguous Prefix -> Attempt
+                Ok(quote! {
+                    if input.peek(#token_code) {
+                        if let Some(res) = rt::attempt(input, |input| { #logic })? {
+                            return Ok(res);
+                        }
+                    }
+                })
+            } else {
+                // Blind -> Attempt
                 Ok(quote! { 
                     if let Some(res) = rt::attempt(input, |input| { #logic })? { 
                         return Ok(res); 

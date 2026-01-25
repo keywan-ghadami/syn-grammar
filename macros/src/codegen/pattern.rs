@@ -10,7 +10,7 @@ pub fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, kws: &
     Ok(quote! { { #steps Ok(#action) } })
 }
 
-fn generate_sequence_steps(patterns: &[ModelPattern], kws: &HashSet<String>) -> Result<TokenStream> {
+pub fn generate_sequence_steps(patterns: &[ModelPattern], kws: &HashSet<String>) -> Result<TokenStream> {
     let steps = patterns.iter()
         .map(|p| generate_pattern_step(p, kws))
         .collect::<Result<Vec<_>>>()?;
@@ -22,10 +22,10 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
     match pattern {
         ModelPattern::Cut => {
-            Ok(quote_spanned! {span=> 
-                // Cut operator: In a full implementation, this marks the commit point.
-                // For now, it consumes no tokens.
-            })
+            // The Cut operator is handled at the RuleVariant level (in rule.rs).
+            // If it appears here, it's likely inside a group or handled implicitly.
+            // We emit no code for it in the sequence flow.
+            Ok(quote!())
         },
         ModelPattern::Lit(lit) => {
             let token_type = analysis::resolve_token_type(lit, kws)?;
