@@ -204,7 +204,7 @@ fn test_left_recursion() {
 fn test_left_recursion_field_access() {
     grammar! {
         grammar field_access {
-            rule expr -> String =
+            pub rule expr -> String =
                 e:expr "." i:ident -> { format!("({}).{}", e, i) }
               | i:ident            -> { i.to_string() }
         }

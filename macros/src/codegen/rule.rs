@@ -76,7 +76,7 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
         };
 
         let bind_stmt = if let Some(b) = lhs_binding {
-            quote! { let #b = lhs; }
+            quote! { let #b = lhs.clone(); }
         } else {
             quote! {}
         };
