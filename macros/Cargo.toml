@@ -8,6 +8,7 @@ repository = "https://github.com/keywan-ghadami/syn-grammar"
 readme = "README.md"
 keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
 categories = ["parsing", "development-tools"]
+authors = "Keywan Ghadami"
 
 # WICHTIG: Markiert dies als prozedurales Makro-Crate
 [lib]

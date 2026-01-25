@@ -8,10 +8,18 @@ repository = "https://github.com/keywan-ghadami/syn-grammar"
 readme = "README.md"
 keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
 categories = ["parsing", "development-tools"]
+authors = "Keywan Ghadami"
 
 # Wir definieren einen Workspace, damit Cargo das Makro-Unterverzeichnis korrekt mitbaut
 [workspace]
 members = ["macros"]
+exclude = [
+    ".devcontainer",                                                ".github",
+    ".aider*",
+    ".gitignore",
+    ".github"
+]
+
 
 [dependencies]
 # 1. Das Makro selbst (lokaler Pfad)
