@@ -5,6 +5,6 @@
       "version": "latest"
     }
   },
-  "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh"
+  "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh|sh && uv tool install aider-chat"
 }
 
