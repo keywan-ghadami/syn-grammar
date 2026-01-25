@@ -21,6 +21,12 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     let span = pattern.span();
 
     match pattern {
+        ModelPattern::Cut => {
+            Ok(quote_spanned! {span=> 
+                // Cut operator: In a full implementation, this marks the commit point.
+                // For now, it consumes no tokens.
+            })
+        },
         ModelPattern::Lit(lit) => {
             let token_type = analysis::resolve_token_type(lit, kws)?;
             Ok(quote_spanned! {span=> let _ = input.parse::<#token_type>()?; })

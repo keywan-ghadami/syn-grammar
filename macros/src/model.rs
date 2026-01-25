@@ -27,6 +27,7 @@ pub struct RuleVariant {
 
 #[derive(Debug, Clone)]
 pub enum ModelPattern {
+    Cut,
     Lit(LitStr),
     RuleCall {
         binding: Option<Ident>,
@@ -80,6 +81,7 @@ impl From<parser::Pattern> for ModelPattern {
     fn from(p: parser::Pattern) -> Self {
         use parser::Pattern as P;
         match p {
+            P::Cut => ModelPattern::Cut,
             P::Lit(l) => ModelPattern::Lit(l),
             P::RuleCall { binding, rule_name, args } => 
                 ModelPattern::RuleCall { binding, rule_name, args },
@@ -108,6 +110,7 @@ impl ModelPattern {
     /// Liefert den Span des Patterns für genaue Fehlermeldungen im Generator via quote_spanned!
     pub fn span(&self) -> Span {
         match self {
+            ModelPattern::Cut => Span::call_site(),
             ModelPattern::Lit(l) => l.span(),
             ModelPattern::RuleCall { rule_name, .. } => rule_name.span(),
             ModelPattern::Optional(p) | ModelPattern::Repeat(p) | ModelPattern::Plus(p) => p.span(),
