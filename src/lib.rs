@@ -8,4 +8,4 @@ pub mod testing;
 
 // 3. Das Makro re-exportieren
 // Damit kann der User schreiben: `use syn_grammar::grammar;`
-pub use syn_grammar_macros::grammar;
+pub use syn_grammar_macros::{grammar, include_grammar};
