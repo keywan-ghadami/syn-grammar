@@ -6,6 +6,9 @@ model: gemini/gemini-3-pro-preview
 # Modus auf Architect setzen
 chat-mode: architect
 
+yes-always: true
+
+weak-model: gemini/gemini-3-flash-preview
 
 # Optional: Editor-Modell festlegen (Aider wählt sonst ein passendes Standardmodell)
 editor-model: gemini/gemini-3-pro-preview
