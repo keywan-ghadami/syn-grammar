@@ -173,7 +173,7 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenSt
 }
 
 fn is_builtin(name: &syn::Ident) -> bool {
-    matches!(name.to_string().as_str(), "ident" | "int_lit" | "string_lit")
+    matches!(name.to_string().as_str(), "ident" | "int_lit" | "string_lit" | "rust_type" | "rust_block" | "lit_str")
 }
 
 fn map_builtin(name: &syn::Ident) -> TokenStream {
@@ -181,6 +181,9 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
         "ident" => quote! { rt::parse_ident(input)? },
         "int_lit" => quote! { rt::parse_int::<i32>(input)? },
         "string_lit" => quote! { input.parse::<syn::LitStr>()?.value() },
+        "lit_str" => quote! { input.parse::<syn::LitStr>()? },
+        "rust_type" => quote! { input.parse::<syn::Type>()? },
+        "rust_block" => quote! { input.parse::<syn::Block>()? },
         _ => unreachable!(),
     }
 }
