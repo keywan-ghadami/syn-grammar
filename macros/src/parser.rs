@@ -7,6 +7,7 @@ mod rt {
     use syn::parse::ParseStream;
     use syn::Result;
     use syn::ext::IdentExt; 
+    use syn::parse::discouraged::Speculative;
 
     pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
         let fork = input.fork();
