@@ -132,7 +132,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             if bindings.is_empty() {
                 Ok(quote_spanned! {span=> {
                     let content;
-                    // FIX: Das '?' wurde entfernt, da das Makro selbst returned
+                    // FIX: The '?' was removed because the macro returns itself
                     let _ = syn::#macro_name!(content in input);
                     let input = &content;
                     #inner_logic

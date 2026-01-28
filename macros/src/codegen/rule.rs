@@ -123,16 +123,16 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
 pub fn generate_variants_internal(
     variants: &[RuleVariant], 
     is_top_level: bool,
-    _custom_keywords: &HashSet<String> // Wird hier aktuell nicht mehr direkt gebraucht
+    _custom_keywords: &HashSet<String> // Currently not directly used here
 ) -> Result<TokenStream> {
     if variants.is_empty() {
         return Ok(quote! { Err(input.error("No variants defined")) });
     }
 
-    // 1. Analyse Phase: Zähle Start-Tokens
+    // 1. Analysis Phase: Count start tokens
     let mut token_counts = HashMap::new();
     for v in variants {
-        // Hinweis: Hier wurde 'custom_keywords' aus dem Aufruf entfernt (wie im vorherigen Fix besprochen)
+        // Note: 'custom_keywords' was removed from the call here (as discussed in previous fix)
         if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
             *token_counts.entry(token_str).or_insert(0) += 1;
         }
@@ -142,7 +142,7 @@ pub fn generate_variants_internal(
         // Check for Cut Operator
         let cut_index = variant.pattern.iter().position(|p| matches!(p, ModelPattern::Cut));
         
-        // Peek-Token holen
+        // Get Peek Token
         let peek_token_obj = variant.pattern.first()
             .and_then(|f| analysis::get_simple_peek(f, _custom_keywords).ok().flatten());
         let peek_str = analysis::get_peek_token_string(&variant.pattern);
@@ -241,9 +241,9 @@ pub fn generate_variants_internal(
         "No matching variant in group" 
     };
 
-    // ÄNDERUNG: Statt #(#arms else)* nutzen wir eine flache Liste.
-    // Da jeder Block mit 'return' endet (bei Erfolg), wirkt das wie ein "First Match Wins".
-    // Wenn nichts matcht, fallen wir unten durch in den Error.
+    // CHANGE: Instead of #(#arms else)* we use a flat list.
+    // Since every block ends with 'return' (on success), this acts like "First Match Wins".
+    // If nothing matches, we fall through to the error.
     Ok(quote! {
         #(#arms)*
         Err(input.error(#error_msg))

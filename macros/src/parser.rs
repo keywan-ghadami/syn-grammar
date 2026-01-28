@@ -31,7 +31,7 @@ mod kw {
     syn::custom_keyword!(paren);
 }
 
-// --- Top-Level Grammatik Definition ---
+// --- Top-Level Grammar Definition ---
 pub struct GrammarDefinition {
     pub name: Ident,
     pub inherits: Option<InheritanceSpec>,
@@ -69,7 +69,7 @@ impl Parse for InheritanceSpec {
     }
 }
 
-// --- Regel Definition ---
+// --- Rule Definition ---
 pub struct Rule {
     pub is_pub: Option<Token![pub]>,
     pub name: Ident,
@@ -107,7 +107,7 @@ impl Rule {
     }
 }
 
-// --- Varianten und Action ---
+// --- Variants and Action ---
 pub struct RuleVariant {
     pub pattern: Vec<Pattern>,
     pub action: TokenStream,
