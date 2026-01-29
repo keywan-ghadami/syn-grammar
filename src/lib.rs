@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 // src/lib.rs
 
 // 1. Export runtime modules
