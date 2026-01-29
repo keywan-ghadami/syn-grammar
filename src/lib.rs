@@ -9,3 +9,4 @@ pub mod testing;
 // 3. Re-export the macro
 // This allows the user to write: `use syn_grammar::grammar;`
 pub use syn_grammar_macros::grammar;
+pub use syn_grammar_macros::include_grammar;

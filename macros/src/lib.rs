@@ -2,6 +2,7 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
+use quote::quote;
 
 // Include modules
 mod parser;
@@ -28,4 +29,11 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         Ok(stream) => stream.into(), // Successful code
         Err(e) => e.to_compile_error().into(), // Emit generation error as compiler error
     }
+}
+
+#[proc_macro]
+pub fn include_grammar(_input: TokenStream) -> TokenStream {
+    quote! {
+        compile_error!("External files are removed in v0.2.0. Please move your grammar inline into grammar! { ... }.");
+    }.into()
 }
