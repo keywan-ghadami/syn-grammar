@@ -41,7 +41,7 @@ use syn::parse::Parser; // Required for .parse_str()
 grammar! {
     grammar Calc {
         // The return type of the rule is defined after `->`
-        rule expression -> i32 =
+        pub rule expression -> i32 =
             l:expression "+" r:term -> { l + r }
           | l:expression "-" r:term -> { l - r }
           | t:term                  -> { t }
@@ -78,7 +78,7 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 
 A grammar consists of a set of rules. Each rule has a name, a return type, and a pattern to match.
 
-```rust
+```rust,ignore
 rule name -> ReturnType = pattern -> { action_code }
 ```
 
@@ -92,7 +92,7 @@ rule name -> ReturnType = pattern -> { action_code }
 #### Literals and Keywords
 Match specific tokens using string literals.
 
-```rust
+```rust,ignore
 rule kw -> () = "fn" "name" -> { () }
 ```
 
@@ -111,7 +111,7 @@ rule kw -> () = "fn" "name" -> { () }
 #### Sequences and Bindings
 Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
 
-```rust
+```rust,ignore
 rule assignment -> Stmt = 
     name:ident "=" val:expr -> { 
         Stmt::Assign(name, val) 
@@ -121,7 +121,7 @@ rule assignment -> Stmt =
 #### Alternatives (`|`)
 Match one of several alternatives. The first one that matches wins.
 
-```rust
+```rust,ignore
 rule boolean -> bool = 
     "true"  -> { true }
   | "false" -> { false }
@@ -132,7 +132,7 @@ rule boolean -> bool =
 - `pattern+`: Match one or more times. Returns a `Vec`.
 - `pattern?`: Match zero or one time. Returns an `Option` (or `()` if unbound).
 
-```rust
+```rust,ignore
 rule list -> Vec<i32> = 
     "[" elements:int_lit* "]" -> { elements }
 ```
@@ -140,7 +140,7 @@ rule list -> Vec<i32> =
 #### Groups `(...)`
 Group patterns together to apply repetitions or ensure precedence.
 
-```rust
+```rust,ignore
 rule complex -> () = 
     ("a" | "b")+ "c" -> { () }
 ```
@@ -152,7 +152,7 @@ Match content inside delimiters.
 - `bracketed[pattern]`: Matches `[ pattern ]`.
 - `braced{pattern}`: Matches `{ pattern }`.
 
-```rust
+```rust,ignore
 rule tuple -> (i32, i32) = 
     paren(a:int_lit "," b:int_lit) -> { (a, b) }
 ```
@@ -161,7 +161,7 @@ rule tuple -> (i32, i32) =
 
 The cut operator `=>` allows you to commit to a specific alternative. If the pattern *before* the `=>` matches, the parser will **not** backtrack to try other alternatives, even if the pattern *after* the `=>` fails. This produces better error messages.
 
-```rust
+```rust,ignore
 rule stmt -> Stmt =
     // If we see "let", we commit to this rule. 
     // If "mut" or the identifier is missing, we error immediately 
@@ -176,7 +176,7 @@ rule stmt -> Stmt =
 
 Recursive descent parsers typically struggle with left recursion (e.g., `A -> A b`). `syn-grammar` automatically detects direct left recursion and compiles it into an iterative loop. This makes writing expression parsers natural and straightforward.
 
-```rust
+```rust,ignore
 // This works perfectly!
 rule expr -> i32 = 
     l:expr "+" r:term -> { l + r }
