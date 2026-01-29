@@ -9,11 +9,21 @@ mod parser;
 mod model;
 mod codegen;
 
-/// The main macro.
-/// Usage:
+/// The main macro for defining grammars.
+///
+/// See the [crate-level documentation](https://docs.rs/syn-grammar) for full syntax and usage details.
+///
+/// # Example
+///
+/// ```rust
+/// use syn_grammar::grammar;
+///
 /// grammar! {
-///     grammar MyGrammar { ... }
+///     grammar MyGrammar {
+///         rule main -> i32 = "42" -> { 42 }
+///     }
 /// }
+/// ```
 #[proc_macro]
 pub fn grammar(input: TokenStream) -> TokenStream {
     // 1. Parsing: From TokenStream to syntactic AST (parser.rs)
@@ -31,6 +41,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     }
 }
 
+#[doc(hidden)]
 #[proc_macro]
 pub fn include_grammar(_input: TokenStream) -> TokenStream {
     quote! {
