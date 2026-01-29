@@ -4,7 +4,7 @@ use syn::{Result, parse_quote};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
-/// Sammelt alle Custom Keywords aus der Grammatik
+/// Collects all custom keywords from the grammar
 pub fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {
     let mut kws = HashSet::new();
     grammar.rules.iter()
@@ -49,7 +49,7 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     bindings
 }
 
-/// Liefert das Token für syn::parse::<Token>() oder Peeking
+/// Returns the token for syn::parse::<Token>() or peeking
 pub fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> Result<syn::Type> {
     let s = lit.value();
     
@@ -67,7 +67,7 @@ pub fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) 
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))
 }
 
-/// Helper für UPO: Liefert einen TokenStream für `input.peek(...)`
+/// Helper for UPO: Returns a TokenStream for input.peek(...)
 pub fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<Option<TokenStream>> {
     match pattern {
         ModelPattern::Lit(lit) => {
@@ -83,7 +83,7 @@ pub fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<
     }
 }
 
-/// Helper für UPO: Liefert einen eindeutigen String-Key für das Start-Token
+/// Helper for UPO: Returns a unique string key for the start token
 pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     match patterns.first() {
         Some(ModelPattern::Lit(l)) => Some(l.value()),
@@ -105,4 +105,3 @@ fn is_identifier(s: &str) -> bool {
 fn is_rust_keyword(s: &str) -> bool {
     matches!(s, "fn" | "let" | "struct" | "enum" | "if" | "else" | "while" | "loop" | "for" | "match" | "return" | "pub" | "mod" | "use" | "type" | "trait" | "impl" | "const" | "static" | "mut" | "unsafe" | "extern" | "ref" | "self" | "Self" | "super" | "crate" | "async" | "await" | "where" | "move" | "true" | "false" | "in" | "as" | "dyn")
 }
-

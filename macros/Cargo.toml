@@ -10,24 +10,14 @@ keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
 categories = ["parsing", "development-tools"]
 authors = ["Keywan Ghadami"]
 
-# WICHTIG: Markiert dies als prozedurales Makro-Crate
+# IMPORTANT: Marks this as a procedural macro crate
 [lib]
 proc-macro = true
 
 [dependencies]
-# 1. Parsing der DSL (Wir brauchen "full" für Syntax-Checks und Parsing)
+# 1. Parsing the DSL (We need "full" for syntax checks and parsing)
 syn = { version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }
 
-# 2. Helfer zum Parsen deiner DSL-Strukturen (spart manuellen Boilerplate)
-derive-syn-parse = "0.2"
-
-# 3. Code-Generierung
+# 2. Code generation
 quote = "1.0"
 proc-macro2 = "1.0"
-
-# 4. Utilities
-# Hilft beim Iterieren und Zusammenfügen von Listen im Generator
-itertools = "0.14" 
-
-# 5. Error Reporting (optional, aber gut für schöne Fehlermeldungen)
-proc-macro-error = "1.0"

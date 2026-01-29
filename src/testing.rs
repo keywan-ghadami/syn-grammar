@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-// Ein Wrapper um syn::Result, um flüssige Tests zu schreiben.
+// A wrapper around syn::Result to write fluent tests.
 pub struct TestResult<T> {
     inner: syn::Result<T>,
     context: Option<String>,
@@ -25,7 +25,7 @@ impl<T: Debug> TestResult<T> {
             .unwrap_or_default()
     }
 
-    // 1. Behauptet Erfolg und gibt den Wert zurück (wie bisher).
+    // 1. Asserts success and returns the value (as before).
     pub fn assert_success(self) -> T {
         let ctx = self.format_context();
         match self.inner {
@@ -39,8 +39,8 @@ impl<T: Debug> TestResult<T> {
         }
     }
 
-    // 2. NEU: Behauptet Erfolg UND prüft direkt den Wert.
-    // Gibt eine schöne Diff-Ausgabe, wenn die Werte nicht übereinstimmen.
+    // 2. NEW: Asserts success AND checks the value directly.
+    // Returns a nice diff output if values do not match.
     pub fn assert_success_is<E>(self, expected: E) -> T 
     where T: PartialEq<E>, E: Debug {
         let ctx = self.format_context();
@@ -54,7 +54,7 @@ impl<T: Debug> TestResult<T> {
         val
     }
 
-    // 3. Behauptet Fehler und gibt den Error zurück.
+    // 3. Asserts failure and returns the error.
     pub fn assert_failure(self) -> syn::Error {
         let ctx = self.format_context();
         match self.inner {
@@ -68,7 +68,7 @@ impl<T: Debug> TestResult<T> {
         }
     }
 
-    // 4. Behauptet Fehler UND prüft, ob die Meldung einen Text enthält.
+    // 4. Asserts failure AND checks if the message contains a specific text.
     pub fn assert_failure_contains(self, expected_msg_part: &str) {
         let ctx = self.format_context();
         let err = self.assert_failure();
