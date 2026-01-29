@@ -2,7 +2,7 @@ use syn_grammar::grammar;
 use syn_grammar::testing::Testable; 
 use syn::parse::Parser; 
 
-// --- Test 1: Basis-Sequenz ---
+// --- Test 1: Basic Sequence ---
 #[test]
 fn test_basic_sequence() {
     grammar! {
@@ -11,18 +11,18 @@ fn test_basic_sequence() {
         }
     }
 
-    // NEU: .assert_success_is(...)
+    // NEW: .assert_success_is(...)
     basic::parse_main.parse_str("hello world")
         .test()
         .assert_success_is("Success");
 
-    // NEU: .assert_failure_contains(...)
+    // NEW: .assert_failure_contains(...)
     basic::parse_main.parse_str("hello universe")
         .test()
         .assert_failure_contains("expected `world`");
 }
 
-// --- Test 2: Backtracking & Priorität ---
+// --- Test 2: Backtracking & Priority ---
 #[test]
 fn test_backtracking_priority() {
     grammar! {
@@ -42,7 +42,7 @@ fn test_backtracking_priority() {
         .assert_success_is("Path A");
 }
 
-// --- Test 3: Komplexe Gruppen & Optionalität ---
+// --- Test 3: Complex Groups & Optionality ---
 #[test]
 fn test_complex_groups() {
     grammar! {
@@ -54,11 +54,11 @@ fn test_complex_groups() {
     complex::parse_main.parse_str("A B C").test().assert_success();
     complex::parse_main.parse_str("C").test().assert_success();
     
-    // Hier erwarten wir, dass es fehlschlägt, weil "B" fehlt
+    // Here we expect it to fail because "B" is missing
     complex::parse_main.parse_str("A C").test().assert_failure();
 }
 
-// --- Test 4: Mathematische Ausdrücke ---
+// --- Test 4: Mathematical Expressions ---
 #[test]
 fn test_math_expression() {
     grammar! {
@@ -88,7 +88,7 @@ fn test_math_expression() {
         .assert_success_is(20);
 }
 
-// --- Test 5: Wiederholungen & Token-Klammern ---
+// --- Test 5: Repetitions & Token Brackets ---
 #[test]
 fn test_repetition() {
     grammar! {
@@ -106,18 +106,18 @@ fn test_repetition() {
     repeat::parse_main.parse_str("[ x, x, x ]").test().assert_success_is(3);
     repeat::parse_main.parse_str("[ ]").test().assert_failure();
     
-    // Fall: Fehlende schließende Klammer.
-    // Wir nutzen jetzt assert_failure(), schauen uns aber den Fehler genau an,
-    // falls er nicht das enthält, was wir erwarten.
+    // Case: Missing closing bracket.
+    // We use assert_failure() now, but look at the error exactly,
+    // in case it doesn't contain what we expect.
     let err = repeat::parse_main.parse_str("[ x, x").test().assert_failure();
     
-    // Debug-Output, damit du genau siehst, was "Got" ist:
+    // Debug output so you see exactly what "Got" is:
     println!("DEBUG: Actual Error Message: '{}'", err);
     
-    // Ich habe den strikten Check hier vorerst entfernt, damit wir den
-    // "echten" Fehler sehen und nicht nur "assertion failed".
-    // Wenn wir wissen, was 'syn' hier wirklich wirft, können wir
-    // .assert_failure_contains("...") wieder scharf schalten.
+    // I have removed the strict check here for now, so we see the
+    // "real" error and not just "assertion failed".
+    // Once we know what 'syn' really throws here, we can
+    // re-enable .assert_failure_contains("...").
 }
 
 // --- Test 6: Built-ins ---

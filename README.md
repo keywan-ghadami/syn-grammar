@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/syn-grammar/badge.svg)](https://docs.rs/syn-grammar)
 [![License](https://img.shields.io/crates/l/syn-grammar.svg)](https://github.com/keywan-ghadami/syn-grammar/blob/main/LICENSE)
 
-**syn-grammar** is a parser generator for Rust that allows you to define EBNF-like grammars directly inside your code (or in external files) and compiles them into `syn` parsers.
+**syn-grammar** is a parser generator for Rust that allows you to define EBNF-like grammars directly inside your code and compiles them into `syn` parsers.
 
 It is designed to make writing procedural macros and Domain Specific Languages (DSLs) in Rust significantly easier by handling the parsing boilerplate for you.
 
@@ -15,7 +15,6 @@ It is designed to make writing procedural macros and Domain Specific Languages (
 - **Syn Integration**: Built-in support for parsing Rust identifiers (`ident`), integers (`int_lit`), and strings (`string_lit`).
 - **Left Recursion**: Automatically handles direct left recursion (e.g., `expr = expr "+" term`), making expression parsing intuitive.
 - **Backtracking**: Supports speculative parsing for ambiguous grammars.
-- **External Files**: Keep your Rust code clean by moving grammars to `.g` files with `include_grammar!`.
 
 ## Installation
 
@@ -60,27 +59,6 @@ fn main() {
     // The macro generates a module `Calc` with functions `parse_<rule_name>`
     let result = Calc::parse_expression.parse_str("1 + 2 * 3");
     assert_eq!(result.unwrap(), 7);
-}
-```
-
-### External Grammar File
-
-**src/grammar.g**
-```text
-grammar MyGrammar {
-    rule main -> String = "hello" "world" -> { "Success".to_string() }
-}
-```
-
-**src/lib.rs**
-```rust
-use syn_grammar::include_grammar;
-
-include_grammar!("grammar.g");
-
-fn test() {
-    let res = MyGrammar::parse_main.parse_str("hello world");
-    assert!(res.is_ok());
 }
 ```
 
