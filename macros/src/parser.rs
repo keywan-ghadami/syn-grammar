@@ -70,9 +70,26 @@ impl Parse for InheritanceSpec {
 }
 
 // --- Rule Definition ---
+pub struct RuleParameter {
+    pub name: Ident,
+    pub _colon: Token![:],
+    pub ty: Type,
+}
+
+impl Parse for RuleParameter {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(RuleParameter {
+            name: input.parse()?,
+            _colon: input.parse()?,
+            ty: input.parse()?,
+        })
+    }
+}
+
 pub struct Rule {
     pub is_pub: Option<Token![pub]>,
     pub name: Ident,
+    pub params: Vec<RuleParameter>,
     pub return_type: Type,
     pub variants: Vec<RuleVariant>,
 }
@@ -87,13 +104,29 @@ impl Parse for Rule {
 
         let _ = input.parse::<kw::rule>()?;
         let name = rt::parse_ident(input)?;
+
+        let params = if input.peek(token::Paren) {
+            let content;
+            syn::parenthesized!(content in input);
+            let mut params = Vec::new();
+            while !content.is_empty() {
+                params.push(content.parse()?);
+                if content.peek(Token![,]) {
+                    let _ = content.parse::<Token![,]>()?;
+                }
+            }
+            params
+        } else {
+            Vec::new()
+        };
+
         let _ = input.parse::<Token![->]>()?;
         let return_type = input.parse::<Type>()?;
         let _ = input.parse::<Token![=]>()?;
         
         let variants = RuleVariant::parse_list(input)?;
 
-        Ok(Rule { is_pub, name, return_type, variants })
+        Ok(Rule { is_pub, name, params, return_type, variants })
     }
 }
 

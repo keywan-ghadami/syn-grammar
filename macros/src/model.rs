@@ -15,6 +15,7 @@ pub struct GrammarDefinition {
 pub struct Rule {
     pub is_pub: bool, 
     pub name: Ident,
+    pub params: Vec<(Ident, Type)>,
     pub return_type: Type,
     pub variants: Vec<RuleVariant>,
 }
@@ -62,6 +63,7 @@ impl From<parser::Rule> for Rule {
             // Option<Token![pub]> -> bool
             is_pub: p.is_pub.is_some(),
             name: p.name,
+            params: p.params.into_iter().map(|param| (param.name, param.ty)).collect(),
             return_type: p.return_type,
             variants: p.variants.into_iter().map(Into::into).collect(),
         }

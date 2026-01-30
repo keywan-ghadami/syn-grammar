@@ -10,6 +10,10 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let fn_name = format_ident!("parse_{}", name);
     let ret_type = &rule.return_type;
     
+    let params = rule.params.iter().map(|(name, ty)| {
+        quote! { , #name : #ty }
+    });
+
     let is_public = rule.is_pub || name == "main";
     let vis = if is_public { quote!(pub) } else { quote!() };
     
@@ -42,7 +46,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     };
 
     Ok(quote! {
-        #vis fn #fn_name(input: ParseStream) -> Result<#ret_type> {
+        #vis fn #fn_name(input: ParseStream #(#params)*) -> Result<#ret_type> {
             #body
         }
     })

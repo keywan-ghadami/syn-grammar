@@ -403,3 +403,63 @@ fn test_complex_return_types() {
     }
     types::parse_main.parse_str("null").test().assert_success();
 }
+
+// --- Test 18: Empty (Epsilon) Alternatives ---
+#[test]
+fn test_epsilon_alternative() {
+    grammar! {
+        grammar epsilon {
+            rule main -> String = 
+                "foo" -> { "foo".to_string() }
+              |       -> { "empty".to_string() } // Empty alternative matches nothing (epsilon)
+        }
+    }
+
+    epsilon::parse_main.parse_str("foo").test().assert_success_is("foo".to_string());
+    epsilon::parse_main.parse_str("").test().assert_success_is("empty".to_string());
+}
+
+// --- Test 19: Inheritance Shadowing ---
+#[test]
+fn test_inheritance_shadowing() {
+    grammar! {
+        grammar base_shadow {
+            pub rule value -> i32 = "1" -> { 1 }
+        }
+    }
+
+    grammar! {
+        grammar derived_shadow : base_shadow {
+            // We override 'value' from base
+            rule value -> i32 = "2" -> { 2 }
+            
+            rule main -> i32 = v:value -> { v }
+        }
+    }
+
+    // Should use the local definition "2", not the imported "1"
+    derived_shadow::parse_main.parse_str("2")
+        .test()
+        .assert_success_is(2);
+}
+
+// --- Test 20: Rule Arguments ---
+#[test]
+fn test_rule_arguments() {
+    grammar! {
+        grammar args_test {
+            // Rule taking an argument from the caller
+            rule main -> i32 = 
+                "start" v:value(10) -> { v }
+
+            // Definition with parameters
+            rule value(offset: i32) -> i32 = 
+                i:int_lit -> { i + offset }
+        }
+    }
+
+    // "start 5" -> calls value(10) -> parses "5" -> returns 5 + 10 = 15
+    args_test::parse_main.parse_str("start 5")
+        .test()
+        .assert_success_is(15);
+}
