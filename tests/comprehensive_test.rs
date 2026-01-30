@@ -420,23 +420,23 @@ fn test_epsilon_alternative() {
 }
 
 // --- Test 19: Inheritance Shadowing ---
+grammar! {
+    grammar base_shadow {
+        pub rule value -> i32 = "one" -> { 1 }
+    }
+}
+
+grammar! {
+    grammar derived_shadow : base_shadow {
+        // We override 'value' from base
+        rule value -> i32 = "two" -> { 2 }
+        
+        rule main -> i32 = v:value -> { v }
+    }
+}
+
 #[test]
 fn test_inheritance_shadowing() {
-    grammar! {
-        grammar base_shadow {
-            pub rule value -> i32 = "one" -> { 1 }
-        }
-    }
-
-    grammar! {
-        grammar derived_shadow : base_shadow {
-            // We override 'value' from base
-            rule value -> i32 = "two" -> { 2 }
-            
-            rule main -> i32 = v:value -> { v }
-        }
-    }
-
     // Should use the local definition "two", not the imported "one"
     derived_shadow::parse_main.parse_str("two")
         .test()
