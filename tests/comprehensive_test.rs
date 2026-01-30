@@ -463,3 +463,50 @@ fn test_rule_arguments() {
         .test()
         .assert_success_is(15);
 }
+
+// --- Test 21: Multiple Arguments ---
+#[test]
+fn test_multiple_arguments() {
+    grammar! {
+        grammar multi_args {
+            rule main -> i32 = 
+                "calc" res:calc(10, 5) -> { res }
+
+            // Testet Komma-Separierung in Parametern
+            rule calc(base: i32, mult: i32) -> i32 = 
+                i:int_lit -> { base + (i * mult) }
+        }
+    }
+
+    // 10 + (2 * 5) = 20
+    multi_args::parse_main.parse_str("calc 2")
+        .test()
+        .assert_success_is(20);
+}
+
+// --- Test 22: Complex Nested Repetition ---
+#[test]
+fn test_nested_repetition_complex() {
+    grammar! {
+        grammar nested_rep {
+            // Pattern: ( "group" ( "item" )* ";" )*
+            // Testet verschachtelte Vec-Generierung und Scopes
+            rule main -> usize = 
+                groups:group* -> { groups.iter().sum() }
+
+            rule group -> usize = 
+                "group" items:item* ";" -> { items.len() }
+
+            rule item -> () = "item" -> { () }
+        }
+    }
+
+    // 2 groups:
+    // 1. group: 2 items
+    // 2. group: 1 item
+    // Total: 3
+    let input = "group item item ; group item ;";
+    nested_rep::parse_main.parse_str(input)
+        .test()
+        .assert_success_is(3);
+}
