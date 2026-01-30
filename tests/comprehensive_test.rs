@@ -294,3 +294,40 @@ fn test_keywords_vs_idents() {
         .test()
         .assert_failure();
 }
+
+// --- Test 13: Missing Syntax Features (Plus, Braced, LitStr) ---
+#[test]
+fn test_missing_syntax_features() {
+    grammar! {
+        grammar missing {
+            // Testet:
+            // 1. braced { ... } (Note: 'braced' keyword is not needed/supported, just use { ... })
+            // 2. + Operator (mindestens ein Element)
+            // 3. Binding an eine Liste (ids:ident+) -> Vec<Ident>
+            rule main -> Vec<String> =
+                { ids:ident+ } -> {
+                    ids.iter().map(|id| id.to_string()).collect()
+                }
+
+            // Testet: lit_str (gibt syn::LitStr zurück, nicht String)
+            rule raw_lit -> String =
+                l:lit_str -> { l.value() }
+        }
+    }
+
+    // 1. Happy Path für Braced + Plus
+    missing::parse_main.parse_str("{ a b c }")
+        .test()
+        .assert_success_is(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+
+    // 2. Fail Path für Plus (Leere Liste in Braces)
+    // Da '+' mindestens eins erwartet, muss "{ }" fehlschlagen.
+    missing::parse_main.parse_str("{ }")
+        .test()
+        .assert_failure();
+
+    // 3. Test für lit_str
+    missing::parse_raw_lit.parse_str("\"raw content\"")
+        .test()
+        .assert_success_is("raw content".to_string());
+}
