@@ -43,15 +43,44 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
                 use syn::Result;
                 use syn::parse::discouraged::Speculative;
                 use syn::ext::IdentExt; 
+                use std::cell::Cell;
+
+                thread_local! {
+                    static IS_FATAL: Cell<bool> = Cell::new(false);
+                }
+
+                pub fn set_fatal(fatal: bool) {
+                    IS_FATAL.set(fatal);
+                }
+
+                pub fn check_fatal() -> bool {
+                    IS_FATAL.get()
+                }
 
                 pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
+                    let was_fatal = check_fatal();
+                    set_fatal(false);
+
                     let fork = input.fork();
-                    match parser(&fork) {
+                    let res = parser(&fork);
+                    
+                    let is_now_fatal = check_fatal();
+
+                    match res {
                         Ok(res) => {
                             input.advance_to(&fork);
+                            set_fatal(was_fatal);
                             Ok(Some(res))
                         }
-                        Err(_) => Ok(None),
+                        Err(e) => {
+                            if is_now_fatal {
+                                set_fatal(true);
+                                Err(e)
+                            } else {
+                                set_fatal(was_fatal);
+                                Ok(None)
+                            }
+                        }
                     }
                 }
 

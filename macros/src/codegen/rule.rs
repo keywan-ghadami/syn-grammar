@@ -170,9 +170,18 @@ pub fn generate_variants_internal(
                 // Just run everything linearly.
                 quote! {
                     {
-                        #pre_logic
-                        #post_logic
-                        return Ok(#action);
+                        let run = || -> syn::Result<_> {
+                            #pre_logic
+                            #post_logic
+                            Ok(#action)
+                        };
+                        match run() {
+                            Ok(v) => return Ok(v),
+                            Err(e) => {
+                                rt::set_fatal(true);
+                                return Err(e);
+                            }
+                        }
                     }
                 }
             } else {
@@ -186,8 +195,17 @@ pub fn generate_variants_internal(
 
                     if let Some(( #(#pre_bindings),* )) = pre_result {
                         // 2. Commit Phase (Post-Cut) - Errors here are fatal!
-                        #post_logic
-                        return Ok(#action);
+                        let post_run = || -> syn::Result<_> {
+                            #post_logic
+                            Ok(#action)
+                        };
+                        match post_run() {
+                            Ok(v) => return Ok(v),
+                            Err(e) => {
+                                rt::set_fatal(true);
+                                return Err(e);
+                            }
+                        }
                     }
                 }
             };
@@ -212,7 +230,16 @@ pub fn generate_variants_internal(
                 let token_code = peek_token_obj.as_ref().unwrap();
                 Ok(quote! {
                     if input.peek(#token_code) {
-                        return #logic;
+                        let run = || -> syn::Result<_> {
+                            #logic
+                        };
+                        match run() {
+                            Ok(v) => return Ok(v),
+                            Err(e) => {
+                                rt::set_fatal(true);
+                                return Err(e);
+                            }
+                        }
                     }
                 })
             } else if let Some(token_code) = peek_token_obj {
