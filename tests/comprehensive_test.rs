@@ -216,3 +216,81 @@ fn test_left_recursion_field_access() {
         .test()
         .assert_success_is("((a).b).c".to_string());
 }
+
+// --- Test 10: Inheritance ---
+// We define the grammars at the module level because the macro generates
+// `use super::base::*;`, which requires `base` to be a sibling module.
+grammar! {
+    grammar base {
+        pub rule num -> i32 = i:int_lit -> { i }
+    }
+}
+
+grammar! {
+    grammar derived : base {
+        rule main -> i32 = 
+            "add" a:num b:num -> { a + b }
+    }
+}
+
+#[test]
+fn test_inheritance() {
+    derived::parse_main.parse_str("add 10 20")
+        .test()
+        .assert_success_is(30);
+}
+
+// --- Test 11: Rust Types & Blocks ---
+#[test]
+fn test_rust_types_and_blocks() {
+    grammar! {
+        grammar rust_syntax {
+            // Parses a type like "Vec<i32>"
+            // We return a String debug representation to avoid complex AST assertions
+            rule parse_type -> String = 
+                t:rust_type -> { format!("{:?}", t) }
+            
+            // Parses a block like "{ let x = 1; }"
+            rule parse_block -> usize = 
+                b:rust_block -> { b.stmts.len() }
+        }
+    }
+
+    // Test Type Parsing
+    // We just assert success here to ensure the built-in parser consumes the input correctly.
+    rust_syntax::parse_parse_type.parse_str("Vec<i32>")
+        .test()
+        .assert_success();
+
+    // Test Block Parsing
+    rust_syntax::parse_parse_block.parse_str("{ let x = 1; let y = 2; }")
+        .test()
+        .assert_success_is(2);
+}
+
+// --- Test 12: Keywords vs Identifiers ---
+#[test]
+fn test_keywords_vs_idents() {
+    grammar! {
+        grammar kw_test {
+            // "fn" is a Rust keyword, "custom" is a custom keyword defined by usage literal
+            rule main -> String = 
+                "fn" name:ident "custom" -> { name.to_string() }
+        }
+    }
+
+    // Happy path
+    kw_test::parse_main.parse_str("fn my_func custom")
+        .test()
+        .assert_success_is("my_func".to_string());
+
+    // Fail: "custom" is expected, but found "other"
+    kw_test::parse_main.parse_str("fn my_func other")
+        .test()
+        .assert_failure();
+        
+    // Fail: "fn" is expected
+    kw_test::parse_main.parse_str("func my_func custom")
+        .test()
+        .assert_failure();
+}
