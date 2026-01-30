@@ -247,11 +247,11 @@ fn test_rust_types_and_blocks() {
         grammar rust_syntax {
             // Parses a type like "Vec<i32>"
             // We return a String debug representation to avoid complex AST assertions
-            rule parse_type -> String = 
+            pub rule parse_type -> String = 
                 t:rust_type -> { format!("{:?}", t) }
             
             // Parses a block like "{ let x = 1; }"
-            rule parse_block -> usize = 
+            pub rule parse_block -> usize = 
                 b:rust_block -> { b.stmts.len() }
         }
     }
