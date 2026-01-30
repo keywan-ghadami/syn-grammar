@@ -310,7 +310,7 @@ fn test_missing_syntax_features() {
                 }
 
             // Testet: lit_str (gibt syn::LitStr zurück, nicht String)
-            rule raw_lit -> String =
+            pub rule raw_lit -> String =
                 l:lit_str -> { l.value() }
         }
     }
