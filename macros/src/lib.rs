@@ -8,6 +8,7 @@ use quote::quote;
 mod parser;
 mod model;
 mod codegen;
+mod validator;
 
 /// The main macro for defining grammars.
 ///
@@ -34,7 +35,12 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     // This uses your manual `impl From` implementation.
     let m_ast: model::GrammarDefinition = p_ast.into();
 
-    // 3. Code Generation: From model to finished Rust code (codegen.rs)
+    // 3. Validation: Check for semantic errors (undefined rules, arg mismatch)
+    if let Err(e) = validator::validate(&m_ast) {
+        return e.to_compile_error().into();
+    }
+
+    // 4. Code Generation: From model to finished Rust code (codegen.rs)
     match codegen::generate_rust(m_ast) {
         Ok(stream) => stream.into(), // Successful code
         Err(e) => e.to_compile_error().into(), // Emit generation error as compiler error

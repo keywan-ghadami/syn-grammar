@@ -10,6 +10,8 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let fn_name = format_ident!("parse_{}", name);
     let ret_type = &rule.return_type;
     
+    let doc_comment = format!("Parser for rule `{}`.", name);
+
     let params = rule.params.iter().map(|(name, ty)| {
         quote! { , #name : #ty }
     });
@@ -46,6 +48,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     };
 
     Ok(quote! {
+        #[doc = #doc_comment]
         #vis fn #fn_name(input: ParseStream #(#params)*) -> Result<#ret_type> {
             #body
         }
