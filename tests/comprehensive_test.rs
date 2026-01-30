@@ -331,3 +331,75 @@ fn test_missing_syntax_features() {
         .test()
         .assert_success_is("raw content".to_string());
 }
+
+// --- Test 14: Plus Operator Validation (Sad Path) ---
+#[test]
+fn test_plus_operator_validation() {
+    grammar! {
+        grammar plus_check {
+            rule main -> Vec<String> = 
+                ids:ident+ -> { ids.iter().map(|i| i.to_string()).collect() }
+        }
+    }
+
+    // Success: 1 or more
+    plus_check::parse_main.parse_str("a").test().assert_success();
+    plus_check::parse_main.parse_str("a b").test().assert_success();
+
+    // Failure: 0 elements
+    // This ensures + does not act like *
+    plus_check::parse_main.parse_str("").test().assert_failure();
+}
+
+// --- Test 15: Nested Groups and Alternatives ---
+#[test]
+fn test_nested_groups_and_alts() {
+    grammar! {
+        grammar nested {
+            // Pattern: ( "A" | ("B" "C") )*
+            rule main -> usize = 
+                ( "A" | ("B" "C") )* -> { 0 } 
+        }
+    }
+
+    nested::parse_main.parse_str("A B C A").test().assert_success();
+    // "B" must be followed by "C"
+    nested::parse_main.parse_str("A B").test().assert_failure(); 
+}
+
+// --- Test 16: Cut in Repetition ---
+#[test]
+fn test_cut_in_repetition() {
+    grammar! {
+        grammar cut_loop {
+            rule main -> usize = 
+                entries:entry* -> { entries.len() }
+
+            rule entry -> () = 
+                "key" => "=" "val" ";" -> { () }
+              | "other" ";"            -> { () }
+        }
+    }
+
+    // Happy Path
+    cut_loop::parse_main.parse_str("key = val ; other ;").test().assert_success_is(2);
+
+    // Fail Path: "key" without "="
+    // With Cut, it must fail with "expected `=`" immediately, not backtrack.
+    cut_loop::parse_main.parse_str("key val ;")
+        .test()
+        .assert_failure_contains("expected `=`");
+}
+
+// --- Test 17: Complex Return Types ---
+#[test]
+fn test_complex_return_types() {
+    grammar! {
+        grammar types {
+            // Tests handling of generics in return types
+            rule main -> Vec<Option<i32>> = 
+                "null" -> { vec![None] }
+        }
+    }
+    types::parse_main.parse_str("null").test().assert_success();
+}
