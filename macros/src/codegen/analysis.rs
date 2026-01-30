@@ -63,6 +63,12 @@ pub fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) 
             format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
     }
 
+    // Check for numeric literals which are not supported as tokens
+    if s.chars().next().map_or(false, |c| c.is_numeric()) {
+        return Err(syn::Error::new(lit.span(), 
+            format!("Numeric literal '{}' cannot be used as a token. Use `int_lit` or similar parsers instead.", s)));
+    }
+
     syn::parse_str::<syn::Type>(&format!("Token![{}]", s))
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))
 }
