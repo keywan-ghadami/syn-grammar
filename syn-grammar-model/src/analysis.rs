@@ -20,7 +20,7 @@ pub struct CutAnalysis<'a> {
 }
 
 /// Checks if a sequence contains a Cut operator and splits it.
-pub fn find_cut(patterns: &[ModelPattern]) -> Option<CutAnalysis> {
+pub fn find_cut<'a>(patterns: &'a [ModelPattern]) -> Option<CutAnalysis<'a>> {
     let idx = patterns.iter().position(|p| matches!(p, ModelPattern::Cut))?;
     Some(CutAnalysis {
         pre_cut: &patterns[0..idx],
