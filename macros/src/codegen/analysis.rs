@@ -64,7 +64,7 @@ pub fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) 
     }
 
     // Check for numeric literals which are not supported as tokens
-    if s.chars().next().map_or(false, |c| c.is_numeric()) {
+    if s.chars().next().is_some_and(|c| c.is_numeric()) {
         return Err(syn::Error::new(lit.span(), 
             format!("Numeric literal '{}' cannot be used as a token. Use `int_lit` or similar parsers instead.", s)));
     }
