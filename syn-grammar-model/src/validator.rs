@@ -3,6 +3,14 @@ use crate::model::*;
 use syn::{Result, Error};
 use std::collections::HashMap;
 
+/// Validates the semantic model of the grammar.
+///
+/// Checks for:
+/// - Undefined rules.
+/// - Argument count mismatches in rule calls.
+/// - Invalid usage of built-in rules.
+///
+/// Returns `Ok(())` if the grammar is valid, or a `syn::Error` pointing to the location of the issue.
 pub fn validate(grammar: &GrammarDefinition) -> Result<()> {
     let mut defined_rules = HashMap::new();
     
