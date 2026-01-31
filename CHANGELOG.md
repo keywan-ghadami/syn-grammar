@@ -4,9 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [0.3.0]
 
-### Changed
-- Version bump to 0.3.0.
-
 ### Added
 - **Error Recovery**: Added `recover(rule, sync_token)` to handle syntax errors gracefully by skipping tokens until a synchronization point.
 - **New Built-in Parsers**:
