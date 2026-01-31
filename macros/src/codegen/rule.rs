@@ -1,5 +1,5 @@
-use crate::model::*;
-use super::{analysis, pattern};
+use syn_grammar_model::{model::*, analysis};
+use super::pattern;
 use std::collections::{HashMap, HashSet};
 use syn::Result;
 use quote::{quote, format_ident};
