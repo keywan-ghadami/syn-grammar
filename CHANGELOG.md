@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [0.3.0]
 
+### Breaking Changes
+- **Renamed Built-in Parsers**:
+  - `int_lit` has been renamed to **`integer`** (returns `i32`).
+  - `string_lit` has been renamed to **`string`** (returns `String`).
+  - This change distinguishes high-level value parsers from the low-level token parsers (`lit_int`, `lit_str`).
+
 ### Added
 - **Error Recovery**: Added `recover(rule, sync_token)` to handle syntax errors gracefully by skipping tokens until a synchronization point.
 - **New Built-in Parsers**:
