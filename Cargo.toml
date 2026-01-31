@@ -1,6 +1,6 @@
 [package]
 name = "syn-grammar"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A parser generator for Rust that compiles EBNF-like grammars into syn::parse::Parse implementations."
 license = "MIT OR Apache-2.0"
