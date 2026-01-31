@@ -20,17 +20,21 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let vis = if is_public { quote!(pub) } else { quote!() };
     
     // Check for direct left recursion
-    let (recursive, base) = split_left_recursive(name, &rule.variants);
+    let (recursive_refs, base_refs) = analysis::split_left_recursive(name, &rule.variants);
 
-    let body = if recursive.is_empty() {
+    let body = if recursive_refs.is_empty() {
         generate_variants_internal(&rule.variants, true, custom_keywords)?
     } else {
-        if base.is_empty() {
+        if base_refs.is_empty() {
             return Err(syn::Error::new(name.span(), "Left-recursive rule requires at least one non-recursive base variant."));
         }
 
-        let base_logic = generate_variants_internal(&base, true, custom_keywords)?;
-        let loop_logic = generate_recursive_loop_body(&recursive, custom_keywords)?;
+        // Clone variants back to owned structs for the generator
+        let base_owned: Vec<RuleVariant> = base_refs.into_iter().cloned().collect();
+        let recursive_owned: Vec<RuleVariant> = recursive_refs.into_iter().cloned().collect();
+
+        let base_logic = generate_variants_internal(&base_owned, true, custom_keywords)?;
+        let loop_logic = generate_recursive_loop_body(&recursive_owned, custom_keywords)?;
 
         quote! {
             let mut lhs = {
@@ -53,22 +57,6 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
             #body
         }
     })
-}
-
-fn split_left_recursive(rule_name: &syn::Ident, variants: &[RuleVariant]) -> (Vec<RuleVariant>, Vec<RuleVariant>) {
-    let mut recursive = Vec::new();
-    let mut base = Vec::new();
-
-    for v in variants {
-        if let Some(ModelPattern::RuleCall { rule_name: r, .. }) = v.pattern.first() {
-            if r == rule_name {
-                recursive.push(v.clone());
-                continue;
-            }
-        }
-        base.push(v.clone());
-    }
-    (recursive, base)
 }
 
 fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>) -> Result<TokenStream> {
@@ -146,7 +134,7 @@ pub fn generate_variants_internal(
 
     let arms = variants.iter().map(|variant| {
         // Check for Cut Operator
-        let cut_index = variant.pattern.iter().position(|p| matches!(p, ModelPattern::Cut));
+        let cut_info = analysis::find_cut(&variant.pattern);
         
         // Get Peek Token
         let peek_token_obj = variant.pattern.first()
@@ -160,10 +148,10 @@ pub fn generate_variants_internal(
             false
         };
 
-        if let Some(idx) = cut_index {
+        if let Some(cut) = cut_info {
             // --- CUT LOGIC (A => B) ---
-            let pre_cut = &variant.pattern[0..idx];
-            let post_cut = &variant.pattern[idx+1..];
+            let pre_cut = cut.pre_cut;
+            let post_cut = cut.post_cut;
             
             let pre_bindings = analysis::collect_bindings(pre_cut);
             let pre_logic = pattern::generate_sequence_steps(pre_cut, _custom_keywords)?;

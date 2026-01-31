@@ -1,16 +1,48 @@
-// Moved from macros/src/codegen/analysis.rs
 use crate::model::*;
 use std::collections::HashSet;
 use syn::{Result, parse_quote};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
+/// Collects all custom keywords from the grammar
 pub fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {
     let mut kws = HashSet::new();
     grammar.rules.iter()
         .flat_map(|r| &r.variants)
         .for_each(|v| collect_from_patterns(&v.pattern, &mut kws));
     kws
+}
+
+/// Result of analyzing a pattern sequence for a Cut operator (`=>`)
+pub struct CutAnalysis<'a> {
+    pub pre_cut: &'a [ModelPattern],
+    pub post_cut: &'a [ModelPattern],
+}
+
+/// Checks if a sequence contains a Cut operator and splits it.
+pub fn find_cut(patterns: &[ModelPattern]) -> Option<CutAnalysis> {
+    let idx = patterns.iter().position(|p| matches!(p, ModelPattern::Cut))?;
+    Some(CutAnalysis {
+        pre_cut: &patterns[0..idx],
+        post_cut: &patterns[idx+1..],
+    })
+}
+
+/// Splits variants into recursive (starts with the rule name) and base cases.
+pub fn split_left_recursive<'a>(rule_name: &Ident, variants: &'a [RuleVariant]) -> (Vec<&'a RuleVariant>, Vec<&'a RuleVariant>) {
+    let mut recursive = Vec::new();
+    let mut base = Vec::new();
+
+    for v in variants {
+        if let Some(ModelPattern::RuleCall { rule_name: r, .. }) = v.pattern.first() {
+            if r == rule_name {
+                recursive.push(v);
+                continue;
+            }
+        }
+        base.push(v);
+    }
+    (recursive, base)
 }
 
 fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
@@ -49,6 +81,7 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     bindings
 }
 
+/// Returns the token for syn::parse::<Token>() or peeking
 pub fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) -> Result<syn::Type> {
     let s = lit.value();
     
@@ -62,6 +95,7 @@ pub fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) 
             format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
     }
 
+    // Check for numeric literals which are not supported as tokens
     if s.chars().next().is_some_and(|c| c.is_numeric()) {
         return Err(syn::Error::new(lit.span(), 
             format!("Numeric literal '{}' cannot be used as a token. Use `int_lit` or similar parsers instead.", s)));
@@ -71,6 +105,7 @@ pub fn resolve_token_type(lit: &syn::LitStr, custom_keywords: &HashSet<String>) 
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))
 }
 
+/// Helper for UPO: Returns a TokenStream for input.peek(...)
 pub fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<Option<TokenStream>> {
     match pattern {
         ModelPattern::Lit(lit) => {
@@ -86,6 +121,7 @@ pub fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<
     }
 }
 
+/// Helper for UPO: Returns a unique string key for the start token
 pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     match patterns.first() {
         Some(ModelPattern::Lit(l)) => Some(l.value()),
