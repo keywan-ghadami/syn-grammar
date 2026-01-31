@@ -25,17 +25,14 @@ jobs:
 
       - name: Cache Cargo Registry
         uses: Swatinem/rust-cache@v2
-# machen wir vielleicht wieder rein wenn es stabil läuft und der code formatiert wurde
-     # - name: Check Formatting
-     #   run: cargo fmt -- --check
 
       - name: Linting (Clippy)
-        # Wir disallowen Warnungen für strikte Qualität
+        # Disallow warnings for strict quality
         run: cargo clippy -- -D warnings
 
       - name: Build
         run: cargo build --verbose
 
       - name: Run Tests
-        # Führt auch die Doc-Tests und Integration-Tests aus
+        # Runs doc tests and integration tests as well
         run: cargo test --verbose

@@ -12,11 +12,11 @@ keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
 categories = ["parsing", "development-tools"]
 authors = ["Keywan Ghadami"]
 
-# Wir definieren einen Workspace, damit Cargo das Makro-Unterverzeichnis korrekt mitbaut
+# We define a workspace so Cargo builds the macro subdirectory correctly
 [workspace]
 members = ["macros"]
 exclude = [
-    ".devcontainer",                                                ".github",
+    ".devcontainer",
     ".aider*",
     ".gitignore",
     ".github"
@@ -24,17 +24,17 @@ exclude = [
 
 
 [dependencies]
-# 1. Das Makro selbst (lokaler Pfad)
-syn-grammar-macros = { path = "./macros", version = "0.1.0" }
+# 1. The macro itself (local path)
+syn-grammar-macros = { path = "./macros", version = "0.2.0" }
 
-# 2. Runtime-Abhängigkeiten
-# Diese werden vom generierten Code verwendet (z.B. ParseStream, Token!, etc.)
-# Wir aktivieren "full", damit der Generator (der Teil dieser Lib ist)
-# Rust-Code-Blöcke in den Grammatik-Dateien parsen kann.
+# 2. Runtime dependencies
+# These are used by the generated code (e.g. ParseStream, Token!, etc.)
+# We enable "full" so the generator (which is part of this lib)
+# can parse Rust code blocks in the grammar files.
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 proc-macro2 = "1.0"
 quote = "1.0"
 
 [dev-dependencies]
-# Für die Tests brauchen wir "full", um komplexere Syntax (wie in den Actions) zu parsen
+# For tests we need "full" to parse complex syntax (like in actions)
 syn = { version = "2.0", features = ["full", "extra-traits"] }

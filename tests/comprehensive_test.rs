@@ -107,17 +107,7 @@ fn test_repetition() {
     repeat::parse_main.parse_str("[ ]").test().assert_failure();
     
     // Case: Missing closing bracket.
-    // We use assert_failure() now, but look at the error exactly,
-    // in case it doesn't contain what we expect.
-    let err = repeat::parse_main.parse_str("[ x, x").test().assert_failure();
-    
-    // Debug output so you see exactly what "Got" is:
-    println!("DEBUG: Actual Error Message: '{}'", err);
-    
-    // I have removed the strict check here for now, so we see the
-    // "real" error and not just "assertion failed".
-    // Once we know what 'syn' really throws here, we can
-    // re-enable .assert_failure_contains("...").
+    repeat::parse_main.parse_str("[ x, x").test().assert_failure();
 }
 
 // --- Test 6: Built-ins ---
@@ -150,12 +140,9 @@ fn test_cut_operator() {
         }
     }
 
-    println!("--- Debugging Cut Operator ---");
-
     // 1. Happy Path: Matches "let" then "mut"
-    let res1 = cut_test::parse_main.parse_str("let mut");
-    println!("Input: 'let mut' => {:?}", res1);
-    res1.test()
+    cut_test::parse_main.parse_str("let mut")
+        .test()
         .assert_success_is("Variable Declaration");
 
     // 2. Edge Case: "let" followed by something else.
@@ -163,9 +150,8 @@ fn test_cut_operator() {
     // Since the Cut operator is implemented, matching "let" commits to the first variant.
     // The parser will NOT backtrack to the second variant ("Identifier(let)").
     // Instead, it will fail because "mut" is expected but not found.
-    let res2 = cut_test::parse_main.parse_str("let");
-    println!("Input: 'let' => {:?}", res2);
-    res2.test()
+    cut_test::parse_main.parse_str("let")
+        .test()
         .assert_failure_contains("expected `mut`");
 }
 
@@ -300,33 +286,33 @@ fn test_keywords_vs_idents() {
 fn test_missing_syntax_features() {
     grammar! {
         grammar missing {
-            // Testet:
+            // Tests:
             // 1. braced { ... } (Note: 'braced' keyword is not needed/supported, just use { ... })
-            // 2. + Operator (mindestens ein Element)
-            // 3. Binding an eine Liste (ids:ident+) -> Vec<Ident>
+            // 2. + Operator (at least one element)
+            // 3. Binding to a list (ids:ident+) -> Vec<Ident>
             rule main -> Vec<String> =
                 { ids:ident+ } -> {
                     ids.iter().map(|id| id.to_string()).collect()
                 }
 
-            // Testet: lit_str (gibt syn::LitStr zurück, nicht String)
+            // Tests: lit_str (returns syn::LitStr, not String)
             pub rule raw_lit -> String =
                 l:lit_str -> { l.value() }
         }
     }
 
-    // 1. Happy Path für Braced + Plus
+    // 1. Happy Path for Braced + Plus
     missing::parse_main.parse_str("{ a b c }")
         .test()
         .assert_success_is(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 
-    // 2. Fail Path für Plus (Leere Liste in Braces)
-    // Da '+' mindestens eins erwartet, muss "{ }" fehlschlagen.
+    // 2. Fail Path for Plus (Empty list in Braces)
+    // Since '+' expects at least one, "{ }" must fail.
     missing::parse_main.parse_str("{ }")
         .test()
         .assert_failure();
 
-    // 3. Test für lit_str
+    // 3. Test for lit_str
     missing::parse_raw_lit.parse_str("\"raw content\"")
         .test()
         .assert_success_is("raw content".to_string());
@@ -472,7 +458,7 @@ fn test_multiple_arguments() {
             rule main -> i32 = 
                 "calc" res:calc(10, 5) -> { res }
 
-            // Testet Komma-Separierung in Parametern
+            // Tests comma separation in parameters
             rule calc(base: i32, mult: i32) -> i32 = 
                 i:int_lit -> { base + (i * mult) }
         }
@@ -490,7 +476,7 @@ fn test_nested_repetition_complex() {
     grammar! {
         grammar nested_rep {
             // Pattern: ( "group" ( "item" )* ";" )*
-            // Testet verschachtelte Vec-Generierung und Scopes
+            // Tests nested Vec generation and scopes
             rule main -> usize = 
                 groups:group* -> { groups.iter().sum() }
 

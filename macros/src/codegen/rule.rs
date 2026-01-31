@@ -139,7 +139,6 @@ pub fn generate_variants_internal(
     // 1. Analysis Phase: Count start tokens
     let mut token_counts = HashMap::new();
     for v in variants {
-        // Note: 'custom_keywords' was removed from the call here (as discussed in previous fix)
         if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
             *token_counts.entry(token_str).or_insert(0) += 1;
         }
