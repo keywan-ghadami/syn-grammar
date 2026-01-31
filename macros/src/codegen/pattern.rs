@@ -237,7 +237,8 @@ fn is_builtin(name: &syn::Ident) -> bool {
     matches!(name.to_string().as_str(), 
         "ident" | "integer" | "string" | "rust_type" | "rust_block" | "lit_str" |
         "lit_int" | "lit_char" | "lit_bool" | "lit_float" |
-        "spanned_int_lit" | "spanned_string_lit"
+        "spanned_int_lit" | "spanned_string_lit" |
+        "spanned_float_lit" | "spanned_bool_lit" | "spanned_char_lit"
     )
 }
 
@@ -264,6 +265,24 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
         "spanned_string_lit" => quote! { 
             {
                 let l = input.parse::<syn::LitStr>()?;
+                (l.value(), l.span())
+            }
+        },
+        "spanned_float_lit" => quote! { 
+            {
+                let l = input.parse::<syn::LitFloat>()?;
+                (l.base10_parse::<f64>()?, l.span())
+            }
+        },
+        "spanned_bool_lit" => quote! { 
+            {
+                let l = input.parse::<syn::LitBool>()?;
+                (l.value, l.span())
+            }
+        },
+        "spanned_char_lit" => quote! { 
+            {
+                let l = input.parse::<syn::LitChar>()?;
                 (l.value(), l.span())
             }
         },

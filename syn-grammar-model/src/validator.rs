@@ -71,6 +71,7 @@ fn is_builtin(name: &str) -> bool {
     matches!(name, 
         "ident" | "integer" | "string" | "rust_type" | "rust_block" | "lit_str" |
         "lit_int" | "lit_char" | "lit_bool" | "lit_float" |
-        "spanned_int_lit" | "spanned_string_lit"
+        "spanned_int_lit" | "spanned_string_lit" |
+        "spanned_float_lit" | "spanned_bool_lit" | "spanned_char_lit"
     )
 }
