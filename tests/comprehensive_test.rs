@@ -75,7 +75,7 @@ fn test_math_expression() {
 
             rule factor -> i32 = 
                 paren(e:expr)  -> { e }
-              | i:int_lit      -> { i }
+              | i:integer      -> { i }
         }
     }
 
@@ -116,7 +116,7 @@ fn test_builtins() {
     grammar! {
         grammar builtins {
             rule main -> (String, String) = 
-                k:ident "=" v:string_lit -> { (k.to_string(), v) }
+                k:ident "=" v:string -> { (k.to_string(), v) }
         }
     }
 
@@ -165,8 +165,8 @@ fn test_left_recursion() {
             // If it were right-recursive (or simple recursive descent without handling),
             // it might stack overflow or parse as "1 - (2 - 3)" = 2.
             pub rule expr -> i32 = 
-                l:expr "-" r:int_lit -> { l - r }
-              | i:int_lit            -> { i }
+                l:expr "-" r:integer -> { l - r }
+              | i:integer            -> { i }
         }
     }
 
@@ -208,7 +208,7 @@ fn test_left_recursion_field_access() {
 // `use super::base::*;`, which requires `base` to be a sibling module.
 grammar! {
     grammar base {
-        pub rule num -> i32 = i:int_lit -> { i }
+        pub rule num -> i32 = i:integer -> { i }
     }
 }
 
@@ -440,7 +440,7 @@ fn test_rule_arguments() {
 
             // Definition with parameters
             rule value(offset: i32) -> i32 = 
-                i:int_lit -> { i + offset }
+                i:integer -> { i + offset }
         }
     }
 
@@ -460,7 +460,7 @@ fn test_multiple_arguments() {
 
             // Tests comma separation in parameters
             rule calc(base: i32, mult: i32) -> i32 = 
-                i:int_lit -> { base + (i * mult) }
+                i:integer -> { base + (i * mult) }
         }
     }
 

@@ -51,7 +51,7 @@ fn test_recovery_complex_sync() {
                 "group" i:recover(inner, "end") "end" -> { i }
 
             rule inner -> i32 = 
-                "val" i:int_lit -> { i }
+                "val" i:integer -> { i }
         }
     }
 

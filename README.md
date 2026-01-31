@@ -52,7 +52,7 @@ grammar! {
           | f:factor            -> { f }
 
         rule factor -> i32 =
-            i:int_lit           -> { i }
+            i:integer           -> { i }
           | paren(e:expression) -> { e }
     }
 }
@@ -102,8 +102,8 @@ rule kw -> () = "fn" "name" -> { () }
 | Parser | Description | Returns |
 |--------|-------------|---------|
 | `ident` | A Rust identifier (e.g., `foo`, `_bar`) | `syn::Ident` |
-| `int_lit` | An integer literal (e.g., `42`) | `i32` |
-| `string_lit` | A string literal (e.g., `"hello"`) | `String` |
+| `integer` | An integer literal (e.g., `42`) | `i32` |
+| `string` | A string literal (e.g., `"hello"`) | `String` |
 | `lit_str` | A string literal object | `syn::LitStr` |
 | `rust_type` | A Rust type (e.g., `Vec<i32>`) | `syn::Type` |
 | `rust_block` | A block of code (e.g., `{ stmt; }`) | `syn::Block` |
@@ -140,7 +140,7 @@ rule boolean -> bool =
 
 ```rust,ignore
 rule list -> Vec<i32> = 
-    "[" elements:int_lit* "]" -> { elements }
+    "[" elements:integer* "]" -> { elements }
 ```
 
 #### Groups `(...)`
@@ -160,7 +160,7 @@ Match content inside delimiters.
 
 ```rust,ignore
 rule tuple -> (i32, i32) = 
-    paren(a:int_lit "," b:int_lit) -> { (a, b) }
+    paren(a:integer "," b:integer) -> { (a, b) }
 ```
 
 #### Error Recovery (`recover`)

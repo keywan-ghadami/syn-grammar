@@ -63,7 +63,7 @@ fn validate_patterns(
 
 fn is_builtin(name: &str) -> bool {
     matches!(name, 
-        "ident" | "int_lit" | "string_lit" | "rust_type" | "rust_block" | "lit_str" |
+        "ident" | "integer" | "string" | "rust_type" | "rust_block" | "lit_str" |
         "lit_int" | "lit_char" | "lit_bool" | "lit_float" |
         "spanned_int_lit" | "spanned_string_lit"
     )
