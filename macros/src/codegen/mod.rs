@@ -1,8 +1,7 @@
-mod analysis;
 mod pattern;
 mod rule;
 
-use crate::model::*;
+use syn_grammar_model::{model::*, analysis};
 use quote::{quote, format_ident};
 use proc_macro2::TokenStream;
 use syn::Result;

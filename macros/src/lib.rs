@@ -3,12 +3,10 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 use quote::quote;
+use syn_grammar_model::{parser, model, validator};
 
 // Include modules
-mod parser;
-mod model;
 mod codegen;
-mod validator;
 
 /// The main macro for defining grammars.
 ///

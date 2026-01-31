@@ -14,7 +14,7 @@ authors = ["Keywan Ghadami"]
 
 # We define a workspace so Cargo builds the macro subdirectory correctly
 [workspace]
-members = ["macros"]
+members = ["macros","syn-grammar-model"]
 exclude = [
     ".devcontainer",
     ".aider*",
@@ -26,7 +26,7 @@ exclude = [
 [dependencies]
 # 1. The macro itself (local path)
 syn-grammar-macros = { path = "./macros", version = "0.2.0" }
-
+syn-grammar-model = { path = "./syn-grammar-model", version = "0.2.0" }
 # 2. Runtime dependencies
 # These are used by the generated code (e.g. ParseStream, Token!, etc.)
 # We enable "full" so the generator (which is part of this lib)

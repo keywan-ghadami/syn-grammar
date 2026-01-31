@@ -1,5 +1,4 @@
-use crate::model::*;
-use super::analysis; 
+use syn_grammar_model::{model::*, analysis};
 use std::collections::HashSet;
 use syn::{Result};
 use quote::{quote, quote_spanned, format_ident};
