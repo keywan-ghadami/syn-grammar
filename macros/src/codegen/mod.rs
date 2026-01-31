@@ -46,7 +46,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
                 use std::cell::Cell;
 
                 thread_local! {
-                    static IS_FATAL: Cell<bool> = Cell::new(false);
+                    static IS_FATAL: Cell<bool> = const { Cell::new(false) };
                 }
 
                 pub fn set_fatal(fatal: bool) {

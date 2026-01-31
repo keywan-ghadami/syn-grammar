@@ -9,7 +9,7 @@ use syn::parse::discouraged::Speculative;
 use syn::ext::IdentExt; 
 
 thread_local! {
-    static IS_FATAL: Cell<bool> = Cell::new(false);
+    static IS_FATAL: Cell<bool> = const { Cell::new(false) };
 }
 
 pub fn set_fatal(fatal: bool) {
