@@ -46,10 +46,8 @@ fn validate_patterns(
                         return Err(Error::new(rule_name.span(), 
                             format!("Rule '{}' expects {} argument(s), but got {}.", name_str, param_count, args.len())));
                     }
-                } else {
-                    if !has_inheritance {
-                        return Err(Error::new(rule_name.span(), format!("Undefined rule: '{}'.", name_str)));
-                    }
+                } else if !has_inheritance {
+                    return Err(Error::new(rule_name.span(), format!("Undefined rule: '{}'.", name_str)));
                 }
             },
             ModelPattern::Group(alts) => {

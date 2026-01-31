@@ -33,7 +33,7 @@ dependencies = [
 
 [[package]]
 name = "syn-grammar"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -44,7 +44,7 @@ dependencies = [
 
 [[package]]
 name = "syn-grammar-macros"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "syn-grammar-model"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",

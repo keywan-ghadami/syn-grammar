@@ -218,15 +218,11 @@ impl Parse for Pattern {
 
 fn parse_atom(input: ParseStream) -> Result<Pattern> {
     // 1. Check for binding
-    let binding = if let Some(b) = rt::attempt(input, |input| {
+    let binding = rt::attempt(input, |input| {
         let id: Ident = input.parse()?;
         let _ = input.parse::<Token![:]>()?;
         Ok(id)
-    })? {
-        Some(b)
-    } else {
-        None
-    };
+    })?;
 
     if input.peek(Token![=>]) {
         if binding.is_some() {
