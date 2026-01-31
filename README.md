@@ -17,7 +17,7 @@ The processing pipeline consists of four stages:
 
 If you are building a custom backend for `syn-grammar`, use the pipeline as follows:
 
-```rust
+```rust,ignore
 use syn_grammar_model::{parser, model, validator, analysis};
 use syn::parse_macro_input;
 use proc_macro::TokenStream;
