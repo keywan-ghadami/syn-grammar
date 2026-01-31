@@ -1,45 +1,216 @@
-# syn-grammar-model
+# syn-grammar
 
-**Shared semantic model and parser for `syn-grammar`.**
+[![Crates.io](https://img.shields.io/crates/v/syn-grammar.svg)](https://crates.io/crates/syn-grammar)
+[![Documentation](https://docs.rs/syn-grammar/badge.svg)](https://docs.rs/syn-grammar)
+[![License](https://img.shields.io/crates/l/syn-grammar.svg)](https://github.com/keywan-ghadami/syn-grammar/blob/main/LICENSE)
 
-This crate provides the core logic for parsing the `grammar! { ... }` DSL, validating it, and transforming it into a semantic model. It is designed to be reusable for different backends (e.g., a `winnow` generator or a documentation generator).
+**syn-grammar** is a powerful parser generator for Rust that allows you to define EBNF-like grammars directly inside your code. It compiles these definitions into efficient `syn` parsers at compile time.
 
-## Architecture
+Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rust often involves writing repetitive boilerplate code using the `syn` crate. **syn-grammar** simplifies this process by letting you describe *what* you want to parse using a clean, readable syntax, while handling the complex logic of parsing, backtracking, and error reporting for you.
 
-The processing pipeline consists of four stages:
+## Features
 
-1.  **Parsing (`parser`)**: Converts the raw `TokenStream` into a syntactic AST (`parser::GrammarDefinition`). This handles the concrete syntax of the DSL.
-2.  **Transformation (`model`)**: Converts the syntactic AST into a semantic model (`model::GrammarDefinition`). This simplifies the structure (e.g., flattening groups, resolving inheritance placeholders).
-3.  **Validation (`validator`)**: Checks the semantic model for errors, such as undefined rules, argument mismatches, or invalid token usage.
-4.  **Analysis (`analysis`)**: Provides helper functions to query the model, such as detecting left-recursion, collecting custom keywords, or finding "Cut" operators.
+- **Inline Grammars**: Define your grammar directly in your Rust code using the `grammar!` macro.
+- **EBNF Syntax**: Familiar syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`), and grouping `(...)`.
+- **Type-Safe Actions**: Directly map parsing rules to Rust types and AST nodes using action blocks (`-> { ... }`).
+- **Seamless Syn Integration**: First-class support for parsing Rust tokens like identifiers, literals, types, and blocks.
+- **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
+- **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
+- **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 
-## Usage
+## Installation
 
-If you are building a custom backend for `syn-grammar`, use the pipeline as follows:
+Add `syn-grammar` to your `Cargo.toml`. You will also likely need `syn`, `quote`, and `proc-macro2` as they are used in the generated code.
 
-```rust,ignore
-use syn_grammar_model::{parser, model, validator, analysis};
-use syn::parse_macro_input;
-use proc_macro::TokenStream;
+```toml
+[dependencies]
+syn-grammar = "0.3"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+```
 
-#[proc_macro]
-pub fn my_grammar_backend(input: TokenStream) -> TokenStream {
-    // 1. Parse: TokenStream -> Syntactic AST
-    let p_ast = parse_macro_input!(input as parser::GrammarDefinition);
+## Quick Start
 
-    // 2. Transform: Syntactic AST -> Semantic Model
-    let m_ast: model::GrammarDefinition = p_ast.into();
+Here is a complete example of a calculator grammar that parses mathematical expressions into an `i32`.
 
-    // 3. Validate: Check for semantic errors
-    if let Err(e) = validator::validate(&m_ast) {
-        return e.to_compile_error().into();
+```rust
+use syn_grammar::grammar;
+use syn::parse::Parser; // Required for .parse_str()
+
+grammar! {
+    grammar Calc {
+        // The return type of the rule is defined after `->`
+        pub rule expression -> i32 =
+            l:expression "+" r:term -> { l + r }
+          | l:expression "-" r:term -> { l - r }
+          | t:term                  -> { t }
+
+        rule term -> i32 =
+            f:factor "*" t:term -> { f * t }
+          | f:factor "/" t:term -> { f / t }
+          | f:factor            -> { f }
+
+        rule factor -> i32 =
+            i:integer           -> { i }
+          | paren(e:expression) -> { e }
     }
+}
 
-    // 4. Analyze & Generate
-    // e.g. Collect keywords to generate a module for them
-    let keywords = analysis::collect_custom_keywords(&m_ast);
-    
-    // ... generate your code ...
-    TokenStream::new()
+fn main() {
+    // The macro generates a module `Calc` containing a function `parse_expression`
+    // corresponding to the `expression` rule.
+    let result = Calc::parse_expression.parse_str("10 - 2 * 3");
+    assert_eq!(result.unwrap(), 4);
 }
 ```
+
+### What happens under the hood?
+
+The `grammar!` macro expands into a Rust module (named `Calc` in the example) containing:
+- A function `parse_<rule_name>` for each rule (e.g., `parse_expression`).
+- These functions take a `syn::parse::ParseStream` and return a `syn::Result<T>`.
+- All necessary imports and helper functions to make the parser work.
+
+## Detailed Syntax Guide
+
+### Rules
+
+A grammar consists of a set of rules. Each rule has a name, a return type, and a pattern to match.
+
+```rust,ignore
+rule name -> ReturnType = pattern -> { action_code }
+```
+
+- **`name`**: The name of the rule (e.g., `expr`).
+- **`ReturnType`**: The Rust type returned by the rule (e.g., `Expr`, `i32`, `Vec<String>`).
+- **`pattern`**: The EBNF pattern defining what to parse.
+- **`action_code`**: A Rust block that constructs the return value from the bound variables.
+
+### Patterns
+
+#### Literals and Keywords
+Match specific tokens using string literals.
+
+```rust,ignore
+rule kw -> () = "fn" "name" -> { () }
+```
+
+#### Built-in Parsers
+`syn-grammar` provides several built-in parsers for common Rust tokens:
+
+| Parser | Description | Returns |
+|--------|-------------|---------|
+| `ident` | A Rust identifier (e.g., `foo`, `_bar`) | `syn::Ident` |
+| `integer` | An integer literal (e.g., `42`) | `i32` |
+| `string` | A string literal (e.g., `"hello"`) | `String` |
+| `lit_str` | A string literal object | `syn::LitStr` |
+| `rust_type` | A Rust type (e.g., `Vec<i32>`) | `syn::Type` |
+| `rust_block` | A block of code (e.g., `{ stmt; }`) | `syn::Block` |
+| `lit_int` | A typed integer literal (e.g. `1u8`) | `syn::LitInt` |
+| `lit_char` | A character literal (e.g. `'c'`) | `syn::LitChar` |
+| `lit_bool` | A boolean literal (`true` or `false`) | `syn::LitBool` |
+| `lit_float` | A floating point literal (e.g. `3.14`) | `syn::LitFloat` |
+| `spanned_int_lit` | An integer literal with span | `(i32, Span)` |
+| `spanned_string_lit` | A string literal with span | `(String, Span)` |
+
+#### Sequences and Bindings
+Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
+
+```rust,ignore
+rule assignment -> Stmt = 
+    name:ident "=" val:expr -> { 
+        Stmt::Assign(name, val) 
+    }
+```
+
+#### Alternatives (`|`)
+Match one of several alternatives. The first one that matches wins.
+
+```rust,ignore
+rule boolean -> bool = 
+    "true"  -> { true }
+  | "false" -> { false }
+```
+
+#### Repetitions (`*`, `+`, `?`)
+- `pattern*`: Match zero or more times. Returns a `Vec`.
+- `pattern+`: Match one or more times. Returns a `Vec`.
+- `pattern?`: Match zero or one time. Returns an `Option` (or `()` if unbound).
+
+```rust,ignore
+rule list -> Vec<i32> = 
+    "[" elements:integer* "]" -> { elements }
+```
+
+#### Groups `(...)`
+Group patterns together to apply repetitions or ensure precedence.
+
+```rust,ignore
+rule complex -> () = 
+    ("a" | "b")+ "c" -> { () }
+```
+
+#### Delimiters
+Match content inside delimiters.
+
+- `paren(pattern)`: Matches `( pattern )`.
+- `bracketed[pattern]`: Matches `[ pattern ]`.
+- `braced{pattern}`: Matches `{ pattern }`.
+
+```rust,ignore
+rule tuple -> (i32, i32) = 
+    paren(a:integer "," b:integer) -> { (a, b) }
+```
+
+#### Error Recovery (`recover`)
+You can make your parser robust against errors using `recover(rule, sync_token)`.
+If `rule` fails, the parser will skip tokens until it finds `sync_token`, returning `None` (or `(None, ...)` for bindings).
+Note that `recover` does **not** consume the sync token.
+
+```rust,ignore
+rule stmt -> Option<Stmt> =
+    // If `parse_stmt` fails, skip until `;`
+    // `s` will be `Option<Stmt>` (Some if success, None if recovered)
+    s:recover(parse_stmt, ";") ";" -> { s }
+```
+
+### The Cut Operator (`=>`)
+
+The cut operator `=>` allows you to commit to a specific alternative. If the pattern *before* the `=>` matches, the parser will **not** backtrack to try other alternatives, even if the pattern *after* the `=>` fails. This produces better error messages.
+
+```rust,ignore
+rule stmt -> Stmt =
+    // If we see "let", we commit to this rule. 
+    // If "mut" or the identifier is missing, we error immediately 
+    // instead of trying the next alternative.
+    "let" => "mut"? name:ident "=" e:expr -> { ... }
+  | e:expr -> { ... }
+```
+
+## Advanced Topics
+
+### Left Recursion
+
+Recursive descent parsers typically struggle with left recursion (e.g., `A -> A b`). `syn-grammar` automatically detects direct left recursion and compiles it into an iterative loop. This makes writing expression parsers natural and straightforward.
+
+```rust,ignore
+// This works perfectly!
+rule expr -> i32 = 
+    l:expr "+" r:term -> { l + r }
+  | t:term            -> { t }
+```
+
+### Backtracking
+
+By default, `syn-grammar` uses `syn`'s speculative parsing (`fork`) to try alternatives.
+1. It checks if the next token matches the start of an alternative (using `peek`).
+2. If ambiguous, it attempts to parse the alternative.
+3. If it fails, it backtracks and tries the next one.
+
+This allows for flexible grammars but can impact performance if overused. Use the **Cut Operator** (`=>`) to prune the search space when possible.
+
+## License
+
+Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+
