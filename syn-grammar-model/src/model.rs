@@ -41,6 +41,11 @@ pub enum ModelPattern {
     Optional(Box<ModelPattern>),
     Repeat(Box<ModelPattern>),
     Plus(Box<ModelPattern>),
+    Recover {
+        binding: Option<Ident>,
+        body: Box<ModelPattern>,
+        sync: Box<ModelPattern>,
+    },
 }
 
 impl From<parser::GrammarDefinition> for GrammarDefinition {
@@ -93,6 +98,11 @@ impl From<parser::Pattern> for ModelPattern {
             P::Optional(p) => ModelPattern::Optional(Box::new(ModelPattern::from(*p))),
             P::Repeat(p) => ModelPattern::Repeat(Box::new(ModelPattern::from(*p))),
             P::Plus(p) => ModelPattern::Plus(Box::new(ModelPattern::from(*p))),
+            P::Recover { binding, body, sync } => ModelPattern::Recover {
+                binding,
+                body: Box::new(ModelPattern::from(*body)),
+                sync: Box::new(ModelPattern::from(*sync)),
+            },
         }
     }
 }
@@ -104,6 +114,7 @@ impl ModelPattern {
             ModelPattern::Lit(l) => l.span(),
             ModelPattern::RuleCall { rule_name, .. } => rule_name.span(),
             ModelPattern::Optional(p) | ModelPattern::Repeat(p) | ModelPattern::Plus(p) => p.span(),
+            ModelPattern::Recover { body, .. } => body.span(),
             ModelPattern::Group(alts) => alts.first().and_then(|seq| seq.first()).map(|p| p.span()).unwrap_or_else(Span::call_site),
             ModelPattern::Bracketed(content) | 
             ModelPattern::Braced(content) | 

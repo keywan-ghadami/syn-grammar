@@ -57,6 +57,10 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
                 collect_from_patterns(s, kws),
             ModelPattern::Optional(i) | ModelPattern::Repeat(i) | ModelPattern::Plus(i) => 
                 collect_from_patterns(std::slice::from_ref(i), kws),
+            ModelPattern::Recover { body, sync, .. } => {
+                collect_from_patterns(std::slice::from_ref(body), kws);
+                collect_from_patterns(std::slice::from_ref(sync), kws);
+            }
             _ => {}
         }
     }
@@ -74,6 +78,13 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
             }
             ModelPattern::Parenthesized(s) | ModelPattern::Bracketed(s) | ModelPattern::Braced(s) => {
                 bindings.extend(collect_bindings(s));
+            }
+            ModelPattern::Recover { binding, body, .. } => {
+                if let Some(b) = binding {
+                    bindings.push(b.clone());
+                } else {
+                    bindings.extend(collect_bindings(std::slice::from_ref(body)));
+                }
             }
             _ => {}
         }
@@ -117,6 +128,7 @@ pub fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<
         ModelPattern::Parenthesized(_) => Ok(Some(quote!(syn::token::Paren))),
         ModelPattern::Optional(inner) | ModelPattern::Repeat(inner) | ModelPattern::Plus(inner) => 
             get_simple_peek(inner, kws),
+        ModelPattern::Recover { body, .. } => get_simple_peek(body, kws),
         _ => Ok(None)
     }
 }
@@ -131,6 +143,7 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         Some(ModelPattern::Optional(inner)) | 
         Some(ModelPattern::Repeat(inner)) | 
         Some(ModelPattern::Plus(inner)) => get_peek_token_string(std::slice::from_ref(&**inner)),
+        Some(ModelPattern::Recover { body, .. }) => get_peek_token_string(std::slice::from_ref(&**body)),
         _ => None
     }
 }

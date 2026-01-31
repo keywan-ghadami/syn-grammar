@@ -60,3 +60,13 @@ pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T>
 where T::Err: std::fmt::Display {
     input.parse::<syn::LitInt>()?.base10_parse()
 }
+
+/// Skips tokens until the predicate returns true or input is empty.
+pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -> Result<()> {
+    while !input.is_empty() && !predicate(input) {
+        if input.parse::<proc_macro2::TokenTree>().is_err() {
+            break; 
+        }
+    }
+    Ok(())
+}

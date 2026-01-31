@@ -24,7 +24,7 @@ Add `syn-grammar` to your `Cargo.toml`. You will also likely need `syn`, `quote`
 
 ```toml
 [dependencies]
-syn-grammar = "0.1"
+syn-grammar = "0.3"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -107,6 +107,12 @@ rule kw -> () = "fn" "name" -> { () }
 | `lit_str` | A string literal object | `syn::LitStr` |
 | `rust_type` | A Rust type (e.g., `Vec<i32>`) | `syn::Type` |
 | `rust_block` | A block of code (e.g., `{ stmt; }`) | `syn::Block` |
+| `lit_int` | A typed integer literal (e.g. `1u8`) | `syn::LitInt` |
+| `lit_char` | A character literal (e.g. `'c'`) | `syn::LitChar` |
+| `lit_bool` | A boolean literal (`true` or `false`) | `syn::LitBool` |
+| `lit_float` | A floating point literal (e.g. `3.14`) | `syn::LitFloat` |
+| `spanned_int_lit` | An integer literal with span | `(i32, Span)` |
+| `spanned_string_lit` | A string literal with span | `(String, Span)` |
 
 #### Sequences and Bindings
 Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
@@ -155,6 +161,18 @@ Match content inside delimiters.
 ```rust,ignore
 rule tuple -> (i32, i32) = 
     paren(a:int_lit "," b:int_lit) -> { (a, b) }
+```
+
+#### Error Recovery (`recover`)
+You can make your parser robust against errors using `recover(rule, sync_token)`.
+If `rule` fails, the parser will skip tokens until it finds `sync_token`, returning `None` (or `(None, ...)` for bindings).
+Note that `recover` does **not** consume the sync token.
+
+```rust,ignore
+rule stmt -> Option<Stmt> =
+    // If `parse_stmt` fails, skip until `;`
+    // `s` will be `Option<Stmt>` (Some if success, None if recovered)
+    s:recover(parse_stmt, ";") ";" -> { s }
 ```
 
 ### The Cut Operator (`=>`)

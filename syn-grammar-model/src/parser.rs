@@ -29,6 +29,7 @@ mod kw {
     syn::custom_keyword!(grammar);
     syn::custom_keyword!(rule);
     syn::custom_keyword!(paren);
+    syn::custom_keyword!(recover);
 }
 
 pub struct GrammarDefinition {
@@ -186,6 +187,11 @@ pub enum Pattern {
     Optional(Box<Pattern>),
     Repeat(Box<Pattern>),
     Plus(Box<Pattern>),
+    Recover {
+        binding: Option<Ident>,
+        body: Box<Pattern>,
+        sync: Box<Pattern>,
+    },
 }
 
 impl Parse for Pattern {
@@ -211,42 +217,73 @@ impl Parse for Pattern {
 }
 
 fn parse_atom(input: ParseStream) -> Result<Pattern> {
+    // 1. Check for binding
+    let binding = if let Some(b) = rt::attempt(input, |input| {
+        let id: Ident = input.parse()?;
+        let _ = input.parse::<Token![:]>()?;
+        Ok(id)
+    })? {
+        Some(b)
+    } else {
+        None
+    };
+
     if input.peek(Token![=>]) {
+        if binding.is_some() {
+             return Err(input.error("Cut operator cannot be bound."));
+        }
         let _ = input.parse::<Token![=>]>()?;
         Ok(Pattern::Cut)
     } else if input.peek(LitStr) {
+        if binding.is_some() {
+             return Err(input.error("Literals cannot be bound directly (wrap in a rule or group if needed)."));
+        }
         Ok(Pattern::Lit(input.parse()?))
     } else if input.peek(token::Bracket) {
+        if binding.is_some() {
+             return Err(input.error("Bracketed groups cannot be bound directly."));
+        }
         let content;
         syn::bracketed!(content in input);
         Ok(Pattern::Bracketed(parse_pattern_list(&content)?))
     } else if input.peek(token::Brace) {
+        if binding.is_some() {
+             return Err(input.error("Braced groups cannot be bound directly."));
+        }
         let content;
         syn::braced!(content in input);
         Ok(Pattern::Braced(parse_pattern_list(&content)?))
     } else if input.peek(kw::paren) {
+        if binding.is_some() {
+             return Err(input.error("Parenthesized groups cannot be bound directly."));
+        }
         let _ = input.parse::<kw::paren>()?;
         let content;
         syn::parenthesized!(content in input);
         Ok(Pattern::Parenthesized(parse_pattern_list(&content)?))
     } else if input.peek(token::Paren) {
+        if binding.is_some() {
+             return Err(input.error("Groups cannot be bound directly."));
+        }
         let content;
         syn::parenthesized!(content in input);
         Ok(Pattern::Group(parse_group_content(&content)?))
+    } else if input.peek(kw::recover) {
+        let _ = input.parse::<kw::recover>()?;
+        let content;
+        syn::parenthesized!(content in input);
+        let body = content.parse()?;
+        let _ = content.parse::<Token![,]>()?;
+        let sync = content.parse()?;
+        Ok(Pattern::Recover { 
+            binding,
+            body: Box::new(body), 
+            sync: Box::new(sync) 
+        })
     } else {
-        if let Some(binding) = rt::attempt(input, |input| {
-            let id: Ident = input.parse()?;
-            let _ = input.parse::<Token![:]>()?;
-            Ok(id)
-        })? {
-            let rule_name: Ident = rt::parse_ident(input)?;
-            let args = parse_args(input)?;
-            Ok(Pattern::RuleCall { binding: Some(binding), rule_name, args })
-        } else {
-            let rule_name: Ident = rt::parse_ident(input)?;
-            let args = parse_args(input)?;
-            Ok(Pattern::RuleCall { binding: None, rule_name, args })
-        }
+        let rule_name: Ident = rt::parse_ident(input)?;
+        let args = parse_args(input)?;
+        Ok(Pattern::RuleCall { binding, rule_name, args })
     }
 }
 

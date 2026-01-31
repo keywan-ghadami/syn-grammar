@@ -158,6 +158,69 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 })
             }
         },
+
+        ModelPattern::Recover { binding, body, sync } => {
+            // Handle binding injection if present
+            let effective_body = if let Some(bind) = binding {
+                match &**body {
+                    ModelPattern::RuleCall { binding: None, rule_name, args } => {
+                        // Inject binding
+                        Box::new(ModelPattern::RuleCall { 
+                            binding: Some(bind.clone()), 
+                            rule_name: rule_name.clone(), 
+                            args: args.clone() 
+                        })
+                    },
+                    _ => return Err(syn::Error::new(span, "Binding on recover(...) is only supported if the body is a direct rule call (e.g. s:recover(stmt, \";\"))."))
+                }
+            } else {
+                body.clone()
+            };
+
+            let inner_logic = generate_pattern_step(&effective_body, kws)?;
+            // We do NOT generate sync logic here anymore. recover() only skips until sync.
+            // The sync token must be consumed by the surrounding rule.
+            // let sync_logic = generate_pattern_step(sync, kws)?;
+            
+            // We need to know what to peek for synchronization
+            let sync_peek = analysis::get_simple_peek(sync, kws)?
+                .ok_or_else(|| syn::Error::new(sync.span(), "Sync pattern in recover(...) must have a simple start token (literal or bracket)."))?;
+
+            let bindings = analysis::collect_bindings(std::slice::from_ref(&effective_body));
+
+            if bindings.is_empty() {
+                Ok(quote_spanned! {span=> 
+                    if rt::attempt_recover(input, |input| { #inner_logic Ok(()) })?.is_none() {
+                        // Recovery
+                        rt::skip_until(input, |i| i.peek(#sync_peek))?;
+                        // We do NOT consume the sync token.
+                    }
+                })
+            } else {
+                // If we have bindings, we must wrap them in Option.
+                // Success -> Some(val), Failure -> None
+                
+                let none_exprs = bindings.iter().map(|_| quote!(Option::<_>::None));
+
+                Ok(quote_spanned! {span=> 
+                    let (#(#bindings),*) = match rt::attempt_recover(input, |input| {
+                        #inner_logic
+                        Ok((#(#bindings),*))
+                    })? {
+                        Some(vals) => {
+                            let (#(#bindings),*) = vals;
+                            (#(Some(#bindings)),*)
+                        },
+                        None => {
+                            // Recovery
+                            rt::skip_until(input, |i| i.peek(#sync_peek))?;
+                            // We do NOT consume the sync token.
+                            (#(#none_exprs),*)
+                        }
+                    };
+                })
+            }
+        },
     }
 }
 
@@ -171,7 +234,11 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenSt
 }
 
 fn is_builtin(name: &syn::Ident) -> bool {
-    matches!(name.to_string().as_str(), "ident" | "int_lit" | "string_lit" | "rust_type" | "rust_block" | "lit_str")
+    matches!(name.to_string().as_str(), 
+        "ident" | "int_lit" | "string_lit" | "rust_type" | "rust_block" | "lit_str" |
+        "lit_int" | "lit_char" | "lit_bool" | "lit_float" |
+        "spanned_int_lit" | "spanned_string_lit"
+    )
 }
 
 fn map_builtin(name: &syn::Ident) -> TokenStream {
@@ -182,6 +249,24 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
         "lit_str" => quote! { input.parse::<syn::LitStr>()? },
         "rust_type" => quote! { input.parse::<syn::Type>()? },
         "rust_block" => quote! { input.parse::<syn::Block>()? },
+        
+        "lit_int" => quote! { input.parse::<syn::LitInt>()? },
+        "lit_char" => quote! { input.parse::<syn::LitChar>()? },
+        "lit_bool" => quote! { input.parse::<syn::LitBool>()? },
+        "lit_float" => quote! { input.parse::<syn::LitFloat>()? },
+
+        "spanned_int_lit" => quote! { 
+            {
+                let l = input.parse::<syn::LitInt>()?;
+                (l.base10_parse::<i32>()?, l.span())
+            }
+        },
+        "spanned_string_lit" => quote! { 
+            {
+                let l = input.parse::<syn::LitStr>()?;
+                (l.value(), l.span())
+            }
+        },
         _ => unreachable!(),
     }
 }

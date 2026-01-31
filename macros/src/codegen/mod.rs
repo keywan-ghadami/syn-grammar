@@ -28,7 +28,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
 
     Ok(quote! {
         pub mod #grammar_name {
-            #![allow(unused_imports, unused_variables, dead_code, unused_braces)]
+            #![allow(unused_imports, unused_variables, dead_code, unused_braces, unused_parens)]
             
             pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);
 
@@ -83,6 +83,30 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
                     }
                 }
 
+                pub fn attempt_recover<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
+                    let was_fatal = check_fatal();
+                    set_fatal(false);
+
+                    let fork = input.fork();
+                    let res = parser(&fork);
+                    
+                    // For recovery, we don't care if it was fatal. We just want to know if it failed.
+                    // We always backtrack (discard fork) on error.
+                    // And we restore the previous fatal state.
+
+                    match res {
+                        Ok(res) => {
+                            input.advance_to(&fork);
+                            set_fatal(was_fatal);
+                            Ok(Some(res))
+                        }
+                        Err(_) => {
+                            set_fatal(was_fatal);
+                            Ok(None)
+                        }
+                    }
+                }
+
                 pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
                     input.call(syn::Ident::parse_any)
                 }
@@ -90,6 +114,15 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
                 pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T> 
                 where T::Err: std::fmt::Display {
                     input.parse::<syn::LitInt>()?.base10_parse()
+                }
+
+                pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -> Result<()> {
+                    while !input.is_empty() && !predicate(input) {
+                        if input.parse::<proc_macro2::TokenTree>().is_err() {
+                            break; 
+                        }
+                    }
+                    Ok(())
                 }
             }
 

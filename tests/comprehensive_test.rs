@@ -496,3 +496,29 @@ fn test_nested_repetition_complex() {
         .test()
         .assert_success_is(3);
 }
+
+// --- Test 23: Extended Literals ---
+#[test]
+fn test_extended_literals() {
+    grammar! {
+        grammar extended_lits {
+            rule main -> (syn::LitInt, syn::LitChar, syn::LitBool, syn::LitFloat) = 
+                i:lit_int c:lit_char b:lit_bool f:lit_float -> { (i, c, b, f) }
+            
+            pub rule spanned -> ((i32, proc_macro2::Span), (String, proc_macro2::Span)) =
+                i:spanned_int_lit s:spanned_string_lit -> { (i, s) }
+        }
+    }
+    
+    // Test syn types
+    let res = extended_lits::parse_main.parse_str("42 'c' true 3.14").unwrap();
+    assert_eq!(res.0.base10_parse::<i32>().unwrap(), 42);
+    assert_eq!(res.1.value(), 'c');
+    assert_eq!(res.2.value, true);
+    assert_eq!(res.3.base10_parse::<f64>().unwrap(), 3.14);
+
+    // Test spanned
+    let res = extended_lits::parse_spanned.parse_str("100 \"text\"").unwrap();
+    assert_eq!(res.0.0, 100);
+    assert_eq!(res.1.0, "text");
+}

@@ -10,7 +10,7 @@ You should **not** add this crate to your `Cargo.toml` directly. Instead, use th
 
 ```toml
 [dependencies]
-syn-grammar = "0.1"
+syn-grammar = "0.3"
 ```
 
 See [syn-grammar](https://crates.io/crates/syn-grammar) for documentation and usage examples.
