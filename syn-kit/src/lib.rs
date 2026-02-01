@@ -1,12 +1,20 @@
+#[cfg(feature = "rt")]
 use syn::parse::ParseStream;
+#[cfg(feature = "rt")]
 use syn::Result;
+#[cfg(feature = "rt")]
 use proc_macro2::Span;
+#[cfg(feature = "rt")]
 use syn::parse::discouraged::Speculative;
+#[cfg(feature = "rt")]
 use syn::ext::IdentExt; 
+#[cfg(feature = "rt")]
 use std::collections::HashSet;
 
+#[cfg(feature = "testing")]
 pub mod testing;
 
+#[cfg(feature = "rt")]
 struct ErrorState {
     err: syn::Error,
     is_deep: bool,
@@ -14,6 +22,7 @@ struct ErrorState {
 
 /// Holds the state for backtracking and error reporting.
 /// This must be passed mutably through the parsing chain.
+#[cfg(feature = "rt")]
 pub struct ParseContext {
     is_fatal: bool,
     best_error: Option<ErrorState>,
@@ -21,6 +30,7 @@ pub struct ParseContext {
     rule_stack: Vec<String>,
 }
 
+#[cfg(feature = "rt")]
 impl ParseContext {
     pub fn new() -> Self {
         Self {
@@ -105,6 +115,7 @@ impl ParseContext {
     }
 }
 
+#[cfg(feature = "rt")]
 impl Default for ParseContext {
     fn default() -> Self {
         Self::new()
@@ -113,6 +124,7 @@ impl Default for ParseContext {
 
 /// Encapsulates a speculative parse attempt. 
 /// Requires passing the ParseContext to manage error state.
+#[cfg(feature = "rt")]
 #[inline]
 pub fn attempt<T, F>(
     input: ParseStream, 
@@ -167,6 +179,7 @@ where
 }
 
 /// Wrapper around attempt used specifically for recovery blocks.
+#[cfg(feature = "rt")]
 #[inline]
 pub fn attempt_recover<T, F>(
     input: ParseStream, 
@@ -211,17 +224,20 @@ where
 
 // --- Stateless Helpers (No Context Needed) ---
 
+#[cfg(feature = "rt")]
 #[inline]
 pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
     input.call(syn::Ident::parse_any)
 }
 
+#[cfg(feature = "rt")]
 #[inline]
 pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T> 
 where T::Err: std::fmt::Display {
     input.parse::<syn::LitInt>()?.base10_parse()
 }
 
+#[cfg(feature = "rt")]
 pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -> Result<()> {
     while !input.is_empty() && !predicate(input) {
         if input.parse::<proc_macro2::TokenTree>().is_err() {
@@ -231,7 +247,7 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rt"))]
 mod tests {
     use super::*;
 

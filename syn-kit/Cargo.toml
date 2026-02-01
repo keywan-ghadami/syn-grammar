@@ -12,6 +12,11 @@ keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
 categories = ["parsing", "development-tools"]
 authors = ["Keywan Ghadami"]
 
+[features]
+default = ["rt"]
+rt = []
+testing = []
+
 [dependencies]
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
 quote = "1.0"
