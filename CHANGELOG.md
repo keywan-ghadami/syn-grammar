@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 - **Error Recovery**: Added `recover(rule, sync_token)` to handle syntax errors gracefully by skipping tokens until a synchronization point.
 - **Rule Arguments**: Rules can now accept parameters (e.g., `rule value(arg: i32) -> ...`), allowing context to be passed down the parser chain.
 - **Grammar Inheritance**: Grammars can inherit from other modules (e.g., `grammar MyGrammar : BaseGrammar`), enabling the use of external or manually written "custom parsers".
+- **Testing Utilities**: Added `syn_grammar::testing` module with fluent assertions (`assert_success_is`, `assert_failure_contains`) to simplify writing tests for grammars.
+- **Improved Error Reporting**: The parser now prioritizes "deep" errors (errors that occur after consuming tokens) over shallow errors.
 - **New Built-in Parsers**:
   - `lit_int` -> `syn::LitInt`
   - `lit_char` -> `syn::LitChar`
@@ -21,6 +23,9 @@ All notable changes to this project will be documented in this file.
   - `lit_float` -> `syn::LitFloat`
   - `spanned_int_lit` -> `(i32, Span)`
   - `spanned_string_lit` -> `(String, Span)`
+  - `spanned_float_lit` -> `(f64, Span)`
+  - `spanned_bool_lit` -> `(bool, Span)`
+  - `spanned_char_lit` -> `(char, Span)`
 
 ## [0.2.0]
 
