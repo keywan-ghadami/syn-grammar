@@ -36,8 +36,8 @@ fn record_error(err: syn::Error, start_span: Span) {
         // Heuristic: Compare the error location to the start of the attempt.
         // If they differ, we made progress (Deep Error).
         // We prioritize Deep Errors over Shallow Errors.
-        // Note: Span does not implement PartialEq, so we use Debug formatting.
-        let is_deep = format!("{:?}", err.span()) != format!("{:?}", start_span);
+        // Note: We use .start() (LineColumn) which implements PartialEq, avoiding string allocation.
+        let is_deep = err.span().start() != start_span.start();
 
         match &mut *borrow {
             None => {
