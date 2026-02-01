@@ -1,13 +1,21 @@
-[package]                                                      -name = "syn-kit"                                               +name = "syn-grammar"
+[package]
+name = "syn-kit"
 version = "0.3.0"
 edition = "2021"
 description = "A parser generator for Rust that compiles EBNF-like grammars into syn::parse::Parse implementations."
-license = "MIT OR Apache-2.0"                                  +repository = "https://github.com/keywan-ghadami/syn-grammar"   +documentation = "https://docs.rs/syn-grammar"
-homepage = "https://github.com/keywan-ghadami/syn-grammar"     +readme = "README.md"                                           +keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
-categories = ["parsing", "development-tools"]                  +authors = ["Keywan Ghadami"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/keywan-ghadami/syn-grammar"
+documentation = "https://docs.rs/syn-grammar"
+homepage = "https://github.com/keywan-ghadami/syn-grammar"
+readme = "README.md"
+keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
+categories = ["parsing", "development-tools"]
 authors = ["Keywan Ghadami"]
 
-[dependencies]                                                 +syn-grammar-macros = { path = "./macros", version = "0.3.0" }  +syn-grammar-model = { path = "./syn-grammar-model", version =
+[dependencies]
+proc-macro2 = "1.0"
+#syn-grammar-macros = { path = "../macros", version = "0.3.0" }
+#syn-grammar-model = { path = "../syn-grammar-model", version = "0.3.0" }
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 
