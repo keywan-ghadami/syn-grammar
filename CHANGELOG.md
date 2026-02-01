@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.3.0]
 
 ### Breaking Changes
+- **Runtime Dependency**: Generated parsers now depend on the new `syn-kit` crate. Users must add `syn-kit = "0.3.0"` to their `Cargo.toml`.
 - **Renamed Built-in Parsers**:
   - `int_lit` has been renamed to **`integer`** (returns `i32`).
   - `string_lit` has been renamed to **`string`** (returns `String`).
@@ -26,6 +27,9 @@ All notable changes to this project will be documented in this file.
   - `spanned_float_lit` -> `(f64, Span)`
   - `spanned_bool_lit` -> `(bool, Span)`
   - `spanned_char_lit` -> `(char, Span)`
+
+### Internal
+- **Architecture**: Extracted runtime utilities (backtracking, error reporting, testing) into a separate `syn-kit` crate.
 
 ## [0.2.0]
 
