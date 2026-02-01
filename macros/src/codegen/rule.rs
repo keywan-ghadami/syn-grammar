@@ -101,7 +101,7 @@ fn generate_recursive_loop_body(
 ) -> Result<TokenStream> {
     let arms = variants.iter().map(|variant| {
         let tail_pattern = &variant.pattern[1..];
-        
+
         let lhs_binding = match &variant.pattern[0] {
             ModelPattern::RuleCall { binding: Some(b), .. } => Some(b),
             _ => None
@@ -114,19 +114,19 @@ fn generate_recursive_loop_body(
         };
 
         let logic = pattern::generate_sequence(tail_pattern, &variant.action, kws)?;
-        
+
         let peek_token_obj = tail_pattern.first()
             .and_then(|f| analysis::get_simple_peek(f, kws).ok().flatten());
-        
+
         match peek_token_obj {
             Some(token_code) => {
                 Ok(quote! {
                     if input.peek(#token_code) {
                         let _start_cursor = input.cursor();
                         // Pass ctx to attempt
-                        if let Some(new_val) = rt::attempt(input, ctx, |input, ctx| { 
+                        if let Some(new_val) = rt::attempt(input, ctx, |input, ctx| {
                             #bind_stmt
-                            #logic 
+                            #logic
                         })? {
                             if _start_cursor == input.cursor() {
                                 return Err(input.error("Left-recursive rule matched empty string (infinite loop detected)"));
@@ -141,9 +141,9 @@ fn generate_recursive_loop_body(
                 Ok(quote! {
                     let _start_cursor = input.cursor();
                     // Pass ctx to attempt
-                    if let Some(new_val) = rt::attempt(input, ctx, |input, ctx| { 
+                    if let Some(new_val) = rt::attempt(input, ctx, |input, ctx| {
                         #bind_stmt
-                        #logic 
+                        #logic
                     })? {
                         if _start_cursor == input.cursor() {
                             return Err(input.error("Left-recursive rule matched empty string (infinite loop detected)"));

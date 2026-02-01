@@ -209,10 +209,10 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let effective_body = if let Some(bind) = binding {
                 match &**body {
                     ModelPattern::RuleCall { binding: None, rule_name, args } => {
-                        Box::new(ModelPattern::RuleCall { 
-                            binding: Some(bind.clone()), 
-                            rule_name: rule_name.clone(), 
-                            args: args.clone() 
+                        Box::new(ModelPattern::RuleCall {
+                            binding: Some(bind.clone()),
+                            rule_name: rule_name.clone(),
+                            args: args.clone()
                         })
                     },
                     _ => return Err(syn::Error::new(span, "Binding on recover(...) is only supported if the body is a direct rule call."))

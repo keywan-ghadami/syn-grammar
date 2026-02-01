@@ -125,13 +125,13 @@ pub fn resolve_token_type(
     }
 
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
-        return Err(syn::Error::new(lit.span(), 
+        return Err(syn::Error::new(lit.span(),
             format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
     }
 
     // Check for numeric literals which are not supported as tokens
     if s.chars().next().is_some_and(|c| c.is_numeric()) {
-        return Err(syn::Error::new(lit.span(), 
+        return Err(syn::Error::new(lit.span(),
             format!("Numeric literal '{}' cannot be used as a token. Use `int_lit` or similar parsers instead.", s)));
     }
 
