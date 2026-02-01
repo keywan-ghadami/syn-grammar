@@ -57,7 +57,11 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
         match p {
             ModelPattern::Lit(lit) => {
                 let s = lit.value();
-                if is_identifier(&s) && !is_rust_keyword(&s) {
+                // If it looks like an identifier AND syn accepts it as an Ident,
+                // it is a custom keyword.
+                // If syn rejects it (e.g. "fn", "struct", "true"), it is a reserved
+                // keyword or literal, so we treat it as a built-in token.
+                if is_identifier(&s) && syn::parse_str::<syn::Ident>(&s).is_ok() {
                     kws.insert(s);
                 }
             }
@@ -220,17 +224,4 @@ fn is_identifier(s: &str) -> bool {
         .next()
         .is_some_and(|c| c.is_alphabetic() || c == '_')
         && s.chars().all(|c| c.is_alphanumeric() || c == '_')
-}
-
-fn is_rust_keyword(s: &str) -> bool {
-    matches!(
-        s,
-        "abstract" | "as" | "async" | "await" | "become" | "box" | "break" | "const"
-            | "continue" | "crate" | "do" | "dyn" | "else" | "enum" | "extern" | "false"
-            | "final" | "fn" | "for" | "if" | "impl" | "in" | "let" | "loop" | "macro"
-            | "match" | "mod" | "move" | "mut" | "override" | "priv" | "pub" | "ref"
-            | "return" | "self" | "Self" | "static" | "struct" | "super" | "trait"
-            | "true" | "try" | "type" | "typeof" | "unsafe" | "unsized" | "use"
-            | "virtual" | "where" | "while" | "yield"
-    )
 }
