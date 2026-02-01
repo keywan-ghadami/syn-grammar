@@ -13,14 +13,14 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     
     let doc_comment = format!("Parser for rule `{}`.", name);
 
-    let params = rule.params.iter().map(|(name, ty)| {
+    let params: Vec<_> = rule.params.iter().map(|(name, ty)| {
         quote! { , #name : #ty }
-    });
+    }).collect();
     
     // Params for the impl call (forwarding arguments)
-    let param_names = rule.params.iter().map(|(name, _)| {
+    let param_names: Vec<_> = rule.params.iter().map(|(name, _)| {
         quote! { , #name }
-    });
+    }).collect();
 
     let is_public = rule.is_pub || name == "main";
     let vis = if is_public { quote!(pub) } else { quote!() };
