@@ -230,3 +230,33 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rule_name_in_error() {
+        let mut ctx = ParseContext::new();
+        ctx.enter_rule("test_rule");
+        
+        let err = syn::Error::new(Span::call_site(), "expected something");
+        ctx.record_error(err, Span::call_site());
+        
+        let final_err = ctx.take_best_error().unwrap();
+        assert_eq!(final_err.to_string(), "Error in rule 'test_rule': expected something");
+    }
+
+    #[test]
+    fn test_nested_rule_name_in_error() {
+        let mut ctx = ParseContext::new();
+        ctx.enter_rule("outer");
+        ctx.enter_rule("inner");
+        
+        let err = syn::Error::new(Span::call_site(), "fail");
+        ctx.record_error(err, Span::call_site());
+        
+        let final_err = ctx.take_best_error().unwrap();
+        assert_eq!(final_err.to_string(), "Error in rule 'inner': fail");
+    }
+}
