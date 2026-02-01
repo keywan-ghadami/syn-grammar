@@ -66,3 +66,33 @@ fn test_recovery_complex_sync() {
 
     assert_eq!(res, vec![Some(10), None, Some(20)]);
 }
+
+#[test]
+fn test_attempt_recover_behavior() {
+    grammar! {
+        grammar recover_check {
+            // recover(inner, "end") tries inner.
+            // If inner fails, it returns None and the generated code skips until "end".
+            // We must then consume "end" explicitly.
+            rule main -> String = 
+                res:recover(inner, "end") "end" -> { 
+                    res.unwrap_or_else(|| "recovered".to_string()) 
+                }
+
+            rule inner -> String = 
+                "start" i:integer -> { i.to_string() }
+        }
+    }
+
+    // 1. Success path
+    let res = recover_check::parse_main.parse_str("start 42 end");
+    assert_eq!(res.unwrap(), "42");
+
+    // 2. Failure path (Recovery)
+    // "start" matches, "broken" fails integer parse.
+    // recover catches error, skips "broken".
+    // stops at "end".
+    // main consumes "end".
+    let res = recover_check::parse_main.parse_str("start broken end");
+    assert_eq!(res.unwrap(), "recovered");
+}

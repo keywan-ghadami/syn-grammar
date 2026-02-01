@@ -70,3 +70,13 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
     }
     Ok(())
 }
+
+/// Wrapper around attempt used specifically for recovery blocks.
+/// It allows the generated code to distinguish semantic intent, 
+/// though currently it shares the same backtracking logic.
+pub fn attempt_recover<T>(
+    input: ParseStream, 
+    parser: impl FnOnce(ParseStream) -> Result<T>
+) -> Result<Option<T>> {
+    attempt(input, parser)
+}
