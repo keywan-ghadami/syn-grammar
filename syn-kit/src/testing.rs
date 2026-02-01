@@ -3,16 +3,16 @@
 //! This module provides a fluent API for testing parsing results,
 //! asserting success/failure, and checking error messages.
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
-// A wrapper around syn::Result to write fluent tests.
-pub struct TestResult<T> {
-    inner: syn::Result<T>,
+// A wrapper around Result to write fluent tests.
+pub struct TestResult<T, E> {
+    inner: Result<T, E>,
     context: Option<String>,
 }
 
-impl<T: Debug> TestResult<T> {
-    pub fn new(result: syn::Result<T>) -> Self {
+impl<T: Debug, E: Display + Debug> TestResult<T, E> {
+    pub fn new(result: Result<T, E>) -> Self {
         Self { 
             inner: result,
             context: None,
@@ -30,15 +30,15 @@ impl<T: Debug> TestResult<T> {
             .unwrap_or_default()
     }
 
-    // 1. Asserts success and returns the value (as before).
+    // 1. Asserts success and returns the value.
     pub fn assert_success(self) -> T {
         let ctx = self.format_context();
         match self.inner {
             Ok(val) => val,
             Err(e) => {
                 panic!(
-                    "\n🔴 TEST FAILED (Expected Success, but got Error):{}\nMessage:  {}\nLocation: {:?}\n", 
-                    ctx, e, e.span()
+                    "\n🔴 TEST FAILED (Expected Success, but got Error):{}\nMessage:  {}\nError Debug: {:?}\n", 
+                    ctx, e, e
                 );
             }
         }
@@ -46,8 +46,8 @@ impl<T: Debug> TestResult<T> {
 
     // 2. Asserts success AND checks the value directly.
     // Returns a nice diff output if values do not match.
-    pub fn assert_success_is<E>(self, expected: E) -> T 
-    where T: PartialEq<E>, E: Debug {
+    pub fn assert_success_is<Exp>(self, expected: Exp) -> T 
+    where T: PartialEq<Exp>, Exp: Debug {
         let ctx = self.format_context();
         let val = self.assert_success();
         if val != expected {
@@ -84,7 +84,7 @@ impl<T: Debug> TestResult<T> {
     }
 
     // 5. Asserts failure and returns the error.
-    pub fn assert_failure(self) -> syn::Error {
+    pub fn assert_failure(self) -> E {
         let ctx = self.format_context();
         match self.inner {
             Ok(val) => {
@@ -104,19 +104,19 @@ impl<T: Debug> TestResult<T> {
         let actual_msg = err.to_string();
         if !actual_msg.contains(expected_msg_part) {
             panic!(
-                "\n🔴 TEST FAILED (Error Message Mismatch):{}\nExpected part: {:?}\nActual msg:    {:?}\nLocation:      {:?}\n", 
-                ctx, expected_msg_part, actual_msg, err.span()
+                "\n🔴 TEST FAILED (Error Message Mismatch):{}\nExpected part: {:?}\nActual msg:    {:?}\nError Debug:   {:?}\n", 
+                ctx, expected_msg_part, actual_msg, err
             );
         }
     }
 }
 
-pub trait Testable<T> {
-    fn test(self) -> TestResult<T>;
+pub trait Testable<T, E> {
+    fn test(self) -> TestResult<T, E>;
 }
 
-impl<T: Debug> Testable<T> for syn::Result<T> {
-    fn test(self) -> TestResult<T> {
+impl<T: Debug> Testable<T, syn::Error> for syn::Result<T> {
+    fn test(self) -> TestResult<T, syn::Error> {
         TestResult::new(self)
     }
 }

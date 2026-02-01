@@ -8,11 +8,53 @@ use proc_macro2::Span;
 use syn::parse::discouraged::Speculative;
 #[cfg(feature = "rt")]
 use syn::ext::IdentExt; 
-#[cfg(feature = "rt")]
 use std::collections::HashSet;
 
 #[cfg(feature = "testing")]
 pub mod testing;
+
+/// Generic symbol table that tracks variable definitions in nested scopes.
+#[derive(Clone, Default)]
+pub struct ScopeStack {
+    scopes: Vec<HashSet<String>>,
+}
+
+impl ScopeStack {
+    pub fn new() -> Self {
+        Self {
+            scopes: vec![HashSet::new()],
+        }
+    }
+
+    pub fn enter_scope(&mut self) {
+        self.scopes.push(HashSet::new());
+    }
+
+    pub fn exit_scope(&mut self) {
+        if self.scopes.len() > 1 {
+            self.scopes.pop();
+        }
+    }
+
+    pub fn define(&mut self, name: impl Into<String>) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.into());
+        }
+    }
+
+    pub fn is_defined(&self, name: &str) -> bool {
+        for scope in self.scopes.iter().rev() {
+            if scope.contains(name) {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn scopes(&self) -> &Vec<HashSet<String>> {
+        &self.scopes
+    }
+}
 
 #[cfg(feature = "rt")]
 #[derive(Clone)]
@@ -28,7 +70,7 @@ struct ErrorState {
 pub struct ParseContext {
     is_fatal: bool,
     best_error: Option<ErrorState>,
-    scopes: Vec<HashSet<String>>,
+    pub scopes: ScopeStack,
     rule_stack: Vec<String>,
 }
 
@@ -38,7 +80,7 @@ impl ParseContext {
         Self {
             is_fatal: false,
             best_error: None,
-            scopes: vec![HashSet::new()],
+            scopes: ScopeStack::new(),
             rule_stack: Vec::new(),
         }
     }
@@ -92,34 +134,25 @@ impl ParseContext {
     // --- Symbol Table Methods ---
 
     pub fn enter_scope(&mut self) {
-        self.scopes.push(HashSet::new());
+        self.scopes.enter_scope();
     }
 
     pub fn exit_scope(&mut self) {
-        if self.scopes.len() > 1 {
-            self.scopes.pop();
-        }
+        self.scopes.exit_scope();
     }
 
     pub fn define(&mut self, name: impl Into<String>) {
-        if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(name.into());
-        }
+        self.scopes.define(name);
     }
 
     pub fn is_defined(&self, name: &str) -> bool {
-        for scope in self.scopes.iter().rev() {
-            if scope.contains(name) {
-                return true;
-            }
-        }
-        false
+        self.scopes.is_defined(name)
     }
 
     // --- Inspection Methods ---
 
     pub fn scopes(&self) -> &Vec<HashSet<String>> {
-        &self.scopes
+        self.scopes.scopes()
     }
 
     pub fn rule_stack(&self) -> &Vec<String> {
