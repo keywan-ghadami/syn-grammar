@@ -1,14 +1,14 @@
 #[cfg(feature = "syn")]
-use syn::parse::ParseStream;
-#[cfg(feature = "syn")]
-use syn::Result;
-#[cfg(feature = "syn")]
 use proc_macro2::Span;
+use std::collections::HashSet;
+#[cfg(feature = "syn")]
+use syn::ext::IdentExt;
 #[cfg(feature = "syn")]
 use syn::parse::discouraged::Speculative;
 #[cfg(feature = "syn")]
-use syn::ext::IdentExt; 
-use std::collections::HashSet;
+use syn::parse::ParseStream;
+#[cfg(feature = "syn")]
+use syn::Result;
 
 #[cfg(feature = "testing")]
 pub mod testing;
@@ -171,17 +171,13 @@ impl Default for ParseContext {
     }
 }
 
-/// Encapsulates a speculative parse attempt. 
+/// Encapsulates a speculative parse attempt.
 /// Requires passing the ParseContext to manage error state.
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
-pub fn attempt<T, F>(
-    input: ParseStream, 
-    ctx: &mut ParseContext, 
-    parser: F
-) -> Result<Option<T>> 
-where 
-    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>
+pub fn attempt<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<Option<T>>
+where
+    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
 {
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
@@ -192,10 +188,10 @@ where
 
     let start_span = input.span();
     let fork = input.fork();
-    
+
     // Pass ctx into the closure
     let res = parser(&fork, ctx);
-    
+
     let is_now_fatal = ctx.check_fatal();
 
     match res {
@@ -209,18 +205,18 @@ where
                 // Restore state
                 ctx.scopes = scopes_snapshot;
                 ctx.rule_stack = rule_stack_snapshot;
-                
+
                 ctx.set_fatal(true);
                 Err(e)
             } else {
                 ctx.set_fatal(was_fatal);
                 // Record error BEFORE restoring state to capture inner rule context
                 ctx.record_error(e, start_span);
-                
+
                 // Restore state
                 ctx.scopes = scopes_snapshot;
                 ctx.rule_stack = rule_stack_snapshot;
-                
+
                 Ok(None)
             }
         }
@@ -231,12 +227,12 @@ where
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn attempt_recover<T, F>(
-    input: ParseStream, 
+    input: ParseStream,
     ctx: &mut ParseContext,
-    parser: F
+    parser: F,
 ) -> Result<Option<T>>
-where 
-    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>
+where
+    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
 {
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
@@ -247,9 +243,9 @@ where
 
     let start_span = input.span();
     let fork = input.fork();
-    
+
     let res = parser(&fork, ctx);
-    
+
     // Always restore fatal state, ignoring whatever happened inside.
     ctx.set_fatal(was_fatal);
 
@@ -265,7 +261,7 @@ where
             // Restore state
             ctx.scopes = scopes_snapshot;
             ctx.rule_stack = rule_stack_snapshot;
-            
+
             Ok(None)
         }
     }
@@ -281,8 +277,10 @@ pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
 
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
-pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T> 
-where T::Err: std::fmt::Display {
+pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T>
+where
+    T::Err: std::fmt::Display,
+{
     input.parse::<syn::LitInt>()?.base10_parse()
 }
 
@@ -290,7 +288,7 @@ where T::Err: std::fmt::Display {
 pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -> Result<()> {
     while !input.is_empty() && !predicate(input) {
         if input.parse::<proc_macro2::TokenTree>().is_err() {
-            break; 
+            break;
         }
     }
     Ok(())
@@ -304,12 +302,15 @@ mod tests {
     fn test_rule_name_in_error() {
         let mut ctx = ParseContext::new();
         ctx.enter_rule("test_rule");
-        
+
         let err = syn::Error::new(Span::call_site(), "expected something");
         ctx.record_error(err, Span::call_site());
-        
+
         let final_err = ctx.take_best_error().unwrap();
-        assert_eq!(final_err.to_string(), "Error in rule 'test_rule': expected something");
+        assert_eq!(
+            final_err.to_string(),
+            "Error in rule 'test_rule': expected something"
+        );
     }
 
     #[test]
@@ -317,10 +318,10 @@ mod tests {
         let mut ctx = ParseContext::new();
         ctx.enter_rule("outer");
         ctx.enter_rule("inner");
-        
+
         let err = syn::Error::new(Span::call_site(), "fail");
         ctx.record_error(err, Span::call_site());
-        
+
         let final_err = ctx.take_best_error().unwrap();
         assert_eq!(final_err.to_string(), "Error in rule 'inner': fail");
     }
@@ -328,19 +329,19 @@ mod tests {
     #[test]
     fn test_attempt_captures_rule_context() {
         use syn::parse::Parser;
-        
+
         let mut ctx = ParseContext::new();
-        
+
         let parser = |input: ParseStream| {
             ctx.enter_rule("outer");
-            
+
             // We simulate an attempt that fails.
             // attempt returns Result<Option<T>>.
             // If the closure returns Err, attempt records it and returns Ok(None) (if not fatal).
             let _ = attempt(input, &mut ctx, |_input, _ctx| {
                 Err(syn::Error::new(Span::call_site(), "parse failed"))
             })?;
-            
+
             ctx.exit_rule();
             Ok(())
         };
@@ -348,8 +349,8 @@ mod tests {
         // We parse an empty string. The attempt fails immediately.
         // The outer parser returns Ok(()).
         // But we check ctx.best_error.
-        let _ = parser.parse_str(""); 
-        
+        let _ = parser.parse_str("");
+
         let err = ctx.take_best_error().expect("Error should be recorded");
         assert_eq!(err.to_string(), "Error in rule 'outer': parse failed");
     }

@@ -11,7 +11,7 @@
 //! 3. **[validator]**: Validate the model for semantic correctness.
 //! 4. **[analysis]**: Extract information (keywords, recursion) for code generation.
 
+pub mod analysis;
 pub mod model;
 pub mod parser;
 pub mod validator;
-pub mod analysis;

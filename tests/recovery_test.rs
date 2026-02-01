@@ -1,6 +1,6 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
-use syn_grammar::testing::Testable; 
-use syn::parse::Parser; 
+use syn_grammar::testing::Testable;
 
 #[test]
 fn test_failure_recovery() {
@@ -8,15 +8,15 @@ fn test_failure_recovery() {
         grammar recovery {
             // We parse a list of statements.
             // If a statement fails, we recover at the semicolon.
-            rule main -> Vec<Option<String>> = 
+            rule main -> Vec<Option<String>> =
                 stmts:stmt_wrapper* -> { stmts }
 
             // recover() skips until ";", but does not consume it.
             // We must consume ";" explicitly.
-            rule stmt_wrapper -> Option<String> = 
+            rule stmt_wrapper -> Option<String> =
                 s:recover(stmt, ";") ";" -> { s }
 
-            rule stmt -> String = 
+            rule stmt -> String =
                 "let" name:ident -> { format!("let {}", name) }
         }
     }
@@ -26,8 +26,9 @@ fn test_failure_recovery() {
     // 2. "let 123;" -> Invalid (123 is not ident), should recover at ;
     // 3. "let b;" -> Valid
     let input = "let a; let 123; let b;";
-    
-    let res = recovery::parse_main.parse_str(input)
+
+    let res = recovery::parse_main
+        .parse_str(input)
         .test()
         .assert_success();
 
@@ -41,16 +42,16 @@ fn test_failure_recovery() {
 fn test_recovery_complex_sync() {
     grammar! {
         grammar recovery_complex {
-            rule main -> Vec<Option<i32>> = 
+            rule main -> Vec<Option<i32>> =
                 items:item* -> { items }
 
             // Recover until we see "end"
             // Note: The sync pattern "end" is NOT consumed by recover logic.
             // We must consume it explicitly.
-            rule item -> Option<i32> = 
+            rule item -> Option<i32> =
                 "group" i:recover(inner, "end") "end" -> { i }
 
-            rule inner -> i32 = 
+            rule inner -> i32 =
                 "val" i:integer -> { i }
         }
     }
@@ -60,7 +61,8 @@ fn test_recovery_complex_sync() {
     // 3. group val 20 end -> OK
     let input = "group val 10 end group val x end group val 20 end";
 
-    let res = recovery_complex::parse_main.parse_str(input)
+    let res = recovery_complex::parse_main
+        .parse_str(input)
         .test()
         .assert_success();
 
@@ -74,12 +76,12 @@ fn test_attempt_recover_behavior() {
             // recover(inner, "end") tries inner.
             // If inner fails, it returns None and the generated code skips until "end".
             // We must then consume "end" explicitly.
-            rule main -> String = 
-                res:recover(inner, "end") "end" -> { 
-                    res.unwrap_or_else(|| "recovered".to_string()) 
+            rule main -> String =
+                res:recover(inner, "end") "end" -> {
+                    res.unwrap_or_else(|| "recovered".to_string())
                 }
 
-            rule inner -> String = 
+            rule inner -> String =
                 "start" i:integer -> { i.to_string() }
         }
     }

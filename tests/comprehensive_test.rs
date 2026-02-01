@@ -1,6 +1,6 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
-use syn_grammar::testing::Testable; 
-use syn::parse::Parser; 
+use syn_grammar::testing::Testable;
 
 // --- Test 1: Basic Sequence ---
 #[test]
@@ -12,12 +12,14 @@ fn test_basic_sequence() {
     }
 
     // NEW: .assert_success_is(...)
-    basic::parse_main.parse_str("hello world")
+    basic::parse_main
+        .parse_str("hello world")
         .test()
         .assert_success_is("Success");
 
     // NEW: .assert_failure_contains(...)
-    basic::parse_main.parse_str("hello universe")
+    basic::parse_main
+        .parse_str("hello universe")
         .test()
         .assert_failure_contains("expected `world`");
 }
@@ -27,17 +29,19 @@ fn test_basic_sequence() {
 fn test_backtracking_priority() {
     grammar! {
         grammar backtrack {
-            rule main -> String = 
+            rule main -> String =
                 "A" "B" -> { "Path AB".to_string() }
               | "A"     -> { "Path A".to_string() }
         }
     }
 
-    backtrack::parse_main.parse_str("A B")
+    backtrack::parse_main
+        .parse_str("A B")
         .test()
         .assert_success_is("Path AB");
 
-    backtrack::parse_main.parse_str("A")
+    backtrack::parse_main
+        .parse_str("A")
         .test()
         .assert_success_is("Path A");
 }
@@ -51,9 +55,12 @@ fn test_complex_groups() {
         }
     }
 
-    complex::parse_main.parse_str("A B C").test().assert_success();
+    complex::parse_main
+        .parse_str("A B C")
+        .test()
+        .assert_success();
     complex::parse_main.parse_str("C").test().assert_success();
-    
+
     // Here we expect it to fail because "B" is missing
     complex::parse_main.parse_str("A C").test().assert_failure();
 }
@@ -65,25 +72,27 @@ fn test_math_expression() {
         grammar math {
             rule main -> i32 = e:expr -> { e }
 
-            rule expr -> i32 = 
+            rule expr -> i32 =
                 t:term "+" e:expr -> { t + e }
               | t:term            -> { t }
 
-            rule term -> i32 = 
+            rule term -> i32 =
                 f:factor "*" t:term -> { f * t }
               | f:factor            -> { f }
 
-            rule factor -> i32 = 
+            rule factor -> i32 =
                 paren(e:expr)  -> { e }
               | i:integer      -> { i }
         }
     }
 
-    math::parse_main.parse_str("2 + 3 * 4")
+    math::parse_main
+        .parse_str("2 + 3 * 4")
         .test()
-        .assert_success_is(14); 
+        .assert_success_is(14);
 
-    math::parse_main.parse_str("(2 + 3) * 4")
+    math::parse_main
+        .parse_str("(2 + 3) * 4")
         .test()
         .assert_success_is(20);
 }
@@ -95,19 +104,28 @@ fn test_repetition() {
         grammar repeat {
             rule main -> usize = [ content:elems ] -> { content }
 
-            rule elems -> usize = 
+            rule elems -> usize =
                 first:elem rest:elem* -> { 1 + rest.len() }
-            
+
             rule elem -> () = "x" ","? -> { () }
         }
     }
 
-    repeat::parse_main.parse_str("[ x ]").test().assert_success_is(1);
-    repeat::parse_main.parse_str("[ x, x, x ]").test().assert_success_is(3);
+    repeat::parse_main
+        .parse_str("[ x ]")
+        .test()
+        .assert_success_is(1);
+    repeat::parse_main
+        .parse_str("[ x, x, x ]")
+        .test()
+        .assert_success_is(3);
     repeat::parse_main.parse_str("[ ]").test().assert_failure();
-    
+
     // Case: Missing closing bracket.
-    repeat::parse_main.parse_str("[ x, x").test().assert_failure();
+    repeat::parse_main
+        .parse_str("[ x, x")
+        .test()
+        .assert_failure();
 }
 
 // --- Test 6: Built-ins ---
@@ -115,12 +133,13 @@ fn test_repetition() {
 fn test_builtins() {
     grammar! {
         grammar builtins {
-            rule main -> (String, String) = 
+            rule main -> (String, String) =
                 k:ident "=" v:string -> { (k.to_string(), v) }
         }
     }
 
-    builtins::parse_main.parse_str("config_key = \"some_value\"")
+    builtins::parse_main
+        .parse_str("config_key = \"some_value\"")
         .test()
         .assert_success_is(("config_key".to_string(), "some_value".to_string()));
 }
@@ -130,18 +149,19 @@ fn test_builtins() {
 fn test_cut_operator() {
     grammar! {
         grammar cut_test {
-            // Scenario: 
+            // Scenario:
             // We want to distinguish a keyword "let" from an identifier "let".
             // If we match "let" literal, we CUT (=>). If the following pattern fails,
             // we should NOT backtrack to parse it as an identifier.
-            rule main -> String = 
+            rule main -> String =
                 "let" => "mut" -> { "Variable Declaration".to_string() }
               | "let"          -> { "Identifier(let)".to_string() }
         }
     }
 
     // 1. Happy Path: Matches "let" then "mut"
-    cut_test::parse_main.parse_str("let mut")
+    cut_test::parse_main
+        .parse_str("let mut")
         .test()
         .assert_success_is("Variable Declaration");
 
@@ -150,7 +170,8 @@ fn test_cut_operator() {
     // Since the Cut operator is implemented, matching "let" commits to the first variant.
     // The parser will NOT backtrack to the second variant ("Identifier(let)").
     // Instead, it will fail because "mut" is expected but not found.
-    cut_test::parse_main.parse_str("let")
+    cut_test::parse_main
+        .parse_str("let")
         .test()
         .assert_failure_contains("expected `mut`");
 }
@@ -164,20 +185,22 @@ fn test_left_recursion() {
             // Parses "1 - 2 - 3" as "(1 - 2) - 3" = -4.
             // If it were right-recursive (or simple recursive descent without handling),
             // it might stack overflow or parse as "1 - (2 - 3)" = 2.
-            pub rule expr -> i32 = 
+            pub rule expr -> i32 =
                 l:expr "-" r:integer -> { l - r }
               | i:integer            -> { i }
         }
     }
 
     // 1. Simple
-    left_rec::parse_expr.parse_str("10 - 2")
+    left_rec::parse_expr
+        .parse_str("10 - 2")
         .test()
         .assert_success_is(8);
 
     // 2. Associativity check: 10 - 2 - 3 => (10 - 2) - 3 = 5
     // (Right associative would be 10 - (2 - 3) = 10 - (-1) = 11)
-    left_rec::parse_expr.parse_str("10 - 2 - 3")
+    left_rec::parse_expr
+        .parse_str("10 - 2 - 3")
         .test()
         .assert_success_is(5);
 }
@@ -198,7 +221,8 @@ fn test_left_recursion_field_access() {
     // 1. a -> "a"
     // 2. a.b -> "(a).b"
     // 3. (a).b.c -> "((a).b).c"
-    field_access::parse_expr.parse_str("a.b.c")
+    field_access::parse_expr
+        .parse_str("a.b.c")
         .test()
         .assert_success_is("((a).b).c".to_string());
 }
@@ -214,14 +238,15 @@ grammar! {
 
 grammar! {
     grammar derived : base {
-        rule main -> i32 = 
+        rule main -> i32 =
             "add" a:num b:num -> { a + b }
     }
 }
 
 #[test]
 fn test_inheritance() {
-    derived::parse_main.parse_str("add 10 20")
+    derived::parse_main
+        .parse_str("add 10 20")
         .test()
         .assert_success_is(30);
 }
@@ -233,23 +258,25 @@ fn test_rust_types_and_blocks() {
         grammar rust_syntax {
             // Parses a type like "Vec<i32>"
             // We return a String debug representation to avoid complex AST assertions
-            pub rule parse_type -> String = 
+            pub rule parse_type -> String =
                 t:rust_type -> { format!("{:?}", t) }
-            
+
             // Parses a block like "{ let x = 1; }"
-            pub rule parse_block -> usize = 
+            pub rule parse_block -> usize =
                 b:rust_block -> { b.stmts.len() }
         }
     }
 
     // Test Type Parsing
     // We just assert success here to ensure the built-in parser consumes the input correctly.
-    rust_syntax::parse_parse_type.parse_str("Vec<i32>")
+    rust_syntax::parse_parse_type
+        .parse_str("Vec<i32>")
         .test()
         .assert_success();
 
     // Test Block Parsing
-    rust_syntax::parse_parse_block.parse_str("{ let x = 1; let y = 2; }")
+    rust_syntax::parse_parse_block
+        .parse_str("{ let x = 1; let y = 2; }")
         .test()
         .assert_success_is(2);
 }
@@ -260,23 +287,26 @@ fn test_keywords_vs_idents() {
     grammar! {
         grammar kw_test {
             // "fn" is a Rust keyword, "custom" is a custom keyword defined by usage literal
-            rule main -> String = 
+            rule main -> String =
                 "fn" name:ident "custom" -> { name.to_string() }
         }
     }
 
     // Happy path
-    kw_test::parse_main.parse_str("fn my_func custom")
+    kw_test::parse_main
+        .parse_str("fn my_func custom")
         .test()
         .assert_success_is("my_func".to_string());
 
     // Fail: "custom" is expected, but found "other"
-    kw_test::parse_main.parse_str("fn my_func other")
+    kw_test::parse_main
+        .parse_str("fn my_func other")
         .test()
         .assert_failure();
-        
+
     // Fail: "fn" is expected
-    kw_test::parse_main.parse_str("func my_func custom")
+    kw_test::parse_main
+        .parse_str("func my_func custom")
         .test()
         .assert_failure();
 }
@@ -302,18 +332,18 @@ fn test_missing_syntax_features() {
     }
 
     // 1. Happy Path for Braced + Plus
-    missing::parse_main.parse_str("{ a b c }")
+    missing::parse_main
+        .parse_str("{ a b c }")
         .test()
         .assert_success_is(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 
     // 2. Fail Path for Plus (Empty list in Braces)
     // Since '+' expects at least one, "{ }" must fail.
-    missing::parse_main.parse_str("{ }")
-        .test()
-        .assert_failure();
+    missing::parse_main.parse_str("{ }").test().assert_failure();
 
     // 3. Test for lit_str
-    missing::parse_raw_lit.parse_str("\"raw content\"")
+    missing::parse_raw_lit
+        .parse_str("\"raw content\"")
         .test()
         .assert_success_is("raw content".to_string());
 }
@@ -323,14 +353,20 @@ fn test_missing_syntax_features() {
 fn test_plus_operator_validation() {
     grammar! {
         grammar plus_check {
-            rule main -> Vec<String> = 
+            rule main -> Vec<String> =
                 ids:ident+ -> { ids.iter().map(|i| i.to_string()).collect() }
         }
     }
 
     // Success: 1 or more
-    plus_check::parse_main.parse_str("a").test().assert_success();
-    plus_check::parse_main.parse_str("a b").test().assert_success();
+    plus_check::parse_main
+        .parse_str("a")
+        .test()
+        .assert_success();
+    plus_check::parse_main
+        .parse_str("a b")
+        .test()
+        .assert_success();
 
     // Failure: 0 elements
     // This ensures + does not act like *
@@ -343,14 +379,17 @@ fn test_nested_groups_and_alts() {
     grammar! {
         grammar nested {
             // Pattern: ( "A" | ("B" "C") )*
-            rule main -> usize = 
-                ( "A" | ("B" "C") )* -> { 0 } 
+            rule main -> usize =
+                ( "A" | ("B" "C") )* -> { 0 }
         }
     }
 
-    nested::parse_main.parse_str("A B C A").test().assert_success();
+    nested::parse_main
+        .parse_str("A B C A")
+        .test()
+        .assert_success();
     // "B" must be followed by "C"
-    nested::parse_main.parse_str("A B").test().assert_failure(); 
+    nested::parse_main.parse_str("A B").test().assert_failure();
 }
 
 // --- Test 16: Cut in Repetition ---
@@ -358,21 +397,25 @@ fn test_nested_groups_and_alts() {
 fn test_cut_in_repetition() {
     grammar! {
         grammar cut_loop {
-            rule main -> usize = 
+            rule main -> usize =
                 entries:entry* -> { entries.len() }
 
-            rule entry -> () = 
+            rule entry -> () =
                 "key" => "=" "val" ";" -> { () }
               | "other" ";"            -> { () }
         }
     }
 
     // Happy Path
-    cut_loop::parse_main.parse_str("key = val ; other ;").test().assert_success_is(2);
+    cut_loop::parse_main
+        .parse_str("key = val ; other ;")
+        .test()
+        .assert_success_is(2);
 
     // Fail Path: "key" without "="
     // With Cut, it must fail with "expected `=`" immediately, not backtrack.
-    cut_loop::parse_main.parse_str("key val ;")
+    cut_loop::parse_main
+        .parse_str("key val ;")
         .test()
         .assert_failure_contains("expected `=`");
 }
@@ -383,7 +426,7 @@ fn test_complex_return_types() {
     grammar! {
         grammar types {
             // Tests handling of generics in return types
-            rule main -> Vec<Option<i32>> = 
+            rule main -> Vec<Option<i32>> =
                 "null" -> { vec![None] }
         }
     }
@@ -395,14 +438,20 @@ fn test_complex_return_types() {
 fn test_epsilon_alternative() {
     grammar! {
         grammar epsilon {
-            rule main -> String = 
+            rule main -> String =
                 "foo" -> { "foo".to_string() }
               |       -> { "empty".to_string() } // Empty alternative matches nothing (epsilon)
         }
     }
 
-    epsilon::parse_main.parse_str("foo").test().assert_success_is("foo".to_string());
-    epsilon::parse_main.parse_str("").test().assert_success_is("empty".to_string());
+    epsilon::parse_main
+        .parse_str("foo")
+        .test()
+        .assert_success_is("foo".to_string());
+    epsilon::parse_main
+        .parse_str("")
+        .test()
+        .assert_success_is("empty".to_string());
 }
 
 // --- Test 19: Inheritance Shadowing ---
@@ -416,7 +465,7 @@ grammar! {
     grammar derived_shadow : base_shadow {
         // We override 'value' from base
         rule value -> i32 = "two" -> { 2 }
-        
+
         rule main -> i32 = v:value -> { v }
     }
 }
@@ -424,7 +473,8 @@ grammar! {
 #[test]
 fn test_inheritance_shadowing() {
     // Should use the local definition "two", not the imported "one"
-    derived_shadow::parse_main.parse_str("two")
+    derived_shadow::parse_main
+        .parse_str("two")
         .test()
         .assert_success_is(2);
 }
@@ -435,17 +485,18 @@ fn test_rule_arguments() {
     grammar! {
         grammar args_test {
             // Rule taking an argument from the caller
-            rule main -> i32 = 
+            rule main -> i32 =
                 "start" v:value(10) -> { v }
 
             // Definition with parameters
-            rule value(offset: i32) -> i32 = 
+            rule value(offset: i32) -> i32 =
                 i:integer -> { i + offset }
         }
     }
 
     // "start 5" -> calls value(10) -> parses "5" -> returns 5 + 10 = 15
-    args_test::parse_main.parse_str("start 5")
+    args_test::parse_main
+        .parse_str("start 5")
         .test()
         .assert_success_is(15);
 }
@@ -455,17 +506,18 @@ fn test_rule_arguments() {
 fn test_multiple_arguments() {
     grammar! {
         grammar multi_args {
-            rule main -> i32 = 
+            rule main -> i32 =
                 "calc" res:calc(10, 5) -> { res }
 
             // Tests comma separation in parameters
-            rule calc(base: i32, mult: i32) -> i32 = 
+            rule calc(base: i32, mult: i32) -> i32 =
                 i:integer -> { base + (i * mult) }
         }
     }
 
     // 10 + (2 * 5) = 20
-    multi_args::parse_main.parse_str("calc 2")
+    multi_args::parse_main
+        .parse_str("calc 2")
         .test()
         .assert_success_is(20);
 }
@@ -477,10 +529,10 @@ fn test_nested_repetition_complex() {
         grammar nested_rep {
             // Pattern: ( "group" ( "item" )* ";" )*
             // Tests nested Vec generation and scopes
-            rule main -> usize = 
+            rule main -> usize =
                 groups:group* -> { groups.iter().sum() }
 
-            rule group -> usize = 
+            rule group -> usize =
                 "group" items:item* ";" -> { items.len() }
 
             rule item -> () = "item" -> { () }
@@ -492,7 +544,8 @@ fn test_nested_repetition_complex() {
     // 2. group: 1 item
     // Total: 3
     let input = "group item item ; group item ;";
-    nested_rep::parse_main.parse_str(input)
+    nested_rep::parse_main
+        .parse_str(input)
         .test()
         .assert_success_is(3);
 }
@@ -502,23 +555,27 @@ fn test_nested_repetition_complex() {
 fn test_extended_literals() {
     grammar! {
         grammar extended_lits {
-            rule main -> (syn::LitInt, syn::LitChar, syn::LitBool, syn::LitFloat) = 
+            rule main -> (syn::LitInt, syn::LitChar, syn::LitBool, syn::LitFloat) =
                 i:lit_int c:lit_char b:lit_bool f:lit_float -> { (i, c, b, f) }
-            
+
             pub rule spanned -> ((i32, proc_macro2::Span), (String, proc_macro2::Span)) =
                 i:spanned_int_lit s:spanned_string_lit -> { (i, s) }
         }
     }
-    
+
     // Test syn types
-    let res = extended_lits::parse_main.parse_str("42 'c' true 3.14").unwrap();
+    let res = extended_lits::parse_main
+        .parse_str("42 'c' true 3.14")
+        .unwrap();
     assert_eq!(res.0.base10_parse::<i32>().unwrap(), 42);
     assert_eq!(res.1.value(), 'c');
     assert_eq!(res.2.value, true);
     assert_eq!(res.3.base10_parse::<f64>().unwrap(), 3.14);
 
     // Test spanned
-    let res = extended_lits::parse_spanned.parse_str("100 \"text\"").unwrap();
-    assert_eq!(res.0.0, 100);
-    assert_eq!(res.1.0, "text");
+    let res = extended_lits::parse_spanned
+        .parse_str("100 \"text\"")
+        .unwrap();
+    assert_eq!(res.0 .0, 100);
+    assert_eq!(res.1 .0, "text");
 }

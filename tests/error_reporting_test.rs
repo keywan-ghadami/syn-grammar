@@ -1,22 +1,22 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
-use syn::parse::Parser;
 
 #[test]
 fn test_deepest_error_wins() {
     grammar! {
         grammar error_test {
-            rule main -> String = 
+            rule main -> String =
                 // Try 'deep' first, then 'shallow'.
                 // If 'deep' fails after consuming tokens, we want THAT error.
                 a:deep_rule -> { a }
                 |
                 b:shallow_rule -> { b }
 
-            rule deep_rule -> String = 
+            rule deep_rule -> String =
                 "start" "deep" "target" -> { "ok".to_string() }
 
-            rule shallow_rule -> String = 
+            rule shallow_rule -> String =
                 "start" "other" -> { "ok".to_string() }
         }
     }
@@ -27,18 +27,18 @@ fn test_deepest_error_wins() {
     // 2. shallow_rule: Matches "start", fails at "deep" (Expected "other").
     //    This is a DEEP error too, but usually we want the one that went further.
     //    However, let's look at a clearer case.
-    
+
     // Input: "start wrong"
     // 1. deep_rule: Matches "start", fails at "wrong" (Expected "deep").
     //    Progress: 1 token.
     // 2. shallow_rule: Matches "start", fails at "wrong" (Expected "other").
     //    Progress: 1 token.
     // This is ambiguous.
-    
+
     // Let's try a case where one is clearly deeper.
     grammar! {
         grammar distinct {
-            rule main -> String = 
+            rule main -> String =
                 l:long -> { l }
               | s:short -> { s }
 
@@ -51,27 +51,36 @@ fn test_deepest_error_wins() {
     // 'long' matches "a", "b", fails at "x" (Expected "c").
     // 'short' matches "a", fails at "b" (Expected "d").
     // 'long' went further. We expect "expected `c`".
-    
-    let err = distinct::parse_main.parse_str("a b x")
+
+    let err = distinct::parse_main
+        .parse_str("a b x")
         .test()
         .assert_failure();
-    
+
     let msg = err.to_string();
-    assert!(msg.contains("expected `c`"), "Error should mention expected 'c', but got: '{}'", msg);
-    assert!(!msg.contains("expected `d`"), "Error should NOT mention expected 'd', but got: '{}'", msg);
+    assert!(
+        msg.contains("expected `c`"),
+        "Error should mention expected 'c', but got: '{}'",
+        msg
+    );
+    assert!(
+        !msg.contains("expected `d`"),
+        "Error should NOT mention expected 'd', but got: '{}'",
+        msg
+    );
 }
 
 #[test]
 fn test_deep_vs_shallow() {
     grammar! {
         grammar priority {
-            rule main -> String = 
+            rule main -> String =
                 d:deep -> { d }
               | s:shallow -> { s }
 
             // Fails at 2nd token
             rule deep -> String = "x" "y" -> { "y".into() }
-            
+
             // Fails at 1st token
             rule shallow -> String = "z" -> { "z".into() }
         }
@@ -82,24 +91,29 @@ fn test_deep_vs_shallow() {
     // shallow: fails at "x" (Expected "z"). (Shallow error)
     // We expect "Expected `y`".
 
-    let err = priority::parse_main.parse_str("x a")
+    let err = priority::parse_main
+        .parse_str("x a")
         .test()
         .assert_failure();
 
     let msg = err.to_string();
-    assert!(msg.contains("y"), "Should report deep error (expected y), got: '{}'", msg);
+    assert!(
+        msg.contains("y"),
+        "Should report deep error (expected y), got: '{}'",
+        msg
+    );
 }
 
 #[test]
 fn test_rule_name_in_error_message() {
     grammar! {
         grammar rule_context {
-            rule main -> String = 
+            rule main -> String =
                 a:inner -> { a }
               | "dummy" -> { "dummy".to_string() }
 
             // Use alternatives in inner to force it to record its own errors via attempt()
-            rule inner -> String = 
+            rule inner -> String =
                 "start" "target" -> { "ok".to_string() }
               | "start" "target2" -> { "ok".to_string() }
         }
@@ -114,10 +128,15 @@ fn test_rule_name_in_error_message() {
     // The errors from (1) and (2) are deeper (at "wrong") than the error from (4) (at "start").
     // So the final error should be one of the inner ones, containing "Error in rule 'inner'".
 
-    let err = rule_context::parse_main.parse_str("start wrong")
+    let err = rule_context::parse_main
+        .parse_str("start wrong")
         .test()
         .assert_failure();
 
     let msg = err.to_string();
-    assert!(msg.contains("Error in rule 'inner'"), "Expected rule name 'inner' in error, got: {}", msg);
+    assert!(
+        msg.contains("Error in rule 'inner'"),
+        "Expected rule name 'inner' in error, got: {}",
+        msg
+    );
 }

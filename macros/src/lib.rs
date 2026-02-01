@@ -1,18 +1,29 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use syn::parse_macro_input;
 use quote::quote;
-use syn_grammar_model::{parser, model, validator};
+use syn::parse_macro_input;
+use syn_grammar_model::{model, parser, validator};
 
 // Include modules
 mod codegen;
 
 const SYN_BUILTINS: &[&str] = &[
-    "ident", "integer", "string", "rust_type", "rust_block", "lit_str",
-    "lit_int", "lit_char", "lit_bool", "lit_float",
-    "spanned_int_lit", "spanned_string_lit",
-    "spanned_float_lit", "spanned_bool_lit", "spanned_char_lit"
+    "ident",
+    "integer",
+    "string",
+    "rust_type",
+    "rust_block",
+    "lit_str",
+    "lit_int",
+    "lit_char",
+    "lit_bool",
+    "lit_float",
+    "spanned_int_lit",
+    "spanned_string_lit",
+    "spanned_float_lit",
+    "spanned_bool_lit",
+    "spanned_char_lit",
 ];
 
 /// The main macro for defining grammars.
@@ -47,7 +58,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
 
     // 4. Code Generation: From model to finished Rust code (codegen.rs)
     match codegen::generate_rust(m_ast) {
-        Ok(stream) => stream.into(), // Successful code
+        Ok(stream) => stream.into(),           // Successful code
         Err(e) => e.to_compile_error().into(), // Emit generation error as compiler error
     }
 }

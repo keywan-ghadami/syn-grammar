@@ -1,15 +1,18 @@
 // Moved from macros/src/parser.rs
-use syn::parse::{Parse, ParseStream};
-use syn::{Result, Token, token, LitStr, Ident, Type, Lit};
 use proc_macro2::TokenStream;
+use syn::parse::{Parse, ParseStream};
+use syn::{token, Ident, Lit, LitStr, Result, Token, Type};
 
 mod rt {
+    use syn::ext::IdentExt;
+    use syn::parse::discouraged::Speculative;
     use syn::parse::ParseStream;
     use syn::Result;
-    use syn::ext::IdentExt; 
-    use syn::parse::discouraged::Speculative;
 
-    pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
+    pub fn attempt<T>(
+        input: ParseStream,
+        parser: impl FnOnce(ParseStream) -> Result<T>,
+    ) -> Result<Option<T>> {
         let fork = input.fork();
         match parser(&fork) {
             Ok(res) => {
@@ -42,7 +45,7 @@ impl Parse for GrammarDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
         let _ = input.parse::<kw::grammar>()?;
         let name = rt::parse_ident(input)?;
-        
+
         let inherits = if input.peek(Token![:]) {
             Some(input.parse::<InheritanceSpec>()?)
         } else {
@@ -53,7 +56,11 @@ impl Parse for GrammarDefinition {
         let _ = syn::braced!(content in input);
         let rules = Rule::parse_all(&content)?;
 
-        Ok(GrammarDefinition { name, inherits, rules })
+        Ok(GrammarDefinition {
+            name,
+            inherits,
+            rules,
+        })
     }
 }
 
@@ -122,10 +129,16 @@ impl Parse for Rule {
         let _ = input.parse::<Token![->]>()?;
         let return_type = input.parse::<Type>()?;
         let _ = input.parse::<Token![=]>()?;
-        
+
         let variants = RuleVariant::parse_list(input)?;
 
-        Ok(Rule { is_pub, name, params, return_type, variants })
+        Ok(Rule {
+            is_pub,
+            name,
+            params,
+            return_type,
+            variants,
+        })
     }
 }
 
@@ -154,7 +167,7 @@ impl RuleVariant {
             }
 
             let _ = input.parse::<Token![->]>()?;
-            
+
             let content;
             syn::braced!(content in input);
             let action = content.parse()?;
@@ -178,7 +191,7 @@ pub enum Pattern {
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
-        args: Vec<Lit>, 
+        args: Vec<Lit>,
     },
     Group(Vec<Vec<Pattern>>),
     Bracketed(Vec<Pattern>),
@@ -226,32 +239,33 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
 
     if input.peek(Token![=>]) {
         if binding.is_some() {
-             return Err(input.error("Cut operator cannot be bound."));
+            return Err(input.error("Cut operator cannot be bound."));
         }
         let _ = input.parse::<Token![=>]>()?;
         Ok(Pattern::Cut)
     } else if input.peek(LitStr) {
         if binding.is_some() {
-             return Err(input.error("Literals cannot be bound directly (wrap in a rule or group if needed)."));
+            return Err(input
+                .error("Literals cannot be bound directly (wrap in a rule or group if needed)."));
         }
         Ok(Pattern::Lit(input.parse()?))
     } else if input.peek(token::Bracket) {
         if binding.is_some() {
-             return Err(input.error("Bracketed groups cannot be bound directly."));
+            return Err(input.error("Bracketed groups cannot be bound directly."));
         }
         let content;
         syn::bracketed!(content in input);
         Ok(Pattern::Bracketed(parse_pattern_list(&content)?))
     } else if input.peek(token::Brace) {
         if binding.is_some() {
-             return Err(input.error("Braced groups cannot be bound directly."));
+            return Err(input.error("Braced groups cannot be bound directly."));
         }
         let content;
         syn::braced!(content in input);
         Ok(Pattern::Braced(parse_pattern_list(&content)?))
     } else if input.peek(kw::paren) {
         if binding.is_some() {
-             return Err(input.error("Parenthesized groups cannot be bound directly."));
+            return Err(input.error("Parenthesized groups cannot be bound directly."));
         }
         let _ = input.parse::<kw::paren>()?;
         let content;
@@ -259,7 +273,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         Ok(Pattern::Parenthesized(parse_pattern_list(&content)?))
     } else if input.peek(token::Paren) {
         if binding.is_some() {
-             return Err(input.error("Groups cannot be bound directly."));
+            return Err(input.error("Groups cannot be bound directly."));
         }
         let content;
         syn::parenthesized!(content in input);
@@ -271,15 +285,19 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         let body = content.parse()?;
         let _ = content.parse::<Token![,]>()?;
         let sync = content.parse()?;
-        Ok(Pattern::Recover { 
+        Ok(Pattern::Recover {
             binding,
-            body: Box::new(body), 
-            sync: Box::new(sync) 
+            body: Box::new(body),
+            sync: Box::new(sync),
         })
     } else {
         let rule_name: Ident = rt::parse_ident(input)?;
         let args = parse_args(input)?;
-        Ok(Pattern::RuleCall { binding, rule_name, args })
+        Ok(Pattern::RuleCall {
+            binding,
+            rule_name,
+            args,
+        })
     }
 }
 

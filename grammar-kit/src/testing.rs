@@ -13,7 +13,7 @@ pub struct TestResult<T, E> {
 
 impl<T: Debug, E: Display + Debug> TestResult<T, E> {
     pub fn new(result: Result<T, E>) -> Self {
-        Self { 
+        Self {
             inner: result,
             context: None,
         }
@@ -25,7 +25,8 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
     }
 
     fn format_context(&self) -> String {
-        self.context.as_ref()
+        self.context
+            .as_ref()
             .map(|c| format!("\nContext:  {}", c))
             .unwrap_or_default()
     }
@@ -46,13 +47,16 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
 
     // 2. Asserts success AND checks the value directly.
     // Returns a nice diff output if values do not match.
-    pub fn assert_success_is<Exp>(self, expected: Exp) -> T 
-    where T: PartialEq<Exp>, Exp: Debug {
+    pub fn assert_success_is<Exp>(self, expected: Exp) -> T
+    where
+        T: PartialEq<Exp>,
+        Exp: Debug,
+    {
         let ctx = self.format_context();
         let val = self.assert_success();
         if val != expected {
             panic!(
-                "\n🔴 TEST FAILED (Value Mismatch):{}\nExpected: {:?}\nGot:      {:?}\n", 
+                "\n🔴 TEST FAILED (Value Mismatch):{}\nExpected: {:?}\nGot:      {:?}\n",
                 ctx, expected, val
             );
         }
@@ -61,8 +65,10 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
 
     // 3. Asserts success AND checks the value using a closure.
     // Useful for complex assertions or when PartialEq is not implemented.
-    pub fn assert_success_with<F>(self, f: F) -> T 
-    where F: FnOnce(&T) {
+    pub fn assert_success_with<F>(self, f: F) -> T
+    where
+        F: FnOnce(&T),
+    {
         let val = self.assert_success();
         f(&val);
         val
@@ -76,7 +82,7 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
         let actual_debug = format!("{:?}", val);
         if actual_debug != expected_debug {
             panic!(
-                "\n🔴 TEST FAILED (Debug Mismatch):{}\nExpected: {:?}\nGot:      {:?}\n", 
+                "\n🔴 TEST FAILED (Debug Mismatch):{}\nExpected: {:?}\nGot:      {:?}\n",
                 ctx, expected_debug, actual_debug
             );
         }
@@ -89,7 +95,7 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
         match self.inner {
             Ok(val) => {
                 panic!(
-                    "\n🔴 TEST FAILED (Expected Failure, but got Success):{}\nParsed Value: {:?}\n", 
+                    "\n🔴 TEST FAILED (Expected Failure, but got Success):{}\nParsed Value: {:?}\n",
                     ctx, val
                 );
             }
