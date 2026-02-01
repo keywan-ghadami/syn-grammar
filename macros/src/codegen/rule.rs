@@ -10,8 +10,15 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let fn_name = format_ident!("parse_{}", name);
     let impl_name = format_ident!("parse_{}_impl", name);
     let ret_type = &rule.return_type;
+    let attrs = &rule.attrs;
 
-    let doc_comment = format!("Parser for rule `{}`.", name);
+    // Default doc comment if none provided
+    let default_doc = if attrs.iter().any(|a| a.path().is_ident("doc")) {
+        quote!()
+    } else {
+        let msg = format!("Parser for rule `{}`.", name);
+        quote!(#[doc = #msg])
+    };
 
     let params: Vec<_> = rule
         .params
@@ -68,7 +75,8 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     };
 
     Ok(quote! {
-        #[doc = #doc_comment]
+        #(#attrs)*
+        #default_doc
         #vis fn #fn_name(input: ParseStream #(#params)*) -> Result<#ret_type> {
             let mut ctx = rt::ParseContext::new();
             match #impl_name(input, &mut ctx #(#param_names)*) {

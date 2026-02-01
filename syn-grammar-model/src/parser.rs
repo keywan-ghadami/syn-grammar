@@ -1,7 +1,7 @@
 // Moved from macros/src/parser.rs
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{token, Ident, Lit, LitStr, Result, Token, Type};
+use syn::{token, Attribute, Ident, Lit, LitStr, Result, Token, Type};
 
 mod rt {
     use syn::ext::IdentExt;
@@ -93,6 +93,7 @@ impl Parse for RuleParameter {
 }
 
 pub struct Rule {
+    pub attrs: Vec<Attribute>,
     pub is_pub: Option<Token![pub]>,
     pub name: Ident,
     pub params: Vec<RuleParameter>,
@@ -102,6 +103,8 @@ pub struct Rule {
 
 impl Parse for Rule {
     fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = Attribute::parse_outer(input)?;
+
         let is_pub = if input.peek(Token![pub]) {
             Some(input.parse()?)
         } else {
@@ -133,6 +136,7 @@ impl Parse for Rule {
         let variants = RuleVariant::parse_list(input)?;
 
         Ok(Rule {
+            attrs,
             is_pub,
             name,
             params,

@@ -1,7 +1,7 @@
 // Moved from macros/src/model.rs
 use crate::parser;
 use proc_macro2::{Span, TokenStream};
-use syn::{Ident, Lit, LitStr, Type};
+use syn::{Attribute, Ident, Lit, LitStr, Type};
 
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
@@ -12,6 +12,7 @@ pub struct GrammarDefinition {
 
 #[derive(Debug, Clone)]
 pub struct Rule {
+    pub attrs: Vec<Attribute>,
     pub is_pub: bool,
     pub name: Ident,
     pub params: Vec<(Ident, Type)>,
@@ -61,6 +62,7 @@ impl From<parser::GrammarDefinition> for GrammarDefinition {
 impl From<parser::Rule> for Rule {
     fn from(p: parser::Rule) -> Self {
         Self {
+            attrs: p.attrs,
             is_pub: p.is_pub.is_some(),
             name: p.name,
             params: p
