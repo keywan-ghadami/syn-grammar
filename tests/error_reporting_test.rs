@@ -89,3 +89,35 @@ fn test_deep_vs_shallow() {
     let msg = err.to_string();
     assert!(msg.contains("y"), "Should report deep error (expected y), got: '{}'", msg);
 }
+
+#[test]
+fn test_rule_name_in_error_message() {
+    grammar! {
+        grammar rule_context {
+            rule main -> String = 
+                a:inner -> { a }
+              | "dummy" -> { "dummy".to_string() }
+
+            // Use alternatives in inner to force it to record its own errors via attempt()
+            rule inner -> String = 
+                "start" "target" -> { "ok".to_string() }
+              | "start" "target2" -> { "ok".to_string() }
+        }
+    }
+
+    // Input: "start wrong"
+    // 1. inner attempts var1: fails at "wrong". Records "Error in rule 'inner': expected `target`".
+    // 2. inner attempts var2: fails at "wrong". Records "Error in rule 'inner': expected `target2`".
+    // 3. inner returns Err.
+    // 4. main attempts inner: fails. Records "Error in rule 'main': ...".
+    //
+    // The errors from (1) and (2) are deeper (at "wrong") than the error from (4) (at "start").
+    // So the final error should be one of the inner ones, containing "Error in rule 'inner'".
+
+    let err = rule_context::parse_main.parse_str("start wrong")
+        .test()
+        .assert_failure();
+
+    let msg = err.to_string();
+    assert!(msg.contains("Error in rule 'inner'"), "Expected rule name 'inner' in error, got: {}", msg);
+}
