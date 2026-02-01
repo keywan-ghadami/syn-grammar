@@ -22,5 +22,4 @@ auto-accept-architect: true
 test-cmd: "cargo test"
 auto-test: true
 auto-lint: true
-#lint-cmd: "rust: cargo clippy --fix --allow-dirty --allow-staged -- -D warnings && cargo fmt"
-
+lint-cmd: "cargo clippy -- -D warnings"
