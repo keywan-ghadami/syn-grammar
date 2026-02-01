@@ -87,6 +87,16 @@ rule name -> ReturnType = pattern -> { action_code }
 - **`pattern`**: The EBNF pattern defining what to parse.
 - **`action_code`**: A Rust block that constructs the return value from the bound variables.
 
+#### Attributes and Doc Comments
+
+Rules can be decorated with standard Rust attributes and documentation comments. These are passed through to the generated function.
+
+```rust,ignore
+/// Parses a valid identifier.
+#[cfg(feature = "extra")]
+rule ident -> Ident = ...
+```
+
 ### Patterns
 
 #### Literals and Keywords
