@@ -294,6 +294,7 @@ fn is_builtin(name: &syn::Ident) -> bool {
             | "spanned_float_lit"
             | "spanned_bool_lit"
             | "spanned_char_lit"
+            | "outer_attrs"
     )
 }
 
@@ -306,6 +307,7 @@ fn map_builtin(name: &syn::Ident) -> TokenStream {
         "lit_str" => quote! { input.parse::<syn::LitStr>()? },
         "rust_type" => quote! { input.parse::<syn::Type>()? },
         "rust_block" => quote! { input.parse::<syn::Block>()? },
+        "outer_attrs" => quote! { syn::Attribute::parse_outer(input)? },
 
         "lit_int" => quote! { input.parse::<syn::LitInt>()? },
         "lit_char" => quote! { input.parse::<syn::LitChar>()? },

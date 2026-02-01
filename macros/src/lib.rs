@@ -24,6 +24,7 @@ const SYN_BUILTINS: &[&str] = &[
     "spanned_float_lit",
     "spanned_bool_lit",
     "spanned_char_lit",
+    "outer_attrs",
 ];
 
 /// The main macro for defining grammars.
