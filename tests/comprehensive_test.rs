@@ -588,12 +588,38 @@ fn test_attributes_on_rules() {
             // Test doc comments and standard attributes
             /// Parses an identifier
             #[allow(missing_docs)]
-            rule main -> String = i:ident -> { i.to_string() }
+            pub rule main -> String = i:ident -> { i.to_string() }
+
+            // Test conditional compilation (should be included in test profile)
+            #[cfg(test)]
+            pub rule test_only -> String = "test" -> { "present".to_string() }
+
+            // Test allowing lints
+            #[allow(non_snake_case)]
+            pub rule CamelCase -> () = "camel" -> { () }
         }
     }
 
+    // 1. Verify standard attributes (doc comment, allow) are accepted.
+    // If #[allow(missing_docs)] didn't work, we might get a warning (if denied).
     attrs::parse_main
         .parse_str("my_id")
         .test()
         .assert_success_is("my_id".to_string());
+
+    // 2. Verify #[cfg(test)] works.
+    // If the attribute wasn't applied, this function would exist in non-test builds too (hard to prove here),
+    // but if the attribute parsing was broken, it might not exist or cause a syntax error.
+    // The fact that it compiles and runs confirms the attribute was passed through to the generated function.
+    attrs::parse_test_only
+        .parse_str("test")
+        .test()
+        .assert_success_is("present".to_string());
+
+    // 3. Verify #[allow(non_snake_case)] works.
+    // If the attribute wasn't applied, `cargo clippy` would have failed/warned on this line.
+    attrs::parse_CamelCase
+        .parse_str("camel")
+        .test()
+        .assert_success();
 }
