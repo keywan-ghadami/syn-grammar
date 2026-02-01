@@ -13,6 +13,22 @@ The `attempt` function allows parsers to try a parsing branch and revert the str
 ### 3. Testing Framework
 The `testing` module provides a fluent API for unit testing your parsers.
 
+## Grammar Syntax
+
+### Attributes on Rules
+
+You can add attributes to rules, including documentation comments and conditional compilation flags.
+
+```rust
+grammar! {
+    grammar MyGrammar {
+        /// Parses a key-value pair.
+        #[cfg(feature = "json")]
+        rule pair -> (String, i32) = k:string ":" v:integer -> { (k, v) }
+    }
+}
+```
+
 ## Installation
 
 Add this to your `Cargo.toml`:
