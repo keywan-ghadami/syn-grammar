@@ -86,11 +86,18 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
             Some(token_code) => {
                 Ok(quote! {
                     if input.peek(#token_code) {
+                        // SAFETY: Capture cursor to check for progress
+                        let _start_cursor = input.cursor();
+
                         // Speculative attempt for the tail
                         if let Some(new_val) = rt::attempt(input, |input| { 
                             #bind_stmt
                             #logic 
                         })? {
+                            // SAFETY: Prevent infinite loop on nullable tails
+                            if _start_cursor == input.cursor() {
+                                return Err(input.error("Left-recursive rule matched empty string (infinite loop detected)"));
+                            }
                             lhs = new_val;
                             continue;
                         }
@@ -100,10 +107,17 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
             None => {
                 // Blind attempt
                 Ok(quote! {
+                    // SAFETY: Capture cursor to check for progress
+                    let _start_cursor = input.cursor();
+
                     if let Some(new_val) = rt::attempt(input, |input| { 
                         #bind_stmt
                         #logic 
                     })? {
+                        // SAFETY: Prevent infinite loop on nullable tails
+                        if _start_cursor == input.cursor() {
+                            return Err(input.error("Left-recursive rule matched empty string (infinite loop detected)"));
+                        }
                         lhs = new_val;
                         continue;
                     }
