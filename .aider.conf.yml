@@ -19,7 +19,6 @@ auto-commits: true
 # Erlaubt Aider, Dateien ohne Bestätigung im Architect-Modus zu bearbeiten
 auto-accept-architect: true
 
-test-cmd: "cargo test && cargo clippy --fix"
+test-cmd: "cargo test && cargo clippy --fix --allow-dirty"
 auto-test: true
 auto-lint: true
-
