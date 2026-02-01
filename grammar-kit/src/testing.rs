@@ -115,6 +115,23 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
             );
         }
     }
+
+    // 7. Asserts success AND checks if the string representation contains a specific substring.
+    pub fn assert_success_contains(self, expected_part: &str) -> T
+    where
+        T: Display,
+    {
+        let ctx = self.format_context();
+        let val = self.assert_success();
+        let val_str = val.to_string();
+        if !val_str.contains(expected_part) {
+            panic!(
+                "\n🔴 TEST FAILED (Content Mismatch):{}\nExpected to contain: {:?}\nGot:                 {:?}\n",
+                ctx, expected_part, val_str
+            );
+        }
+        val
+    }
 }
 
 pub trait Testable<T, E> {

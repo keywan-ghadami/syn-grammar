@@ -631,10 +631,9 @@ fn test_attributes_on_rules() {
     let src = attrs::GENERATED_SOURCE;
     let normalized: String = src.chars().filter(|c| !c.is_whitespace()).collect();
 
-    if !normalized.contains("#[inline]") {
-        panic!(
-            "\n🔴 TEST FAILED (Attribute Missing in Generated Code)\nExpected to contain: #[inline]\nActual Source:\n{}\n",
-            src
-        );
-    }
+    // Use the testing framework to assert content
+    let res: syn::Result<String> = Ok(normalized);
+    res.test()
+        .with_context("Checking generated source for #[inline] attribute")
+        .assert_success_contains("#[inline]");
 }
