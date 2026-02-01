@@ -10,7 +10,7 @@ use syn::ext::IdentExt;
 
 thread_local! {
     static IS_FATAL: Cell<bool> = const { Cell::new(false) };
-    static BEST_ERROR: RefCell<Option<syn::Error>> = RefCell::new(None);
+    static BEST_ERROR: RefCell<Option<syn::Error>> = const { RefCell::new(None) };
 }
 
 pub fn set_fatal(fatal: bool) {
