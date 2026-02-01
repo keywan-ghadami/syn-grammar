@@ -35,7 +35,7 @@ fn record_error(err: syn::Error, start_span_debug: String) {
             None => {
                 *borrow = Some(err);
             }
-            Some(existing) => {
+            Some(_existing) => {
                 // If the new error is Deep, we prefer it.
                 // A more sophisticated check might compare actual line/column if available,
                 // but checking inequality with start is a good proxy for "moved forward".
