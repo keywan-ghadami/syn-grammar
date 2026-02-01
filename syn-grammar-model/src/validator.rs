@@ -11,7 +11,7 @@ use std::collections::HashMap;
 /// - Invalid usage of built-in rules.
 ///
 /// Returns `Ok(())` if the grammar is valid, or a `syn::Error` pointing to the location of the issue.
-pub fn validate(grammar: &GrammarDefinition) -> Result<()> {
+pub fn validate(grammar: &GrammarDefinition, valid_builtins: &[&str]) -> Result<()> {
     let mut defined_rules = HashMap::new();
     
     for rule in &grammar.rules {
@@ -20,7 +20,7 @@ pub fn validate(grammar: &GrammarDefinition) -> Result<()> {
 
     for rule in &grammar.rules {
         for variant in &rule.variants {
-            validate_patterns(&variant.pattern, &defined_rules, grammar.inherits.is_some())?;
+            validate_patterns(&variant.pattern, &defined_rules, grammar.inherits.is_some(), valid_builtins)?;
         }
     }
 
@@ -30,14 +30,15 @@ pub fn validate(grammar: &GrammarDefinition) -> Result<()> {
 fn validate_patterns(
     patterns: &[ModelPattern], 
     defined_rules: &HashMap<String, usize>,
-    has_inheritance: bool
+    has_inheritance: bool,
+    valid_builtins: &[&str]
 ) -> Result<()> {
     for pattern in patterns {
         match pattern {
             ModelPattern::RuleCall { rule_name, args, .. } => {
                 let name_str = rule_name.to_string();
                 
-                if is_builtin(&name_str) {
+                if valid_builtins.contains(&name_str.as_str()) {
                     if !args.is_empty() {
                         return Err(Error::new(rule_name.span(), format!("Built-in rule '{}' does not accept arguments.", name_str)));
                     }
@@ -52,26 +53,21 @@ fn validate_patterns(
             },
             ModelPattern::Group(alts) => {
                 for alt in alts {
-                    validate_patterns(alt, defined_rules, has_inheritance)?;
+                    validate_patterns(alt, defined_rules, has_inheritance, valid_builtins)?;
                 }
             },
             ModelPattern::Optional(p) | ModelPattern::Repeat(p) | ModelPattern::Plus(p) => {
-                validate_patterns(std::slice::from_ref(p), defined_rules, has_inheritance)?;
+                validate_patterns(std::slice::from_ref(p), defined_rules, has_inheritance, valid_builtins)?;
             },
             ModelPattern::Bracketed(p) | ModelPattern::Braced(p) | ModelPattern::Parenthesized(p) => {
-                validate_patterns(p, defined_rules, has_inheritance)?;
+                validate_patterns(p, defined_rules, has_inheritance, valid_builtins)?;
+            },
+            ModelPattern::Recover { body, sync, .. } => {
+                validate_patterns(std::slice::from_ref(body), defined_rules, has_inheritance, valid_builtins)?;
+                validate_patterns(std::slice::from_ref(sync), defined_rules, has_inheritance, valid_builtins)?;
             },
             _ => {}
         }
     }
     Ok(())
-}
-
-fn is_builtin(name: &str) -> bool {
-    matches!(name, 
-        "ident" | "integer" | "string" | "rust_type" | "rust_block" | "lit_str" |
-        "lit_int" | "lit_char" | "lit_bool" | "lit_float" |
-        "spanned_int_lit" | "spanned_string_lit" |
-        "spanned_float_lit" | "spanned_bool_lit" | "spanned_char_lit"
-    )
 }

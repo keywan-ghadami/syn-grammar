@@ -8,6 +8,13 @@ use syn_grammar_model::{parser, model, validator};
 // Include modules
 mod codegen;
 
+const SYN_BUILTINS: &[&str] = &[
+    "ident", "integer", "string", "rust_type", "rust_block", "lit_str",
+    "lit_int", "lit_char", "lit_bool", "lit_float",
+    "spanned_int_lit", "spanned_string_lit",
+    "spanned_float_lit", "spanned_bool_lit", "spanned_char_lit"
+];
+
 /// The main macro for defining grammars.
 ///
 /// See the [crate-level documentation](https://docs.rs/syn-grammar) for full syntax and usage details.
@@ -34,7 +41,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     let m_ast: model::GrammarDefinition = p_ast.into();
 
     // 3. Validation: Check for semantic errors (undefined rules, arg mismatch)
-    if let Err(e) = validator::validate(&m_ast) {
+    if let Err(e) = validator::validate(&m_ast, SYN_BUILTINS) {
         return e.to_compile_error().into();
     }
 
