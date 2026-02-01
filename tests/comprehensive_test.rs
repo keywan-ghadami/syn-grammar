@@ -628,9 +628,13 @@ fn test_attributes_on_rules() {
         .assert_success();
 
     // 4. Verify #[inline] is present in the generated source.
-    // proc_macro2::TokenStream::to_string() often puts spaces around punctuation.
-    // We check for the presence of "inline" and the attribute structure.
     let src = attrs::GENERATED_SOURCE;
-    assert!(src.contains("# [ inline ]") || src.contains("#[inline]"),
-        "Generated source missing #[inline] attribute. Source:\n{}", src);
+    let normalized: String = src.chars().filter(|c| !c.is_whitespace()).collect();
+
+    if !normalized.contains("#[inline]") {
+        panic!(
+            "\n🔴 TEST FAILED (Attribute Missing in Generated Code)\nExpected to contain: #[inline]\nActual Source:\n{}\n",
+            src
+        );
+    }
 }
