@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.3.0]
 
 ### Breaking Changes
-- **Runtime Dependency**: Generated parsers now depend on the new `syn-kit` crate. Users must add `syn-kit = "0.3.0"` to their `Cargo.toml`.
+- **Runtime Dependency**: Generated parsers now depend on the new `grammar-kit` crate (formerly `syn-kit`). Users must add `grammar-kit = "0.3.0"` to their `Cargo.toml`.
 - **Renamed Built-in Parsers**:
   - `int_lit` has been renamed to **`integer`** (returns `i32`).
   - `string_lit` has been renamed to **`string`** (returns `String`).
@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 
 ### Internal
 - **Architecture**: Extracted runtime utilities (backtracking, error reporting, testing) into a separate `grammar-kit` crate.
+- **Renaming**: `syn-kit` has been renamed to `grammar-kit` and extended with feature flags for `syn` support.
 
 ## [0.2.0]
 
