@@ -18,6 +18,7 @@ pub struct ParseContext {
     is_fatal: bool,
     best_error: Option<ErrorState>,
     scopes: Vec<HashSet<String>>,
+    rule_stack: Vec<String>,
 }
 
 impl ParseContext {
@@ -26,6 +27,7 @@ impl ParseContext {
             is_fatal: false,
             best_error: None,
             scopes: vec![HashSet::new()],
+            rule_stack: Vec::new(),
         }
     }
 
@@ -37,10 +39,26 @@ impl ParseContext {
         self.is_fatal
     }
 
+    pub fn enter_rule(&mut self, name: &str) {
+        self.rule_stack.push(name.to_string());
+    }
+
+    pub fn exit_rule(&mut self) {
+        self.rule_stack.pop();
+    }
+
     /// Records an error if it is "deeper" than the current best error.
     pub fn record_error(&mut self, err: syn::Error, start_span: Span) {
         // Heuristic: Compare the error location to the start of the attempt.
         let is_deep = err.span().start() != start_span.start();
+
+        // Enrich error with rule name if available
+        let err = if let Some(rule_name) = self.rule_stack.last() {
+            let msg = format!("Error in rule '{}': {}", rule_name, err);
+            syn::Error::new(err.span(), msg)
+        } else {
+            err
+        };
 
         match &mut self.best_error {
             None => {
@@ -107,8 +125,9 @@ where
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
 
-    // Snapshot symbol table
+    // Snapshot symbol table and rule stack
     let scopes_snapshot = ctx.scopes.clone();
+    let rule_stack_snapshot = ctx.rule_stack.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -125,15 +144,22 @@ where
             Ok(Some(val))
         }
         Err(e) => {
-            // Restore symbol table on failure
-            ctx.scopes = scopes_snapshot;
-
             if is_now_fatal {
+                // Restore state
+                ctx.scopes = scopes_snapshot;
+                ctx.rule_stack = rule_stack_snapshot;
+                
                 ctx.set_fatal(true);
                 Err(e)
             } else {
                 ctx.set_fatal(was_fatal);
+                // Record error BEFORE restoring state to capture inner rule context
                 ctx.record_error(e, start_span);
+                
+                // Restore state
+                ctx.scopes = scopes_snapshot;
+                ctx.rule_stack = rule_stack_snapshot;
+                
                 Ok(None)
             }
         }
@@ -153,8 +179,9 @@ where
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
 
-    // Snapshot symbol table
+    // Snapshot symbol table and rule stack
     let scopes_snapshot = ctx.scopes.clone();
+    let rule_stack_snapshot = ctx.rule_stack.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -170,10 +197,13 @@ where
             Ok(Some(val))
         }
         Err(e) => {
-            // Restore symbol table on failure
-            ctx.scopes = scopes_snapshot;
-            
+            // Record error BEFORE restoring state
             ctx.record_error(e, start_span);
+
+            // Restore state
+            ctx.scopes = scopes_snapshot;
+            ctx.rule_stack = rule_stack_snapshot;
+            
             Ok(None)
         }
     }
