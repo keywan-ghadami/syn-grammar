@@ -8,12 +8,18 @@ use proc_macro2::TokenStream;
 pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<TokenStream> {
     let name = &rule.name;
     let fn_name = format_ident!("parse_{}", name);
+    let impl_name = format_ident!("parse_{}_impl", name);
     let ret_type = &rule.return_type;
     
     let doc_comment = format!("Parser for rule `{}`.", name);
 
     let params = rule.params.iter().map(|(name, ty)| {
         quote! { , #name : #ty }
+    });
+    
+    // Params for the impl call (forwarding arguments)
+    let param_names = rule.params.iter().map(|(name, _)| {
+        quote! { , #name }
     });
 
     let is_public = rule.is_pub || name == "main";
@@ -29,7 +35,6 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
             return Err(syn::Error::new(name.span(), "Left-recursive rule requires at least one non-recursive base variant."));
         }
 
-        // Clone variants back to owned structs for the generator
         let base_owned: Vec<RuleVariant> = base_refs.into_iter().cloned().collect();
         let recursive_owned: Vec<RuleVariant> = recursive_refs.into_iter().cloned().collect();
 
@@ -38,10 +43,10 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
 
         quote! {
             let mut lhs = {
-                let base_parser = |input: ParseStream| -> Result<#ret_type> {
+                let base_parser = |input: ParseStream, ctx: &mut rt::ParseContext| -> Result<#ret_type> {
                     #base_logic
                 };
-                base_parser(input)?
+                base_parser(input, ctx)?
             };
             loop {
                 #loop_logic
@@ -54,6 +59,20 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     Ok(quote! {
         #[doc = #doc_comment]
         #vis fn #fn_name(input: ParseStream #(#params)*) -> Result<#ret_type> {
+            let mut ctx = rt::ParseContext::new();
+            match #impl_name(input, &mut ctx #(#param_names)*) {
+                Ok(val) => Ok(val),
+                Err(e) => {
+                    if let Some(best) = ctx.take_best_error() {
+                        Err(best)
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
+        }
+
+        fn #impl_name(input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> {
             #body
         }
     })
@@ -61,10 +80,8 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
 
 fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>) -> Result<TokenStream> {
     let arms = variants.iter().map(|variant| {
-        // Pattern without the first element (the left-recursive call)
         let tail_pattern = &variant.pattern[1..];
         
-        // Binding for the LHS (e.g. "l" in "l:expr + ...")
         let lhs_binding = match &variant.pattern[0] {
             ModelPattern::RuleCall { binding: Some(b), .. } => Some(b),
             _ => None
@@ -78,7 +95,6 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
 
         let logic = pattern::generate_sequence(tail_pattern, &variant.action, kws)?;
         
-        // Peek logic on the *first token of the tail*
         let peek_token_obj = tail_pattern.first()
             .and_then(|f| analysis::get_simple_peek(f, kws).ok().flatten());
         
@@ -86,15 +102,12 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
             Some(token_code) => {
                 Ok(quote! {
                     if input.peek(#token_code) {
-                        // SAFETY: Capture cursor to check for progress
                         let _start_cursor = input.cursor();
-
-                        // Speculative attempt for the tail
-                        if let Some(new_val) = rt::attempt(input, |input| { 
+                        // Pass ctx to attempt
+                        if let Some(new_val) = rt::attempt(input, ctx, |input, ctx| { 
                             #bind_stmt
                             #logic 
                         })? {
-                            // SAFETY: Prevent infinite loop on nullable tails
                             if _start_cursor == input.cursor() {
                                 return Err(input.error("Left-recursive rule matched empty string (infinite loop detected)"));
                             }
@@ -105,16 +118,13 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
                 })
             },
             None => {
-                // Blind attempt
                 Ok(quote! {
-                    // SAFETY: Capture cursor to check for progress
                     let _start_cursor = input.cursor();
-
-                    if let Some(new_val) = rt::attempt(input, |input| { 
+                    // Pass ctx to attempt
+                    if let Some(new_val) = rt::attempt(input, ctx, |input, ctx| { 
                         #bind_stmt
                         #logic 
                     })? {
-                        // SAFETY: Prevent infinite loop on nullable tails
                         if _start_cursor == input.cursor() {
                             return Err(input.error("Left-recursive rule matched empty string (infinite loop detected)"));
                         }
@@ -138,13 +148,9 @@ pub fn generate_variants_internal(
         return Ok(quote! { Err(input.error("No variants defined")) });
     }
 
-    // 1. Analysis Phase: Count start tokens
     let mut token_counts = HashMap::new();
     for v in variants {
-        // SAFETY: We can only use peek dispatch if the variant is NOT nullable.
-        // If it is nullable (e.g. "a"*), it must run even if peek("a") fails.
         let is_nullable = v.pattern.first().map_or(true, |p| analysis::is_nullable(p));
-        
         if !is_nullable {
             if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
                 *token_counts.entry(token_str).or_insert(0) += 1;
@@ -153,14 +159,10 @@ pub fn generate_variants_internal(
     }
 
     let arms = variants.iter().map(|variant| {
-        // Check for Cut Operator
         let cut_info = analysis::find_cut(&variant.pattern);
-        
-        // SAFETY: Check nullability before enabling peek dispatch
         let first_pat = variant.pattern.first();
         let is_nullable = first_pat.map_or(true, |p| analysis::is_nullable(p));
 
-        // Get Peek Token (only if not nullable)
         let peek_token_obj = if !is_nullable {
             first_pat.and_then(|f| analysis::get_simple_peek(f, _custom_keywords).ok().flatten())
         } else {
@@ -173,7 +175,6 @@ pub fn generate_variants_internal(
             None
         };
         
-        // Determine if we have a unique prefix (optimization)
         let is_unique = if let (_, Some(token_key)) = (&peek_token_obj, &peek_str) {
             token_counts.get(token_key).map(|c| *c == 1).unwrap_or(false)
         } else {
@@ -181,7 +182,6 @@ pub fn generate_variants_internal(
         };
 
         if let Some(cut) = cut_info {
-            // --- CUT LOGIC (A => B) ---
             let pre_cut = cut.pre_cut;
             let post_cut = cut.post_cut;
             
@@ -190,10 +190,7 @@ pub fn generate_variants_internal(
             let post_logic = pattern::generate_sequence_steps(post_cut, _custom_keywords)?;
             let action = &variant.action;
 
-            // Construct the logic block
             let logic_block = if is_unique {
-                // If unique, we don't need speculative parsing for the pre-cut part either.
-                // Just run everything linearly.
                 quote! {
                     {
                         let run = || -> syn::Result<_> {
@@ -204,23 +201,21 @@ pub fn generate_variants_internal(
                         match run() {
                             Ok(v) => return Ok(v),
                             Err(e) => {
-                                rt::set_fatal(true);
+                                ctx.set_fatal(true); // Use ctx
                                 return Err(e);
                             }
                         }
                     }
                 }
             } else {
-                // Ambiguous: Speculative Pre-Cut, Fatal Post-Cut
                 quote! {
-                    // 1. Speculative Phase (Pre-Cut)
-                    let pre_result = rt::attempt(input, |input| {
+                    // Pass ctx to attempt
+                    let pre_result = rt::attempt(input, ctx, |input, ctx| {
                         #pre_logic
                         Ok(( #(#pre_bindings),* ))
                     })?;
 
                     if let Some(( #(#pre_bindings),* )) = pre_result {
-                        // 2. Commit Phase (Post-Cut) - Errors here are fatal!
                         let post_run = || -> syn::Result<_> {
                             #post_logic
                             Ok(#action)
@@ -228,7 +223,7 @@ pub fn generate_variants_internal(
                         match post_run() {
                             Ok(v) => return Ok(v),
                             Err(e) => {
-                                rt::set_fatal(true);
+                                ctx.set_fatal(true); // Use ctx
                                 return Err(e);
                             }
                         }
@@ -236,7 +231,6 @@ pub fn generate_variants_internal(
                 }
             };
 
-            // Wrap with Peek check if available
             if let Some(token_code) = peek_token_obj {
                 Ok(quote! {
                     if input.peek(#token_code) {
@@ -248,11 +242,9 @@ pub fn generate_variants_internal(
             }
 
         } else {
-            // --- STANDARD LOGIC (No Cut) ---
             let logic = pattern::generate_sequence(&variant.pattern, &variant.action, _custom_keywords)?;
 
             if is_unique {
-                // Unique Prefix -> Commit immediately
                 let token_code = peek_token_obj.as_ref().unwrap();
                 Ok(quote! {
                     if input.peek(#token_code) {
@@ -262,25 +254,25 @@ pub fn generate_variants_internal(
                         match run() {
                             Ok(v) => return Ok(v),
                             Err(e) => {
-                                rt::set_fatal(true);
+                                ctx.set_fatal(true); // Use ctx
                                 return Err(e);
                             }
                         }
                     }
                 })
             } else if let Some(token_code) = peek_token_obj {
-                // Ambiguous Prefix -> Attempt
                 Ok(quote! {
                     if input.peek(#token_code) {
-                        if let Some(res) = rt::attempt(input, |input| { #logic })? {
+                        // Pass ctx to attempt
+                        if let Some(res) = rt::attempt(input, ctx, |input, ctx| { #logic })? {
                             return Ok(res);
                         }
                     }
                 })
             } else {
-                // Blind -> Attempt
                 Ok(quote! { 
-                    if let Some(res) = rt::attempt(input, |input| { #logic })? { 
+                    // Pass ctx to attempt
+                    if let Some(res) = rt::attempt(input, ctx, |input, ctx| { #logic })? { 
                         return Ok(res); 
                     } 
                 })
@@ -294,13 +286,10 @@ pub fn generate_variants_internal(
         "No matching variant in group" 
     };
 
-    // CHANGE: Instead of #(#arms else)* we use a flat list.
-    // Since every block ends with 'return' (on success), this acts like "First Match Wins".
-    // If nothing matches, we fall through to the error.
     Ok(quote! {
         #(#arms)*
         
-        if let Some(best_err) = rt::take_best_error() {
+        if let Some(best_err) = ctx.take_best_error() { // Use ctx
             Err(best_err)
         } else {
             Err(input.error(#error_msg))

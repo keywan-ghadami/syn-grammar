@@ -20,12 +20,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     let span = pattern.span();
 
     match pattern {
-        ModelPattern::Cut => {
-            // The Cut operator is handled at the RuleVariant level (in rule.rs).
-            // If it appears here, it's likely inside a group or handled implicitly.
-            // We emit no code for it in the sequence flow.
-            Ok(quote!())
-        },
+        ModelPattern::Cut => Ok(quote!()),
         ModelPattern::Lit(lit) => {
             let token_type = analysis::resolve_token_type(lit, kws)?;
             Ok(quote_spanned! {span=> let _ = input.parse::<#token_type>()?; })
@@ -59,14 +54,18 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                  } else {
                      Ok(quote_spanned! {span=> 
                         let mut #bind = Vec::new();
-                        while let Some(val) = rt::attempt(input, |input| { Ok(#func_call) })? {
+                        // Pass ctx to attempt
+                        while let Some(val) = rt::attempt(input, ctx, |input, ctx| { Ok(#func_call) })? {
                             #bind.push(val);
                         }
                      })
                  }
             } else {
                 let inner_logic = generate_pattern_step(inner, kws)?;
-                Ok(quote_spanned! {span=> while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {} })
+                Ok(quote_spanned! {span=> 
+                    // Pass ctx to attempt
+                    while let Some(_) = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })? {} 
+                })
             }
         },
         
@@ -91,7 +90,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                       Ok(quote_spanned! {span=> 
                         let mut #bind = Vec::new();
                         #bind.push(#func_call);
-                        while let Some(val) = rt::attempt(input, |input| { Ok(#func_call) })? {
+                        // Pass ctx to attempt
+                        while let Some(val) = rt::attempt(input, ctx, |input, ctx| { Ok(#func_call) })? {
                             #bind.push(val);
                         }
                      })
@@ -100,29 +100,29 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 let inner_logic = generate_pattern_step(inner, kws)?;
                 Ok(quote_spanned! {span=> 
                     #inner_logic
-                    while let Some(_) = rt::attempt(input, |input| { #inner_logic Ok(()) })? {}
+                    // Pass ctx to attempt
+                    while let Some(_) = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })? {}
                 })
              }
         },
 
         ModelPattern::Optional(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
-            
-            // OPTIMIZATION: If we can peek the start token AND the inner pattern is not nullable,
-            // we can guard the attempt with a peek check.
-            // If the inner pattern IS nullable (e.g. "a"*), we must run it even if peek fails
-            // (because it might match empty).
             let peek_opt = analysis::get_simple_peek(inner, kws)?;
             let is_nullable = analysis::is_nullable(inner);
 
             if let (Some(peek), false) = (peek_opt, is_nullable) {
                 Ok(quote_spanned! {span=> 
                     if input.peek(#peek) {
-                        let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; 
+                        // Pass ctx to attempt
+                        let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?; 
                     }
                 })
             } else {
-                Ok(quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; })
+                Ok(quote_spanned! {span=> 
+                    // Pass ctx to attempt
+                    let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?; 
+                })
             }
         },
         ModelPattern::Group(alts) => {
@@ -176,50 +176,40 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         },
 
         ModelPattern::Recover { binding, body, sync } => {
-            // Handle binding injection if present
             let effective_body = if let Some(bind) = binding {
                 match &**body {
                     ModelPattern::RuleCall { binding: None, rule_name, args } => {
-                        // Inject binding
                         Box::new(ModelPattern::RuleCall { 
                             binding: Some(bind.clone()), 
                             rule_name: rule_name.clone(), 
                             args: args.clone() 
                         })
                     },
-                    _ => return Err(syn::Error::new(span, "Binding on recover(...) is only supported if the body is a direct rule call (e.g. s:recover(stmt, \";\"))."))
+                    _ => return Err(syn::Error::new(span, "Binding on recover(...) is only supported if the body is a direct rule call."))
                 }
             } else {
                 body.clone()
             };
 
             let inner_logic = generate_pattern_step(&effective_body, kws)?;
-            // We do NOT generate sync logic here anymore. recover() only skips until sync.
-            // The sync token must be consumed by the surrounding rule.
-            // let sync_logic = generate_pattern_step(sync, kws)?;
-            
-            // We need to know what to peek for synchronization
             let sync_peek = analysis::get_simple_peek(sync, kws)?
-                .ok_or_else(|| syn::Error::new(sync.span(), "Sync pattern in recover(...) must have a simple start token (literal or bracket)."))?;
+                .ok_or_else(|| syn::Error::new(sync.span(), "Sync pattern in recover(...) must have a simple start token."))?;
 
             let bindings = analysis::collect_bindings(std::slice::from_ref(&effective_body));
 
             if bindings.is_empty() {
                 Ok(quote_spanned! {span=> 
-                    if rt::attempt_recover(input, |input| { #inner_logic Ok(()) })?.is_none() {
-                        // Recovery
+                    // Pass ctx to attempt_recover
+                    if rt::attempt_recover(input, ctx, |input, ctx| { #inner_logic Ok(()) })?.is_none() {
                         rt::skip_until(input, |i| i.peek(#sync_peek))?;
-                        // We do NOT consume the sync token.
                     }
                 })
             } else {
-                // If we have bindings, we must wrap them in Option.
-                // Success -> Some(val), Failure -> None
-                
                 let none_exprs = bindings.iter().map(|_| quote!(Option::<_>::None));
 
                 Ok(quote_spanned! {span=> 
-                    let (#(#bindings),*) = match rt::attempt_recover(input, |input| {
+                    // Pass ctx to attempt_recover
+                    let (#(#bindings),*) = match rt::attempt_recover(input, ctx, |input, ctx| {
                         #inner_logic
                         Ok((#(#bindings),*))
                     })? {
@@ -228,9 +218,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                             (#(Some(#bindings)),*)
                         },
                         None => {
-                            // Recovery
                             rt::skip_until(input, |i| i.peek(#sync_peek))?;
-                            // We do NOT consume the sync token.
                             (#(#none_exprs),*)
                         }
                     };
@@ -244,8 +232,13 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenSt
     if is_builtin(rule_name) {
         map_builtin(rule_name)
     } else {
-        let f = format_ident!("parse_{}", rule_name);
-        if args.is_empty() { quote!(#f(input)?) } else { quote!(#f(input, #(#args),*)?) }
+        // Call the _impl version and pass ctx
+        let f = format_ident!("parse_{}_impl", rule_name);
+        if args.is_empty() { 
+            quote!(#f(input, ctx)?) 
+        } else { 
+            quote!(#f(input, ctx, #(#args),*)?) 
+        }
     }
 }
 
@@ -259,6 +252,7 @@ fn is_builtin(name: &syn::Ident) -> bool {
 }
 
 fn map_builtin(name: &syn::Ident) -> TokenStream {
+    // Builtins are stateless, so they don't need ctx
     match name.to_string().as_str() {
         "ident" => quote! { rt::parse_ident(input)? },
         "integer" => quote! { rt::parse_int::<i32>(input)? },
