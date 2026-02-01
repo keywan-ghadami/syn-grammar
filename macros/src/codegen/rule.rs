@@ -267,6 +267,11 @@ pub fn generate_variants_internal(
     // If nothing matches, we fall through to the error.
     Ok(quote! {
         #(#arms)*
-        Err(input.error(#error_msg))
+        
+        if let Some(best_err) = rt::take_best_error() {
+            Err(best_err)
+        } else {
+            Err(input.error(#error_msg))
+        }
     })
 }
