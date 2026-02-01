@@ -4,7 +4,7 @@
 model: gemini/gemini-3-pro-preview
 
 # Modus auf Architect setzen
-chat-mode: architect
+#chat-mode: architect
 
 yes-always: true
 
