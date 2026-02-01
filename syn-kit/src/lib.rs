@@ -119,11 +119,32 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
 }
 
 /// Wrapper around attempt used specifically for recovery blocks.
-/// It allows the generated code to distinguish semantic intent, 
-/// though currently it shares the same backtracking logic.
+/// Unlike `attempt`, this ignores the `fatal` flag from the inner parser,
+/// because the explicit purpose is to recover from errors.
 pub fn attempt_recover<T>(
     input: ParseStream, 
     parser: impl FnOnce(ParseStream) -> Result<T>
 ) -> Result<Option<T>> {
-    attempt(input, parser)
+    let was_fatal = check_fatal();
+    set_fatal(false);
+
+    let start_span = format!("{:?}", input.span());
+
+    let fork = input.fork();
+    let res = parser(&fork);
+    
+    // Always restore fatal state, ignoring whatever happened inside.
+    // We are recovering, so we swallow the inner fatal error.
+    set_fatal(was_fatal);
+
+    match res {
+        Ok(val) => {
+            input.advance_to(&fork);
+            Ok(Some(val))
+        }
+        Err(e) => {
+            record_error(e, start_span);
+            Ok(None)
+        }
+    }
 }
