@@ -44,7 +44,7 @@ impl<T: Debug> TestResult<T> {
         }
     }
 
-    // 2. NEW: Asserts success AND checks the value directly.
+    // 2. Asserts success AND checks the value directly.
     // Returns a nice diff output if values do not match.
     pub fn assert_success_is<E>(self, expected: E) -> T 
     where T: PartialEq<E>, E: Debug {
@@ -59,7 +59,31 @@ impl<T: Debug> TestResult<T> {
         val
     }
 
-    // 3. Asserts failure and returns the error.
+    // 3. Asserts success AND checks the value using a closure.
+    // Useful for complex assertions or when PartialEq is not implemented.
+    pub fn assert_success_with<F>(self, f: F) -> T 
+    where F: FnOnce(&T) {
+        let val = self.assert_success();
+        f(&val);
+        val
+    }
+
+    // 4. Asserts success AND checks the Debug representation matches.
+    // Useful for syn types where PartialEq is often missing or complicated by Spans.
+    pub fn assert_success_debug(self, expected_debug: &str) -> T {
+        let ctx = self.format_context();
+        let val = self.assert_success();
+        let actual_debug = format!("{:?}", val);
+        if actual_debug != expected_debug {
+            panic!(
+                "\n🔴 TEST FAILED (Debug Mismatch):{}\nExpected: {:?}\nGot:      {:?}\n", 
+                ctx, expected_debug, actual_debug
+            );
+        }
+        val
+    }
+
+    // 5. Asserts failure and returns the error.
     pub fn assert_failure(self) -> syn::Error {
         let ctx = self.format_context();
         match self.inner {
@@ -73,7 +97,7 @@ impl<T: Debug> TestResult<T> {
         }
     }
 
-    // 4. Asserts failure AND checks if the message contains a specific text.
+    // 6. Asserts failure AND checks if the message contains a specific text.
     pub fn assert_failure_contains(self, expected_msg_part: &str) {
         let ctx = self.format_context();
         let err = self.assert_failure();

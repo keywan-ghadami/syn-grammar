@@ -15,6 +15,7 @@ use std::collections::HashSet;
 pub mod testing;
 
 #[cfg(feature = "rt")]
+#[derive(Clone)]
 struct ErrorState {
     err: syn::Error,
     is_deep: bool,
@@ -23,6 +24,7 @@ struct ErrorState {
 /// Holds the state for backtracking and error reporting.
 /// This must be passed mutably through the parsing chain.
 #[cfg(feature = "rt")]
+#[derive(Clone)]
 pub struct ParseContext {
     is_fatal: bool,
     best_error: Option<ErrorState>,
@@ -112,6 +114,16 @@ impl ParseContext {
             }
         }
         false
+    }
+
+    // --- Inspection Methods ---
+
+    pub fn scopes(&self) -> &Vec<HashSet<String>> {
+        &self.scopes
+    }
+
+    pub fn rule_stack(&self) -> &Vec<String> {
+        &self.rule_stack
     }
 }
 
