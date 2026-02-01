@@ -30,7 +30,6 @@ All notable changes to this project will be documented in this file.
 
 ### Internal
 - **Architecture**: Extracted runtime utilities (backtracking, error reporting, testing) into a separate `grammar-kit` crate.
-- **Renaming**: `syn-kit` has been renamed to `grammar-kit` and extended with feature flags for `syn` support.
 
 ## [0.2.0]
 
