@@ -1,7 +1,0 @@
-
-## Usage
-
-### Testing Parsers
-
-`syn-kit` provides a `Testable` trait that extends `syn::Result`. This allows you to write clean, assertion-based tests for your parsers.
-
