@@ -74,7 +74,12 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
 
         #[doc(hidden)]
         pub fn #impl_name(input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> {
-            #body
+            ctx.enter_rule(stringify!(#name));
+            let res = (|| -> syn::Result<#ret_type> {
+                #body
+            })();
+            ctx.exit_rule();
+            res
         }
     })
 }
