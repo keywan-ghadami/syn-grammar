@@ -275,4 +275,33 @@ mod tests {
         let final_err = ctx.take_best_error().unwrap();
         assert_eq!(final_err.to_string(), "Error in rule 'inner': fail");
     }
+
+    #[test]
+    fn test_attempt_captures_rule_context() {
+        use syn::parse::Parser;
+        
+        let mut ctx = ParseContext::new();
+        
+        let parser = |input: ParseStream| {
+            ctx.enter_rule("outer");
+            
+            // We simulate an attempt that fails.
+            // attempt returns Result<Option<T>>.
+            // If the closure returns Err, attempt records it and returns Ok(None) (if not fatal).
+            let _ = attempt(input, &mut ctx, |_input, _ctx| {
+                Err(syn::Error::new(Span::call_site(), "parse failed"))
+            })?;
+            
+            ctx.exit_rule();
+            Ok(())
+        };
+
+        // We parse an empty string. The attempt fails immediately.
+        // The outer parser returns Ok(()).
+        // But we check ctx.best_error.
+        let _ = parser.parse_str(""); 
+        
+        let err = ctx.take_best_error().expect("Error should be recorded");
+        assert_eq!(err.to_string(), "Error in rule 'outer': parse failed");
+    }
 }
