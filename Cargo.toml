@@ -1,11 +1,33 @@
 [package]
-name = "syn-kit"
+name = "syn-grammar"
 version = "0.3.0"
 edition = "2021"
-description = "Runtime and testing utilities for syn-grammar"
+description = "A parser generator for Rust that compiles EBNF-like grammars into syn::parse::Parse implementations."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/keywan-ghadami/syn-grammar"
+documentation = "https://docs.rs/syn-grammar"
+homepage = "https://github.com/keywan-ghadami/syn-grammar"
+readme = "README.md"
+keywords = ["parser", "syn", "grammar", "ebnf", "macro"]
+categories = ["parsing", "development-tools"]
+authors = ["Keywan Ghadami"]
+
+[workspace]
+members = ["macros", "syn-grammar-model", "syn-kit"]
+exclude = [
+    ".devcontainer",
+    ".aider*",
+    ".gitignore",
+    ".github"
+]
 
 [dependencies]
+syn-grammar-macros = { path = "./macros", version = "0.3.0" }
+syn-grammar-model = { path = "./syn-grammar-model", version = "0.3.0" }
+syn-kit = { path = "./syn-kit", version = "0.3.0" }
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 proc-macro2 = "1.0"
 quote = "1.0"
+
+[dev-dependencies]
+syn = { version = "2.0", features = ["full", "extra-traits"] }
