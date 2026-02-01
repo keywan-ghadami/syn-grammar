@@ -1,6 +1,7 @@
 use syn::parse::ParseStream;
 use syn::Result;
 use std::cell::{Cell, RefCell};
+use proc_macro2::Span;
 
 // 1. IMPORTANT for backtracking: Enables .fork() and .advance_to()
 use syn::parse::discouraged::Speculative;
@@ -28,15 +29,15 @@ pub fn check_fatal() -> bool {
     IS_FATAL.get()
 }
 
-fn record_error(err: syn::Error, start_span_debug: String) {
+fn record_error(err: syn::Error, start_span: Span) {
     BEST_ERROR.with(|cell| {
         let mut borrow = cell.borrow_mut();
         
         // Heuristic: Compare the error location to the start of the attempt.
         // If they differ, we made progress (Deep Error).
         // We prioritize Deep Errors over Shallow Errors.
-        let err_span_debug = format!("{:?}", err.span());
-        let is_deep = err_span_debug != start_span_debug;
+        // OPTIMIZATION: Direct Span comparison (cheap) instead of String formatting (expensive).
+        let is_deep = err.span() != start_span;
 
         match &mut *borrow {
             None => {
@@ -50,8 +51,6 @@ fn record_error(err: syn::Error, start_span_debug: String) {
                 // 4. If new is shallow and existing is shallow -> Keep existing (First wins)
                 
                 // We only overwrite if we have a strictly better error category.
-                // Since we can't compare depth magnitude (e.g. 2 tokens vs 3 tokens),
-                // we stick to the first error in the same category.
                 if is_deep && !existing.is_deep {
                     *borrow = Some(ErrorState { err, is_deep });
                 }
@@ -66,11 +65,13 @@ pub fn take_best_error() -> Option<syn::Error> {
 
 /// Encapsulates a speculative parse attempt. 
 /// Allows the generator to write backtracking as a one-liner.
+#[inline]
 pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
     let was_fatal = check_fatal();
     set_fatal(false);
 
-    let start_span = format!("{:?}", input.span());
+    // OPTIMIZATION: Capture Span directly (Copy), avoiding String allocation.
+    let start_span = input.span();
 
     let fork = input.fork(); // Requires 'Speculative'
     let res = parser(&fork);
@@ -97,12 +98,14 @@ pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result
 }
 
 /// Helper for identifiers (allows keywords)
+#[inline]
 pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
     // Requires 'IdentExt'
     input.call(syn::Ident::parse_any)
 }
 
 /// Helper for typed integers
+#[inline]
 pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T> 
 where T::Err: std::fmt::Display {
     input.parse::<syn::LitInt>()?.base10_parse()
@@ -121,6 +124,7 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
 /// Wrapper around attempt used specifically for recovery blocks.
 /// Unlike `attempt`, this ignores the `fatal` flag from the inner parser,
 /// because the explicit purpose is to recover from errors.
+#[inline]
 pub fn attempt_recover<T>(
     input: ParseStream, 
     parser: impl FnOnce(ParseStream) -> Result<T>
@@ -128,7 +132,8 @@ pub fn attempt_recover<T>(
     let was_fatal = check_fatal();
     set_fatal(false);
 
-    let start_span = format!("{:?}", input.span());
+    // OPTIMIZATION: Capture Span directly.
+    let start_span = input.span();
 
     let fork = input.fork();
     let res = parser(&fork);
