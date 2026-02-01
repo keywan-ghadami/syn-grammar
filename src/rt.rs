@@ -8,9 +8,14 @@ use syn::parse::discouraged::Speculative;
 // 2. IMPORTANT for identifiers: Enables .parse_any() (allows keywords as names)
 use syn::ext::IdentExt; 
 
+struct ErrorState {
+    err: syn::Error,
+    is_deep: bool,
+}
+
 thread_local! {
     static IS_FATAL: Cell<bool> = const { Cell::new(false) };
-    static BEST_ERROR: RefCell<Option<syn::Error>> = const { RefCell::new(None) };
+    static BEST_ERROR: RefCell<Option<ErrorState>> = const { RefCell::new(None) };
 }
 
 pub fn set_fatal(fatal: bool) {
@@ -31,16 +36,22 @@ fn record_error(err: syn::Error, start_span_debug: String) {
         let err_span_debug = format!("{:?}", err.span());
         let is_deep = err_span_debug != start_span_debug;
 
-        match &*borrow {
+        match &mut *borrow {
             None => {
-                *borrow = Some(err);
+                *borrow = Some(ErrorState { err, is_deep });
             }
-            Some(_existing) => {
-                // If the new error is Deep, we prefer it.
-                // A more sophisticated check might compare actual line/column if available,
-                // but checking inequality with start is a good proxy for "moved forward".
-                if is_deep {
-                    *borrow = Some(err);
+            Some(existing) => {
+                // Logic:
+                // 1. If new is deep and existing is shallow -> Overwrite
+                // 2. If new is deep and existing is deep -> Keep existing (First wins)
+                // 3. If new is shallow and existing is deep -> Keep existing
+                // 4. If new is shallow and existing is shallow -> Keep existing (First wins)
+                
+                // We only overwrite if we have a strictly better error category.
+                // Since we can't compare depth magnitude (e.g. 2 tokens vs 3 tokens),
+                // we stick to the first error in the same category.
+                if is_deep && !existing.is_deep {
+                    *borrow = Some(ErrorState { err, is_deep });
                 }
             }
         }
@@ -48,7 +59,7 @@ fn record_error(err: syn::Error, start_span_debug: String) {
 }
 
 pub fn take_best_error() -> Option<syn::Error> {
-    BEST_ERROR.with(|cell| cell.borrow_mut().take())
+    BEST_ERROR.with(|cell| cell.borrow_mut().take().map(|s| s.err))
 }
 
 /// Encapsulates a speculative parse attempt. 

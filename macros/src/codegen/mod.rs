@@ -44,9 +44,14 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
                 use syn::ext::IdentExt; 
                 use std::cell::{Cell, RefCell};
 
+                struct ErrorState {
+                    err: syn::Error,
+                    is_deep: bool,
+                }
+
                 thread_local! {
                     static IS_FATAL: Cell<bool> = const { Cell::new(false) };
-                    static BEST_ERROR: RefCell<Option<syn::Error>> = const { RefCell::new(None) };
+                    static BEST_ERROR: RefCell<Option<ErrorState>> = const { RefCell::new(None) };
                 }
 
                 pub fn set_fatal(fatal: bool) {
@@ -67,16 +72,19 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
                         let err_span_debug = format!("{:?}", err.span());
                         let is_deep = err_span_debug != start_span_debug;
 
-                        match &*borrow {
+                        match &mut *borrow {
                             None => {
-                                *borrow = Some(err);
+                                *borrow = Some(ErrorState { err, is_deep });
                             }
-                            Some(_existing) => {
-                                // If the new error is Deep, we prefer it.
-                                // A more sophisticated check might compare actual line/column if available,
-                                // but checking inequality with start is a good proxy for "moved forward".
-                                if is_deep {
-                                    *borrow = Some(err);
+                            Some(existing) => {
+                                // Logic:
+                                // 1. If new is deep and existing is shallow -> Overwrite
+                                // 2. If new is deep and existing is deep -> Keep existing (First wins)
+                                // 3. If new is shallow and existing is deep -> Keep existing
+                                // 4. If new is shallow and existing is shallow -> Keep existing (First wins)
+                                
+                                if is_deep && !existing.is_deep {
+                                    *borrow = Some(ErrorState { err, is_deep });
                                 }
                             }
                         }
@@ -84,7 +92,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
                 }
 
                 pub fn take_best_error() -> Option<syn::Error> {
-                    BEST_ERROR.with(|cell| cell.borrow_mut().take())
+                    BEST_ERROR.with(|cell| cell.borrow_mut().take().map(|s| s.err))
                 }
 
                 pub fn attempt<T>(input: ParseStream, parser: impl FnOnce(ParseStream) -> Result<T>) -> Result<Option<T>> {
