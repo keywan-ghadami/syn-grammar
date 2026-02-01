@@ -3,6 +3,7 @@ use syn::Result;
 use proc_macro2::Span;
 use syn::parse::discouraged::Speculative;
 use syn::ext::IdentExt; 
+use std::collections::HashSet;
 
 pub mod testing;
 
@@ -16,6 +17,7 @@ struct ErrorState {
 pub struct ParseContext {
     is_fatal: bool,
     best_error: Option<ErrorState>,
+    scopes: Vec<HashSet<String>>,
 }
 
 impl ParseContext {
@@ -23,6 +25,7 @@ impl ParseContext {
         Self {
             is_fatal: false,
             best_error: None,
+            scopes: vec![HashSet::new()],
         }
     }
 
@@ -55,6 +58,33 @@ impl ParseContext {
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
         self.best_error.take().map(|s| s.err)
     }
+
+    // --- Symbol Table Methods ---
+
+    pub fn enter_scope(&mut self) {
+        self.scopes.push(HashSet::new());
+    }
+
+    pub fn exit_scope(&mut self) {
+        if self.scopes.len() > 1 {
+            self.scopes.pop();
+        }
+    }
+
+    pub fn define(&mut self, name: impl Into<String>) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.into());
+        }
+    }
+
+    pub fn is_defined(&self, name: &str) -> bool {
+        for scope in self.scopes.iter().rev() {
+            if scope.contains(name) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl Default for ParseContext {
@@ -77,6 +107,9 @@ where
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
 
+    // Snapshot symbol table
+    let scopes_snapshot = ctx.scopes.clone();
+
     let start_span = input.span();
     let fork = input.fork();
     
@@ -92,6 +125,9 @@ where
             Ok(Some(val))
         }
         Err(e) => {
+            // Restore symbol table on failure
+            ctx.scopes = scopes_snapshot;
+
             if is_now_fatal {
                 ctx.set_fatal(true);
                 Err(e)
@@ -117,6 +153,9 @@ where
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
 
+    // Snapshot symbol table
+    let scopes_snapshot = ctx.scopes.clone();
+
     let start_span = input.span();
     let fork = input.fork();
     
@@ -131,6 +170,9 @@ where
             Ok(Some(val))
         }
         Err(e) => {
+            // Restore symbol table on failure
+            ctx.scopes = scopes_snapshot;
+            
             ctx.record_error(e, start_span);
             Ok(None)
         }
