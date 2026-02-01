@@ -1,5 +1,6 @@
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
+use syn::parse::Parser;
 
 #[test]
 fn test_deepest_error_wins() {
