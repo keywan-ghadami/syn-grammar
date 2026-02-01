@@ -37,7 +37,9 @@ fn test_deepest_error_wins() {
     // Let's try a case where one is clearly deeper.
     grammar! {
         grammar distinct {
-            rule main -> String = long | short
+            rule main -> String = 
+                l:long -> { l }
+              | s:short -> { s }
 
             rule long -> String = "a" "b" "c" -> { "long".into() }
             rule short -> String = "a" "d" -> { "short".into() }
@@ -62,7 +64,9 @@ fn test_deepest_error_wins() {
 fn test_deep_vs_shallow() {
     grammar! {
         grammar priority {
-            rule main -> String = deep | shallow
+            rule main -> String = 
+                d:deep -> { d }
+              | s:shallow -> { s }
 
             // Fails at 2nd token
             rule deep -> String = "x" "y" -> { "y".into() }
