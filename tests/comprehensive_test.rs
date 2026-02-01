@@ -579,3 +579,21 @@ fn test_extended_literals() {
     assert_eq!(res.0 .0, 100);
     assert_eq!(res.1 .0, "text");
 }
+
+// --- Test 24: Attributes on Rules ---
+#[test]
+fn test_attributes_on_rules() {
+    grammar! {
+        grammar attrs {
+            // Test doc comments and standard attributes
+            /// Parses an identifier
+            #[allow(missing_docs)]
+            rule main -> String = i:ident -> { i.to_string() }
+        }
+    }
+
+    attrs::parse_main
+        .parse_str("my_id")
+        .test()
+        .assert_success_is("my_id".to_string());
+}
