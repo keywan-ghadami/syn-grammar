@@ -1,0 +1,9 @@
+
+### Runtime Helpers
+
+The library exposes several helper functions used by generated parsers:
+
+*   `attempt`: Forks the input, runs a closure, and advances only on success.
+*   `parse_ident`: Parses identifiers, accepting Rust keywords (via `IdentExt`).
+*   `parse_int`: Parses integer literals into typed Rust integers.
+*   `skip_until`: Skips tokens until a specific condition is met (used for error recovery).
