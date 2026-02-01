@@ -597,6 +597,10 @@ fn test_attributes_on_rules() {
             // Test allowing lints
             #[allow(non_snake_case)]
             pub rule CamelCase -> () = "camel" -> { () }
+
+            // Test inline attribute for source verification
+            #[inline]
+            pub rule inline_rule -> () = "inline" -> { () }
         }
     }
 
@@ -622,4 +626,11 @@ fn test_attributes_on_rules() {
         .parse_str("camel")
         .test()
         .assert_success();
+
+    // 4. Verify #[inline] is present in the generated source.
+    // proc_macro2::TokenStream::to_string() often puts spaces around punctuation.
+    // We check for the presence of "inline" and the attribute structure.
+    let src = attrs::GENERATED_SOURCE;
+    assert!(src.contains("# [ inline ]") || src.contains("#[inline]"),
+        "Generated source missing #[inline] attribute. Source:\n{}", src);
 }

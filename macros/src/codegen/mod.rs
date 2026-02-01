@@ -28,11 +28,19 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
         .map(|r| rule::generate_rule(r, &custom_keywords))
         .collect::<Result<Vec<_>>>()?;
 
+    // Capture the rules as a TokenStream to reuse for both code generation and string introspection
+    let rules_stream = quote! { #(#rules)* };
+    let rules_str = rules_stream.to_string();
+
     Ok(quote! {
         pub mod #grammar_name {
             #![allow(unused_imports, unused_variables, dead_code, unused_braces, unused_parens)]
+            #![allow(clippy::all)]
 
             pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);
+
+            /// The generated source code of the rules, used for testing verification.
+            pub const GENERATED_SOURCE: &str = #rules_str;
 
             use syn::parse::{Parse, ParseStream};
             use syn::Result;
@@ -45,7 +53,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             #kw_defs
             #inheritance
 
-            #(#rules)*
+            #rules_stream
         }
     })
 }
