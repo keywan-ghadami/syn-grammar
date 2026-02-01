@@ -29,7 +29,7 @@ All notable changes to this project will be documented in this file.
   - `spanned_char_lit` -> `(char, Span)`
 
 ### Internal
-- **Architecture**: Extracted runtime utilities (backtracking, error reporting, testing) into a separate `syn-kit` crate.
+- **Architecture**: Extracted runtime utilities (backtracking, error reporting, testing) into a separate `grammar-kit` crate.
 
 ## [0.2.0]
 
