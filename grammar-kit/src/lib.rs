@@ -56,7 +56,7 @@ impl ScopeStack {
     }
 }
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", feature = "syn"))]
 #[derive(Clone)]
 struct ErrorState {
     err: syn::Error,
@@ -69,6 +69,7 @@ struct ErrorState {
 #[derive(Clone)]
 pub struct ParseContext {
     is_fatal: bool,
+    #[cfg(feature = "syn")]
     best_error: Option<ErrorState>,
     pub scopes: ScopeStack,
     rule_stack: Vec<String>,
@@ -79,6 +80,7 @@ impl ParseContext {
     pub fn new() -> Self {
         Self {
             is_fatal: false,
+            #[cfg(feature = "syn")]
             best_error: None,
             scopes: ScopeStack::new(),
             rule_stack: Vec::new(),
@@ -102,6 +104,7 @@ impl ParseContext {
     }
 
     /// Records an error if it is "deeper" than the current best error.
+    #[cfg(feature = "syn")]
     pub fn record_error(&mut self, err: syn::Error, start_span: Span) {
         // Heuristic: Compare the error location to the start of the attempt.
         let is_deep = err.span().start() != start_span.start();
@@ -127,6 +130,7 @@ impl ParseContext {
         }
     }
 
+    #[cfg(feature = "syn")]
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
         self.best_error.take().map(|s| s.err)
     }
@@ -169,7 +173,7 @@ impl Default for ParseContext {
 
 /// Encapsulates a speculative parse attempt. 
 /// Requires passing the ParseContext to manage error state.
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn attempt<T, F>(
     input: ParseStream, 
@@ -224,7 +228,7 @@ where
 }
 
 /// Wrapper around attempt used specifically for recovery blocks.
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn attempt_recover<T, F>(
     input: ParseStream, 
@@ -269,20 +273,20 @@ where
 
 // --- Stateless Helpers (No Context Needed) ---
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
     input.call(syn::Ident::parse_any)
 }
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T> 
 where T::Err: std::fmt::Display {
     input.parse::<syn::LitInt>()?.base10_parse()
 }
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", feature = "syn"))]
 pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -> Result<()> {
     while !input.is_empty() && !predicate(input) {
         if input.parse::<proc_macro2::TokenTree>().is_err() {
@@ -292,7 +296,7 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
     Ok(())
 }
 
-#[cfg(all(test, feature = "rt"))]
+#[cfg(all(test, feature = "rt", feature = "syn"))]
 mod tests {
     use super::*;
 

@@ -13,12 +13,12 @@ categories = ["parsing", "development-tools"]
 authors = ["Keywan Ghadami"]
 
 [features]
-default = ["rt", "testing"]
+default = ["rt", "testing", "syn"]
 rt = []
 testing = []
-syn = []
+syn = ["dep:syn"]
 
 [dependencies]
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
 quote = "1.0"
-syn = { version = "2.0", features = ["full", "extra-traits"] }
+syn = { version = "2.0", features = ["full", "extra-traits"], optional = true }
