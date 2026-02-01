@@ -107,7 +107,23 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
         ModelPattern::Optional(inner) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
-            Ok(quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; })
+            
+            // OPTIMIZATION: If we can peek the start token AND the inner pattern is not nullable,
+            // we can guard the attempt with a peek check.
+            // If the inner pattern IS nullable (e.g. "a"*), we must run it even if peek fails
+            // (because it might match empty).
+            let peek_opt = analysis::get_simple_peek(inner, kws)?;
+            let is_nullable = analysis::is_nullable(inner);
+
+            if let (Some(peek), false) = (peek_opt, is_nullable) {
+                Ok(quote_spanned! {span=> 
+                    if input.peek(#peek) {
+                        let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; 
+                    }
+                })
+            } else {
+                Ok(quote_spanned! {span=> let _ = rt::attempt(input, |input| { #inner_logic Ok(()) })?; })
+            }
         },
         ModelPattern::Group(alts) => {
             use super::rule::generate_variants_internal;

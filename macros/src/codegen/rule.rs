@@ -132,7 +132,7 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], kws: &HashSet<String>)
 pub fn generate_variants_internal(
     variants: &[RuleVariant], 
     is_top_level: bool,
-    _custom_keywords: &HashSet<String> // Currently not directly used here
+    _custom_keywords: &HashSet<String> 
 ) -> Result<TokenStream> {
     if variants.is_empty() {
         return Ok(quote! { Err(input.error("No variants defined")) });
@@ -141,8 +141,14 @@ pub fn generate_variants_internal(
     // 1. Analysis Phase: Count start tokens
     let mut token_counts = HashMap::new();
     for v in variants {
-        if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
-            *token_counts.entry(token_str).or_insert(0) += 1;
+        // SAFETY: We can only use peek dispatch if the variant is NOT nullable.
+        // If it is nullable (e.g. "a"*), it must run even if peek("a") fails.
+        let is_nullable = v.pattern.first().map_or(true, |p| analysis::is_nullable(p));
+        
+        if !is_nullable {
+            if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
+                *token_counts.entry(token_str).or_insert(0) += 1;
+            }
         }
     }
 
@@ -150,10 +156,22 @@ pub fn generate_variants_internal(
         // Check for Cut Operator
         let cut_info = analysis::find_cut(&variant.pattern);
         
-        // Get Peek Token
-        let peek_token_obj = variant.pattern.first()
-            .and_then(|f| analysis::get_simple_peek(f, _custom_keywords).ok().flatten());
-        let peek_str = analysis::get_peek_token_string(&variant.pattern);
+        // SAFETY: Check nullability before enabling peek dispatch
+        let first_pat = variant.pattern.first();
+        let is_nullable = first_pat.map_or(true, |p| analysis::is_nullable(p));
+
+        // Get Peek Token (only if not nullable)
+        let peek_token_obj = if !is_nullable {
+            first_pat.and_then(|f| analysis::get_simple_peek(f, _custom_keywords).ok().flatten())
+        } else {
+            None
+        };
+
+        let peek_str = if !is_nullable {
+            analysis::get_peek_token_string(&variant.pattern)
+        } else {
+            None
+        };
         
         // Determine if we have a unique prefix (optimization)
         let is_unique = if let (_, Some(token_key)) = (&peek_token_obj, &peek_str) {

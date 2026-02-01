@@ -129,6 +129,17 @@ pub fn get_simple_peek(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<
         ModelPattern::Optional(inner) | ModelPattern::Repeat(inner) | ModelPattern::Plus(inner) => 
             get_simple_peek(inner, kws),
         ModelPattern::Recover { body, .. } => get_simple_peek(body, kws),
+        ModelPattern::Group(alts) => {
+            if alts.len() == 1 {
+                if let Some(first) = alts[0].first() {
+                    get_simple_peek(first, kws)
+                } else {
+                    Ok(None)
+                }
+            } else {
+                Ok(None)
+            }
+        },
         _ => Ok(None)
     }
 }
@@ -144,7 +155,32 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         Some(ModelPattern::Repeat(inner)) | 
         Some(ModelPattern::Plus(inner)) => get_peek_token_string(std::slice::from_ref(&**inner)),
         Some(ModelPattern::Recover { body, .. }) => get_peek_token_string(std::slice::from_ref(&**body)),
+        Some(ModelPattern::Group(alts)) => {
+            if alts.len() == 1 {
+                get_peek_token_string(&alts[0])
+            } else {
+                None
+            }
+        },
         _ => None
+    }
+}
+
+/// Checks if a pattern can match the empty string (epsilon).
+/// Used to determine if it is safe to skip a pattern based on a failed peek.
+pub fn is_nullable(pattern: &ModelPattern) -> bool {
+    match pattern {
+        ModelPattern::Cut => true,
+        ModelPattern::Lit(_) => false,
+        // Conservative assumption: Rule calls might be nullable.
+        // To be safe, we assume they are, preventing unsafe peek optimizations.
+        ModelPattern::RuleCall { .. } => true, 
+        ModelPattern::Group(alts) => alts.iter().any(|seq| seq.iter().all(is_nullable)),
+        ModelPattern::Bracketed(_) | ModelPattern::Braced(_) | ModelPattern::Parenthesized(_) => false,
+        ModelPattern::Optional(_) => true,
+        ModelPattern::Repeat(_) => true,
+        ModelPattern::Plus(inner) => is_nullable(inner),
+        ModelPattern::Recover { .. } => true,
     }
 }
 
