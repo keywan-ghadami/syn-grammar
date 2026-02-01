@@ -72,7 +72,8 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
             }
         }
 
-        fn #impl_name(input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> {
+        #[doc(hidden)]
+        pub fn #impl_name(input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> {
             #body
         }
     })
@@ -193,7 +194,7 @@ pub fn generate_variants_internal(
             let logic_block = if is_unique {
                 quote! {
                     {
-                        let run = || -> syn::Result<_> {
+                        let mut run = || -> syn::Result<_> {
                             #pre_logic
                             #post_logic
                             Ok(#action)
@@ -216,7 +217,7 @@ pub fn generate_variants_internal(
                     })?;
 
                     if let Some(( #(#pre_bindings),* )) = pre_result {
-                        let post_run = || -> syn::Result<_> {
+                        let mut post_run = || -> syn::Result<_> {
                             #post_logic
                             Ok(#action)
                         };
@@ -248,7 +249,7 @@ pub fn generate_variants_internal(
                 let token_code = peek_token_obj.as_ref().unwrap();
                 Ok(quote! {
                     if input.peek(#token_code) {
-                        let run = || -> syn::Result<_> {
+                        let mut run = || -> syn::Result<_> {
                             #logic
                         };
                         match run() {
