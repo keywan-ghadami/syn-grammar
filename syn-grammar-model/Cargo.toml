@@ -4,6 +4,13 @@ version = "0.3.0"
 edition = "2021"
 description = "Shared model and parser for syn-grammar"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/keywan-ghadami/syn-grammar"
+documentation = "https://docs.rs/syn-grammar-model"
+homepage = "https://github.com/keywan-ghadami/syn-grammar"
+readme = "README.md"
+keywords = ["parser", "syn", "grammar", "ebnf", "model"]
+categories = ["parsing", "development-tools"]
+authors = ["Keywan Ghadami"]
 
 [dependencies]
 syn = { version = "2.0", features = ["full", "parsing", "printing", "extra-traits"] }
