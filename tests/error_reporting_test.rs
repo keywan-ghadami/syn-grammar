@@ -58,7 +58,7 @@ fn test_deepest_error_wins() {
     
     let msg = err.to_string();
     assert!(msg.contains("c"), "Error should mention expected 'c', but got: '{}'", msg);
-    assert!(!msg.contains("d"), "Error should NOT mention expected 'd'");
+    assert!(!msg.contains("d"), "Error should NOT mention expected 'd', but got: '{}'", msg);
 }
 
 #[test]
