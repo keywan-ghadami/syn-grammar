@@ -134,8 +134,13 @@ pub fn resolve_token_type(
     }
 
     if s == "true" || s == "false" {
-        return Err(syn::Error::new(lit.span(),
-            format!("Boolean literal '{}' cannot be used as a token. Use `lit_bool` parser instead.", s)));
+        return Err(syn::Error::new(
+            lit.span(),
+            format!(
+                "Boolean literal '{}' cannot be used as a token. Use `lit_bool` parser instead.",
+                s
+            ),
+        ));
     }
 
     // Check for numeric literals which are not supported as tokens
