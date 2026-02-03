@@ -2,6 +2,8 @@
 
 **The code generation engine for `syn-grammar`.**
 
+> **Note:** You should **not** add this crate to your `Cargo.toml` directly. Instead, use the `syn-grammar` crate, which re-exports the macros from this crate.
+
 This crate defines the procedural macros (`grammar!`) that compile the EBNF-like grammar DSL into actual Rust code. While it is an internal implementation detail of `syn-grammar`, understanding its architecture is useful if you intend to write a custom parser backend.
 
 ## Responsibilities
@@ -29,7 +31,7 @@ To create a new backend:
 1.  **Create a new proc-macro crate** (e.g., `my-grammar-macros`).
 2.  **Depend on `syn-grammar-model`**. This gives you the parser for the DSL, so you don't have to rewrite the grammar syntax parsing.
 3.  **Implement your own `codegen` module**. This module will take the `GrammarDefinition` from the model and output your desired code.
-4.  **Define your own `grammar!` macro**. Since you cannot inject logic into this crate's macro, you must define the entry point in your own crate.
+4.  **Define your own `grammar!` macro**. This is necessary because of a fundamental limitation in Rust procedural macros: a macro crate must contain the logic it executes. You cannot dynamically inject a generator function into an existing compiled macro crate. Therefore, you must define the macro entry point in your own crate to invoke your custom generator.
 
 Example of a custom backend entry point:
 
