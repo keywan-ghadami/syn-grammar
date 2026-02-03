@@ -17,14 +17,18 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
 - **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
+- **Rule Arguments**: Pass context or parameters between rules.
+- **Grammar Inheritance**: Reuse rules from other grammars.
+- **Testing Utilities**: Fluent API for testing your parsers.
 
 ## Installation
 
-Add `syn-grammar` to your `Cargo.toml`. You will also likely need `syn`, `quote`, and `proc-macro2` as they are used in the generated code.
+Add `syn-grammar` and `grammar-kit` to your `Cargo.toml`. You will also likely need `syn`, `quote`, and `proc-macro2` as they are used in the generated code.
 
 ```toml
 [dependencies]
 syn-grammar = "0.3"
+grammar-kit = "0.3"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -97,6 +101,41 @@ Rules can be decorated with standard Rust attributes and documentation comments.
 rule ident -> Ident = ...
 ```
 
+### Rule Arguments
+
+Rules can accept arguments, allowing you to pass context or state down the parser chain.
+
+```rust,ignore
+rule main -> i32 = 
+    "start" v:value(10) -> { v }
+
+rule value(offset: i32) -> i32 =
+    i:integer -> { i + offset }
+```
+
+### Grammar Inheritance
+
+You can inherit rules from another grammar module. This is useful for splitting large grammars or reusing common rules.
+
+```rust,ignore
+// In base.rs
+grammar! {
+    grammar Base {
+        pub rule num -> i32 = i:integer -> { i }
+    }
+}
+
+// In derived.rs
+use crate::base::Base;
+
+grammar! {
+    grammar Derived : Base {
+        rule main -> i32 = 
+            "add" a:num b:num -> { a + b }
+    }
+}
+```
+
 ### Patterns
 
 #### Literals and Keywords
@@ -123,6 +162,10 @@ rule kw -> () = "fn" "name" -> { () }
 | `lit_float` | A floating point literal (e.g. `3.14`) | `syn::LitFloat` |
 | `spanned_int_lit` | An integer literal with span | `(i32, Span)` |
 | `spanned_string_lit` | A string literal with span | `(String, Span)` |
+| `spanned_float_lit` | A float literal with span | `(f64, Span)` |
+| `spanned_bool_lit` | A bool literal with span | `(bool, Span)` |
+| `spanned_char_lit` | A char literal with span | `(char, Span)` |
+| `outer_attrs` | Outer attributes (e.g. `#[...]`) | `Vec<syn::Attribute>` |
 
 #### Sequences and Bindings
 Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
@@ -196,6 +239,27 @@ rule stmt -> Stmt =
     // instead of trying the next alternative.
     "let" => "mut"? name:ident "=" e:expr -> { ... }
   | e:expr -> { ... }
+```
+
+## Testing
+
+`syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`).
+
+```rust,ignore
+use syn_grammar::testing::Testable;
+
+#[test]
+fn test_calc() {
+    Calc::parse_expression
+        .parse_str("1 + 2")
+        .test()
+        .assert_success_is(3);
+
+    Calc::parse_expression
+        .parse_str("1 + *")
+        .test()
+        .assert_failure_contains("expected term");
+}
 ```
 
 ## Advanced Topics
