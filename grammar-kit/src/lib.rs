@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 #[cfg(feature = "syn")]
 use proc_macro2::Span;
 use std::collections::HashSet;
