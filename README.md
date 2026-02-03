@@ -21,12 +21,16 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Grammar Inheritance**: Reuse rules from other grammars.
 - **Testing Utilities**: Fluent API for testing your parsers.
 
-## Quick Installation
+## Installation
 
-Add `syn-grammar` to your `Cargo.toml`.
+### 1. Quick Installation (Runtime Parsing)
 
-You also need to add `syn`, as the generated code relies on its types (e.g., `ParseStream`). 
-If you are writing a procedural macro, you will likely need `quote` and `proc-macro2` as well.
+Use this setup if you want to parse strings **at runtime** inside your application. This is the standard approach for:
+- **CLIs & Interpreters**: Parsing user input or commands.
+- **Configuration Files**: Reading custom config formats at startup.
+- **Prototyping**: Experimenting with grammars in `main.rs`.
+
+Add `syn-grammar` and `syn` to your `Cargo.toml`. `syn` is required at runtime because the generated parser relies on its types (e.g., `ParseStream`, `Ident`).
 
 ```toml
 [dependencies]
@@ -36,16 +40,32 @@ quote = "1.0"
 proc-macro2 = "1.0"
 ```
 
-### Clean Installation / Managing Dependencies
+### 2. Optimized Installation (Compile-Time Macros)
 
-Since `syn` and `quote` are heavy dependencies, it is recommended to isolate your parser definition in a separate crate.
+If you are writing a **procedural macro** to parse input **at compile time**, you should isolate your parser definition in a separate crate. This is the correct approach for:
 
-1. Create a separate `proc-macro` crate for your macro definition.
-2. Add `syn-grammar`, `syn`, and `quote` to that crate's `Cargo.toml`.
+- **Embedded DSLs**: Parsing custom syntax inside Rust code (e.g., HTML-like templates, State Machines, SQL-like queries).
+- **Code Generation**: Reading an external definition file during the build and generating Rust code from it.
+- **Compile-Time Verification**: Checking syntax or configuration validity during `cargo build`.
+
+**Steps:**
+
+1. Create a separate `proc-macro` crate.
+2. Add `syn-grammar`, `syn`, and `quote` to **that** crate's `Cargo.toml`.
 3. Define your grammar and macro there.
 4. Depend on that crate from your main project.
 
-Your main project will use the macro but will **not** need to compile `syn` or `syn-grammar` itself, significantly improving build times.
+**Why?** Your main project will use the macro to generate code, but the heavy `syn` parsing logic will not be compiled into your final binary. This significantly improves build times for users of your macro.
+
+### ⚠️ Important Note on Tokenization
+
+Since `syn-grammar` is built on top of `syn`, it uses the **Rust Tokenizer**. This means your grammar must consist of valid Rust tokens.
+
+- **Good Use Cases**: Grammars that look somewhat like code or data structures (e.g., JSON, mathematical expressions, C-like syntax, HTML tags).
+- **Limitations**: You cannot parse languages that require a custom lexer, such as:
+    - **Whitespace-sensitive languages** (e.g., Python, YAML) — `syn` skips whitespace automatically.
+    - **Binary formats**.
+    - **Arbitrary text** that doesn't form valid Rust tokens (e.g., unquoted strings with special characters like `@` or `$` in positions Rust doesn't allow).
 
 ## Quick Start
 
