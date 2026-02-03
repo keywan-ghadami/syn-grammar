@@ -34,6 +34,18 @@ quote = "1.0"
 proc-macro2 = "1.0"
 ```
 
+### Managing Dependencies
+
+Since `syn` and `quote` are heavy dependencies, it is recommended to isolate your parser definition in a separate crate.
+
+If you are writing a **procedural macro**:
+1. Create a separate `proc-macro` crate for your macro definition.
+2. Add `syn-grammar`, `grammar-kit`, `syn`, and `quote` to that crate's `Cargo.toml`.
+3. Define your grammar and macro there.
+4. Depend on that crate from your main project.
+
+Your main project will use the macro but will **not** need to compile `syn` or `syn-grammar` itself, significantly improving build times.
+
 ## Quick Start
 
 Here is a complete example of a calculator grammar that parses mathematical expressions into an `i32`.
