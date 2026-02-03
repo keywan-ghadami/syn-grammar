@@ -8,9 +8,8 @@ This crate defines the procedural macros (`grammar!`) that compile the EBNF-like
 
 ## Responsibilities
 
-1.  **Parsing**: It uses `syn-grammar-model` to parse the raw `TokenStream` from the macro input into a semantic model.
-2.  **Validation**: It checks the model for semantic errors (e.g., undefined rules, argument mismatches).
-3.  **Code Generation**: It transforms the validated model into a Rust module containing `syn`-based parser functions.
+1.  **Parsing & Validation**: It delegates parsing, transformation, and semantic validation to `syn-grammar-model`.
+2.  **Code Generation**: It transforms the validated model into a Rust module containing `syn`-based parser functions.
 
 ## Code Generation Details
 
