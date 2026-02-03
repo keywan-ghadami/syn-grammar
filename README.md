@@ -21,11 +21,12 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Grammar Inheritance**: Reuse rules from other grammars.
 - **Testing Utilities**: Fluent API for testing your parsers.
 
-## Installation
+## Quick Installation
 
 Add `syn-grammar` to your `Cargo.toml`.
 
-You also need to add `syn`, as the generated code relies on its types (e.g., `ParseStream`). If you are writing a procedural macro, you will likely need `quote` and `proc-macro2` as well.
+You also need to add `syn`, as the generated code relies on its types (e.g., `ParseStream`). 
+If you are writing a procedural macro, you will likely need `quote` and `proc-macro2` as well.
 
 ```toml
 [dependencies]
@@ -35,11 +36,10 @@ quote = "1.0"
 proc-macro2 = "1.0"
 ```
 
-### Managing Dependencies
+### Clean Installation / Managing Dependencies
 
 Since `syn` and `quote` are heavy dependencies, it is recommended to isolate your parser definition in a separate crate.
 
-If you are writing a **procedural macro**:
 1. Create a separate `proc-macro` crate for your macro definition.
 2. Add `syn-grammar`, `syn`, and `quote` to that crate's `Cargo.toml`.
 3. Define your grammar and macro there.
