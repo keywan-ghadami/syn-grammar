@@ -12,15 +12,52 @@ This crate defines the procedural macros (`grammar!`) that compile the EBNF-like
 2.  **Validation**: It checks the model for semantic errors (e.g., undefined rules, argument mismatches).
 3.  **Code Generation**: It transforms the validated model into a Rust module containing `syn`-based parser functions.
 
-## How it Works
+## Code Generation Details
 
-The `grammar!` macro follows a standard compiler pipeline:
+The code generation phase (`codegen` module) transforms the semantic model into a Rust module containing `syn` parser functions.
 
-1.  **Input**: The macro receives the grammar definition as a `TokenStream`.
-2.  **Pipeline**:
-    *   `syn_grammar_model::parse_grammar(input)` converts tokens into a `GrammarDefinition` (AST).
-    *   `codegen::generate_rust(ast)` traverses the AST and emits Rust code using `quote!`.
-3.  **Output**: The resulting `TokenStream` is returned to the compiler, replacing the macro invocation with the generated parser code.
+### 1. Rule Generation
+
+For each rule in the grammar, a public function `parse_<rule_name>` and an internal implementation function `parse_<rule_name>_impl` are generated.
+
+-   **`parse_<rule_name>`**: The public entry point. It initializes the `ParseContext` (used for error reporting and state) and calls the implementation. It handles converting internal errors into `syn::Result`.
+-   **`parse_<rule_name>_impl`**: The actual parser logic. It takes `input: ParseStream` and `ctx: &mut ParseContext`.
+
+### 2. Pattern Matching
+
+The generator converts EBNF patterns into `syn` parsing calls:
+
+-   **Literals** (`"fn"`): Converted to `input.parse::<Token![fn]>()?` or custom keyword parsing.
+-   **Sequences** (`A B`): Generated as a sequence of statements.
+-   **Alternatives** (`A | B`):
+    -   If the alternatives have unique starting tokens (determined by `peek`), `if input.peek(...)` blocks are generated for efficient dispatch.
+    -   Otherwise, `syn::parse::discouraged::Speculative` (via `rt::attempt`) is used to try each alternative in order.
+-   **Repetitions** (`A*`): Converted to `while` loops.
+-   **Groups** (`(A B)`): Treated as nested sequences.
+
+### 3. Left Recursion Handling
+
+Standard recursive descent parsers loop infinitely on left-recursive rules (e.g., `expr = expr + term`). `syn-grammar` automatically detects direct left recursion and transforms it into an iterative loop:
+
+1.  **Split Variants**: The rule's variants are split into "base cases" (non-recursive) and "recursive cases" (starting with the rule itself).
+2.  **Parse Base**: The parser first attempts to match one of the base cases to establish an initial value (`lhs`).
+3.  **Loop**: It then enters a `loop`. Inside the loop, it checks if the input matches the "tail" of any recursive variant (the part after the recursive call).
+    -   If it matches, the action is executed using the current `lhs` and the parsed tail, updating `lhs` with the result.
+    -   If no recursive variant matches, the loop terminates, and `lhs` is returned.
+
+This transformation allows writing natural expression grammars without manual restructuring.
+
+### 4. The Cut Operator (`=>`)
+
+The cut operator is handled during the generation of alternative branches. When a pattern contains `=>`:
+
+1.  The pattern is split into `pre_cut` and `post_cut`.
+2.  If `pre_cut` matches successfully, the parser commits to this branch.
+3.  Any failure in `post_cut` becomes a fatal error, preventing backtracking to other alternatives.
+
+### 5. Error Reporting
+
+The generated code uses `ParseContext` to track errors. When speculative parsing (`attempt`) fails, the error is recorded. The context keeps track of the "deepest" error (the one that consumed the most tokens) to provide helpful diagnostics to the user, rather than just reporting the last failure.
 
 ## Creating a Custom Backend
 
