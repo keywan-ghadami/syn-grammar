@@ -23,12 +23,13 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 
 ## Installation
 
-Add `syn-grammar` and `grammar-kit` to your `Cargo.toml`. You will also likely need `syn`, `quote`, and `proc-macro2` as they are used in the generated code.
+Add `syn-grammar` to your `Cargo.toml`.
+
+You also need to add `syn`, as the generated code relies on its types (e.g., `ParseStream`). If you are writing a procedural macro, you will likely need `quote` and `proc-macro2` as well.
 
 ```toml
 [dependencies]
 syn-grammar = "0.3"
-grammar-kit = "0.3"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -40,7 +41,7 @@ Since `syn` and `quote` are heavy dependencies, it is recommended to isolate you
 
 If you are writing a **procedural macro**:
 1. Create a separate `proc-macro` crate for your macro definition.
-2. Add `syn-grammar`, `grammar-kit`, `syn`, and `quote` to that crate's `Cargo.toml`.
+2. Add `syn-grammar`, `syn`, and `quote` to that crate's `Cargo.toml`.
 3. Define your grammar and macro there.
 4. Depend on that crate from your main project.
 
