@@ -226,7 +226,7 @@ rule boolean -> bool =
 
 ```rust,ignore
 rule list -> Vec<i32> = 
-    "[" elements:integer* "]" -> { elements }
+    [ elements:integer* ] -> { elements }
 ```
 
 #### Groups `(...)`
@@ -241,8 +241,8 @@ rule complex -> () =
 Match content inside delimiters.
 
 - `paren(pattern)`: Matches `( pattern )`.
-- `bracketed[pattern]`: Matches `[ pattern ]`.
-- `braced{pattern}`: Matches `{ pattern }`.
+- `[ pattern ]`: Matches `[ pattern ]`.
+- `{ pattern }`: Matches `{ pattern }`.
 
 ```rust,ignore
 rule tuple -> (i32, i32) = 

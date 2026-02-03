@@ -130,7 +130,7 @@ pub fn resolve_token_type(
 
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
         return Err(syn::Error::new(lit.span(),
-            format!("Invalid direct token literal: '{}'. Use paren(...), bracketed[...] or braced{{...}} instead.", s)));
+            format!("Invalid direct token literal: '{}'. Use paren(...), [...] or {{...}} instead.", s)));
     }
 
     if s == "true" || s == "false" {
