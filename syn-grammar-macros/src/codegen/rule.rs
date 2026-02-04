@@ -233,7 +233,7 @@ pub fn generate_variants_internal(
                             let mut run = || -> syn::Result<_> {
                                 #pre_logic
                                 #post_logic
-                                Ok(#action)
+                                Ok({ #action })
                             };
                             match run() {
                                 Ok(v) => return Ok(v),
@@ -255,7 +255,7 @@ pub fn generate_variants_internal(
                         if let Some(( #(#pre_bindings),* )) = pre_result {
                             let mut post_run = || -> syn::Result<_> {
                                 #post_logic
-                                Ok(#action)
+                                Ok({ #action })
                             };
                             match post_run() {
                                 Ok(v) => return Ok(v),

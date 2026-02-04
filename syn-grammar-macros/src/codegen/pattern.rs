@@ -10,7 +10,7 @@ pub fn generate_sequence(
     kws: &HashSet<String>,
 ) -> Result<TokenStream> {
     let steps = generate_sequence_steps(patterns, kws)?;
-    Ok(quote! { { #steps Ok(#action) } })
+    Ok(quote! { { #steps Ok({ #action }) } })
 }
 
 pub fn generate_sequence_steps(
@@ -30,8 +30,44 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     match pattern {
         ModelPattern::Cut => Ok(quote!()),
         ModelPattern::Lit(lit) => {
-            let token_type = analysis::resolve_token_type(lit, kws)?;
-            Ok(quote_spanned! {span=> let _ = input.parse::<#token_type>()?; })
+            let token_types = analysis::resolve_token_types(lit, kws)?;
+
+            if token_types.len() <= 1 {
+                let parses = token_types.iter().map(|ty| {
+                    quote_spanned! {span=> let _ = input.parse::<#ty>()?; }
+                });
+                Ok(quote! { #(#parses)* })
+            } else {
+                let mut steps = Vec::new();
+                let mut checks = Vec::new();
+
+                for (i, ty) in token_types.iter().enumerate() {
+                    let var = format_ident!("_t{}", i);
+                    steps.push(quote_spanned! {span=>
+                        let #var = input.parse::<#ty>()?;
+                    });
+
+                    if i > 0 {
+                        let prev = format_ident!("_t{}", i - 1);
+                        let err_msg = format!("expected '{}', found space between tokens", lit.value());
+                        checks.push(quote_spanned! {span=>
+                            if #prev.span().end() != #var.span().start() {
+                                return Err(syn::Error::new(
+                                    #var.span(),
+                                    #err_msg
+                                ));
+                            }
+                        });
+                    }
+                }
+
+                Ok(quote! {
+                    {
+                        #(#steps)*
+                        #(#checks)*
+                    }
+                })
+            }
         }
         ModelPattern::RuleCall {
             binding,

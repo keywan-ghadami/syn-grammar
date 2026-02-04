@@ -637,3 +637,22 @@ fn test_attributes_on_rules() {
         .with_context("Checking generated source for #[inline] attribute")
         .assert_success_contains("#[inline]");
 }
+
+// --- Test 25: Action Blocks with Statements ---
+#[test]
+fn test_action_block_statements() {
+    grammar! {
+        grammar action_block {
+            rule main -> i32 = "val" -> {
+                let x = 10;
+                let y = 20;
+                x + y
+            }
+        }
+    }
+
+    action_block::parse_main
+        .parse_str("val")
+        .test()
+        .assert_success_is(30);
+}

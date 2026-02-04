@@ -57,12 +57,19 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
         match p {
             ModelPattern::Lit(lit) => {
                 let s = lit.value();
-                // If it looks like an identifier AND syn accepts it as an Ident,
-                // it is a custom keyword.
-                // If syn rejects it (e.g. "fn", "struct", "true"), it is a reserved
-                // keyword or literal, so we treat it as a built-in token.
-                if is_identifier(&s) && syn::parse_str::<syn::Ident>(&s).is_ok() {
-                    kws.insert(s);
+                // Try to tokenize the string literal to find identifiers
+                if let Ok(ts) = syn::parse_str::<proc_macro2::TokenStream>(&s) {
+                    for token in ts {
+                        if let proc_macro2::TokenTree::Ident(ident) = token {
+                            let s = ident.to_string();
+                            // If syn accepts it as an Ident, it's a candidate.
+                            // We rely on syn::parse_str::<syn::Ident> to filter out reserved keywords.
+                            // We also exclude "_" because it cannot be a struct name for custom_keyword!.
+                            if s != "_" && syn::parse_str::<syn::Ident>(&s).is_ok() {
+                                kws.insert(s);
+                            }
+                        }
+                    }
                 }
             }
             ModelPattern::Group(alts) => {
@@ -116,23 +123,36 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     bindings
 }
 
-/// Returns the token for syn::parse::<Token>() or peeking
-pub fn resolve_token_type(
+/// Returns the sequence of tokens for syn::parse::<Token>()
+///
+/// This handles:
+/// 1. Custom keywords (e.g. "my_kw")
+/// 2. Single tokens (e.g. "->", "==")
+/// 3. Multi-token sequences (e.g. "?.", "@detached")
+pub fn resolve_token_types(
     lit: &syn::LitStr,
     custom_keywords: &HashSet<String>,
-) -> Result<syn::Type> {
+) -> Result<Vec<syn::Type>> {
     let s = lit.value();
 
+    // 1. Check for exact custom keyword match
     if custom_keywords.contains(&s) {
         let ident = format_ident!("{}", s);
-        return Ok(parse_quote!(kw::#ident));
+        return Ok(vec![parse_quote!(kw::#ident)]);
     }
 
+    // 2. Check for forbidden direct tokens
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
-        return Err(syn::Error::new(lit.span(),
-            format!("Invalid direct token literal: '{}'. Use paren(...), [...] or {{...}} instead.", s)));
+        return Err(syn::Error::new(
+            lit.span(),
+            format!(
+                "Invalid direct token literal: '{}'. Use paren(...), [...] or {{...}} instead.",
+                s
+            ),
+        ));
     }
 
+    // 3. Check for boolean/numeric literals
     if s == "true" || s == "false" {
         return Err(syn::Error::new(
             lit.span(),
@@ -142,15 +162,72 @@ pub fn resolve_token_type(
             ),
         ));
     }
-
-    // Check for numeric literals which are not supported as tokens
     if s.chars().next().is_some_and(|c| c.is_numeric()) {
         return Err(syn::Error::new(lit.span(),
             format!("Numeric literal '{}' cannot be used as a token. Use `integer` or `lit_int` parsers instead.", s)));
     }
 
-    syn::parse_str::<syn::Type>(&format!("Token![{}]", s))
-        .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))
+    // 4. Try parsing as a single Token![...] type
+    // This handles standard operators like "->", "==", etc.
+    if let Ok(ty) = syn::parse_str::<syn::Type>(&format!("Token![{}]", s)) {
+        return Ok(vec![ty]);
+    }
+
+    // 5. If single token failed, try splitting into multiple tokens
+    // e.g. "?." -> Token![?] + Token![.]
+    // e.g. "@detached" -> Token![@] + kw::detached
+    let ts: proc_macro2::TokenStream = syn::parse_str(&s)
+        .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))?;
+
+    let mut types = Vec::new();
+    for token in ts {
+        match token {
+            proc_macro2::TokenTree::Punct(p) => {
+                let c = p.as_char();
+                let ty: syn::Type = syn::parse_str(&format!("Token![{}]", c)).map_err(|_| {
+                    syn::Error::new(
+                        lit.span(),
+                        format!("Cannot map punctuation '{}' to Token!", c),
+                    )
+                })?;
+                types.push(ty);
+            }
+            proc_macro2::TokenTree::Ident(i) => {
+                let s = i.to_string();
+                if custom_keywords.contains(&s) {
+                    let ident = format_ident!("{}", s);
+                    types.push(parse_quote!(kw::#ident));
+                } else {
+                    // Try as standard token (e.g. keyword)
+                    let ty: syn::Type = syn::parse_str(&format!("Token![{}]", s)).map_err(|_| {
+                        syn::Error::new(
+                            lit.span(),
+                            format!(
+                                "Identifier '{}' is not a custom keyword and not a valid Token!",
+                                s
+                            ),
+                        )
+                    })?;
+                    types.push(ty);
+                }
+            }
+            _ => {
+                return Err(syn::Error::new(
+                    lit.span(),
+                    "Literal contains unsupported token tree (Group or Literal)",
+                ))
+            }
+        }
+    }
+
+    if types.is_empty() {
+        return Err(syn::Error::new(
+            lit.span(),
+            "Empty string literal is not supported.",
+        ));
+    }
+
+    Ok(types)
 }
 
 /// Helper for UPO: Returns a TokenStream for input.peek(...)
@@ -160,8 +237,13 @@ pub fn get_simple_peek(
 ) -> Result<Option<TokenStream>> {
     match pattern {
         ModelPattern::Lit(lit) => {
-            let token_type = resolve_token_type(lit, kws)?;
-            Ok(Some(quote!(#token_type)))
+            let token_types = resolve_token_types(lit, kws)?;
+            // Peek the first token
+            if let Some(first_type) = token_types.first() {
+                Ok(Some(quote!(#first_type)))
+            } else {
+                Ok(None)
+            }
         }
         ModelPattern::Bracketed(_) => Ok(Some(quote!(syn::token::Bracket))),
         ModelPattern::Braced(_) => Ok(Some(quote!(syn::token::Brace))),
@@ -227,11 +309,4 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Plus(inner) => is_nullable(inner),
         ModelPattern::Recover { .. } => true,
     }
-}
-
-fn is_identifier(s: &str) -> bool {
-    s.chars()
-        .next()
-        .is_some_and(|c| c.is_alphabetic() || c == '_')
-        && s.chars().all(|c| c.is_alphanumeric() || c == '_')
 }

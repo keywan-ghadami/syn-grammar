@@ -46,6 +46,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             use syn::Result;
             use syn::Token;
             use syn::ext::IdentExt;
+            use syn::spanned::Spanned;
 
             // Import runtime from syn_grammar
             use syn_grammar::rt;

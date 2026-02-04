@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0]
+
+### Added
+- **Token Recognition in Literals**: Enhanced parsing of string literals in the grammar to support multi-token sequences and complex combinations (e.g. `"?."`, `"@detached"`).
+
+### Fixed
+- **Documentation**: Fixed documentation regarding the usage of brackets and delimiters.
+
 ## [0.3.0]
 
 ### Breaking Changes
