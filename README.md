@@ -34,7 +34,7 @@ Add `syn-grammar` and `syn` to your `Cargo.toml`. `syn` is required at runtime b
 
 ```toml
 [dependencies]
-syn-grammar = "0.3"
+syn-grammar = "0.4"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"

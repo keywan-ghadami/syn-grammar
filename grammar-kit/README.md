@@ -19,7 +19,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-grammar-kit = "0.3.0"
+grammar-kit = "0.4.0"
 ```
 
 ### Runtime Helpers
