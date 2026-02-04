@@ -307,3 +307,41 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Recover { .. } => true,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn test_resolve_token_types_valid() {
+        let kws = HashSet::new();
+        let lit: syn::LitStr = parse_quote!("fn");
+        let types = resolve_token_types(&lit, &kws).unwrap();
+        assert_eq!(types.len(), 1);
+    }
+
+    #[test]
+    fn test_resolve_token_types_invalid_direct() {
+        let kws = HashSet::new();
+        let lit: syn::LitStr = parse_quote!("(");
+        let err = resolve_token_types(&lit, &kws).unwrap_err();
+        assert!(err.to_string().contains("Invalid direct token literal"));
+    }
+
+    #[test]
+    fn test_resolve_token_types_invalid_bool() {
+        let kws = HashSet::new();
+        let lit: syn::LitStr = parse_quote!("true");
+        let err = resolve_token_types(&lit, &kws).unwrap_err();
+        assert!(err.to_string().contains("Boolean literal"));
+    }
+
+    #[test]
+    fn test_resolve_token_types_invalid_numeric() {
+        let kws = HashSet::new();
+        let lit: syn::LitStr = parse_quote!("123");
+        let err = resolve_token_types(&lit, &kws).unwrap_err();
+        assert!(err.to_string().contains("Numeric literal"));
+    }
+}

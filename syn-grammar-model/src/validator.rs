@@ -110,3 +110,51 @@ fn validate_patterns(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::GrammarDefinition as AstGrammar;
+    use crate::model::GrammarDefinition as ModelGrammar;
+    use quote::quote;
+
+    fn validate_grammar(input: proc_macro2::TokenStream) -> Result<()> {
+        let ast: AstGrammar = syn::parse2(input)?;
+        let model: ModelGrammar = ast.into();
+        validate(&model, crate::SYN_BUILTINS)
+    }
+
+    #[test]
+    fn test_undefined_rule() {
+        let input = quote! {
+            grammar test {
+                rule main -> () = undefined_rule -> { () }
+            }
+        };
+        let err = validate_grammar(input).unwrap_err();
+        assert_eq!(err.to_string(), "Undefined rule: 'undefined_rule'.");
+    }
+
+    #[test]
+    fn test_arg_count_mismatch() {
+        let input = quote! {
+            grammar test {
+                rule main -> () = sub(1) -> { () }
+                rule sub -> () = "a" -> { () }
+            }
+        };
+        let err = validate_grammar(input).unwrap_err();
+        assert_eq!(err.to_string(), "Rule 'sub' expects 0 argument(s), but got 1.");
+    }
+
+    #[test]
+    fn test_builtin_args() {
+        let input = quote! {
+            grammar test {
+                rule main -> () = ident(1) -> { () }
+            }
+        };
+        let err = validate_grammar(input).unwrap_err();
+        assert_eq!(err.to_string(), "Built-in rule 'ident' does not accept arguments.");
+    }
+}
