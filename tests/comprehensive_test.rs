@@ -664,14 +664,14 @@ fn test_multi_token_literals() {
         grammar multi_token {
             // "?." is two tokens: Token![?] and Token![.]
             // The parser generator ensures they are adjacent (no whitespace).
-            rule optional_dot -> () = "?." -> { () }
+            pub rule optional_dot -> () = "?." -> { () }
 
             // "@detached" involves a Punct and an Ident.
             // "detached" should be recognized as a custom keyword automatically.
-            rule at_detached -> () = "@detached" -> { () }
+            pub rule at_detached -> () = "@detached" -> { () }
 
             // "..." is a single token Token![...]
-            rule dot3 -> () = "..." -> { () }
+            pub rule dot3 -> () = "..." -> { () }
         }
     }
 
