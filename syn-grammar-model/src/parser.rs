@@ -28,7 +28,7 @@ mod rt {
     }
 }
 
-mod kw {
+pub mod kw {
     syn::custom_keyword!(grammar);
     syn::custom_keyword!(rule);
     syn::custom_keyword!(paren);
@@ -190,24 +190,25 @@ impl RuleVariant {
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
-    Cut,
+    Cut(Token![=>]),
     Lit(LitStr),
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
         args: Vec<Lit>,
     },
-    Group(Vec<Vec<Pattern>>),
-    Bracketed(Vec<Pattern>),
-    Braced(Vec<Pattern>),
-    Parenthesized(Vec<Pattern>),
-    Optional(Box<Pattern>),
-    Repeat(Box<Pattern>),
-    Plus(Box<Pattern>),
+    Group(Vec<Vec<Pattern>>, token::Paren),
+    Bracketed(Vec<Pattern>, token::Bracket),
+    Braced(Vec<Pattern>, token::Brace),
+    Parenthesized(Vec<Pattern>, kw::paren, token::Paren),
+    Optional(Box<Pattern>, Token![?]),
+    Repeat(Box<Pattern>, Token![*]),
+    Plus(Box<Pattern>, Token![+]),
     Recover {
         binding: Option<Ident>,
         body: Box<Pattern>,
         sync: Box<Pattern>,
+        kw_token: kw::recover,
     },
 }
 
@@ -217,14 +218,14 @@ impl Parse for Pattern {
 
         loop {
             if input.peek(Token![*]) {
-                let _ = input.parse::<Token![*]>()?;
-                pat = Pattern::Repeat(Box::new(pat));
+                let token = input.parse::<Token![*]>()?;
+                pat = Pattern::Repeat(Box::new(pat), token);
             } else if input.peek(Token![+]) {
-                let _ = input.parse::<Token![+]>()?;
-                pat = Pattern::Plus(Box::new(pat));
+                let token = input.parse::<Token![+]>()?;
+                pat = Pattern::Plus(Box::new(pat), token);
             } else if input.peek(Token![?]) {
-                let _ = input.parse::<Token![?]>()?;
-                pat = Pattern::Optional(Box::new(pat));
+                let token = input.parse::<Token![?]>()?;
+                pat = Pattern::Optional(Box::new(pat), token);
             } else {
                 break;
             }
@@ -245,8 +246,8 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         if binding.is_some() {
             return Err(input.error("Cut operator cannot be bound."));
         }
-        let _ = input.parse::<Token![=>]>()?;
-        Ok(Pattern::Cut)
+        let token = input.parse::<Token![=>]>()?;
+        Ok(Pattern::Cut(token))
     } else if input.peek(LitStr) {
         if binding.is_some() {
             return Err(input
@@ -258,32 +259,36 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
             return Err(input.error("Bracketed groups cannot be bound directly."));
         }
         let content;
-        syn::bracketed!(content in input);
-        Ok(Pattern::Bracketed(parse_pattern_list(&content)?))
+        let token = syn::bracketed!(content in input);
+        Ok(Pattern::Bracketed(parse_pattern_list(&content)?, token))
     } else if input.peek(token::Brace) {
         if binding.is_some() {
             return Err(input.error("Braced groups cannot be bound directly."));
         }
         let content;
-        syn::braced!(content in input);
-        Ok(Pattern::Braced(parse_pattern_list(&content)?))
+        let token = syn::braced!(content in input);
+        Ok(Pattern::Braced(parse_pattern_list(&content)?, token))
     } else if input.peek(kw::paren) {
         if binding.is_some() {
             return Err(input.error("Parenthesized groups cannot be bound directly."));
         }
-        let _ = input.parse::<kw::paren>()?;
+        let kw = input.parse::<kw::paren>()?;
         let content;
-        syn::parenthesized!(content in input);
-        Ok(Pattern::Parenthesized(parse_pattern_list(&content)?))
+        let token = syn::parenthesized!(content in input);
+        Ok(Pattern::Parenthesized(
+            parse_pattern_list(&content)?,
+            kw,
+            token,
+        ))
     } else if input.peek(token::Paren) {
         if binding.is_some() {
             return Err(input.error("Groups cannot be bound directly."));
         }
         let content;
-        syn::parenthesized!(content in input);
-        Ok(Pattern::Group(parse_group_content(&content)?))
+        let token = syn::parenthesized!(content in input);
+        Ok(Pattern::Group(parse_group_content(&content)?, token))
     } else if input.peek(kw::recover) {
-        let _ = input.parse::<kw::recover>()?;
+        let kw_token = input.parse::<kw::recover>()?;
         let content;
         syn::parenthesized!(content in input);
         let body = content.parse()?;
@@ -293,6 +298,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
             binding,
             body: Box::new(body),
             sync: Box::new(sync),
+            kw_token,
         })
     } else {
         let rule_name: Ident = rt::parse_ident(input)?;

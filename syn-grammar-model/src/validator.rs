@@ -71,12 +71,14 @@ fn validate_patterns(
                     ));
                 }
             }
-            ModelPattern::Group(alts) => {
+            ModelPattern::Group(alts, _) => {
                 for alt in alts {
                     validate_patterns(alt, defined_rules, has_inheritance, valid_builtins)?;
                 }
             }
-            ModelPattern::Optional(p) | ModelPattern::Repeat(p) | ModelPattern::Plus(p) => {
+            ModelPattern::Optional(p, _)
+            | ModelPattern::Repeat(p, _)
+            | ModelPattern::Plus(p, _) => {
                 validate_patterns(
                     std::slice::from_ref(p),
                     defined_rules,
@@ -84,9 +86,9 @@ fn validate_patterns(
                     valid_builtins,
                 )?;
             }
-            ModelPattern::Bracketed(p)
-            | ModelPattern::Braced(p)
-            | ModelPattern::Parenthesized(p) => {
+            ModelPattern::Bracketed(p, _)
+            | ModelPattern::Braced(p, _)
+            | ModelPattern::Parenthesized(p, _) => {
                 validate_patterns(p, defined_rules, has_inheritance, valid_builtins)?;
             }
             ModelPattern::Recover { body, sync, .. } => {

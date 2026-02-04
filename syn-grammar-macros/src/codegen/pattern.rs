@@ -28,7 +28,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     let span = pattern.span();
 
     match pattern {
-        ModelPattern::Cut => Ok(quote!()),
+        ModelPattern::Cut(_) => Ok(quote!()),
         ModelPattern::Lit(lit) => {
             let token_types = analysis::resolve_token_types(lit, kws)?;
 
@@ -82,7 +82,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             })
         }
 
-        ModelPattern::Repeat(inner) => {
+        ModelPattern::Repeat(inner, _) => {
             if let ModelPattern::RuleCall {
                 binding: Some(bind),
                 rule_name,
@@ -122,7 +122,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             }
         }
 
-        ModelPattern::Plus(inner) => {
+        ModelPattern::Plus(inner, _) => {
             if let ModelPattern::RuleCall {
                 binding: Some(bind),
                 rule_name,
@@ -164,7 +164,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             }
         }
 
-        ModelPattern::Optional(inner) => {
+        ModelPattern::Optional(inner, _) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
             let peek_opt = analysis::get_simple_peek(inner, kws)?;
             let is_nullable = analysis::is_nullable(inner);
@@ -183,7 +183,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 })
             }
         }
-        ModelPattern::Group(alts) => {
+        ModelPattern::Group(alts, _) => {
             use super::rule::generate_variants_internal;
             let temp_variants = alts
                 .iter()
@@ -196,10 +196,12 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             Ok(quote_spanned! {span=> { #variant_logic }?; })
         }
 
-        ModelPattern::Bracketed(s) | ModelPattern::Braced(s) | ModelPattern::Parenthesized(s) => {
+        ModelPattern::Bracketed(s, _)
+        | ModelPattern::Braced(s, _)
+        | ModelPattern::Parenthesized(s, _) => {
             let macro_name = match pattern {
-                ModelPattern::Bracketed(_) => quote!(bracketed),
-                ModelPattern::Braced(_) => quote!(braced),
+                ModelPattern::Bracketed(_, _) => quote!(bracketed),
+                ModelPattern::Braced(_, _) => quote!(braced),
                 _ => quote!(parenthesized),
             };
 
@@ -241,6 +243,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             binding,
             body,
             sync,
+            ..
         } => {
             let effective_body = if let Some(bind) = binding {
                 match &**body {

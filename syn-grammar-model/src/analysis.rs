@@ -25,7 +25,7 @@ pub struct CutAnalysis<'a> {
 pub fn find_cut<'a>(patterns: &'a [ModelPattern]) -> Option<CutAnalysis<'a>> {
     let idx = patterns
         .iter()
-        .position(|p| matches!(p, ModelPattern::Cut))?;
+        .position(|p| matches!(p, ModelPattern::Cut(_)));
     Some(CutAnalysis {
         pre_cut: &patterns[0..idx],
         post_cut: &patterns[idx + 1..],
@@ -72,15 +72,15 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
                     }
                 }
             }
-            ModelPattern::Group(alts) => {
+            ModelPattern::Group(alts, _) => {
                 alts.iter().for_each(|alt| collect_from_patterns(alt, kws))
             }
-            ModelPattern::Bracketed(s)
-            | ModelPattern::Braced(s)
-            | ModelPattern::Parenthesized(s) => collect_from_patterns(s, kws),
-            ModelPattern::Optional(i) | ModelPattern::Repeat(i) | ModelPattern::Plus(i) => {
-                collect_from_patterns(std::slice::from_ref(i), kws)
-            }
+            ModelPattern::Bracketed(s, _)
+            | ModelPattern::Braced(s, _)
+            | ModelPattern::Parenthesized(s, _) => collect_from_patterns(s, kws),
+            ModelPattern::Optional(i, _)
+            | ModelPattern::Repeat(i, _)
+            | ModelPattern::Plus(i, _) => collect_from_patterns(std::slice::from_ref(i), kws),
             ModelPattern::Recover { body, sync, .. } => {
                 collect_from_patterns(std::slice::from_ref(body), kws);
                 collect_from_patterns(std::slice::from_ref(sync), kws);
@@ -97,7 +97,7 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
             ModelPattern::RuleCall {
                 binding: Some(b), ..
             } => bindings.push(b.clone()),
-            ModelPattern::Repeat(inner) | ModelPattern::Plus(inner) => {
+            ModelPattern::Repeat(inner, _) | ModelPattern::Plus(inner, _) => {
                 if let ModelPattern::RuleCall {
                     binding: Some(b), ..
                 } = &**inner
@@ -105,9 +105,9 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
                     bindings.push(b.clone());
                 }
             }
-            ModelPattern::Parenthesized(s)
-            | ModelPattern::Bracketed(s)
-            | ModelPattern::Braced(s) => {
+            ModelPattern::Parenthesized(s, _)
+            | ModelPattern::Bracketed(s, _)
+            | ModelPattern::Braced(s, _) => {
                 bindings.extend(collect_bindings(s));
             }
             ModelPattern::Recover { binding, body, .. } => {
@@ -240,14 +240,14 @@ pub fn get_simple_peek(
                 Ok(None)
             }
         }
-        ModelPattern::Bracketed(_) => Ok(Some(quote!(syn::token::Bracket))),
-        ModelPattern::Braced(_) => Ok(Some(quote!(syn::token::Brace))),
-        ModelPattern::Parenthesized(_) => Ok(Some(quote!(syn::token::Paren))),
-        ModelPattern::Optional(inner) | ModelPattern::Repeat(inner) | ModelPattern::Plus(inner) => {
-            get_simple_peek(inner, kws)
-        }
+        ModelPattern::Bracketed(_, _) => Ok(Some(quote!(syn::token::Bracket))),
+        ModelPattern::Braced(_, _) => Ok(Some(quote!(syn::token::Brace))),
+        ModelPattern::Parenthesized(_, _) => Ok(Some(quote!(syn::token::Paren))),
+        ModelPattern::Optional(inner, _)
+        | ModelPattern::Repeat(inner, _)
+        | ModelPattern::Plus(inner, _) => get_simple_peek(inner, kws),
         ModelPattern::Recover { body, .. } => get_simple_peek(body, kws),
-        ModelPattern::Group(alts) => {
+        ModelPattern::Group(alts, _) => {
             if alts.len() == 1 {
                 if let Some(first) = alts[0].first() {
                     get_simple_peek(first, kws)
@@ -266,16 +266,18 @@ pub fn get_simple_peek(
 pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     match patterns.first() {
         Some(ModelPattern::Lit(l)) => Some(l.value()),
-        Some(ModelPattern::Bracketed(_)) => Some("Bracket".to_string()),
-        Some(ModelPattern::Braced(_)) => Some("Brace".to_string()),
-        Some(ModelPattern::Parenthesized(_)) => Some("Paren".to_string()),
-        Some(ModelPattern::Optional(inner))
-        | Some(ModelPattern::Repeat(inner))
-        | Some(ModelPattern::Plus(inner)) => get_peek_token_string(std::slice::from_ref(&**inner)),
+        Some(ModelPattern::Bracketed(_, _)) => Some("Bracket".to_string()),
+        Some(ModelPattern::Braced(_, _)) => Some("Brace".to_string()),
+        Some(ModelPattern::Parenthesized(_, _)) => Some("Paren".to_string()),
+        Some(ModelPattern::Optional(inner, _))
+        | Some(ModelPattern::Repeat(inner, _))
+        | Some(ModelPattern::Plus(inner, _)) => {
+            get_peek_token_string(std::slice::from_ref(&**inner))
+        }
         Some(ModelPattern::Recover { body, .. }) => {
             get_peek_token_string(std::slice::from_ref(&**body))
         }
-        Some(ModelPattern::Group(alts)) => {
+        Some(ModelPattern::Group(alts, _)) => {
             if alts.len() == 1 {
                 get_peek_token_string(&alts[0])
             } else {
@@ -290,18 +292,18 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
 /// Used to determine if it is safe to skip a pattern based on a failed peek.
 pub fn is_nullable(pattern: &ModelPattern) -> bool {
     match pattern {
-        ModelPattern::Cut => true,
+        ModelPattern::Cut(_) => true,
         ModelPattern::Lit(_) => false,
         // Conservative assumption: Rule calls might be nullable.
         // To be safe, we assume they are, preventing unsafe peek optimizations.
         ModelPattern::RuleCall { .. } => true,
-        ModelPattern::Group(alts) => alts.iter().any(|seq| seq.iter().all(is_nullable)),
-        ModelPattern::Bracketed(_) | ModelPattern::Braced(_) | ModelPattern::Parenthesized(_) => {
-            false
-        }
-        ModelPattern::Optional(_) => true,
-        ModelPattern::Repeat(_) => true,
-        ModelPattern::Plus(inner) => is_nullable(inner),
+        ModelPattern::Group(alts, _) => alts.iter().any(|seq| seq.iter().all(is_nullable)),
+        ModelPattern::Bracketed(_, _)
+        | ModelPattern::Braced(_, _)
+        | ModelPattern::Parenthesized(_, _) => false,
+        ModelPattern::Optional(_, _) => true,
+        ModelPattern::Repeat(_, _) => true,
+        ModelPattern::Plus(inner, _) => is_nullable(inner),
         ModelPattern::Recover { .. } => true,
     }
 }
