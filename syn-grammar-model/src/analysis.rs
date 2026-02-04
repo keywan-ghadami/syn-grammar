@@ -25,7 +25,7 @@ pub struct CutAnalysis<'a> {
 pub fn find_cut<'a>(patterns: &'a [ModelPattern]) -> Option<CutAnalysis<'a>> {
     let idx = patterns
         .iter()
-        .position(|p| matches!(p, ModelPattern::Cut(_)));
+        .position(|p| matches!(p, ModelPattern::Cut(_)))?;
     Some(CutAnalysis {
         pre_cut: &patterns[0..idx],
         post_cut: &patterns[idx + 1..],

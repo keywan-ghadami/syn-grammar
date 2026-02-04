@@ -106,19 +106,19 @@ impl From<parser::Pattern> for ModelPattern {
                 alts.into_iter()
                     .map(|seq| seq.into_iter().map(ModelPattern::from).collect())
                     .collect(),
-                token.span,
+                token.span.join(),
             ),
             P::Bracketed(p, token) => ModelPattern::Bracketed(
                 p.into_iter().map(ModelPattern::from).collect(),
-                token.span,
+                token.span.join(),
             ),
             P::Braced(p, token) => ModelPattern::Braced(
                 p.into_iter().map(ModelPattern::from).collect(),
-                token.span,
+                token.span.join(),
             ),
             P::Parenthesized(p, _, token) => ModelPattern::Parenthesized(
                 p.into_iter().map(ModelPattern::from).collect(),
-                token.span,
+                token.span.join(),
             ),
             P::Optional(p, token) => {
                 ModelPattern::Optional(Box::new(ModelPattern::from(*p)), token.span())
