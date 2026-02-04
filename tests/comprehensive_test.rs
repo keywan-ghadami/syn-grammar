@@ -656,3 +656,53 @@ fn test_action_block_statements() {
         .test()
         .assert_success_is(30);
 }
+
+// --- Test 26: Multi-token Literals (Added in 0.4.0) ---
+#[test]
+fn test_multi_token_literals() {
+    grammar! {
+        grammar multi_token {
+            // "?." is two tokens: Token![?] and Token![.]
+            // The parser generator ensures they are adjacent (no whitespace).
+            rule optional_dot -> () = "?." -> { () }
+
+            // "@detached" involves a Punct and an Ident.
+            // "detached" should be recognized as a custom keyword automatically.
+            rule at_detached -> () = "@detached" -> { () }
+
+            // "..." is a single token Token![...]
+            rule dot3 -> () = "..." -> { () }
+        }
+    }
+
+    // 1. Happy Path: "?."
+    multi_token::parse_optional_dot
+        .parse_str("?.")
+        .test()
+        .assert_success();
+
+    // 2. Fail Path: "? ." (Space between tokens)
+    // The grammar defined "?." as a single literal, so it enforces adjacency.
+    multi_token::parse_optional_dot
+        .parse_str("? .")
+        .test()
+        .assert_failure_contains("found space between tokens");
+
+    // 3. Happy Path: "@detached"
+    multi_token::parse_at_detached
+        .parse_str("@detached")
+        .test()
+        .assert_success();
+
+    // 4. Fail Path: "@ detached"
+    multi_token::parse_at_detached
+        .parse_str("@ detached")
+        .test()
+        .assert_failure_contains("found space between tokens");
+
+    // 5. Happy Path: "..."
+    multi_token::parse_dot3
+        .parse_str("...")
+        .test()
+        .assert_success();
+}
