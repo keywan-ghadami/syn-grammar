@@ -167,15 +167,10 @@ pub fn resolve_token_types(
             format!("Numeric literal '{}' cannot be used as a token. Use `integer` or `lit_int` parsers instead.", s)));
     }
 
-    // 4. Try parsing as a single Token![...] type
-    // This handles standard operators like "->", "==", etc.
-    if let Ok(ty) = syn::parse_str::<syn::Type>(&format!("Token![{}]", s)) {
-        return Ok(vec![ty]);
-    }
-
-    // 5. If single token failed, try splitting into multiple tokens
+    // 4. Split into tokens and map each to a Type
     // e.g. "?." -> Token![?] + Token![.]
     // e.g. "@detached" -> Token![@] + kw::detached
+    // e.g. "->" -> Token![-] + Token![>] (syn handles this as two Puncts)
     let ts: proc_macro2::TokenStream = syn::parse_str(&s)
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))?;
 
