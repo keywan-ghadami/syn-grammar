@@ -312,6 +312,7 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
 mod tests {
     use super::*;
     use syn::parse_quote;
+    use syn::spanned::Spanned;
 
     #[test]
     fn test_resolve_token_types_valid() {
@@ -327,6 +328,7 @@ mod tests {
         let lit: syn::LitStr = parse_quote!("(");
         let err = resolve_token_types(&lit, &kws).unwrap_err();
         assert!(err.to_string().contains("Invalid direct token literal"));
+        assert_eq!(format!("{:?}", err.span()), format!("{:?}", lit.span()));
     }
 
     #[test]
@@ -335,6 +337,7 @@ mod tests {
         let lit: syn::LitStr = parse_quote!("true");
         let err = resolve_token_types(&lit, &kws).unwrap_err();
         assert!(err.to_string().contains("Boolean literal"));
+        assert_eq!(format!("{:?}", err.span()), format!("{:?}", lit.span()));
     }
 
     #[test]
@@ -343,5 +346,6 @@ mod tests {
         let lit: syn::LitStr = parse_quote!("123");
         let err = resolve_token_types(&lit, &kws).unwrap_err();
         assert!(err.to_string().contains("Numeric literal"));
+        assert_eq!(format!("{:?}", err.span()), format!("{:?}", lit.span()));
     }
 }

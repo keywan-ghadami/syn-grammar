@@ -118,10 +118,9 @@ mod tests {
     use crate::model::GrammarDefinition as ModelGrammar;
     use quote::quote;
 
-    fn validate_grammar(input: proc_macro2::TokenStream) -> Result<()> {
-        let ast: AstGrammar = syn::parse2(input)?;
-        let model: ModelGrammar = ast.into();
-        validate(&model, crate::SYN_BUILTINS)
+    fn parse_model(input: proc_macro2::TokenStream) -> ModelGrammar {
+        let ast: AstGrammar = syn::parse2(input).expect("Failed to parse AST");
+        ast.into()
     }
 
     #[test]
@@ -131,8 +130,16 @@ mod tests {
                 rule main -> () = undefined_rule -> { () }
             }
         };
-        let err = validate_grammar(input).unwrap_err();
+        let model = parse_model(input);
+
+        // Locate the expected span: rule 'main' -> variant 0 -> pattern 0 ('undefined_rule')
+        let expected_span = model.rules[0].variants[0].pattern[0].span();
+
+        let err = validate(&model, crate::SYN_BUILTINS).unwrap_err();
         assert_eq!(err.to_string(), "Undefined rule: 'undefined_rule'.");
+
+        // Verify that the error span matches the span of the undefined rule usage
+        assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
     }
 
     #[test]
@@ -143,8 +150,14 @@ mod tests {
                 rule sub -> () = "a" -> { () }
             }
         };
-        let err = validate_grammar(input).unwrap_err();
+        let model = parse_model(input);
+
+        // Locate the expected span: rule 'main' -> variant 0 -> pattern 0 ('sub(1)')
+        let expected_span = model.rules[0].variants[0].pattern[0].span();
+
+        let err = validate(&model, crate::SYN_BUILTINS).unwrap_err();
         assert_eq!(err.to_string(), "Rule 'sub' expects 0 argument(s), but got 1.");
+        assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
     }
 
     #[test]
@@ -154,7 +167,13 @@ mod tests {
                 rule main -> () = ident(1) -> { () }
             }
         };
-        let err = validate_grammar(input).unwrap_err();
+        let model = parse_model(input);
+
+        // Locate the expected span: rule 'main' -> variant 0 -> pattern 0 ('ident(1)')
+        let expected_span = model.rules[0].variants[0].pattern[0].span();
+
+        let err = validate(&model, crate::SYN_BUILTINS).unwrap_err();
         assert_eq!(err.to_string(), "Built-in rule 'ident' does not accept arguments.");
+        assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
     }
 }
