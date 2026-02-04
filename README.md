@@ -178,6 +178,18 @@ Match specific tokens using string literals.
 rule kw -> () = "fn" "name" -> { () }
 ```
 
+#### Multi-token Literals
+You can match sequences of tokens that must appear strictly adjacent to each other (no whitespace) by using a single string literal containing multiple tokens.
+
+```rust,ignore
+// Matches "?." (e.g. in `foo?.bar`)
+// Fails if there is a space like `? .`
+rule optional_dot -> () = "?." -> { () }
+
+// Matches "@detached" (Punct `@` + Ident `detached`) without space
+rule attribute -> () = "@detached" -> { () }
+```
+
 #### Built-in Parsers
 `syn-grammar` provides several built-in parsers for common Rust tokens:
 
@@ -239,6 +251,8 @@ rule complex -> () =
 
 #### Delimiters
 Match content inside delimiters.
+
+**Note**: You cannot match delimiters using string literals (e.g., `"["` or `"}"`) because `syn` parses them as structural `TokenTree`s. You must use the syntax below.
 
 - `paren(pattern)`: Matches `( pattern )`.
 - `[ pattern ]`: Matches `[ pattern ]`.
