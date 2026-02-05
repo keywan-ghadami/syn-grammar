@@ -19,7 +19,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 - **Rule Arguments**: Pass context or parameters between rules.
 - **Grammar Inheritance**: Reuse rules from other grammars.
-- **Testing Utilities**: Fluent API for testing your parsers.
+- **Testing Utilities**: Fluent API for testing your parsers with pretty-printed error reporting.
 
 ## Installation
 
@@ -290,7 +290,7 @@ rule stmt -> Stmt =
 
 ## Testing
 
-`syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`).
+`syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`). When tests fail, errors are pretty-printed with source context and underlining.
 
 ```rust,ignore
 use syn_grammar::testing::Testable;
