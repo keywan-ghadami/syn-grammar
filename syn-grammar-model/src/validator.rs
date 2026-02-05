@@ -114,8 +114,8 @@ fn validate_patterns(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::GrammarDefinition as AstGrammar;
     use crate::model::GrammarDefinition as ModelGrammar;
+    use crate::parser::GrammarDefinition as AstGrammar;
     use quote::quote;
 
     fn parse_model(input: proc_macro2::TokenStream) -> ModelGrammar {
@@ -156,7 +156,10 @@ mod tests {
         let expected_span = model.rules[0].variants[0].pattern[0].span();
 
         let err = validate(&model, crate::SYN_BUILTINS).unwrap_err();
-        assert_eq!(err.to_string(), "Rule 'sub' expects 0 argument(s), but got 1.");
+        assert_eq!(
+            err.to_string(),
+            "Rule 'sub' expects 0 argument(s), but got 1."
+        );
         assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
     }
 
@@ -173,7 +176,10 @@ mod tests {
         let expected_span = model.rules[0].variants[0].pattern[0].span();
 
         let err = validate(&model, crate::SYN_BUILTINS).unwrap_err();
-        assert_eq!(err.to_string(), "Built-in rule 'ident' does not accept arguments.");
+        assert_eq!(
+            err.to_string(),
+            "Built-in rule 'ident' does not accept arguments."
+        );
         assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
     }
 }

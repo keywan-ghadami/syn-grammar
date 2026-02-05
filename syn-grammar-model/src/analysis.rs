@@ -194,15 +194,16 @@ pub fn resolve_token_types(
                     types.push(parse_quote!(kw::#ident));
                 } else {
                     // Try as standard token (e.g. keyword)
-                    let ty: syn::Type = syn::parse_str(&format!("Token![{}]", s)).map_err(|_| {
-                        syn::Error::new(
-                            lit.span(),
-                            format!(
+                    let ty: syn::Type =
+                        syn::parse_str(&format!("Token![{}]", s)).map_err(|_| {
+                            syn::Error::new(
+                                lit.span(),
+                                format!(
                                 "Identifier '{}' is not a custom keyword and not a valid Token!",
                                 s
                             ),
-                        )
-                    })?;
+                            )
+                        })?;
                     types.push(ty);
                 }
             }

@@ -126,9 +126,7 @@ impl From<parser::Pattern> for ModelPattern {
             P::Repeat(p, token) => {
                 ModelPattern::Repeat(Box::new(ModelPattern::from(*p)), token.span())
             }
-            P::Plus(p, token) => {
-                ModelPattern::Plus(Box::new(ModelPattern::from(*p)), token.span())
-            }
+            P::Plus(p, token) => ModelPattern::Plus(Box::new(ModelPattern::from(*p)), token.span()),
             P::Recover {
                 binding,
                 body,

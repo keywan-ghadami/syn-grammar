@@ -49,7 +49,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                     if i > 0 {
                         let prev = format_ident!("_t{}", i - 1);
-                        let err_msg = format!("expected '{}', found space between tokens", lit.value());
+                        let err_msg =
+                            format!("expected '{}', found space between tokens", lit.value());
                         checks.push(quote_spanned! {span=>
                             if #prev.span().end() != #var.span().start() {
                                 return Err(syn::Error::new(

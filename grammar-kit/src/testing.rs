@@ -3,9 +3,9 @@
 //! This module provides a fluent API for testing parsing results,
 //! asserting success/failure, and checking error messages.
 
-use std::fmt::{Debug, Display};
 #[cfg(feature = "syn")]
 use std::any::Any;
+use std::fmt::{Debug, Display};
 
 // A wrapper around Result to write fluent tests.
 pub struct TestResult<T, E> {
