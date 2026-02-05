@@ -12,6 +12,22 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let ret_type = &rule.return_type;
     let attrs = &rule.attrs;
 
+    // Filter attributes for the implementation function
+    // Structural & Lint attributes must be on both.
+    // API & Doc attributes should only be on the wrapper.
+    let impl_attrs: Vec<&syn::Attribute> = attrs
+        .iter()
+        .filter(|a| {
+            let p = a.path();
+            p.is_ident("cfg")
+                || p.is_ident("cfg_attr")
+                || p.is_ident("allow")
+                || p.is_ident("warn")
+                || p.is_ident("deny")
+                || p.is_ident("forbid")
+        })
+        .collect();
+
     // Default doc comment if none provided
     let default_doc = if attrs.iter().any(|a| a.path().is_ident("doc")) {
         quote!()
@@ -92,6 +108,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
         }
 
         #[doc(hidden)]
+        #(#impl_attrs)*
         pub fn #impl_name(input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> {
             ctx.enter_rule(stringify!(#name));
             let res = (|| -> syn::Result<#ret_type> {
