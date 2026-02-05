@@ -49,8 +49,8 @@ impl<T: Debug, E: Display + Debug + 'static> TestResult<T, E> {
         let ctx = self.format_context();
         match self.inner {
             Ok(val) => val,
-            Err(e) => {
-                let msg = self.format_err(&e);
+            Err(ref e) => {
+                let msg = self.format_err(e);
                 panic!(
                     "\n🔴 TEST FAILED (Expected Success, but got Error):{}\nMessage:  {}\nError Debug: {:?}\n", 
                     ctx, msg, e
