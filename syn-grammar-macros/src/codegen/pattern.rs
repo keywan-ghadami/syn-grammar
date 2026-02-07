@@ -87,8 +87,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
 
             if !bindings.is_empty() {
-                let init_vecs = bindings.iter().map(|b| quote!(let mut #b = Vec::new();));
-                let push_vecs = bindings.iter().map(|b| quote!(#b.push(#b);));
+                let init_vecs: Vec<_> = bindings.iter().map(|b| quote!(let mut #b = Vec::new();)).collect();
+                let push_vecs: Vec<_> = bindings.iter().map(|b| quote!(#b.push(#b);)).collect();
 
                 let inner_logic = generate_pattern_step(inner, kws)?;
 
@@ -137,8 +137,8 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
 
             if !bindings.is_empty() {
-                let init_vecs = bindings.iter().map(|b| quote!(let mut #b = Vec::new();));
-                let push_vecs = bindings.iter().map(|b| quote!(#b.push(#b);));
+                let init_vecs: Vec<_> = bindings.iter().map(|b| quote!(let mut #b = Vec::new();)).collect();
+                let push_vecs: Vec<_> = bindings.iter().map(|b| quote!(#b.push(#b);)).collect();
 
                 let inner_logic = generate_pattern_step(inner, kws)?;
 
