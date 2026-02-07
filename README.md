@@ -387,7 +387,7 @@ grammar! {
 
 `syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`). When tests fail, errors are pretty-printed with source context and underlining.
 
-```rust
+```rust,no_run
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
