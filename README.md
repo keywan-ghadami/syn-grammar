@@ -273,12 +273,10 @@ You can capture the `Span` of a parsed rule or built-in using the syntax `name:r
 
 ```rust
 use syn_grammar::grammar;
-use proc_macro2::Span;
-use syn::Ident;
 
 grammar! {
     grammar Spanned {
-        rule main -> (Ident, Span) = 
+        rule main -> (syn::Ident, proc_macro2::Span) = 
             // Binds the identifier to `id` and its span to `s`
             id:ident @ s -> { (id, s) }
     }
