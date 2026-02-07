@@ -139,7 +139,7 @@ grammar! {
         rule my_ident -> Ident = i:ident -> { i }
     }
 }
-fn main() {}
+
 ```
 
 ### Rule Arguments
@@ -158,7 +158,6 @@ grammar! {
             i:integer -> { i + offset }
     }
 }
-fn main() {}
 ```
 
 ### Grammar Inheritance
@@ -184,7 +183,7 @@ grammar! {
             "add" a:num b:num -> { a + b }
     }
 }
-fn main() {}
+# fn main() {}
 ```
 
 ### Patterns
@@ -200,7 +199,6 @@ grammar! {
         rule kw -> () = "fn" "name" -> { () }
     }
 }
-fn main() {}
 ```
 
 #### Multi-token Literals
@@ -219,7 +217,6 @@ grammar! {
         rule attribute -> () = "@detached" -> { () }
     }
 }
-fn main() {}
 ```
 
 #### Built-in Parsers
@@ -266,7 +263,7 @@ grammar! {
         rule expr -> i32 = i:integer -> { i }
     }
 }
-fn main() {}
+# fn main() {}
 ```
 
 #### Alternatives (`|`)
@@ -282,7 +279,6 @@ grammar! {
           | "no"  -> { false }
     }
 }
-fn main() {}
 ```
 
 #### Repetitions (`*`, `+`, `?`)
@@ -299,7 +295,6 @@ grammar! {
             [ elements:integer* ] -> { elements }
     }
 }
-fn main() {}
 ```
 
 #### Groups `(...)`
@@ -314,7 +309,6 @@ grammar! {
             ("a" | "b")+ "c" -> { () }
     }
 }
-fn main() {}
 ```
 
 #### Delimiters
@@ -335,7 +329,6 @@ grammar! {
             paren(a:integer "," b:integer) -> { (a, b) }
     }
 }
-fn main() {}
 ```
 
 #### Error Recovery (`recover`)
@@ -359,7 +352,7 @@ grammar! {
         rule parse_stmt -> super::Stmt = "let" "x" -> { super::Stmt }
     }
 }
-fn main() {}
+# fn main() {}
 ```
 
 ### The Cut Operator (`=>`)
@@ -387,7 +380,7 @@ grammar! {
         rule expr -> i32 = i:integer -> { i }
     }
 }
-fn main() {}
+# fn main() {}
 ```
 
 ## Testing
@@ -422,7 +415,7 @@ fn test_calc() {
         
     assert!(err.to_string().contains("expected"));
 }
-fn main() {}
+# fn main() {}
 ```
 
 ## Advanced Topics
