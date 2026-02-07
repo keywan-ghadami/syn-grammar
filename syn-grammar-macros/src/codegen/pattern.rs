@@ -34,7 +34,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
             if token_types.len() <= 1 {
                 let parses = token_types.iter().map(|ty| {
-                    quote_spanned! {span=> let _ = input.parse::<#ty>()?; }
+                    quote! { let _ = input.parse::<#ty>()?; }
                 });
                 Ok(quote! { #(#parses)* })
             } else {
@@ -43,7 +43,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                 for (i, ty) in token_types.iter().enumerate() {
                     let var = format_ident!("_t{}", i);
-                    steps.push(quote_spanned! {span=>
+                    steps.push(quote! {
                         let #var = input.parse::<#ty>()?;
                     });
 
@@ -51,7 +51,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         let prev = format_ident!("_t{}", i - 1);
                         let err_msg =
                             format!("expected '{}', found space between tokens", lit.value());
-                        checks.push(quote_spanned! {span=>
+                        checks.push(quote! {
                             if #prev.span().end() != #var.span().start() {
                                 return Err(syn::Error::new(
                                     #var.span(),
@@ -77,9 +77,9 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         } => {
             let func_call = generate_rule_call_expr(rule_name, args);
             Ok(if let Some(bind) = binding {
-                quote_spanned! {span=> let #bind = #func_call; }
+                quote! { let #bind = #func_call; }
             } else {
-                quote_spanned! {span=> let _ = #func_call; }
+                quote! { let _ = #func_call; }
             })
         }
 
@@ -98,7 +98,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 };
 
                 if analysis::get_simple_peek(inner, kws)?.is_some() {
-                    Ok(quote_spanned! {span=>
+                    Ok(quote! {
                        let mut #bind = Vec::new();
                        while #peek_check {
                            let val = #func_call;
@@ -106,7 +106,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                        }
                     })
                 } else {
-                    Ok(quote_spanned! {span=>
+                    Ok(quote! {
                        let mut #bind = Vec::new();
                        // Pass ctx to attempt
                        while let Some(val) = rt::attempt(input, ctx, |input, ctx| { Ok(#func_call) })? {
@@ -116,7 +116,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 }
             } else {
                 let inner_logic = generate_pattern_step(inner, kws)?;
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     // Pass ctx to attempt
                     while let Some(_) = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })? {}
                 })
@@ -138,7 +138,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 };
 
                 if analysis::get_simple_peek(inner, kws)?.is_some() {
-                    Ok(quote_spanned! {span=>
+                    Ok(quote! {
                        let mut #bind = Vec::new();
                        #bind.push(#func_call);
                        while #peek_check {
@@ -146,7 +146,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                        }
                     })
                 } else {
-                    Ok(quote_spanned! {span=>
+                    Ok(quote! {
                        let mut #bind = Vec::new();
                        #bind.push(#func_call);
                        // Pass ctx to attempt
@@ -157,7 +157,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 }
             } else {
                 let inner_logic = generate_pattern_step(inner, kws)?;
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     #inner_logic
                     // Pass ctx to attempt
                     while let Some(_) = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })? {}
@@ -171,14 +171,14 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let is_nullable = analysis::is_nullable(inner);
 
             if let (Some(peek), false) = (peek_opt, is_nullable) {
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     if input.peek(#peek) {
                         // Pass ctx to attempt
                         let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
                     }
                 })
             } else {
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     // Pass ctx to attempt
                     let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
                 })
@@ -194,7 +194,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 })
                 .collect::<Vec<_>>();
             let variant_logic = generate_variants_internal(&temp_variants, false, kws)?;
-            Ok(quote_spanned! {span=> { #variant_logic }?; })
+            Ok(quote! { { #variant_logic }?; })
         }
 
         ModelPattern::Bracketed(s, _)
@@ -210,7 +210,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let bindings = analysis::collect_bindings(s);
 
             if bindings.is_empty() {
-                Ok(quote_spanned! {span=> {
+                Ok(quote! { {
                     let content;
                     let _ = syn::#macro_name!(content in input);
                     let input = &content;
@@ -218,7 +218,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 }})
             } else if bindings.len() == 1 {
                 let bind = &bindings[0];
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     let #bind = {
                         let content;
                         let _ = syn::#macro_name!(content in input);
@@ -228,7 +228,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     };
                 })
             } else {
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     let (#(#bindings),*) = {
                         let content;
                         let _ = syn::#macro_name!(content in input);
@@ -272,7 +272,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let bindings = analysis::collect_bindings(std::slice::from_ref(&effective_body));
 
             if bindings.is_empty() {
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     // Pass ctx to attempt_recover
                     if rt::attempt_recover(input, ctx, |input, ctx| { #inner_logic Ok(()) })?.is_none() {
                         rt::skip_until(input, |i| i.peek(#sync_peek))?;
@@ -281,7 +281,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             } else {
                 let none_exprs = bindings.iter().map(|_| quote!(Option::<_>::None));
 
-                Ok(quote_spanned! {span=>
+                Ok(quote! {
                     // Pass ctx to attempt_recover
                     let (#(#bindings),*) = match rt::attempt_recover(input, ctx, |input, ctx| {
                         #inner_logic
