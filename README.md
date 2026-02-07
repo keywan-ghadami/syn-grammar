@@ -136,7 +136,7 @@ grammar! {
     grammar MyGrammar {
         /// Parses a valid identifier.
         #[cfg(feature = "extra")]
-        rule ident -> Ident = i:ident -> { i }
+        rule my_ident -> Ident = i:ident -> { i }
     }
 }
 fn main() {}
@@ -258,9 +258,9 @@ pub enum Stmt {
 
 grammar! {
     grammar Assignment {
-        rule assignment -> Stmt = 
+        rule assignment -> super::Stmt = 
             name:ident "=" val:expr -> { 
-                Stmt::Assign(name, val) 
+                super::Stmt::Assign(name, val) 
             }
             
         rule expr -> i32 = i:integer -> { i }
@@ -276,10 +276,10 @@ Match one of several alternatives. The first one that matches wins.
 use syn_grammar::grammar;
 
 grammar! {
-    grammar Bool {
-        rule boolean -> bool = 
-            "true"  -> { true }
-          | "false" -> { false }
+    grammar Choice {
+        rule choice -> bool = 
+            "yes" -> { true }
+          | "no"  -> { false }
     }
 }
 fn main() {}
@@ -351,12 +351,12 @@ pub struct Stmt;
 
 grammar! {
     grammar Recovery {
-        rule stmt -> Option<Stmt> =
+        rule stmt -> Option<super::Stmt> =
             // If `parse_stmt` fails, skip until `;`
             // `s` will be `Option<Stmt>` (Some if success, None if recovered)
             s:recover(parse_stmt, ";") ";" -> { s }
             
-        rule parse_stmt -> Stmt = "let" "x" -> { Stmt }
+        rule parse_stmt -> super::Stmt = "let" "x" -> { super::Stmt }
     }
 }
 fn main() {}
@@ -377,12 +377,12 @@ pub enum Stmt {
 
 grammar! {
     grammar Cut {
-        rule stmt -> Stmt =
+        rule stmt -> super::Stmt =
             // If we see "let", we commit to this rule. 
             // If "mut" or the identifier is missing, we error immediately 
             // instead of trying the next alternative.
-            "let" => "mut"? name:ident "=" e:expr -> { Stmt::Let(name, e) }
-          | e:expr -> { Stmt::Expr(e) }
+            "let" => "mut"? name:ident "=" e:expr -> { super::Stmt::Let(name, e) }
+          | e:expr -> { super::Stmt::Expr(e) }
           
         rule expr -> i32 = i:integer -> { i }
     }
