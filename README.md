@@ -408,12 +408,11 @@ fn test_calc() {
         .test()
         .assert_success_is(3);
 
-    let err = Calc::parse_expression
+    Calc::parse_expression
         .parse_str("1 + *")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected term");
         
-    assert!(err.to_string().contains("expected"));
 }
 # fn main() {}
 ```
@@ -437,7 +436,6 @@ grammar! {
         rule term -> i32 = i:integer -> { i }
     }
 }
-fn main() {}
 ```
 
 ### Backtracking

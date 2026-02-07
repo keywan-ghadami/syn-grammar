@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, quote_spanned};
+use quote::{format_ident, quote};
 use std::collections::HashSet;
 use syn::Result;
 use syn_grammar_model::{analysis, model::*};
