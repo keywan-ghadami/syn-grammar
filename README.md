@@ -115,7 +115,7 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 
 A grammar consists of a set of rules. Each rule has a name, a return type, and a pattern to match.
 
-```rust,ignore
+```text
 rule name -> ReturnType = pattern -> { action_code }
 ```
 
@@ -128,38 +128,55 @@ rule name -> ReturnType = pattern -> { action_code }
 
 Rules can be decorated with standard Rust attributes and documentation comments. These are passed through to the generated function.
 
-```rust,ignore
-/// Parses a valid identifier.
-#[cfg(feature = "extra")]
-rule ident -> Ident = ...
+```rust
+use syn_grammar::grammar;
+use syn::Ident;
+
+grammar! {
+    grammar MyGrammar {
+        /// Parses a valid identifier.
+        #[cfg(feature = "extra")]
+        rule ident -> Ident = i:ident -> { i }
+    }
+}
+fn main() {}
 ```
 
 ### Rule Arguments
 
 Rules can accept arguments, allowing you to pass context or state down the parser chain.
 
-```rust,ignore
-rule main -> i32 = 
-    "start" v:value(10) -> { v }
+```rust
+use syn_grammar::grammar;
 
-rule value(offset: i32) -> i32 =
-    i:integer -> { i + offset }
+grammar! {
+    grammar Args {
+        rule main -> i32 = 
+            "start" v:value(10) -> { v }
+
+        rule value(offset: i32) -> i32 =
+            i:integer -> { i + offset }
+    }
+}
+fn main() {}
 ```
 
 ### Grammar Inheritance
 
 You can inherit rules from another grammar module. This is useful for splitting large grammars or reusing common rules.
 
-```rust,ignore
-// In base.rs
-grammar! {
-    grammar Base {
-        pub rule num -> i32 = i:integer -> { i }
+```rust
+mod base {
+    use syn_grammar::grammar;
+    grammar! {
+        grammar Base {
+            pub rule num -> i32 = i:integer -> { i }
+        }
     }
 }
 
-// In derived.rs
-use crate::base::Base;
+use syn_grammar::grammar;
+use base::Base;
 
 grammar! {
     grammar Derived : Base {
@@ -167,6 +184,7 @@ grammar! {
             "add" a:num b:num -> { a + b }
     }
 }
+fn main() {}
 ```
 
 ### Patterns
@@ -174,20 +192,34 @@ grammar! {
 #### Literals and Keywords
 Match specific tokens using string literals.
 
-```rust,ignore
-rule kw -> () = "fn" "name" -> { () }
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Kws {
+        rule kw -> () = "fn" "name" -> { () }
+    }
+}
+fn main() {}
 ```
 
 #### Multi-token Literals
 You can match sequences of tokens that must appear strictly adjacent to each other (no whitespace) by using a single string literal containing multiple tokens.
 
-```rust,ignore
-// Matches "?." (e.g. in `foo?.bar`)
-// Fails if there is a space like `? .`
-rule optional_dot -> () = "?." -> { () }
+```rust
+use syn_grammar::grammar;
 
-// Matches "@detached" (Punct `@` + Ident `detached`) without space
-rule attribute -> () = "@detached" -> { () }
+grammar! {
+    grammar Tokens {
+        // Matches "?." (e.g. in `foo?.bar`)
+        // Fails if there is a space like `? .`
+        rule optional_dot -> () = "?." -> { () }
+
+        // Matches "@detached" (Punct `@` + Ident `detached`) without space
+        rule attribute -> () = "@detached" -> { () }
+    }
+}
+fn main() {}
 ```
 
 #### Built-in Parsers
@@ -215,20 +247,42 @@ rule attribute -> () = "@detached" -> { () }
 #### Sequences and Bindings
 Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
 
-```rust,ignore
-rule assignment -> Stmt = 
-    name:ident "=" val:expr -> { 
-        Stmt::Assign(name, val) 
+```rust
+use syn_grammar::grammar;
+use syn::Ident;
+
+// Mock Stmt for the example
+pub enum Stmt {
+    Assign(Ident, i32),
+}
+
+grammar! {
+    grammar Assignment {
+        rule assignment -> Stmt = 
+            name:ident "=" val:expr -> { 
+                Stmt::Assign(name, val) 
+            }
+            
+        rule expr -> i32 = i:integer -> { i }
     }
+}
+fn main() {}
 ```
 
 #### Alternatives (`|`)
 Match one of several alternatives. The first one that matches wins.
 
-```rust,ignore
-rule boolean -> bool = 
-    "true"  -> { true }
-  | "false" -> { false }
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Bool {
+        rule boolean -> bool = 
+            "true"  -> { true }
+          | "false" -> { false }
+    }
+}
+fn main() {}
 ```
 
 #### Repetitions (`*`, `+`, `?`)
@@ -236,17 +290,31 @@ rule boolean -> bool =
 - `pattern+`: Match one or more times. Returns a `Vec`.
 - `pattern?`: Match zero or one time. Returns an `Option` (or `()` if unbound).
 
-```rust,ignore
-rule list -> Vec<i32> = 
-    [ elements:integer* ] -> { elements }
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar List {
+        rule list -> Vec<i32> = 
+            [ elements:integer* ] -> { elements }
+    }
+}
+fn main() {}
 ```
 
 #### Groups `(...)`
 Group patterns together to apply repetitions or ensure precedence.
 
-```rust,ignore
-rule complex -> () = 
-    ("a" | "b")+ "c" -> { () }
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Group {
+        rule complex -> () = 
+            ("a" | "b")+ "c" -> { () }
+    }
+}
+fn main() {}
 ```
 
 #### Delimiters
@@ -258,9 +326,16 @@ Match content inside delimiters.
 - `[ pattern ]`: Matches `[ pattern ]`.
 - `{ pattern }`: Matches `{ pattern }`.
 
-```rust,ignore
-rule tuple -> (i32, i32) = 
-    paren(a:integer "," b:integer) -> { (a, b) }
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Tuple {
+        rule tuple -> (i32, i32) = 
+            paren(a:integer "," b:integer) -> { (a, b) }
+    }
+}
+fn main() {}
 ```
 
 #### Error Recovery (`recover`)
@@ -268,32 +343,70 @@ You can make your parser robust against errors using `recover(rule, sync_token)`
 If `rule` fails, the parser will skip tokens until it finds `sync_token`, returning `None` (or `(None, ...)` for bindings).
 Note that `recover` does **not** consume the sync token.
 
-```rust,ignore
-rule stmt -> Option<Stmt> =
-    // If `parse_stmt` fails, skip until `;`
-    // `s` will be `Option<Stmt>` (Some if success, None if recovered)
-    s:recover(parse_stmt, ";") ";" -> { s }
+```rust
+use syn_grammar::grammar;
+
+#[derive(Debug)]
+pub struct Stmt;
+
+grammar! {
+    grammar Recovery {
+        rule stmt -> Option<Stmt> =
+            // If `parse_stmt` fails, skip until `;`
+            // `s` will be `Option<Stmt>` (Some if success, None if recovered)
+            s:recover(parse_stmt, ";") ";" -> { s }
+            
+        rule parse_stmt -> Stmt = "let" "x" -> { Stmt }
+    }
+}
+fn main() {}
 ```
 
 ### The Cut Operator (`=>`)
 
 The cut operator `=>` allows you to commit to a specific alternative. If the pattern *before* the `=>` matches, the parser will **not** backtrack to try other alternatives, even if the pattern *after* the `=>` fails. This produces better error messages.
 
-```rust,ignore
-rule stmt -> Stmt =
-    // If we see "let", we commit to this rule. 
-    // If "mut" or the identifier is missing, we error immediately 
-    // instead of trying the next alternative.
-    "let" => "mut"? name:ident "=" e:expr -> { ... }
-  | e:expr -> { ... }
+```rust
+use syn_grammar::grammar;
+use syn::Ident;
+
+pub enum Stmt {
+    Let(Ident, i32),
+    Expr(i32),
+}
+
+grammar! {
+    grammar Cut {
+        rule stmt -> Stmt =
+            // If we see "let", we commit to this rule. 
+            // If "mut" or the identifier is missing, we error immediately 
+            // instead of trying the next alternative.
+            "let" => "mut"? name:ident "=" e:expr -> { Stmt::Let(name, e) }
+          | e:expr -> { Stmt::Expr(e) }
+          
+        rule expr -> i32 = i:integer -> { i }
+    }
+}
+fn main() {}
 ```
 
 ## Testing
 
 `syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`). When tests fail, errors are pretty-printed with source context and underlining.
 
-```rust,ignore
+```rust
+use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
+
+grammar! {
+    grammar Calc {
+        rule expression -> i32 = 
+            l:expression "+" r:term -> { l + r }
+          | t:term -> { t }
+        
+        rule term -> i32 = i:integer -> { i }
+    }
+}
 
 #[test]
 fn test_calc() {
@@ -302,11 +415,14 @@ fn test_calc() {
         .test()
         .assert_success_is(3);
 
-    Calc::parse_expression
+    let err = Calc::parse_expression
         .parse_str("1 + *")
         .test()
-        .assert_failure_contains("expected term");
+        .assert_failure();
+        
+    assert!(err.to_string().contains("expected"));
 }
+fn main() {}
 ```
 
 ## Advanced Topics
@@ -315,11 +431,20 @@ fn test_calc() {
 
 Recursive descent parsers typically struggle with left recursion (e.g., `A -> A b`). `syn-grammar` automatically detects direct left recursion and compiles it into an iterative loop. This makes writing expression parsers natural and straightforward.
 
-```rust,ignore
-// This works perfectly!
-rule expr -> i32 = 
-    l:expr "+" r:term -> { l + r }
-  | t:term            -> { t }
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Expr {
+        // This works perfectly!
+        rule expr -> i32 = 
+            l:expr "+" r:term -> { l + r }
+          | t:term            -> { t }
+          
+        rule term -> i32 = i:integer -> { i }
+    }
+}
+fn main() {}
 ```
 
 ### Backtracking
