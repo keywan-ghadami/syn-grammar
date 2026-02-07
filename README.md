@@ -267,7 +267,7 @@ grammar! {
 ```
 
 #### Span Binding (`@`)
-You can capture the `Span` of a parsed rule or built-in using the `@` operator. This is useful for error reporting or constructing spanned AST nodes.
+You can capture the `Span` of a parsed rule or built-in using the syntax `name:rule @ span_var`. This is useful for error reporting or constructing spanned AST nodes.
 
 **Note**: The rule being bound must return a type that implements `syn::spanned::Spanned` (e.g., `syn::Ident`, `syn::Type`, `syn::LitStr`). Primitive types like `i32` or `String` do not support this.
 
