@@ -559,7 +559,9 @@ fn test_extended_literals() {
                 i:lit_int c:lit_char b:lit_bool f:lit_float -> { (i, c, b, f) }
 
             pub rule spanned -> ((i32, proc_macro2::Span), (String, proc_macro2::Span)) =
-                i:spanned_int_lit s:spanned_string_lit -> { (i, s) }
+                i:lit_int @ is  s:lit_str @ ss -> {
+                    ((i.base10_parse().unwrap(), is), (s.value(), ss))
+                }
         }
     }
 
