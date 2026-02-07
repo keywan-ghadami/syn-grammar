@@ -234,11 +234,11 @@ grammar! {
 | `lit_char` | A character literal (e.g. `'c'`) | `syn::LitChar` |
 | `lit_bool` | A boolean literal (`true` or `false`) | `syn::LitBool` |
 | `lit_float` | A floating point literal (e.g. `3.14`) | `syn::LitFloat` |
-| `spanned_int_lit` | An integer literal with span | `(i32, Span)` |
-| `spanned_string_lit` | A string literal with span | `(String, Span)` |
-| `spanned_float_lit` | A float literal with span | `(f64, Span)` |
-| `spanned_bool_lit` | A bool literal with span | `(bool, Span)` |
-| `spanned_char_lit` | A char literal with span | `(char, Span)` |
+| `spanned_int_lit` | **Deprecated** Use `lit_int` with `@` | `(i32, Span)` |
+| `spanned_string_lit` | **Deprecated** Use `lit_str` with `@` | `(String, Span)` |
+| `spanned_float_lit` | **Deprecated** Use `lit_float` with `@` | `(f64, Span)` |
+| `spanned_bool_lit` | **Deprecated** Use `lit_bool` with `@` | `(bool, Span)` |
+| `spanned_char_lit` | **Deprecated** Use `lit_char` with `@` | `(char, Span)` |
 | `outer_attrs` | Outer attributes (e.g. `#[...]`) | `Vec<syn::Attribute>` |
 
 #### Sequences and Bindings
