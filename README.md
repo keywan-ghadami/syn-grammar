@@ -266,6 +266,25 @@ grammar! {
 # fn main() {}
 ```
 
+#### Span Binding (`@`)
+You can capture the `Span` of a parsed rule or built-in using the `@` operator. This is useful for error reporting or constructing spanned AST nodes.
+
+**Note**: The rule being bound must return a type that implements `syn::spanned::Spanned` (e.g., `syn::Ident`, `syn::Type`, `syn::LitStr`). Primitive types like `i32` or `String` do not support this.
+
+```rust
+use syn_grammar::grammar;
+use proc_macro2::Span;
+use syn::Ident;
+
+grammar! {
+    grammar Spanned {
+        rule main -> (Ident, Span) = 
+            // Binds the identifier to `id` and its span to `s`
+            id:ident @ s -> { (id, s) }
+    }
+}
+```
+
 #### Alternatives (`|`)
 Match one of several alternatives. The first one that matches wins.
 
