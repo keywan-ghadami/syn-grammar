@@ -87,8 +87,26 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
 
             if !bindings.is_empty() {
-                let init_vecs: Vec<_> = bindings.iter().map(|b| quote!(let mut #b = Vec::new();)).collect();
-                let push_vecs: Vec<_> = bindings.iter().map(|b| quote!(#b.push(#b);)).collect();
+                // Use temporary names for vectors to avoid shadowing by inner bindings
+                let vec_names: Vec<_> = bindings
+                    .iter()
+                    .map(|b| format_ident!("_vec_{}", b))
+                    .collect();
+
+                let init_vecs: Vec<_> = vec_names
+                    .iter()
+                    .map(|v| quote!(let mut #v = Vec::new();))
+                    .collect();
+                let push_vecs: Vec<_> = vec_names
+                    .iter()
+                    .zip(bindings.iter())
+                    .map(|(v, b)| quote!(#v.push(#b);))
+                    .collect();
+                let finalize_vecs: Vec<_> = bindings
+                    .iter()
+                    .zip(vec_names.iter())
+                    .map(|(b, v)| quote!(let #b = #v;))
+                    .collect();
 
                 let inner_logic = generate_pattern_step(inner, kws)?;
 
@@ -107,6 +125,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                                #(#push_vecs)*
                            }
                        }
+                       #(#finalize_vecs)*
                     })
                 } else {
                     let return_tuple = quote!(( #(#bindings),* ));
@@ -122,6 +141,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                            let #tuple_pat = vals;
                            #(#push_vecs)*
                        }
+                       #(#finalize_vecs)*
                     })
                 }
             } else {
@@ -137,8 +157,26 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
 
             if !bindings.is_empty() {
-                let init_vecs: Vec<_> = bindings.iter().map(|b| quote!(let mut #b = Vec::new();)).collect();
-                let push_vecs: Vec<_> = bindings.iter().map(|b| quote!(#b.push(#b);)).collect();
+                // Use temporary names for vectors to avoid shadowing by inner bindings
+                let vec_names: Vec<_> = bindings
+                    .iter()
+                    .map(|b| format_ident!("_vec_{}", b))
+                    .collect();
+
+                let init_vecs: Vec<_> = vec_names
+                    .iter()
+                    .map(|v| quote!(let mut #v = Vec::new();))
+                    .collect();
+                let push_vecs: Vec<_> = vec_names
+                    .iter()
+                    .zip(bindings.iter())
+                    .map(|(v, b)| quote!(#v.push(#b);))
+                    .collect();
+                let finalize_vecs: Vec<_> = bindings
+                    .iter()
+                    .zip(vec_names.iter())
+                    .map(|(b, v)| quote!(let #b = #v;))
+                    .collect();
 
                 let inner_logic = generate_pattern_step(inner, kws)?;
 
@@ -161,6 +199,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                                #(#push_vecs)*
                            }
                        }
+                       #(#finalize_vecs)*
                     })
                 } else {
                     let return_tuple = quote!(( #(#bindings),* ));
@@ -180,6 +219,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                            let #tuple_pat = vals;
                            #(#push_vecs)*
                        }
+                       #(#finalize_vecs)*
                     })
                 }
             } else {
