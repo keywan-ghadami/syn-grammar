@@ -84,13 +84,14 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         }
 
         ModelPattern::Repeat(inner, _) => {
-            if let ModelPattern::RuleCall {
-                binding: Some(bind),
-                rule_name,
-                args,
-            } = &**inner
-            {
-                let func_call = generate_rule_call_expr(rule_name, args);
+            let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
+
+            if !bindings.is_empty() {
+                let init_vecs = bindings.iter().map(|b| quote!(let mut #b = Vec::new();));
+                let push_vecs = bindings.iter().map(|b| quote!(#b.push(#b);));
+
+                let inner_logic = generate_pattern_step(inner, kws)?;
+
                 let peek_check = if let Some(peek) = analysis::get_simple_peek(inner, kws)? {
                     quote!(input.peek(#peek))
                 } else {
@@ -99,18 +100,27 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                 if analysis::get_simple_peek(inner, kws)?.is_some() {
                     Ok(quote! {
-                       let mut #bind = Vec::new();
+                       #(#init_vecs)*
                        while #peek_check {
-                           let val = #func_call;
-                           #bind.push(val);
+                           {
+                               #inner_logic
+                               #(#push_vecs)*
+                           }
                        }
                     })
                 } else {
+                    let return_tuple = quote!(( #(#bindings),* ));
+                    let tuple_pat = quote!(( #(#bindings),* ));
+
                     Ok(quote! {
-                       let mut #bind = Vec::new();
+                       #(#init_vecs)*
                        // Pass ctx to attempt
-                       while let Some(val) = rt::attempt(input, ctx, |input, ctx| { Ok(#func_call) })? {
-                           #bind.push(val);
+                       while let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                           #inner_logic
+                           Ok(#return_tuple)
+                       })? {
+                           let #tuple_pat = vals;
+                           #(#push_vecs)*
                        }
                     })
                 }
@@ -124,13 +134,14 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         }
 
         ModelPattern::Plus(inner, _) => {
-            if let ModelPattern::RuleCall {
-                binding: Some(bind),
-                rule_name,
-                args,
-            } = &**inner
-            {
-                let func_call = generate_rule_call_expr(rule_name, args);
+            let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
+
+            if !bindings.is_empty() {
+                let init_vecs = bindings.iter().map(|b| quote!(let mut #b = Vec::new();));
+                let push_vecs = bindings.iter().map(|b| quote!(#b.push(#b);));
+
+                let inner_logic = generate_pattern_step(inner, kws)?;
+
                 let peek_check = if let Some(peek) = analysis::get_simple_peek(inner, kws)? {
                     quote!(input.peek(#peek))
                 } else {
@@ -139,19 +150,35 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                 if analysis::get_simple_peek(inner, kws)?.is_some() {
                     Ok(quote! {
-                       let mut #bind = Vec::new();
-                       #bind.push(#func_call);
+                       #(#init_vecs)*
+                       {
+                           #inner_logic
+                           #(#push_vecs)*
+                       }
                        while #peek_check {
-                           #bind.push(#func_call);
+                           {
+                               #inner_logic
+                               #(#push_vecs)*
+                           }
                        }
                     })
                 } else {
+                    let return_tuple = quote!(( #(#bindings),* ));
+                    let tuple_pat = quote!(( #(#bindings),* ));
+
                     Ok(quote! {
-                       let mut #bind = Vec::new();
-                       #bind.push(#func_call);
+                       #(#init_vecs)*
+                       {
+                           #inner_logic
+                           #(#push_vecs)*
+                       }
                        // Pass ctx to attempt
-                       while let Some(val) = rt::attempt(input, ctx, |input, ctx| { Ok(#func_call) })? {
-                           #bind.push(val);
+                       while let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                           #inner_logic
+                           Ok(#return_tuple)
+                       })? {
+                           let #tuple_pat = vals;
+                           #(#push_vecs)*
                        }
                     })
                 }
@@ -238,6 +265,60 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     };
                 })
             }
+        }
+
+        ModelPattern::SpanBinding(inner, span_var, _) => {
+            let (inner_pat, binding_name) = match &**inner {
+                ModelPattern::RuleCall {
+                    binding,
+                    rule_name,
+                    args,
+                } => {
+                    if let Some(b) = binding {
+                        (inner.clone(), b.clone())
+                    } else {
+                        let temp = format_ident!("_val_{}", span_var);
+                        let new_inner = ModelPattern::RuleCall {
+                            binding: Some(temp.clone()),
+                            rule_name: rule_name.clone(),
+                            args: args.clone(),
+                        };
+                        (Box::new(new_inner), temp)
+                    }
+                }
+                ModelPattern::Recover {
+                    binding,
+                    body,
+                    sync,
+                    span,
+                } => {
+                    if let Some(b) = binding {
+                        (inner.clone(), b.clone())
+                    } else {
+                        let temp = format_ident!("_val_{}", span_var);
+                        let new_inner = ModelPattern::Recover {
+                            binding: Some(temp.clone()),
+                            body: body.clone(),
+                            sync: sync.clone(),
+                            span: *span,
+                        };
+                        (Box::new(new_inner), temp)
+                    }
+                }
+                _ => {
+                    return Err(syn::Error::new(
+                        span_var.span(),
+                        "Span binding (@) is currently only supported on rule calls and recover() blocks.",
+                    ));
+                }
+            };
+
+            let inner_code = generate_pattern_step(&inner_pat, kws)?;
+
+            Ok(quote! {
+                #inner_code
+                let #span_var = syn::spanned::Spanned::span(&#binding_name);
+            })
         }
 
         ModelPattern::Recover {

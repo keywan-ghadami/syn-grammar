@@ -81,6 +81,9 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
             ModelPattern::Optional(i, _)
             | ModelPattern::Repeat(i, _)
             | ModelPattern::Plus(i, _) => collect_from_patterns(std::slice::from_ref(i), kws),
+            ModelPattern::SpanBinding(i, _, _) => {
+                collect_from_patterns(std::slice::from_ref(i), kws)
+            }
             ModelPattern::Recover { body, sync, .. } => {
                 collect_from_patterns(std::slice::from_ref(body), kws);
                 collect_from_patterns(std::slice::from_ref(sync), kws);
@@ -98,17 +101,16 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
                 binding: Some(b), ..
             } => bindings.push(b.clone()),
             ModelPattern::Repeat(inner, _) | ModelPattern::Plus(inner, _) => {
-                if let ModelPattern::RuleCall {
-                    binding: Some(b), ..
-                } = &**inner
-                {
-                    bindings.push(b.clone());
-                }
+                bindings.extend(collect_bindings(std::slice::from_ref(inner)));
             }
             ModelPattern::Parenthesized(s, _)
             | ModelPattern::Bracketed(s, _)
             | ModelPattern::Braced(s, _) => {
                 bindings.extend(collect_bindings(s));
+            }
+            ModelPattern::SpanBinding(inner, ident, _) => {
+                bindings.push(ident.clone());
+                bindings.extend(collect_bindings(std::slice::from_ref(inner)));
             }
             ModelPattern::Recover { binding, body, .. } => {
                 if let Some(b) = binding {
@@ -247,6 +249,7 @@ pub fn get_simple_peek(
         ModelPattern::Optional(inner, _)
         | ModelPattern::Repeat(inner, _)
         | ModelPattern::Plus(inner, _) => get_simple_peek(inner, kws),
+        ModelPattern::SpanBinding(inner, _, _) => get_simple_peek(inner, kws),
         ModelPattern::Recover { body, .. } => get_simple_peek(body, kws),
         ModelPattern::Group(alts, _) => {
             if alts.len() == 1 {
@@ -273,6 +276,9 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         Some(ModelPattern::Optional(inner, _))
         | Some(ModelPattern::Repeat(inner, _))
         | Some(ModelPattern::Plus(inner, _)) => {
+            get_peek_token_string(std::slice::from_ref(&**inner))
+        }
+        Some(ModelPattern::SpanBinding(inner, _, _)) => {
             get_peek_token_string(std::slice::from_ref(&**inner))
         }
         Some(ModelPattern::Recover { body, .. }) => {
@@ -305,6 +311,7 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Optional(_, _) => true,
         ModelPattern::Repeat(_, _) => true,
         ModelPattern::Plus(inner, _) => is_nullable(inner),
+        ModelPattern::SpanBinding(inner, _, _) => is_nullable(inner),
         ModelPattern::Recover { .. } => true,
     }
 }

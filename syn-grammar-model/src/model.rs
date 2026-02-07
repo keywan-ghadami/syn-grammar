@@ -43,6 +43,7 @@ pub enum ModelPattern {
     Optional(Box<ModelPattern>, Span),
     Repeat(Box<ModelPattern>, Span),
     Plus(Box<ModelPattern>, Span),
+    SpanBinding(Box<ModelPattern>, Ident, Span),
     Recover {
         binding: Option<Ident>,
         body: Box<ModelPattern>,
@@ -127,6 +128,9 @@ impl From<parser::Pattern> for ModelPattern {
                 ModelPattern::Repeat(Box::new(ModelPattern::from(*p)), token.span())
             }
             P::Plus(p, token) => ModelPattern::Plus(Box::new(ModelPattern::from(*p)), token.span()),
+            P::SpanBinding(p, ident, token) => {
+                ModelPattern::SpanBinding(Box::new(ModelPattern::from(*p)), ident, token.span)
+            }
             P::Recover {
                 binding,
                 body,
@@ -151,6 +155,7 @@ impl ModelPattern {
             ModelPattern::Optional(_, s)
             | ModelPattern::Repeat(_, s)
             | ModelPattern::Plus(_, s) => *s,
+            ModelPattern::SpanBinding(_, _, s) => *s,
             ModelPattern::Recover { span, .. } => *span,
             ModelPattern::Group(_, s) => *s,
             ModelPattern::Bracketed(_, s)

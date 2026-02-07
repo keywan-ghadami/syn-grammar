@@ -1,3 +1,4 @@
+// Entire file content ...
 // Moved from macros/src/parser.rs
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
@@ -204,6 +205,7 @@ pub enum Pattern {
     Optional(Box<Pattern>, Token![?]),
     Repeat(Box<Pattern>, Token![*]),
     Plus(Box<Pattern>, Token![+]),
+    SpanBinding(Box<Pattern>, Ident, Token![@]),
     Recover {
         binding: Option<Ident>,
         body: Box<Pattern>,
@@ -226,6 +228,10 @@ impl Parse for Pattern {
             } else if input.peek(Token![?]) {
                 let token = input.parse::<Token![?]>()?;
                 pat = Pattern::Optional(Box::new(pat), token);
+            } else if input.peek(Token![@]) {
+                let token = input.parse::<Token![@]>()?;
+                let ident = input.parse::<Ident>()?;
+                pat = Pattern::SpanBinding(Box::new(pat), ident, token);
             } else {
                 break;
             }
