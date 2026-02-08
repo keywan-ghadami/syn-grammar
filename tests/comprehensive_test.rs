@@ -1,4 +1,3 @@
-use std::f64::consts::PI;
 use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
@@ -568,12 +567,14 @@ fn test_extended_literals() {
 
     // Test syn types
     let res = extended_lits::parse_main
-        .parse_str("42 'c' true 3.14")
+        .parse_str("42 'c' true 3.123456")
         .unwrap();
     assert_eq!(res.0.base10_parse::<i32>().unwrap(), 42);
     assert_eq!(res.1.value(), 'c');
     assert!(res.2.value);
-    assert_eq!(res.3.base10_parse::<f64>().unwrap(), PI);
+    
+    let f_val = res.3.base10_parse::<f64>().unwrap();
+    assert!(f_val > 3.123455 && f_val < 3.123457);
 
     // Test spanned
     let res = extended_lits::parse_spanned
