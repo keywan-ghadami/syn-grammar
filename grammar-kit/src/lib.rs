@@ -340,7 +340,7 @@ mod tests {
             // We simulate an attempt that fails.
             // attempt returns Result<Option<T>>.
             // If the closure returns Err, attempt records it and returns Ok(None) (if not fatal).
-            let _ = attempt(input, &mut ctx, |_input, _ctx| {
+            let _: Option<()> = attempt(input, &mut ctx, |_input, _ctx| {
                 Err(syn::Error::new(Span::call_site(), "parse failed"))
             })?;
 
