@@ -1,7 +1,7 @@
+use std::f64::consts::PI;
 use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
-use std::f64::consts::PI;
 
 // --- Test 1: Basic Sequence ---
 #[test]
