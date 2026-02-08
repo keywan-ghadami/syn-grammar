@@ -208,7 +208,7 @@ pub fn generate_variants_internal(
         .map(|variant| {
             let cut_info = analysis::find_cut(&variant.pattern);
             let first_pat = variant.pattern.first();
-            let is_nullable = first_pat.map_or(true, analysis::is_nullable);
+            let is_nullable = first_pat.is_none_or(analysis::is_nullable);
 
             let peek_token_obj = if !is_nullable {
                 first_pat.and_then(|f| {

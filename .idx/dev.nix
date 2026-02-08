@@ -3,23 +3,21 @@
   channel = "unstable";
 
   packages = [
-    pkgs.rustc
-    pkgs.cargo
-    pkgs.rustfmt
-    pkgs.rust-analyzer
+    pkgs.rustup
     # KRITISCH: gcc liefert den Linker (cc), ohne den Proc Macros fehlschlagen
     pkgs.gcc
   ];
-
-  # Notwendig, damit rust-analyzer die Standardbibliothek findet
-  env = {
-    RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-  };
 
   idx = {
     extensions = [
       "rust-lang.rust-analyzer"
       "tamasfe.even-better-toml"
     ];
+
+    workspace = {
+      onCreate = {
+        rust-install = "rustup toolchain install stable --profile minimal --component clippy,rustfmt,rust-src,rust-analyzer && rustup default stable";
+      };
+    };
   };
 }
