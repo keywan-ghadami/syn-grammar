@@ -320,7 +320,7 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
 mod tests {
     use super::*;
     use syn::parse_quote;
-    use syn::spanned::Spanned;
+    // use syn::spanned::Spanned; // Removed unused import
 
     #[test]
     fn test_resolve_token_types_valid() {
