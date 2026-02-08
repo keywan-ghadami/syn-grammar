@@ -111,6 +111,25 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 
 ## Detailed Syntax Guide
 
+### Use Statements
+
+You can include standard Rust `use` statements directly within your grammar block. These are passed through to the generated parser module, allowing you to easily import types needed for your rules.
+
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar MyGrammar {
+        use std::collections::HashMap;
+        use syn::Ident;
+
+        rule map -> HashMap<String, String> = 
+            // ... implementation using HashMap
+            "test" -> { HashMap::new() }
+    }
+}
+```
+
 ### Rules
 
 A grammar consists of a set of rules. Each rule has a name, a return type, and a pattern to match.
