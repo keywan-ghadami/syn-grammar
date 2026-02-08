@@ -42,6 +42,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             /// The generated source code of the rules, used for testing verification.
             pub const GENERATED_SOURCE: &str = #rules_str;
 
+            use super::*;
             use syn::parse::{Parse, ParseStream};
             use syn::Result;
             use syn::Token;

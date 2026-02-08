@@ -34,7 +34,7 @@ Add `syn-grammar` and `syn` to your `Cargo.toml`. `syn` is required at runtime b
 
 ```toml
 [dependencies]
-syn-grammar = "0.4"
+syn-grammar = "0.6.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -51,7 +51,7 @@ If you are writing a **procedural macro** to parse input **at compile time**, yo
 **Steps:**
 
 1. Create a separate `proc-macro` crate.
-2. Add `syn-grammar`, `syn`, and `quote` to **that** crate's `Cargo.toml`.
+2. Add `syn-grammar`, `syn`, and `quote` to **that** crate\'s `Cargo.toml`.
 3. Define your grammar and macro there.
 4. Depend on that crate from your main project.
 
@@ -65,7 +65,7 @@ Since `syn-grammar` is built on top of `syn`, it uses the **Rust Tokenizer**. Th
 - **Limitations**: You cannot parse languages that require a custom lexer, such as:
     - **Whitespace-sensitive languages** (e.g., Python, YAML) — `syn` skips whitespace automatically.
     - **Binary formats**.
-    - **Arbitrary text** that doesn't form valid Rust tokens (e.g., unquoted strings with special characters like `@` or `$` in positions Rust doesn't allow).
+    - **Arbitrary text** that doesn\'t form valid Rust tokens (e.g., unquoted strings with special characters like `@` or `$` in positions Rust doesn\'t allow).
 
 ## Quick Start
 
@@ -107,7 +107,7 @@ fn main() {
 The `grammar!` macro expands into a Rust module (named `Calc` in the example) containing:
 - A function `parse_<rule_name>` for each rule (e.g., `parse_expression`).
 - These functions take a `syn::parse::ParseStream` and return a `syn::Result<T>`.
-- All necessary imports and helper functions to make the parser work.
+- All necessary imports and helper functions to make the parser work, including `use super::*;` for convenience.
 
 ## Detailed Syntax Guide
 
@@ -196,7 +196,7 @@ use syn_grammar::grammar;
 
 grammar! {
     grammar Kws {
-        rule kw -> () = "fn" "name" -> { () }
+        rule kw -> () = "fn" "name" -> { () }\
     }
 }
 ```
@@ -226,12 +226,12 @@ grammar! {
 |--------|-------------|---------|
 | `ident` | A Rust identifier (e.g., `foo`, `_bar`) | `syn::Ident` |
 | `integer` | An integer literal (e.g., `42`) | `i32` |
-| `string` | A string literal (e.g., `"hello"`) | `String` |
+| `string` | A string literal (e.g., `\"hello\"`) | `String` |
 | `lit_str` | A string literal object | `syn::LitStr` |
 | `rust_type` | A Rust type (e.g., `Vec<i32>`) | `syn::Type` |
 | `rust_block` | A block of code (e.g., `{ stmt; }`) | `syn::Block` |
 | `lit_int` | A typed integer literal (e.g. `1u8`) | `syn::LitInt` |
-| `lit_char` | A character literal (e.g. `'c'`) | `syn::LitChar` |
+| `lit_char` | A character literal (e.g. `\'c\'`) | `syn::LitChar` |
 | `lit_bool` | A boolean literal (`true` or `false`) | `syn::LitBool` |
 | `lit_float` | A floating point literal (e.g. `3.14`) | `syn::LitFloat` |
 | `spanned_int_lit` | **Deprecated** Use `lit_int` with `@` | `(i32, Span)` |
@@ -242,7 +242,7 @@ grammar! {
 | `outer_attrs` | Outer attributes (e.g. `#[...]`) | `Vec<syn::Attribute>` |
 
 #### Sequences and Bindings
-Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
+Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block. As of v0.6.0, generated parsers automatically include `use super::*;`, allowing you to refer to items from the parent module (like `Stmt` in the example below) without a `super::` prefix.
 
 ```rust
 use syn_grammar::grammar;
@@ -255,9 +255,9 @@ pub enum Stmt {
 
 grammar! {
     grammar Assignment {
-        rule assignment -> super::Stmt = 
+        rule assignment -> Stmt = 
             name:ident "=" val:expr -> { 
-                super::Stmt::Assign(name, val) 
+                Stmt::Assign(name, val) 
             }
             
         rule expr -> i32 = i:integer -> { i }
@@ -331,7 +331,7 @@ grammar! {
 #### Delimiters
 Match content inside delimiters.
 
-**Note**: You cannot match delimiters using string literals (e.g., `"["` or `"}"`) because `syn` parses them as structural `TokenTree`s. You must use the syntax below.
+**Note**: You cannot match delimiters using string literals (e.g., `\"[\"` or `\"}\"`) because `syn` parses them as structural `TokenTree`s. You must use the syntax below.
 
 - `paren(pattern)`: Matches `( pattern )`.
 - `[ pattern ]`: Matches `[ pattern ]`.
@@ -361,12 +361,12 @@ pub struct Stmt;
 
 grammar! {
     grammar Recovery {
-        rule stmt -> Option<super::Stmt> =
+        rule stmt -> Option<Stmt> =
             // If `parse_stmt` fails, skip until `;`
             // `s` will be `Option<Stmt>` (Some if success, None if recovered)
             s:recover(parse_stmt, ";") ";" -> { s }
             
-        rule parse_stmt -> super::Stmt = "let" "x" -> { super::Stmt }
+        rule parse_stmt -> Stmt = "let" "x" -> { Stmt }
     }
 }
 # fn main() {}
@@ -387,12 +387,12 @@ pub enum Stmt {
 
 grammar! {
     grammar Cut {
-        rule stmt -> super::Stmt =
+        rule stmt -> Stmt =
             // If we see "let", we commit to this rule. 
             // If "mut" or the identifier is missing, we error immediately 
             // instead of trying the next alternative.
-            "let" => "mut"? name:ident "=" e:expr -> { super::Stmt::Let(name, e) }
-          | e:expr -> { super::Stmt::Expr(e) }
+            "let" => "mut"? name:ident "=" e:expr -> { Stmt::Let(name, e) }
+          | e:expr -> { Stmt::Expr(e) }
           
         rule expr -> i32 = i:integer -> { i }
     }
@@ -457,7 +457,7 @@ grammar! {
 
 ### Backtracking
 
-By default, `syn-grammar` uses `syn`'s speculative parsing (`fork`) to try alternatives.
+By default, `syn-grammar` uses `syn`\'s speculative parsing (`fork`) to try alternatives.
 1. It checks if the next token matches the start of an alternative (using `peek`).
 2. If ambiguous, it attempts to parse the alternative.
 3. If it fails, it backtracks and tries the next one.
