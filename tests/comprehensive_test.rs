@@ -1,6 +1,7 @@
 use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
+use std::f64::consts::PI;
 
 // --- Test 1: Basic Sequence ---
 #[test]
@@ -571,8 +572,8 @@ fn test_extended_literals() {
         .unwrap();
     assert_eq!(res.0.base10_parse::<i32>().unwrap(), 42);
     assert_eq!(res.1.value(), 'c');
-    assert_eq!(res.2.value, true);
-    assert_eq!(res.3.base10_parse::<f64>().unwrap(), 3.14);
+    assert!(res.2.value);
+    assert_eq!(res.3.base10_parse::<f64>().unwrap(), PI);
 
     // Test spanned
     let res = extended_lits::parse_spanned
