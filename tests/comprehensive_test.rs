@@ -572,7 +572,7 @@ fn test_extended_literals() {
     assert_eq!(res.0.base10_parse::<i32>().unwrap(), 42);
     assert_eq!(res.1.value(), 'c');
     assert!(res.2.value);
-    
+
     let f_val = res.3.base10_parse::<f64>().unwrap();
     assert!(f_val > 3.123455 && f_val < 3.123457);
 
