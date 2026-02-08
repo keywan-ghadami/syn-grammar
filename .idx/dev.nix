@@ -1,6 +1,6 @@
 { pkgs, ... }: {
   # Nutze stable oder unstable (unstable hat oft aktuelleres Rust)
-  channel = "stable-23.11";
+  channel = "stable-25.05";
 
   packages = [
     pkgs.rustc
