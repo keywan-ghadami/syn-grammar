@@ -196,7 +196,7 @@ use syn_grammar::grammar;
 
 grammar! {
     grammar Kws {
-        rule kw -> () = "fn" "name" -> { () }\
+        rule kw -> () = "fn" "name" -> { () }
     }
 }
 ```
