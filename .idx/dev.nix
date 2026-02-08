@@ -11,8 +11,9 @@
     # pkgs.python311Packages.pip
     # pkgs.nodejs_20
     # pkgs.nodePackages.nodemon
-    pkgs.cargo
-    pkgs.rustc
+    pkgs.cargo,
+    pkgs.rustc,
+    pkgs.build-essential
   ];
 
   # Sets environment variables in the workspace

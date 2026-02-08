@@ -22,6 +22,8 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
         quote! { use super::#parent::*; }
     });
 
+    let uses = &grammar.uses;
+
     let rules = grammar
         .rules
         .iter()
@@ -54,6 +56,8 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
 
             #kw_defs
             #inheritance
+
+            #(#uses)*
 
             #rules_stream
         }

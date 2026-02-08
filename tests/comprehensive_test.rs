@@ -708,3 +708,24 @@ fn test_multi_token_literals() {
         .test()
         .assert_success();
 }
+
+// --- Test 27: Use Statements ---
+#[test]
+fn test_use_statements() {
+    grammar! {
+        grammar use_statement_test {
+            use std::collections::HashMap;
+
+            rule main -> HashMap<String, i32> = "key" -> {
+                let mut map = HashMap::new();
+                map.insert("key".to_string(), 100);
+                map
+            }
+        }
+    }
+
+    use_statement_test::parse_main
+        .parse_str("key")
+        .test()
+        .assert_success();
+}

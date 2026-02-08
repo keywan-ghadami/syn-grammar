@@ -2,7 +2,7 @@
 // Moved from macros/src/parser.rs
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{token, Attribute, Ident, Lit, LitStr, Result, Token, Type};
+use syn::{token, Attribute, Ident, ItemUse, Lit, LitStr, Result, Token, Type};
 
 mod rt {
     use syn::ext::IdentExt;
@@ -39,6 +39,7 @@ pub mod kw {
 pub struct GrammarDefinition {
     pub name: Ident,
     pub inherits: Option<InheritanceSpec>,
+    pub uses: Vec<ItemUse>,
     pub rules: Vec<Rule>,
 }
 
@@ -55,11 +56,18 @@ impl Parse for GrammarDefinition {
 
         let content;
         let _ = syn::braced!(content in input);
+
+        let mut uses = Vec::new();
+        while content.peek(Token![use]) {
+            uses.push(content.parse()?);
+        }
+
         let rules = Rule::parse_all(&content)?;
 
         Ok(GrammarDefinition {
             name,
             inherits,
+            uses,
             rules,
         })
     }

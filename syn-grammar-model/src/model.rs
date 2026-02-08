@@ -1,13 +1,14 @@
-// Moved from macros/src/model.rs
+"""// Moved from macros/src/model.rs
 use crate::parser;
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
-use syn::{Attribute, Ident, Lit, LitStr, Type};
+use syn::{Attribute, Ident, ItemUse, Lit, LitStr, Type};
 
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
     pub name: Ident,
     pub inherits: Option<Ident>,
+    pub uses: Vec<ItemUse>,
     pub rules: Vec<Rule>,
 }
 
@@ -57,6 +58,7 @@ impl From<parser::GrammarDefinition> for GrammarDefinition {
         Self {
             name: p.name,
             inherits: p.inherits.map(|spec| spec.name),
+            uses: p.uses,
             rules: p.rules.into_iter().map(Into::into).collect(),
         }
     }
@@ -164,3 +166,4 @@ impl ModelPattern {
         }
     }
 }
+""
