@@ -1,4 +1,4 @@
-"""// Moved from macros/src/model.rs
+// Moved from macros/src/model.rs
 use crate::parser;
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
@@ -166,4 +166,3 @@ impl ModelPattern {
         }
     }
 }
-""
