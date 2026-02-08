@@ -195,7 +195,7 @@ pub fn generate_variants_internal(
 
     let mut token_counts = HashMap::new();
     for v in variants {
-        let is_nullable = v.pattern.first().map_or(true, analysis::is_nullable);
+        let is_nullable = v.pattern.first().is_none_or(analysis::is_nullable);
         if !is_nullable {
             if let Some(token_str) = analysis::get_peek_token_string(&v.pattern) {
                 *token_counts.entry(token_str).or_insert(0) += 1;
