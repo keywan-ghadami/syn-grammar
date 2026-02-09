@@ -14,6 +14,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **EBNF Syntax**: Familiar syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`), and grouping `(...)`.
 - **Type-Safe Actions**: Directly map parsing rules to Rust types and AST nodes using action blocks (`-> { ... }`).
 - **Seamless Syn Integration**: First-class support for parsing Rust tokens like identifiers, literals, types, and blocks.
+- **Overridable Built-ins**: Easily customize or replace standard token parsers (e.g., `ident`) with your own logic or external backends.
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
 - **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
@@ -34,7 +35,7 @@ Add `syn-grammar` and `syn` to your `Cargo.toml`. `syn` is required at runtime b
 
 ```toml
 [dependencies]
-syn-grammar = "0.6.0"
+syn-grammar = "0.7.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -108,6 +109,15 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 - A function `parse_<rule_name>` for each rule (e.g., `parse_expression`).
 - These functions take a `syn::parse::ParseStream` and return a `syn::Result<T>`.
 - All necessary imports and helper functions to make the parser work, including `use super::*;` for convenience.
+
+## Extending syn-grammar
+
+`syn-grammar` is designed to be a modular frontend. You can use it to define grammars that target other backends (like `winnow`) or simply override the default built-in rules with your own logic.
+
+See [EXTENDING.md](EXTENDING.md) for a detailed guide on how to:
+- Override built-in rules (like `ident` or `string`).
+- Inject external rules from other crates.
+- Build custom parser backends using `syn-grammar` as the definition language.
 
 ## Detailed Syntax Guide
 
