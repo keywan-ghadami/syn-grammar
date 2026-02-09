@@ -424,87 +424,11 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 }
 
 fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenStream {
-    if is_builtin(rule_name) {
-        map_builtin(rule_name)
+    // Call the _impl version and pass ctx
+    let f = format_ident!("parse_{}_impl", rule_name);
+    if args.is_empty() {
+        quote!(#f(input, ctx)?)
     } else {
-        // Call the _impl version and pass ctx
-        let f = format_ident!("parse_{}_impl", rule_name);
-        if args.is_empty() {
-            quote!(#f(input, ctx)?)
-        } else {
-            quote!(#f(input, ctx, #(#args),*)?)
-        }
-    }
-}
-
-fn is_builtin(name: &syn::Ident) -> bool {
-    matches!(
-        name.to_string().as_str(),
-        "ident"
-            | "integer"
-            | "string"
-            | "rust_type"
-            | "rust_block"
-            | "lit_str"
-            | "lit_int"
-            | "lit_char"
-            | "lit_bool"
-            | "lit_float"
-            | "spanned_int_lit"
-            | "spanned_string_lit"
-            | "spanned_float_lit"
-            | "spanned_bool_lit"
-            | "spanned_char_lit"
-            | "outer_attrs"
-    )
-}
-
-fn map_builtin(name: &syn::Ident) -> TokenStream {
-    // Builtins are stateless, so they don't need ctx
-    match name.to_string().as_str() {
-        "ident" => quote! { rt::parse_ident(input)? },
-        "integer" => quote! { rt::parse_int::<i32>(input)? },
-        "string" => quote! { input.parse::<syn::LitStr>()?.value() },
-        "lit_str" => quote! { input.parse::<syn::LitStr>()? },
-        "rust_type" => quote! { input.parse::<syn::Type>()? },
-        "rust_block" => quote! { input.parse::<syn::Block>()? },
-        "outer_attrs" => quote! { syn::Attribute::parse_outer(input)? },
-
-        "lit_int" => quote! { input.parse::<syn::LitInt>()? },
-        "lit_char" => quote! { input.parse::<syn::LitChar>()? },
-        "lit_bool" => quote! { input.parse::<syn::LitBool>()? },
-        "lit_float" => quote! { input.parse::<syn::LitFloat>()? },
-
-        "spanned_int_lit" => quote! {
-            {
-                let l = input.parse::<syn::LitInt>()?;
-                (l.base10_parse::<i32>()?, l.span())
-            }
-        },
-        "spanned_string_lit" => quote! {
-            {
-                let l = input.parse::<syn::LitStr>()?;
-                (l.value(), l.span())
-            }
-        },
-        "spanned_float_lit" => quote! {
-            {
-                let l = input.parse::<syn::LitFloat>()?;
-                (l.base10_parse::<f64>()?, l.span())
-            }
-        },
-        "spanned_bool_lit" => quote! {
-            {
-                let l = input.parse::<syn::LitBool>()?;
-                (l.value, l.span())
-            }
-        },
-        "spanned_char_lit" => quote! {
-            {
-                let l = input.parse::<syn::LitChar>()?;
-                (l.value(), l.span())
-            }
-        },
-        _ => unreachable!(),
+        quote!(#f(input, ctx, #(#args),*)?)
     }
 }

@@ -24,6 +24,8 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
 
     let uses = &grammar.uses;
 
+    // Remove defined_rule_names collection as it's no longer needed for builtin logic
+
     let rules = grammar
         .rules
         .iter()
@@ -53,6 +55,10 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
 
             // Import runtime from syn_grammar
             use syn_grammar::rt;
+
+            // Import builtins (can be shadowed by local imports or rules)
+            #[allow(unused_imports)]
+            use syn_grammar::builtins::*;
 
             #kw_defs
             #inheritance

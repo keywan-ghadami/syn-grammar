@@ -1,6 +1,6 @@
 [package]
 name = "syn-grammar"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 description = "A parser generator for Rust that compiles EBNF-like grammars into syn::parse::Parse implementations."
 license = "MIT OR Apache-2.0"
@@ -22,9 +22,9 @@ exclude = [
 ]
 
 [dependencies]
-syn-grammar-macros = { path = "./syn-grammar-macros", version = "0.6.0" }
-syn-grammar-model = { path = "./syn-grammar-model", version = "0.6.0" }
-grammar-kit = { path = "./grammar-kit", version = "0.6.0", features = ["syn"] }
+syn-grammar-macros = { path = "./syn-grammar-macros", version = "0.7.0" }
+syn-grammar-model = { path = "./syn-grammar-model", version = "0.7.0" }
+grammar-kit = { path = "./grammar-kit", version = "0.7.0", features = ["syn"] }
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 proc-macro2 = "1.0"
 quote = "1.0"

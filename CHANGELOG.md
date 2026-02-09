@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0]
+
+### Breaking Changes
+- **Built-in Rule Resolution**: The precedence of built-in rules (like `ident`, `string`) has changed. They are no longer hardcoded keywords but are now provided as default implementations in `syn_grammar::builtins`.
+    - **Impact**: If you define a rule named `ident` in your grammar, it will now *shadow* the built-in `ident` parser instead of being ignored. This fixes a long-standing limitation but may change behavior if you accidentally relied on the shadowing being ignored.
+    - **Impact**: If you inherit from a grammar that defines `ident`, and you use `ident`, you might encounter ambiguity between the inherited rule and the built-in. Use explicit imports (e.g., `use super::Parent::ident;`) to resolve this.
+
+### Added
+- **Overridable Built-ins**: You can now replace standard token parsers by defining rules with the same name or importing functions with the same name. This enables backends (like `winnow-grammar`) to inject their own implementations for core types.
+- **`syn_grammar::builtins` Module**: Exposes the default implementations of all built-in rules.
+
 ## [0.6.0]
 
 ### Added

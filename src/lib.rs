@@ -17,3 +17,6 @@ pub use syn_grammar_macros::grammar;
 
 #[doc(hidden)]
 pub use syn_grammar_macros::include_grammar;
+
+#[doc(hidden)]
+pub mod builtins;
