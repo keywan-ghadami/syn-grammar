@@ -1,7 +1,7 @@
 use crate::rt::{self, ParseContext};
 use syn::parse::ParseStream;
-use syn::Result;
 use syn::spanned::Spanned;
+use syn::Result;
 
 pub fn parse_ident_impl(input: ParseStream, _ctx: &mut ParseContext) -> Result<syn::Ident> {
     rt::parse_ident(input)
