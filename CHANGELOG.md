@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.7.0]
 
+### Added
+- **Backend-Agnostic Model**: The `syn-grammar-model` crate now exposes `parse_grammar_with_builtins`. This allows backend authors (e.g., for `winnow-grammar`) to validate grammars against their own set of built-in rules, rather than being forced to use the default `syn` built-ins.
+- **Backend Author Guide**: `EXTENDING.md` has been rewritten to focus on how to build custom parser generator backends using `syn-grammar` as the frontend DSL.
+
 ### Breaking Changes
 - **Built-in Rule Resolution**: The precedence of built-in rules (like `ident`, `string`) has changed. They are no longer hardcoded keywords but are now provided as default implementations in `syn_grammar::builtins`.
     - **Impact**: If you define a rule named `ident` in your grammar, it will now *shadow* the built-in `ident` parser instead of being ignored. This fixes a long-standing limitation but may change behavior if you accidentally relied on the shadowing being ignored.

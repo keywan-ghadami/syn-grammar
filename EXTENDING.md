@@ -1,112 +1,147 @@
-# Extending syn-grammar as a Frontend
+# Building a Custom Parser Backend
 
-`syn-grammar` is designed to be a modular frontend for defining grammars in Rust. While it provides a default backend targeting `syn` types and recursive descent parsing, its components are decoupled to allow the creation of alternative backends (e.g., `winnow-grammar`, `chumsky-grammar`).
+This guide is for developers who want to create their own parser generator backend using `syn-grammar` as the frontend (DSL). The primary use case is building a library like `winnow-grammar` that targets a specific parsing library (e.g., `winnow`, `chumsky`) but offers the ergonomic `grammar! { ... }` syntax.
 
-This guide explains how to use `syn-grammar`'s infrastructure to build your own parser backend or extend the existing one.
+## Why use `syn-grammar` as a frontend?
 
-## Architecture & Reusable Components
+Writing a parser generator from scratch is hard. You need to:
+1.  Design a DSL.
+2.  Write a parser for that DSL.
+3.  Handle error reporting and spans.
+4.  Implement semantic validation (e.g., left recursion checks).
 
-The project is split into several crates, each providing reusable functionality:
+`syn-grammar-model` solves steps 1-4 for you. It parses the standard `grammar! { ... }` block and gives you a clean, validated Abstract Semantic Graph (ASG) ready for code generation.
 
-### 1. `syn-grammar-model` (The Frontend)
-This crate handles the syntax and semantics of the grammar definition language itself. Backends can use this to parse and validate grammars without worrying about the specific syntax.
--   **Parsing**: Parses the `grammar! { ... }` block into a structured `GrammarDefinition`.
--   **Validation**: checks for undefined rules, unused rules, and other common errors.
--   **Analysis**: Contains powerful analysis tools, such as:
-    -   **Left Recursion Detection**: Identifies direct and indirect left recursion loops.
-    -   **Cycle Detection**: Finds infinite loops in the grammar graph.
-    -   **First/Follow Sets**: (Future) Helpers for LL(k) analysis.
+## Getting Started
 
-**Use Case**: If you are writing a backend that compiles grammar definitions to a different target (e.g., a parser combinator library), use `syn-grammar-model` to parse the user's input.
+Your backend crate (e.g., `winnow-grammar-macros`) should depend on `syn-grammar-model`.
 
-### 2. `grammar-kit` (The Runtime)
-This crate provides the runtime components needed by the generated parsers. It is re-exported as `syn_grammar::rt`.
--   **`ParseContext`**: Manages the state of the parser, including error accumulation and recovery.
--   **Error Recovery**: Utilities like `attempt`, `attempt_recover`, and `skip_until` provide robust error handling strategies common to recursive descent parsers.
--   **Backtracking**: Helper functions to try multiple alternatives and backtrack on failure.
+```toml
+[dependencies]
+syn-grammar-model = "0.2" # Check for latest version
+syn = "2.0"
+quote = "1.0"
+proc-macro2 = "1.0"
+```
 
-**Use Case**: Your backend can reuse `grammar-kit` to handle the tricky parts of parser state management, even if your specific parsing logic differs.
+## The Pipeline
 
-### 3. `syn-grammar-macros` (The Codegen)
-This crate contains the logic to generate Rust code from the `GrammarDefinition`.
--   **Default Codegen**: Targets `syn::parse::ParseStream` and produces standard recursive descent functions.
--   **Extensibility**: The built-in rule handling has been decoupled (see below), allowing you to swap out implementations for basic tokens.
+Your macro will typically look like this:
 
-### 4. `grammar-kit/testing`
-A testing framework designed to verify parsers.
--   **Source Verification**: Ensures that the generated parser can round-trip (parse and print) correctly, or at least match the structure of the input.
--   **Snapshot Testing**: compare parser output against expected ASTs.
-
-## Building a Backend (e.g., `winnow-grammar`)
-
-To build a backend that uses `syn-grammar`'s syntax but targets a different library (like `winnow`), you have two main approaches:
-
-### Approach A: Injection (Reuse Codegen)
-If your target library can be adapted to the `fn(input, ctx) -> Result<T>` signature, you can reuse the existing `syn-grammar` codegen and simply inject your own implementations for the leaf rules (terminals).
-
-**How it works:**
-1.  Create a library crate (e.g., `winnow-adapters`) that implements the core rules (`ident`, `string`, `integer`) using `winnow`.
-2.  Ensure these functions match the `syn-grammar` signature.
-3.  Users of your backend simply import your adapters in their grammar.
-
-**Example:**
 ```rust
-// User's code
-use winnow_adapters::*; // Injects 'ident', 'string', etc.
+use proc_macro::TokenStream;
+use syn_grammar_model::{parse_grammar_with_builtins, model::GrammarDefinition};
 
-grammar MyParser {
-    rule main = ident  // Uses winnow_adapters::parse_ident_impl
+// Define the built-in rules your backend supports.
+// These are rules that users can use without defining them (e.g., 'ident', 'digit').
+const MY_BACKEND_BUILTINS: &[&str] = &[
+    "ident",
+    "digit",
+    "alpha1",
+    // ... add more specific to your backend (e.g. winnow::ascii::digit1)
+];
+
+#[proc_macro]
+pub fn grammar(input: TokenStream) -> TokenStream {
+    // 1. Parse & Validate
+    // Use parse_grammar_with_builtins to validate against YOUR set of built-ins.
+    // This ensures users get errors if they use 'rust_type' but you don't support it.
+    let model = match parse_grammar_with_builtins(input.into(), MY_BACKEND_BUILTINS) {
+        Ok(m) => m,
+        Err(e) => return e.to_compile_error().into(),
+    };
+
+    // 2. Code Generation
+    // This is where you write your custom logic to translate the model into Rust code.
+    generate_code(model).into()
+}
+
+fn generate_code(grammar: GrammarDefinition) -> proc_macro2::TokenStream {
+    // ... your codegen implementation
 }
 ```
 
-This approach is best if you want to keep the overall structure of recursive descent functions but change how tokens are consumed.
+## The Semantic Model (`syn_grammar_model::model`)
 
-### Approach B: Custom Codegen
-If the target architecture is fundamentally different (e.g., a parser combinator struct instead of functions), you should write a custom macro.
+The `GrammarDefinition` struct is your source of truth. It contains:
 
-**How it works:**
-1.  Depend on `syn-grammar-model`.
-2.  Create a proc-macro that parses the input using `syn_grammar_model::parse_grammar`.
-3.  Perform your own code generation by iterating over the `GrammarDefinition`.
-4.  (Optional) Reuse `syn_grammar_model::analysis` to handle left recursion or optimize your output.
+-   `name`: The name of the grammar module/struct.
+-   `rules`: A list of `Rule` definitions.
 
-This gives you complete control over the generated code structure.
+### `Rule`
+-   `name`: The rule name (e.g., `expr`).
+-   `return_type`: The Rust return type (e.g., `syn::Expr`).
+-   `variants`: A list of alternatives (like `match` arms).
 
-## Extending the Default Backend
+### `RuleVariant`
+-   `pattern`: A sequence of `ModelPattern`s that must match.
+-   `action`: The Rust code block to execute on success.
 
-`syn-grammar` provides a set of built-in rules (like `ident`, `string`, `lit_int`) that map to `syn` types by default. These are now implemented as default functions in `syn_grammar::builtins` and are automatically imported.
+### `ModelPattern` (The important part)
+This enum represents the structure of the grammar. You need to map each variant to your target library's combinators.
 
-This decoupling allows you to override them easily.
+| Pattern | Description | Winnow Equivalent (Concept) |
+| :--- | :--- | :--- |
+| `Lit(LitStr)` | A string literal (e.g., `"fn"`) | `literal("fn")` |
+| `RuleCall { rule_name, .. }` | Calling another rule | `rule_name` |
+| `Group(alts)` | `(a | b)` | `alt((a, b))` |
+| `Optional(p)` | `p?` | `opt(p)` |
+| `Repeat(p)` | `p*` | `repeat(0.., p)` |
+| `Plus(p)` | `p+` | `repeat(1.., p)` |
+| `Cut` | `=>` | `cut_err` |
 
-### How Built-ins Resolution Works
-When a rule calls `ident`, the generated code calls `parse_ident_impl`. This resolves in the following order:
-1.  **Local Rule**: A `rule ident` defined in the grammar block.
-2.  **Imported Item**: A function imported via `use my_mod::ident;`.
-3.  **Built-in**: The default `syn_grammar::builtins::ident` (wildcard import).
+## Handling Built-ins
 
-### Overriding Built-ins
-To replace a built-in rule with your own logic (or a backend's logic):
+`syn-grammar-model` validates that every rule used is either defined in the grammar or is in the `valid_builtins` list you provided.
 
-**1. Define it locally:**
+When you encounter a `RuleCall` where `rule_name` is one of your built-ins (e.g., `digit`), you should generate code that invokes your backend's implementation for that primitive.
+
 ```rust
-grammar MyGrammar {
-    rule ident -> MyType { ... } // Shadows built-in
+// In your codegen:
+match pattern {
+    ModelPattern::RuleCall { rule_name, .. } => {
+        if is_builtin(&rule_name) {
+            quote! { winnow::ascii::#rule_name } // Map to library function
+        } else {
+            quote! { #rule_name } // Call generated rule function
+        }
+    }
+    // ...
 }
 ```
 
-**2. Import it (Injection):**
+## Advanced Analysis
+
+`syn-grammar-model::analysis` provides tools to help you generate better code:
+
+-   **`collect_custom_keywords`**: Finds all string literals that look like keywords. Useful if you need to generate a tokenizer.
+-   **`find_cut`**: detect `=>` operators to handle error cutting/commit points.
+-   **`split_left_recursive`**: Separates recursive and base cases. This is crucial if your target library doesn't support left recursion natively (most PEGs/combinators don't).
+
+## Example: Winnow-like Codegen Snippet
+
+Here is a simplified example of how you might translate a variant into a `winnow` parser chain.
+
 ```rust
-grammar MyGrammar {
-    use my_backend::parse_ident_impl; // Shadows built-in wildcard
-    rule list = ident*
+fn compile_variant(v: &RuleVariant) -> TokenStream {
+    let mut steps = Vec::new();
+    
+    for pat in &v.pattern {
+        let p_code = compile_pattern(pat);
+        steps.push(p_code);
+    }
+    
+    // Winnow often uses tuples for sequencing: (p1, p2, p3)
+    let sequence = quote! { ( #(#steps),* ) };
+    
+    // Map the result to the user's action block
+    let action = &v.action;
+    quote! {
+        #sequence.map(|args| #action)
+    }
 }
 ```
 
-**3. Resolve Ambiguity:**
-If you inherit from a grammar that provides `ident` AND the built-ins provide `ident`, usage is ambiguous. Resolve it by explicitly importing the one you want:
-```rust
-grammar Child : Parent {
-    use super::Parent::parse_ident_impl;
-    rule usage = ident
-}
-```
+## Conclusion
+
+By using `syn-grammar-model`, you focus entirely on **how to generate efficient code for your target library**, rather than worrying about parsing grammar syntax or validating rule references.

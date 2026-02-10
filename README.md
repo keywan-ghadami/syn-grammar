@@ -110,15 +110,6 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 - These functions take a `syn::parse::ParseStream` and return a `syn::Result<T>`.
 - All necessary imports and helper functions to make the parser work, including `use super::*;` for convenience.
 
-## Extending syn-grammar
-
-`syn-grammar` is designed to be a modular frontend. You can use it to define grammars that target other backends (like `winnow`) or simply override the default built-in rules with your own logic.
-
-See [EXTENDING.md](EXTENDING.md) for a detailed guide on how to:
-- Override built-in rules (like `ident` or `string`).
-- Inject external rules from other crates.
-- Build custom parser backends using `syn-grammar` as the definition language.
-
 ## Detailed Syntax Guide
 
 ### Use Statements
@@ -269,6 +260,44 @@ grammar! {
 | `spanned_bool_lit` | **Deprecated** Use `lit_bool` with `@` | `(bool, Span)` |
 | `spanned_char_lit` | **Deprecated** Use `lit_char` with `@` | `(char, Span)` |
 | `outer_attrs` | Outer attributes (e.g. `#[...]`) | `Vec<syn::Attribute>` |
+
+### Overriding Built-ins & Custom Rules
+
+If you need to change how a built-in works or define a reusable rule that isn't part of the standard set, you have two options:
+
+#### 1. Local Override
+You can shadow a built-in rule by defining a rule with the same name in your grammar block.
+
+```rust
+grammar! {
+    grammar MyGrammar {
+        // Overrides the default 'ident' behavior
+        rule ident -> String = 
+             i:ident -> { i.to_string().to_uppercase() }
+    }
+}
+```
+
+#### 2. Import Injection
+You can import a function that matches the expected signature (`fn(ParseStream) -> Result<T>`) and use it as a terminal rule.
+
+```rust
+// In some other module
+pub fn my_custom_parser(input: syn::parse::ParseStream) -> syn::Result<MyType> {
+    // ... custom parsing logic
+}
+
+grammar! {
+    grammar MyGrammar {
+        use super::my_custom_parser; // Import it
+
+        rule main -> MyType = 
+            // Use it like any other rule
+            val:my_custom_parser -> { val }
+    }
+}
+```
+This is particularly useful for library authors who want to provide a "prelude" of custom parsers for their users.
 
 #### Sequences and Bindings
 Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block. As of v0.6.0, generated parsers automatically include `use super::*;`, allowing you to refer to items from the parent module (like `Stmt` in the example below) without a `super::` prefix.
@@ -492,6 +521,12 @@ By default, `syn-grammar` uses `syn`\'s speculative parsing (`fork`) to try alte
 3. If it fails, it backtracks and tries the next one.
 
 This allows for flexible grammars but can impact performance if overused. Use the **Cut Operator** (`=>`) to prune the search space when possible.
+
+## Building Custom Backends
+
+If you are a library author who wants to create a parser generator using `syn-grammar`'s syntax (e.g. `winnow-grammar` or `chumsky-grammar`), you can use `syn-grammar-model` as a reusable frontend.
+
+See [EXTENDING.md](EXTENDING.md) for a guide on how to build custom backends.
 
 ## License
 
