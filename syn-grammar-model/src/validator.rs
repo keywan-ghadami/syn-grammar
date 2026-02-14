@@ -74,8 +74,23 @@ fn validate_pattern(
         ModelPattern::Repeat(inner, _)
         | ModelPattern::Plus(inner, _)
         | ModelPattern::Optional(inner, _)
-        | ModelPattern::SpanBinding(inner, _, _) => {
+        | ModelPattern::SpanBinding(inner, _, _)
+        | ModelPattern::Peek(inner, _) => {
             validate_pattern(inner, all_defs, params)?;
+        }
+        ModelPattern::Not(inner, _) => {
+            // Bindings in `not(...)` are useless because `not` only succeeds if inner fails.
+            // We should ideally warn or error if inner has bindings, but for now just validate structure.
+            // Actually, we should validate the inner pattern structure, but we must ensure
+            // that we don't think variables are bound.
+            validate_pattern(inner, all_defs, params)?;
+
+            // TODO: Check that `inner` does not define bindings.
+            // This requires a helper `collect_bindings` which is in `analysis`.
+            // But `validator` shouldn't depend on `analysis`?
+            // `analysis` depends on `model`. `validator` depends on `model`.
+            // They are siblings.
+            // For now, we just validate structure.
         }
         ModelPattern::Group(variants, _) => {
             for seq in variants {

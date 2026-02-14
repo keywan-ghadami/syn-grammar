@@ -506,6 +506,41 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 })
             }
         }
+
+        ModelPattern::Peek(inner, _) => {
+            let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
+            let inner_logic = generate_pattern_step(inner, kws)?;
+
+            if bindings.is_empty() {
+                Ok(quote! {
+                   let _ = rt::peek(input, ctx, |input, ctx| {
+                       #inner_logic
+                       Ok(())
+                   })?;
+                })
+            } else {
+                let tuple_pat = quote!(( #(#bindings),* ));
+                let tuple_ret = quote!(( #(#bindings),* ));
+
+                Ok(quote! {
+                    let #tuple_pat = rt::peek(input, ctx, |input, ctx| {
+                        #inner_logic
+                        Ok(#tuple_ret)
+                    })?;
+                })
+            }
+        }
+
+        ModelPattern::Not(inner, _) => {
+            // Not does not export bindings.
+            let inner_logic = generate_pattern_step(inner, kws)?;
+            Ok(quote! {
+                rt::not_check(input, ctx, |input, ctx| {
+                    #inner_logic
+                    Ok(())
+                })?;
+            })
+        }
     }
 }
 
