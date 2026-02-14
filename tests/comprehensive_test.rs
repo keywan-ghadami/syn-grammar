@@ -228,8 +228,6 @@ fn test_left_recursion_field_access() {
 }
 
 // --- Test 10: Inheritance ---
-// We define the grammars at the module level because the macro generates
-// `use super::base::*;`, which requires `base` to be a sibling module.
 grammar! {
     grammar base {
         pub rule num -> i32 = i:integer -> { i }

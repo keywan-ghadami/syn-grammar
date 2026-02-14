@@ -9,5 +9,5 @@ if [ -n "$FILES" ]; then
     echo "$FILES" | xargs git add
 fi
 
-# Ensure no clippy warnings are present
-cargo clippy -- -D warnings
+# Ensure no clippy warnings are present across all workspace members and targets
+cargo clippy --workspace --all-targets -- -D warnings
