@@ -77,42 +77,51 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         } => {
             let rule_name_str = rule_name.to_string();
             if syn_grammar_model::PORTABLE_BUILTINS.contains(&rule_name_str.as_str()) {
-                match rule_name_str.as_str() {
-                    "alpha" => {
-                        let expr = quote! {
-                            {
-                                let la = input.lookahead1();
-                                if la.peek(syn::Ident) {
-                                    let ident: syn::Ident = input.parse()?;
-                                    if ident.to_string().chars().all(char::is_alphabetic) {
-                                        Ok(ident)
-                                    } else {
-                                        Err(syn::Error::new(ident.span(), "expected an alphabetic identifier"))
-                                    }
-                                } else {
-                                    Err(la.error())
-                                }
-                            }?
-                        };
-                        let result = if let Some(bind) = binding {
-                            quote! { let #bind = #expr; }
-                        } else {
-                            quote! { let _ = #expr; }
-                        };
-                        Ok(result)
+                // Generate a token-filtering expression for the primitive.
+                let expr = match rule_name_str.as_str() {
+                    "alpha" => quote! {
+                        rt::token_filter::alpha(input)?
+                    },
+                    "digit" => quote! {
+                        rt::token_filter::digit(input)?
+                    },
+                    "alphanumeric" => quote! {
+                        rt::token_filter::alphanumeric(input)?
+                    },
+                    "hex_digit" => quote! {
+                        rt::token_filter::hex_digit(input)?
+                    },
+                    "oct_digit" => quote! {
+                        rt::token_filter::oct_digit(input)?
+                    },
+                    "any_byte" => quote! {
+                        input.parse::<syn::LitByte>()?
+                    },
+                    "eof" => {
+                        return Ok(quote! {
+                            if !input.is_empty() {
+                                return Err(syn::Error::new(input.span(), "expected end of input"));
+                            }
+                        });
                     }
-                    // Handle other portable builtins here if they need special logic in the syn backend
+                    "whitespace" => {
+                        // Whitespace is handled by the sequence generator's span-gap detection.
+                        // This is a placeholder that should be handled by the caller.
+                        return Ok(quote! { /* WHITESPACE_CHECK */ });
+                    }
+                    // Defer to built-in rules for high-level primitives like "ident", "integer"
                     _ => {
-                        // For other portable builtins, we can often just defer to the standard rule call
-                        // since the syn-grammar crate itself defines them.
                         let func_call = generate_rule_call_expr(rule_name, args);
-                        Ok(if let Some(bind) = binding {
-                            quote! { let #bind = #func_call; }
-                        } else {
-                            quote! { let _ = #func_call; }
-                        })
+                        quote! { #func_call }
                     }
-                }
+                };
+
+                let result = if let Some(bind) = binding {
+                    quote! { let #bind = #expr; }
+                } else {
+                    quote! { let _ = #expr; }
+                };
+                Ok(result)
             } else {
                 let func_call = generate_rule_call_expr(rule_name, args);
                 Ok(if let Some(bind) = binding {
