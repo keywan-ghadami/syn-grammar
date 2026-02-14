@@ -75,6 +75,8 @@ pub struct ParseContext {
     best_error: Option<ErrorState>,
     pub scopes: ScopeStack,
     rule_stack: Vec<String>,
+    #[cfg(feature = "syn")]
+    pub last_span: Option<Span>,
 }
 
 #[cfg(feature = "rt")]
@@ -86,6 +88,8 @@ impl ParseContext {
             best_error: None,
             scopes: ScopeStack::new(),
             rule_stack: Vec::new(),
+            #[cfg(feature = "syn")]
+            last_span: None,
         }
     }
 
@@ -137,6 +141,24 @@ impl ParseContext {
         self.best_error.take().map(|s| s.err)
     }
 
+    // --- Span Tracking ---
+
+    #[cfg(feature = "syn")]
+    pub fn record_span(&mut self, span: Span) {
+        self.last_span = Some(span);
+    }
+
+    #[cfg(feature = "syn")]
+    pub fn check_whitespace(&self, next_span: Span) -> bool {
+        if let Some(last) = self.last_span {
+            // Check if they are NOT adjacent (end != start)
+            last.end() != next_span.start()
+        } else {
+            // No previous token? Treat as valid (start of file)
+            true
+        }
+    }
+
     // --- Symbol Table Methods ---
 
     pub fn enter_scope(&mut self) {
@@ -184,9 +206,10 @@ where
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
 
-    // Snapshot symbol table and rule stack
+    // Snapshot symbol table, rule stack, and last_span
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
+    let last_span_snapshot = ctx.last_span;
 
     let start_span = input.span();
     let fork = input.fork();
@@ -200,6 +223,7 @@ where
         Ok(val) => {
             input.advance_to(&fork);
             ctx.set_fatal(was_fatal);
+            // We KEEP the last_span updated by the successful attempt
             Ok(Some(val))
         }
         Err(e) => {
@@ -207,6 +231,7 @@ where
                 // Restore state
                 ctx.scopes = scopes_snapshot;
                 ctx.rule_stack = rule_stack_snapshot;
+                ctx.last_span = last_span_snapshot;
 
                 ctx.set_fatal(true);
                 Err(e)
@@ -218,6 +243,7 @@ where
                 // Restore state
                 ctx.scopes = scopes_snapshot;
                 ctx.rule_stack = rule_stack_snapshot;
+                ctx.last_span = last_span_snapshot;
 
                 Ok(None)
             }
@@ -242,6 +268,7 @@ where
     // Snapshot symbol table and rule stack
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
+    let last_span_snapshot = ctx.last_span;
 
     let start_span = input.span();
     let fork = input.fork();
@@ -254,6 +281,7 @@ where
     match res {
         Ok(val) => {
             input.advance_to(&fork);
+            // Keep last_span
             Ok(Some(val))
         }
         Err(e) => {
@@ -263,6 +291,7 @@ where
             // Restore state
             ctx.scopes = scopes_snapshot;
             ctx.rule_stack = rule_stack_snapshot;
+            ctx.last_span = last_span_snapshot;
 
             Ok(None)
         }

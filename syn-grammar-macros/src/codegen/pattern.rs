@@ -34,7 +34,10 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
             if token_types.len() <= 1 {
                 let parses = token_types.iter().map(|ty| {
-                    quote! { let _ = input.parse::<#ty>()?; }
+                    quote! {
+                        let _t = input.parse::<#ty>()?;
+                        ctx.record_span(syn::spanned::Spanned::span(&_t));
+                    }
                 });
                 Ok(quote! { #(#parses)* })
             } else {
@@ -46,6 +49,13 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     steps.push(quote! {
                         let #var = input.parse::<#ty>()?;
                     });
+
+                    // Record span for the last token
+                    if i == token_types.len() - 1 {
+                        steps.push(quote! {
+                            ctx.record_span(syn::spanned::Spanned::span(&#var));
+                        });
+                    }
 
                     if i > 0 {
                         let prev = format_ident!("_t{}", i - 1);
@@ -80,22 +90,46 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 // Generate a token-filtering expression for the primitive.
                 let expr = match rule_name_str.as_str() {
                     "alpha" => quote! {
-                        rt::token_filter::alpha(input)?
+                        {
+                            let t = rt::token_filter::alpha(input)?;
+                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            t
+                        }
                     },
                     "digit" => quote! {
-                        rt::token_filter::digit(input)?
+                        {
+                            let t = rt::token_filter::digit(input)?;
+                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            t
+                        }
                     },
                     "alphanumeric" => quote! {
-                        rt::token_filter::alphanumeric(input)?
+                        {
+                            let t = rt::token_filter::alphanumeric(input)?;
+                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            t
+                        }
                     },
                     "hex_digit" => quote! {
-                        rt::token_filter::hex_digit(input)?
+                        {
+                            let t = rt::token_filter::hex_digit(input)?;
+                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            t
+                        }
                     },
                     "oct_digit" => quote! {
-                        rt::token_filter::oct_digit(input)?
+                        {
+                            let t = rt::token_filter::oct_digit(input)?;
+                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            t
+                        }
                     },
                     "any_byte" => quote! {
-                        input.parse::<syn::LitByte>()?
+                        {
+                            let t = input.parse::<syn::LitByte>()?;
+                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            t
+                        }
                     },
                     "eof" => {
                         return Ok(quote! {
@@ -105,11 +139,13 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         });
                     }
                     "whitespace" => {
-                        // Whitespace is handled by the sequence generator's span-gap detection.
-                        // This is a placeholder that should be handled by the caller.
-                        return Ok(quote! { /* WHITESPACE_CHECK */ });
+                        return Ok(quote! {
+                            if !ctx.check_whitespace(input.span()) {
+                                return Err(syn::Error::new(input.span(), "expected whitespace"));
+                            }
+                        });
                     }
-                    // Defer to built-in rules for high-level primitives like "ident", "integer"
+                    // Defer to built-in rules for high-level primitives like "ident", "integer", "float"
                     _ => {
                         let func_call = generate_rule_call_expr(rule_name, args);
                         quote! { #func_call }
@@ -329,6 +365,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 Ok(quote! { {
                     let content;
                     let _ = syn::#macro_name!(content in input);
+                    // TODO: Record span of brackets?
                     let input = &content;
                     #inner_logic
                 }})
