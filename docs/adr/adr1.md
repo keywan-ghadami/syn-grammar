@@ -1,36 +1,63 @@
-Architecture Decision Record (ADR): Universal Character and Byte Primitives
-1. Title
-Handling Character, Byte, and Whitespace Primitives across Token-Based and Character-Based Backends
-2. Status
-Accepted
-3. Context
-syn-grammar is evolving from a single-backend procedural macro parser (targeting syn) into a universal parser frontend (syn-grammar-model) capable of driving multiple backends, such as the character/byte-oriented winnow-grammar.
-Upstream users require granular, low-level primitives like alpha, digit, oct_digit, any_byte, and whitespace. However, a fundamental impedance mismatch exists between the target domains:
- * Character/Byte Streams (winnow): Operate on raw &str or &[u8]. Every character and whitespace is physically present and can be consumed individually.
- * Token Streams (syn): Operate on proc_macro2::TokenStream. The Rust lexer has already destroyed all whitespace and grouped characters into atomic, indivisible tokens (Ident, LitInt, Punct).
-We need a way to support these primitives in the EBNF DSL without tying the syntax to a specific backend, while maintaining executability in the native syn backend.
-4. Decision
-We will introduce a standardized, domain-agnostic set of built-in primitive names (eof, whitespace, alpha, digit, alphanumeric, hex_digit, oct_digit, any_byte).
- * AST Representation: These primitives will not get dedicated EBNF AST nodes (to keep syn-grammar-model's parse_atom lean). They will be parsed as standard ModelPattern::RuleCalls.
- * Validation: syn-grammar-model will expose a constant list of these standard built-ins (UNIVERSAL_CHAR_BUILTINS). Backends will validate RuleCalls against this list.
- * Backend-Specific Semantics: The responsibility of translating these primitives falls entirely to the backend's code generator:
-   * Character-stream backends (winnow) will map these to consuming parsers (e.g., winnow::ascii::alpha1).
-   * Token-stream backends (syn) will map these to Token Filters and Zero-Width Assertions (Lookarounds) acting upon the already lexed tokens.
-5. Alternatives Considered & Rejected
- * Option A: Allow backends to inject proprietary types (e.g., winnow's oct_digit1).
-   * Rejected because: It causes "Vendor Leaking." If a user writes oct_digit1 in their grammar, it is permanently locked to the winnow ecosystem. The DSL must remain 100% portable across backends.
- * Option B: Force the syn backend to parse character-by-character.
-   * Rejected because: It is technically impossible without breaking macro hygiene and spans. proc_macro2 does not allow partial consumption of an Ident. Furthermore, the original whitespace is irrecoverably lost by the time syn receives the token stream.
- * Option C: Hardcode AST variants for every new primitive in syn-grammar-model.
-   * Rejected because: It bloats the core parse_atom function with endless else if branches for specific keywords, making the model rigid. Reusing RuleCall delegates the semantic translation to the code generator, which is the correct architectural boundary.
-6. Consequences & Implementation Directives
-By adopting this architecture, the EBNF syntax remains clean and portable. The syn-grammar-macros (token backend) must implement the following specific behaviors to emulate character-level concepts:
-6.1. The Whitespace Paradox (Span-Gap Detection)
-Since whitespace does not exist as a token in syn, the whitespace primitive acts as a zero-width assertion. The syn backend will generate code that compares the Span of the previously parsed token with the Span of the upcoming token.
- * Implementation: If the tokens are not adjacent (i.e., span_end of Token A != span_start of Token B), a gap exists, implying whitespace or comments were present. The rule succeeds without consuming a token.
-6.2. Token Filtering for Character Primitives
-Instead of consuming single characters, the syn backend will apply string-validation filters to the next available token.
- * alpha / alphanumeric: Matches a syn::Ident. The generated action block converts the ident to a string and asserts .chars().all(...).
- * digit / hex_digit / oct_digit: Matches a syn::LitInt. Validates the numeric base (e.g., checking for 0x or 0o prefixes via base10_digits()).
- * any_byte: Matches a syn::LitByte. If applied repeatedly, the backend must generate complex logic to peek into a syn::LitByteStr and advance an internal cursor.
- * eof: Maps natively to input.is_empty().
+# Architecture Decision Record (ADR): Portable and Backend-Specific Primitives
+
+## 1. Title
+
+A Unified Strategy for Portable and Backend-Specific Primitives
+
+## 2. Status
+
+Supersedes ADR of 2024-10-26. Accepted.
+
+## 3. Context
+
+`syn-grammar` is evolving into a universal parser frontend (`syn-grammar-model`) capable of driving multiple backends, including the token-oriented `syn` and character-oriented backends like `winnow`.
+
+A key value proposition of a grammar DSL is the ability to use high-level, common primitives like `ident`, `integer`, and `string`. However, a fundamental impedance mismatch exists between backends:
+
+-   **Token Streams (`syn`):** Operate on `proc_macro2::TokenStream`. The Rust lexer has already grouped characters into indivisible tokens (`Ident`, `LitInt`). Primitives like `ident` are trivial to parse (consume one token), but character-level primitives like `alpha` must be emulated by inspecting the token's content. Whitespace is lost.
+-   **Character Streams (`winnow`):** Operate on `&str` or `&[u8]`. Character-level primitives like `alpha` are trivial (consume one character). High-level primitives like `ident` require more work, as the backend must parse a sequence of characters according to the language's rules.
+
+We need a clear architectural contract that defines which primitives are considered portable across all backends and which are specific to the `syn` ecosystem.
+
+## 4. Decision
+
+We will establish two distinct categories of built-in primitives to make the portability contract explicit.
+
+1.  **`PORTABLE_BUILTINS`**: This list will contain primitives that are **conceptually portable**, representing universal parsing concepts. All backends are expected to provide a meaningful implementation for them. A grammar that uses only these primitives is guaranteed to be portable.
+    -   **High-Level Concepts**: `ident`, `integer`, `string`, `float`.
+    -   **Low-Level Character Classes**: `alpha`, `digit`, `alphanumeric`, `hex_digit`, `eof`, `whitespace`.
+
+2.  **`SYN_SPECIFIC_BUILTINS`**: This list will contain primitives that are **fundamentally tied to the `syn` crate's Abstract Syntax Tree (AST)**. They provide powerful shortcuts but knowingly lock a grammar into the `syn` ecosystem.
+    -   **Examples**: `rust_type` (returns a `syn::Type`), `rust_block` (returns a `syn::Block`), `lit_str` (returns a `syn::LitStr`).
+
+The responsibility for implementing these primitives lies with the backend. The abstraction focuses on the **conceptual contract**, not the implementation difficulty.
+
+-   The `syn` backend implements `ident` by consuming a `syn::Ident` token. It implements `alpha` by consuming a `syn::Ident` and then running a filter on its string content.
+-   A `winnow` backend implements `alpha` by consuming an alphabetic character. It implements `ident` by parsing a sequence of characters that constitute a valid identifier.
+
+## 5. Alternatives Considered & Rejected
+
+### Alternative A: Classify Primitives by Implementation Difficulty (Original ADR)
+
+-   **Idea**: Only treat primitives that are simple for *all* backends (like character classes) as "universal." High-level primitives like `ident` would be considered `syn`-specific because they are "hard" for character-based backends to implement.
+-   **Rejected Because**: This is the wrong abstraction. It prioritizes the backend's implementation convenience over the grammar author's experience. The main value of a grammar is working with high-level, common types. Forcing every `winnow-grammar` user to re-implement an `ident` parser is a critical failure of the DSL. The existence of `ident` parsers in the `winnow` ecosystem proves they are a universal expectation.
+
+### Alternative B: Vendor-Specific Primitives (e.g., `winnow_ident`)
+
+-   **Idea**: Allow each backend to inject its own proprietary primitives into the grammar.
+-   **Rejected Because**: This leads to "Vendor Leaking" and destroys portability. A grammar written with `winnow_ident` cannot be used with the `syn` backend. The core DSL syntax must remain 100% portable.
+
+### Alternative C: Force `syn` to Parse Character-by-Character
+
+-   **Idea**: Make the `syn` backend behave exactly like a character-stream parser.
+-   **Rejected Because**: This is technically impossible. `proc_macro2::TokenStream` does not permit partial consumption of tokens (e.g., taking just the first character of an `Ident`). Furthermore, all original whitespace is irrecoverably lost by the time the macro receives the tokens.
+
+## 6. Consequences & Implementation Directives
+
+-   **Clarity for Users**: Grammar authors now have a clear understanding of the portability trade-offs. If they stick to `PORTABLE_BUILTINS`, their grammar can target any backend.
+-   **Burden on Backend Authors**: Authors of new, non-`syn` backends have a clear contract. They **must** implement all `PORTABLE_BUILTINS` to be compliant. This includes re-implementing lexing logic for high-level primitives like `ident` and `integer`. This is considered an acceptable trade-off for providing a high-quality, portable DSL.
+-   **`syn-grammar-model`**: This crate will be the source of truth, exposing the `PORTABLE_BUILTINS` and `SYN_SPECIFIC_BUILTINS` constants for validation.
+-   **`syn-grammar` (The `syn` backend) Implementation**:
+    -   **`ident`, `integer`, etc.**: These map directly to consuming the corresponding `syn` token (`syn::Ident`, `syn::LitInt`).
+    -   **`alpha`, `digit`, etc.**: These are implemented as **Token Filters**. The backend consumes the next logical token (e.g., a `syn::Ident` for `alpha`) and then applies a validation function to its content (e.g., `.chars().all(char::is_alphabetic)`).
+    -   **`whitespace`**: This remains a zero-width assertion implemented via "span-gap detection" (checking if the end span of the previous token is adjacent to the start span of the next token).
