@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [0.7.0] - 2024-10-27
 
 ### Added
+- **`float` Primitive**: Added the `float` high-level primitive, which parses a floating-point literal and returns `f64`.
+- **`whitespace` Primitive**: Added the `whitespace` assertion, which ensures a gap (non-adjacency) between two tokens.
+- **Lookahead Operators**: Added support for positive (`peek(...)`) and negative (`not(...)`) lookahead operators.
+    - `peek(pattern)`: Succeeds if the pattern matches, but does not consume input.
+    - `not(pattern)`: Succeeds if the pattern does *not* match. Does not consume input.
 - **Portable Primitives**: Introduced a distinction between `PORTABLE_BUILTINS` (`ident`, `integer`, `alpha`, etc.) and `SYN_SPECIFIC_BUILTINS` (`rust_type`, `lit_str`, etc.). This clarifies the portability contract for authors of alternative backends (e.g., `winnow-grammar`), encouraging a rich, shared vocabulary of common parsing concepts.
 - **`alpha` Primitive**: Added the `alpha` built-in primitive, which matches an identifier composed entirely of alphabetic characters.
 - **ADR for Primitives**: Added an Architecture Decision Record (`docs/adr/adr1.md`) to document the design for handling character-level, byte-level, and token-level primitives across different backends.

@@ -18,6 +18,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
 - **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
+- **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
 - **Rule Arguments**: Pass context or parameters between rules.
 - **Grammar Inheritance**: Reuse rules from other grammars.
 - **Testing Utilities**: Fluent API for testing your parsers with pretty-printed error reporting.
@@ -248,6 +249,7 @@ grammar! {
 | `float` | A float literal | `f64` |
 | `alpha` | An alphabetic identifier | `syn::Ident` |
 | `digit` | A numeric identifier | `syn::Ident` |
+| `whitespace` | Ensures token separation | `()` |
 
 **`syn`-Specific Built-ins**: These are tied to the `syn` crate's AST and are not portable.
 
@@ -406,6 +408,26 @@ grammar! {
     grammar Tuple {
         rule tuple -> (i32, i32) = 
             paren(a:integer "," b:integer) -> { (a, b) }
+    }
+}
+```
+
+#### Lookahead (`peek`, `not`)
+Lookahead operators allow you to check for a pattern without consuming input.
+
+- `peek(pattern)`: Succeeds if `pattern` matches. Input is not advanced.
+- `not(pattern)`: Succeeds if `pattern` does *not* match. Input is not advanced.
+
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Lookahead {
+        // Matches "a" only if followed by "b", but "b" is not consumed
+        rule check -> () = "a" peek("b") -> { () }
+        
+        // Matches "a" only if NOT followed by "c"
+        rule neg -> () = "a" not("c") -> { () }
     }
 }
 ```
