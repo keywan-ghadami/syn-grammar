@@ -2,20 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.7.0]
+## [0.7.0] - 2024-10-27
 
 ### Added
-- **Backend-Agnostic Model**: The `syn-grammar-model` crate now exposes `parse_grammar_with_builtins`. This allows backend authors (e.g., for `winnow-grammar`) to validate grammars against their own set of built-in rules, rather than being forced to use the default `syn` built-ins.
+- **Portable Primitives**: Introduced a distinction between `PORTABLE_BUILTINS` (`ident`, `integer`, `alpha`, etc.) and `SYN_SPECIFIC_BUILTINS` (`rust_type`, `lit_str`, etc.). This clarifies the portability contract for authors of alternative backends (e.g., `winnow-grammar`), encouraging a rich, shared vocabulary of common parsing concepts.
+- **`alpha` Primitive**: Added the `alpha` built-in primitive, which matches an identifier composed entirely of alphabetic characters.
+- **ADR for Primitives**: Added an Architecture Decision Record (`docs/adr/adr1.md`) to document the design for handling character-level, byte-level, and token-level primitives across different backends.
+
+### Changed
+- **Backend-Agnostic Model**: The `syn-grammar-model` crate now exposes `parse_grammar_with_builtins`. This allows backend authors to validate grammars against their own set of built-in rules.
 - **Backend Author Guide**: `EXTENDING.md` has been rewritten to focus on how to build custom parser generator backends using `syn-grammar` as the frontend DSL.
 
 ### Breaking Changes
 - **Built-in Rule Resolution**: The precedence of built-in rules (like `ident`, `string`) has changed. They are no longer hardcoded keywords but are now provided as default implementations in `syn_grammar::builtins`.
     - **Impact**: If you define a rule named `ident` in your grammar, it will now *shadow* the built-in `ident` parser instead of being ignored. This fixes a long-standing limitation but may change behavior if you accidentally relied on the shadowing being ignored.
-    - **Impact**: If you inherit from a grammar that defines `ident`, and you use `ident`, you might encounter ambiguity between the inherited rule and the built-in. Use explicit imports (e.g., `use super::Parent::ident;`) to resolve this.
-
-### Added
-- **Overridable Built-ins**: You can now replace standard token parsers by defining rules with the same name or importing functions with the same name. This enables backends (like `winnow-grammar`) to inject their own implementations for core types.
-- **`syn_grammar::builtins` Module**: Exposes the default implementations of all built-in rules.
 
 ## [0.6.0]
 

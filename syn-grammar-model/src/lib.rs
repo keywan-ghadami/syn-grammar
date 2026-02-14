@@ -19,10 +19,28 @@ pub mod model;
 pub mod parser;
 pub mod validator;
 
-pub const SYN_BUILTINS: &[&str] = &[
+/// Primitives that are conceptually portable across different backends (token or character based).
+/// A grammar using only these should be portable.
+pub const PORTABLE_BUILTINS: &[&str] = &[
+    // High-level conceptual tokens
     "ident",
     "integer",
     "string",
+    "float",
+    // Low-level character classes
+    "eof",
+    "whitespace",
+    "alpha",
+    "digit",
+    "alphanumeric",
+    "hex_digit",
+    "oct_digit",
+    "any_byte",
+];
+
+/// Primitives that are intrinsically tied to the `syn` crate and its AST.
+/// A grammar using these is not portable to a non-syn backend.
+pub const SYN_SPECIFIC_BUILTINS: &[&str] = &[
     "rust_type",
     "rust_block",
     "lit_str",
@@ -30,12 +48,13 @@ pub const SYN_BUILTINS: &[&str] = &[
     "lit_char",
     "lit_bool",
     "lit_float",
+    "outer_attrs",
+    // Deprecated spanned variants
     "spanned_int_lit",
     "spanned_string_lit",
     "spanned_float_lit",
     "spanned_bool_lit",
     "spanned_char_lit",
-    "outer_attrs",
 ];
 
 /// Reusable pipeline: Parses, transforms, and validates the grammar.
@@ -45,7 +64,12 @@ pub const SYN_BUILTINS: &[&str] = &[
 /// This function uses the default built-ins for `syn-grammar`.
 /// If you are building a custom backend (e.g. `winnow-grammar`), use `parse_grammar_with_builtins` instead.
 pub fn parse_grammar(input: TokenStream) -> Result<model::GrammarDefinition> {
-    parse_grammar_with_builtins(input, SYN_BUILTINS)
+    let all_builtins: Vec<&str> = PORTABLE_BUILTINS
+        .iter()
+        .cloned()
+        .chain(SYN_SPECIFIC_BUILTINS.iter().cloned())
+        .collect();
+    parse_grammar_with_builtins(input, &all_builtins)
 }
 
 /// Reusable pipeline with custom built-ins.

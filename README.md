@@ -14,7 +14,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **EBNF Syntax**: Familiar syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`), and grouping `(...)`.
 - **Type-Safe Actions**: Directly map parsing rules to Rust types and AST nodes using action blocks (`-> { ... }`).
 - **Seamless Syn Integration**: First-class support for parsing Rust tokens like identifiers, literals, types, and blocks.
-- **Overridable Built-ins**: Easily customize or replace standard token parsers (e.g., `ident`) with your own logic or external backends.
+- **Portable Primitives**: A core set of built-ins (`ident`, `integer`, `alpha`) are conceptually portable, allowing other backends like `winnow-grammar` to provide their own efficient implementations.
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
 - **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
@@ -185,17 +185,13 @@ grammar! {
 You can inherit rules from another grammar module. This is useful for splitting large grammars or reusing common rules.
 
 ```rust
-mod base {
-    use syn_grammar::grammar;
-    grammar! {
-        grammar Base {
-            pub rule num -> i32 = i:integer -> { i }
-        }
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Base {
+        pub rule num -> i32 = i:integer -> { i }
     }
 }
-
-use syn_grammar::grammar;
-use base::Base;
 
 grammar! {
     grammar Derived : Base {
@@ -240,26 +236,27 @@ grammar! {
 ```
 
 #### Built-in Parsers
-`syn-grammar` provides several built-in parsers for common Rust tokens:
+`syn-grammar` provides several built-in parsers. They are divided into two categories:
+
+**Portable Built-ins**: These represent high-level, conceptually portable primitives that other backends (like `winnow-grammar`) are expected to implement. A grammar using only these should be portable.
+
+| Parser | Description | Returns (`syn-grammar` default) |
+|---|---|---|
+| `ident` | A Rust identifier | `syn::Ident` |
+| `integer` | An integer literal | `i32` |
+| `string` | A string literal's content | `String` |
+| `float` | A float literal | `f64` |
+| `alpha` | An alphabetic identifier | `syn::Ident` |
+| `digit` | A numeric identifier | `syn::Ident` |
+
+**`syn`-Specific Built-ins**: These are tied to the `syn` crate's AST and are not portable.
 
 | Parser | Description | Returns |
-|--------|-------------|---------|
-| `ident` | A Rust identifier (e.g., `foo`, `_bar`) | `syn::Ident` |
-| `integer` | An integer literal (e.g., `42`) | `i32` |
-| `string` | A string literal (e.g., `\"hello\"`) | `String` |
-| `lit_str` | A string literal object | `syn::LitStr` |
+|---|---|---|
 | `rust_type` | A Rust type (e.g., `Vec<i32>`) | `syn::Type` |
 | `rust_block` | A block of code (e.g., `{ stmt; }`) | `syn::Block` |
+| `lit_str` | A string literal object | `syn::LitStr` |
 | `lit_int` | A typed integer literal (e.g. `1u8`) | `syn::LitInt` |
-| `lit_char` | A character literal (e.g. `\'c\'`) | `syn::LitChar` |
-| `lit_bool` | A boolean literal (`true` or `false`) | `syn::LitBool` |
-| `lit_float` | A floating point literal (e.g. `3.14`) | `syn::LitFloat` |
-| `spanned_int_lit` | **Deprecated** Use `lit_int` with `@` | `(i32, Span)` |
-| `spanned_string_lit` | **Deprecated** Use `lit_str` with `@` | `(String, Span)` |
-| `spanned_float_lit` | **Deprecated** Use `lit_float` with `@` | `(f64, Span)` |
-| `spanned_bool_lit` | **Deprecated** Use `lit_bool` with `@` | `(bool, Span)` |
-| `spanned_char_lit` | **Deprecated** Use `lit_char` with `@` | `(char, Span)` |
-| `outer_attrs` | Outer attributes (e.g. `#[...]`) | `Vec<syn::Attribute>` |
 
 ### Overriding Built-ins & Custom Rules
 
@@ -268,12 +265,15 @@ If you need to change how a built-in works or define a reusable rule that isn't 
 #### 1. Local Override
 You can shadow a built-in rule by defining a rule with the same name in your grammar block.
 
-```rust
+```rust,ignore
+use syn_grammar::grammar;
+use syn::Token;
+
 grammar! {
     grammar MyGrammar {
         // Overrides the default 'ident' behavior
-        rule ident -> String = 
-             i:ident -> { i.to_string().to_uppercase() }
+        rule ident -> String =
+            i:ident -> { i.to_string().to_uppercase() }
     }
 }
 ```
@@ -281,10 +281,14 @@ grammar! {
 #### 2. Import Injection
 You can import a function that matches the expected signature (`fn(ParseStream) -> Result<T>`) and use it as a terminal rule.
 
-```rust
+```rust,ignore
+use syn_grammar::grammar;
+
 // In some other module
+pub struct MyType;
 pub fn my_custom_parser(input: syn::parse::ParseStream) -> syn::Result<MyType> {
     // ... custom parsing logic
+    Ok(MyType)
 }
 
 grammar! {
