@@ -100,8 +100,10 @@ fn test_nested_repetition_complex() {
     }
 
     // "(1 2) (3)" -> [[1, 2], [3]]
-    let res = complex_rep::parse_main.parse_str("(1 2) (3)").unwrap();
-    assert_eq!(res, vec![vec![1, 2], vec![3]]);
+    complex_rep::parse_main
+        .parse_str("(1 2) (3)")
+        .test()
+        .assert_success_is(vec![vec![1, 2], vec![3]]);
 }
 
 // --- Test Cut Operator ---
@@ -207,8 +209,10 @@ fn test_basic_sequence() {
         }
     }
 
-    let res = seq_test::parse_main.parse_str("10 20").unwrap();
-    assert_eq!(res, (10, 20));
+    seq_test::parse_main
+        .parse_str("10 20")
+        .test()
+        .assert_success_is((10, 20));
 }
 
 // --- Test Epsilon Alternative ---
@@ -281,11 +285,10 @@ fn test_complex_return_types() {
         }
     }
 
-    let res = types::parse_main.parse_str("10 \"skip\" 20").unwrap();
-    assert_eq!(res.len(), 3);
-    assert_eq!(res[0], Some(10));
-    assert_eq!(res[1], None);
-    assert_eq!(res[2], Some(20));
+    types::parse_main
+        .parse_str("10 \"skip\" 20")
+        .test()
+        .assert_success_is(vec![Some(10), None, Some(20)]);
 }
 
 // --- Test Cut in Repetition ---

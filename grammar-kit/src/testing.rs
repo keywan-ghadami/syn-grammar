@@ -148,6 +148,21 @@ impl<T: Debug, E: Display + Debug + 'static> TestResult<T, E> {
         }
         val
     }
+    
+    // 8. Asserts failure AND checks if the message DOES NOT contain a specific text.
+    pub fn assert_failure_not_contains(self, unexpected_part: &str) {
+        let ctx = self.format_context();
+        let source = self.source.clone();
+        let err = self.assert_failure();
+        let actual_msg = err.to_string();
+        if actual_msg.contains(unexpected_part) {
+            let formatted = format_error_impl(&err, source.as_deref());
+            panic!(
+                "\n🔴 TEST FAILED (Unexpected Error Message Content):{}\nUnexpected part: {:?}\nActual msg:      {:?}\nError Debug:     {:?}\nFormatted:\n{}\n", 
+                ctx, unexpected_part, actual_msg, err, formatted
+            );
+        }
+    }
 }
 
 pub trait Testable<T, E> {

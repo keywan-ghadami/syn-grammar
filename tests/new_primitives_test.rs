@@ -15,11 +15,9 @@ fn test_float_primitive() {
     float_test::parse_main
         .parse_str("1.23456")
         .test()
-        .assert_success();
-
-    // Verify value
-    let val = float_test::parse_main.parse_str("1.23456").unwrap();
-    assert!((val - 1.23456).abs() < 1e-6);
+        .assert_success_with(|val| {
+            assert!((val - 1.23456).abs() < 1e-6, "Float value mismatch");
+        });
 
     // Integers should fail (syn::LitFloat does not match integer literals unless they have . or exponent)
     float_test::parse_main
@@ -41,15 +39,34 @@ fn test_numeric_primitives() {
         }
     }
 
-    assert_eq!(num_test::parse_test_i8.parse_str("127").unwrap(), 127i8);
-    assert_eq!(num_test::parse_test_u64.parse_str("1000").unwrap(), 1000u64);
+    num_test::parse_test_i8
+        .parse_str("127")
+        .test()
+        .assert_success_is(127i8);
+    num_test::parse_test_u64
+        .parse_str("1000")
+        .test()
+        .assert_success_is(1000u64);
 
-    let f: f32 = num_test::parse_test_f32.parse_str("1.5").unwrap();
-    assert!((f - 1.5).abs() < 1e-6);
+    num_test::parse_test_f32
+        .parse_str("1.5")
+        .test()
+        .assert_success_with(|f| {
+            assert!((f - 1.5).abs() < 1e-6);
+        });
 
-    assert_eq!(num_test::parse_test_hex.parse_str("0xFF").unwrap(), 255u64);
-    assert_eq!(num_test::parse_test_oct.parse_str("0o77").unwrap(), 63u64);
-    assert_eq!(num_test::parse_test_bin.parse_str("0b1010").unwrap(), 10u64);
+    num_test::parse_test_hex
+        .parse_str("0xFF")
+        .test()
+        .assert_success_is(255u64);
+    num_test::parse_test_oct
+        .parse_str("0o77")
+        .test()
+        .assert_success_is(63u64);
+    num_test::parse_test_bin
+        .parse_str("0b1010")
+        .test()
+        .assert_success_is(10u64);
 }
 
 // --- Test Whitespace Primitive ---
