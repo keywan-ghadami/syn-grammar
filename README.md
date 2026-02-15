@@ -14,7 +14,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **EBNF Syntax**: Familiar syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`), and grouping `(...)`.
 - **Type-Safe Actions**: Directly map parsing rules to Rust types and AST nodes using action blocks (`-> { ... }`).
 - **Seamless Syn Integration**: First-class support for parsing Rust tokens like identifiers, literals, types, and blocks.
-- **Portable Primitives**: A core set of built-ins (`ident`, `integer`, `alpha`) are conceptually portable, allowing other backends like `winnow-grammar` to provide their own efficient implementations.
+- **Portable Primitives**: A core set of built-ins (`ident`, `u32`, `i64`, `alpha`) are conceptually portable, allowing other backends like `winnow-grammar` to provide their own efficient implementations.
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
 - **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
@@ -91,7 +91,7 @@ grammar! {
           | f:factor            -> { f }
 
         rule factor -> i32 =
-            i:integer           -> { i }
+            i:i32               -> { i }
           | paren(e:expression) -> { e }
     }
 }
@@ -176,7 +176,7 @@ grammar! {
             "start" v:value(10) -> { v }
 
         rule value(offset: i32) -> i32 =
-            i:integer -> { i + offset }
+            i:i32 -> { i + offset }
     }
 }
 ```
@@ -190,7 +190,7 @@ use syn_grammar::grammar;
 
 grammar! {
     grammar Base {
-        pub rule num -> i32 = i:integer -> { i }
+        pub rule num -> i32 = i:i32 -> { i }
     }
 }
 
@@ -237,21 +237,39 @@ grammar! {
 ```
 
 #### Built-in Parsers
-`syn-grammar` provides several built-in parsers. They are divided into two categories:
+`syn-grammar` provides a rich set of built-in parsers. They are divided into two categories:
 
-**Portable Built-ins**: These represent high-level, conceptually portable primitives that other backends (like `winnow-grammar`) are expected to implement. A grammar using only these should be portable.
+**1. Portable Built-ins**
 
-| Parser | Description | Returns (`syn-grammar` default) |
+These represent high-level, conceptually portable primitives that other backends (like `winnow-grammar`) are expected to implement. A grammar using only these should be portable.
+
+**Core Primitives**
+
+| Parser | Description | Returns |
 |---|---|---|
 | `ident` | A Rust identifier | `syn::Ident` |
-| `integer` | An integer literal | `i32` |
 | `string` | A string literal's content | `String` |
-| `float` | A float literal | `f64` |
 | `alpha` | An alphabetic identifier | `syn::Ident` |
 | `digit` | A numeric identifier | `syn::Ident` |
 | `whitespace` | Ensures token separation | `()` |
+| `outer_attrs` | Parses `#[...]` attributes | `Vec<syn::Attribute>` |
 
-**`syn`-Specific Built-ins**: These are tied to the `syn` crate's AST and are not portable.
+**Numeric Types (Consistent Naming)**
+
+We implement a comprehensive naming convention for numeric types.
+
+| Category | Grammar Name | Return Type (Rust) | Aliases |
+|---|---|---|---|
+| **Signed** | `i8`, `i16`, `i32`, `i64`, `i128`, `isize` | `i8`, `i16`, `i32`, `i64`, `i128`, `isize` | |
+| **Unsigned** | `u8`, `u16`, `u32`, `u64`, `u128`, `usize` | `u8`, `u16`, `u32`, `u64`, `u128`, `usize` | |
+| **Float** | `f32`, `f64` | `f32`, `f64` | |
+| **Alt Bases** | `hex_literal`, `oct_literal`, `bin_literal` | `u64` | |
+
+*Note: For alternative bases (`hex`, `oct`, `bin`), parsing is done into a maximum-width unsigned container (`u64`) to avoid combinatorial type explosion. Use developer action blocks for explicit downcasting.*
+
+**2. `syn`-Specific Built-ins**
+
+These are tied to the `syn` crate's AST and are not portable.
 
 | Parser | Description | Returns |
 |---|---|---|
@@ -324,7 +342,7 @@ grammar! {
                 Stmt::Assign(name, val) 
             }
             
-        rule expr -> i32 = i:integer -> { i }
+        rule expr -> i32 = i:i32 -> { i }
     }
 }
 # fn main() {}
@@ -373,7 +391,7 @@ use syn_grammar::grammar;
 grammar! {
     grammar List {
         rule list -> Vec<i32> = 
-            [ elements:integer* ] -> { elements }
+            [ elements:i32* ] -> { elements }
     }
 }
 ```
@@ -407,7 +425,7 @@ use syn_grammar::grammar;
 grammar! {
     grammar Tuple {
         rule tuple -> (i32, i32) = 
-            paren(a:integer "," b:integer) -> { (a, b) }
+            paren(a:i32 "," b:i32) -> { (a, b) }
     }
 }
 ```
@@ -478,7 +496,7 @@ grammar! {
             "let" => "mut"? name:ident "=" e:expr -> { Stmt::Let(name, e) }
           | e:expr -> { Stmt::Expr(e) }
           
-        rule expr -> i32 = i:integer -> { i }
+        rule expr -> i32 = i:i32 -> { i }
     }
 }
 # fn main() {}
@@ -498,7 +516,7 @@ grammar! {
             l:expression "+" r:term -> { l + r }
           | t:term -> { t }
         
-        rule term -> i32 = i:integer -> { i }
+        rule term -> i32 = i:i32 -> { i }
     }
 }
 
@@ -534,7 +552,7 @@ grammar! {
             l:expr "+" r:term -> { l + r }
           | t:term            -> { t }
           
-        rule term -> i32 = i:integer -> { i }
+        rule term -> i32 = i:i32 -> { i }
     }
 }
 ```

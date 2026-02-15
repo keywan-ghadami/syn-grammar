@@ -4,8 +4,6 @@
 use proc_macro2::Span;
 use std::collections::HashSet;
 #[cfg(feature = "syn")]
-use syn::ext::IdentExt;
-#[cfg(feature = "syn")]
 use syn::parse::discouraged::Speculative;
 #[cfg(feature = "syn")]
 use syn::parse::ParseStream;
@@ -365,7 +363,7 @@ where
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> {
-    input.call(syn::Ident::parse_any)
+    input.parse()
 }
 
 #[cfg(all(feature = "rt", feature = "syn"))]

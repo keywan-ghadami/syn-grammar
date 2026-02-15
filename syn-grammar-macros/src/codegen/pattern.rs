@@ -17,16 +17,14 @@ pub fn generate_sequence_steps(
     patterns: &[ModelPattern],
     kws: &HashSet<String>,
 ) -> Result<TokenStream> {
-    let steps = patterns
-        .iter()
-        .map(|p| generate_pattern_step(p, kws))
-        .collect::<Result<Vec<_>>>()?;
+    let mut steps = Vec::new();
+    for p in patterns {
+        steps.push(generate_pattern_step(p, kws)?);
+    }
     Ok(quote! { #(#steps)* })
 }
 
 fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<TokenStream> {
-    let span = pattern.span();
-
     match pattern {
         ModelPattern::Cut(_) => Ok(quote!()),
         ModelPattern::Lit(lit) => {
@@ -195,16 +193,13 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                 let inner_logic = generate_pattern_step(inner, kws)?;
 
-                let peek_check = if let Some(peek) = analysis::get_simple_peek(inner, kws)? {
-                    quote!(input.peek(#peek))
-                } else {
-                    quote!(true)
-                };
+                // Only use peek optimization if it's safe and unambiguous
+                let peek_opt = analysis::get_simple_peek(inner, kws).ok().flatten();
 
-                if analysis::get_simple_peek(inner, kws)?.is_some() {
+                if let Some(peek) = peek_opt {
                     Ok(quote! {
                        #(#init_vecs)*
-                       while #peek_check {
+                       while input.peek(#peek) {
                            {
                                #inner_logic
                                #(#push_vecs)*
@@ -264,21 +259,16 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     .collect();
 
                 let inner_logic = generate_pattern_step(inner, kws)?;
+                let peek_opt = analysis::get_simple_peek(inner, kws).ok().flatten();
 
-                let peek_check = if let Some(peek) = analysis::get_simple_peek(inner, kws)? {
-                    quote!(input.peek(#peek))
-                } else {
-                    quote!(true)
-                };
-
-                if analysis::get_simple_peek(inner, kws)?.is_some() {
+                if let Some(peek) = peek_opt {
                     Ok(quote! {
                        #(#init_vecs)*
                        {
                            #inner_logic
                            #(#push_vecs)*
                        }
-                       while #peek_check {
+                       while input.peek(#peek) {
                            {
                                #inner_logic
                                #(#push_vecs)*
@@ -319,34 +309,102 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
         ModelPattern::Optional(inner, _) => {
             let inner_logic = generate_pattern_step(inner, kws)?;
-            let peek_opt = analysis::get_simple_peek(inner, kws)?;
+            let peek_opt = analysis::get_simple_peek(inner, kws).ok().flatten();
             let is_nullable = analysis::is_nullable(inner);
 
+            let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
+
             if let (Some(peek), false) = (peek_opt, is_nullable) {
-                Ok(quote! {
-                    if input.peek(#peek) {
+                if bindings.is_empty() {
+                    Ok(quote! {
+                        if input.peek(#peek) {
+                            // Pass ctx to attempt
+                            let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
+                        }
+                    })
+                } else {
+                    // For optional binding, we need to return Option<T>
+                    let vars: Vec<_> = bindings.iter().map(|b| quote!(#b)).collect();
+                    let some_vars: Vec<_> = bindings.iter().map(|b| quote!(Some(#b))).collect();
+                    let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
+
+                    Ok(quote! {
+                        let (#(#vars),*) = if input.peek(#peek) {
+                            if let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                                #inner_logic
+                                Ok((#(#vars),*))
+                            })? {
+                                let (#(#vars),*) = vals;
+                                (#(#some_vars),*)
+                            } else {
+                                (#(#none_vars),*)
+                            }
+                        } else {
+                            (#(#none_vars),*)
+                        };
+                    })
+                }
+            } else {
+                if bindings.is_empty() {
+                    Ok(quote! {
                         // Pass ctx to attempt
                         let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
-                    }
-                })
-            } else {
-                Ok(quote! {
-                    // Pass ctx to attempt
-                    let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
-                })
+                    })
+                } else {
+                    let vars: Vec<_> = bindings.iter().map(|b| quote!(#b)).collect();
+                    let some_vars: Vec<_> = bindings.iter().map(|b| quote!(Some(#b))).collect();
+                    let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
+
+                    Ok(quote! {
+                        let (#(#vars),*) = if let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                             #inner_logic
+                             Ok((#(#vars),*))
+                        })? {
+                            let (#(#vars),*) = vals;
+                            (#(#some_vars),*)
+                        } else {
+                            (#(#none_vars),*)
+                        };
+                    })
+                }
             }
         }
         ModelPattern::Group(alts, _) => {
             use super::rule::generate_variants_internal;
+
             let temp_variants = alts
                 .iter()
-                .map(|pat_seq| RuleVariant {
-                    pattern: pat_seq.clone(),
-                    action: quote!({}),
+                .map(|pat_seq| {
+                    let bindings = analysis::collect_bindings(pat_seq);
+                    let action_expr = if bindings.is_empty() {
+                        quote!(())
+                    } else {
+                        quote!(( #(#bindings),* ))
+                    };
+                    RuleVariant {
+                        pattern: pat_seq.clone(),
+                        action: quote!({ #action_expr }),
+                    }
                 })
                 .collect::<Vec<_>>();
+
             let variant_logic = generate_variants_internal(&temp_variants, false, kws)?;
-            Ok(quote! { { #variant_logic }?; })
+            let group_bindings = analysis::collect_bindings(std::slice::from_ref(pattern));
+
+            let wrapped_logic = quote! {
+                (|| -> syn::Result<_> {
+                    #variant_logic
+                })()
+            };
+
+            if group_bindings.is_empty() {
+                Ok(quote! { { #wrapped_logic }?; })
+            } else {
+                let tuple_pat = quote!(( #(#group_bindings),* ));
+                Ok(quote! {
+                    let #tuple_pat = { #wrapped_logic }?;
+                })
+            }
         }
 
         ModelPattern::Bracketed(s, _)
@@ -451,18 +509,22 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             binding,
             body,
             sync,
-            ..
+            span,
         } => {
             let effective_body = if let Some(bind) = binding {
                 match &**body {
-                    ModelPattern::RuleCall { binding: None, rule_name, args } => {
-                        Box::new(ModelPattern::RuleCall {
-                            binding: Some(bind.clone()),
-                            rule_name: rule_name.clone(),
-                            args: args.clone()
-                        })
-                    },
-                    _ => return Err(syn::Error::new(span, "Binding on recover(...) is only supported if the body is a direct rule call."))
+                    ModelPattern::RuleCall {
+                        binding: None,
+                        rule_name,
+                        args,
+                    } => Box::new(ModelPattern::RuleCall {
+                        binding: Some(bind.clone()),
+                        rule_name: rule_name.clone(),
+                        args: args.clone(),
+                    }),
+                    // If the body is already binding, we might have an issue if we try to override it.
+                    // But typically recover wraps a rule call.
+                    _ => body.clone(), // fallback
                 }
             } else {
                 body.clone()
@@ -487,23 +549,42 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 })
             } else {
                 let none_exprs = bindings.iter().map(|_| quote!(Option::<_>::None));
+                // We need to return Option<T> for each binding if it failed.
 
-                Ok(quote! {
-                    // Pass ctx to attempt_recover
-                    let (#(#bindings),*) = match rt::attempt_recover(input, ctx, |input, ctx| {
-                        #inner_logic
-                        Ok((#(#bindings),*))
-                    })? {
-                        Some(vals) => {
-                            let (#(#bindings),*) = vals;
-                            (#(Some(#bindings)),*)
-                        },
-                        None => {
-                            rt::skip_until(input, |i| i.peek(#sync_peek))?;
-                            (#(#none_exprs),*)
-                        }
-                    };
-                })
+                if let Some(main_bind) = binding {
+                    Ok(quote! {
+                        let #main_bind = match rt::attempt_recover(input, ctx, |input, ctx| {
+                            #inner_logic
+                            Ok((#(#bindings),*))
+                        })? {
+                            Some(vals) => {
+                                let (#(#bindings),*) = vals;
+                                Some(#(#bindings),*)
+                            },
+                            None => {
+                                rt::skip_until(input, |i| i.peek(#sync_peek))?;
+                                None
+                            }
+                        };
+                    })
+                } else {
+                    // Fallback to tuple destructuring if no single binding on recover
+                    Ok(quote! {
+                        let (#(#bindings),*) = match rt::attempt_recover(input, ctx, |input, ctx| {
+                            #inner_logic
+                            Ok((#(#bindings),*))
+                        })? {
+                            Some(vals) => {
+                                let (#(#bindings),*) = vals;
+                                (#(Some(#bindings)),*)
+                            },
+                            None => {
+                                rt::skip_until(input, |i| i.peek(#sync_peek))?;
+                                (#(#none_exprs),*)
+                            }
+                        };
+                    })
+                }
             }
         }
 

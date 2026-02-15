@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [0.7.0] - 2024-10-27
 
 ### Added
+- **Numeric Built-ins**: Added a comprehensive set of portable numeric built-ins:
+    - **Signed Integers**: `i8`, `i16`, `i32`, `i64`, `i128`, `isize` (and `int*` aliases).
+    - **Unsigned Integers**: `u8`, `u16`, `u32`, `u64`, `u128`, `usize` (and `uint*` aliases).
+    - **Floating Point**: `f32`, `f64` (and `float*` aliases).
+    - **Alternative Bases**: `hex_literal`, `oct_literal`, `bin_literal` (parses into `u64`).
 - **`float` Primitive**: Added the `float` high-level primitive, which parses a floating-point literal and returns `f64`.
 - **`whitespace` Primitive**: Added the `whitespace` assertion, which ensures a gap (non-adjacency) between two tokens.
 - **Lookahead Operators**: Added support for positive (`peek(...)`) and negative (`not(...)`) lookahead operators.

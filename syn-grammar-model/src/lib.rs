@@ -24,9 +24,28 @@ pub mod validator;
 pub const PORTABLE_BUILTINS: &[&str] = &[
     // High-level conceptual tokens
     "ident",
-    "integer",
     "string",
-    "float",
+    // Fixed-size Signed Integers
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "i128",
+    "isize",
+    // Fixed-size Unsigned Integers
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "u128",
+    "usize",
+    // Floating Point Numbers
+    "f32",
+    "f64",
+    // Alternative Bases (Maximum-Width Containers)
+    "hex_literal",
+    "oct_literal",
+    "bin_literal",
     // Low-level character classes
     "eof",
     "whitespace",
@@ -36,6 +55,7 @@ pub const PORTABLE_BUILTINS: &[&str] = &[
     "hex_digit",
     "oct_digit",
     "any_byte",
+    "outer_attrs",
 ];
 
 /// Primitives that are intrinsically tied to the `syn` crate and its AST.
@@ -48,7 +68,6 @@ pub const SYN_SPECIFIC_BUILTINS: &[&str] = &[
     "lit_char",
     "lit_bool",
     "lit_float",
-    "outer_attrs",
     // Deprecated spanned variants
     "spanned_int_lit",
     "spanned_string_lit",
@@ -74,7 +93,7 @@ pub fn parse_grammar(input: TokenStream) -> Result<model::GrammarDefinition> {
 
 /// Reusable pipeline with custom built-ins.
 ///
-/// Use this if your backend supports a different set of built-in rules.
+/// Use this if your backend supports a different set of built-ins.
 pub fn parse_grammar_with_builtins(
     input: TokenStream,
     valid_builtins: &[&str],

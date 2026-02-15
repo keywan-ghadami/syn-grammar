@@ -103,7 +103,9 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
             ModelPattern::RuleCall {
                 binding: Some(b), ..
             } => bindings.push(b.clone()),
-            ModelPattern::Repeat(inner, _) | ModelPattern::Plus(inner, _) => {
+            ModelPattern::Repeat(inner, _)
+            | ModelPattern::Plus(inner, _)
+            | ModelPattern::Optional(inner, _) => {
                 bindings.extend(collect_bindings(std::slice::from_ref(inner)));
             }
             ModelPattern::Parenthesized(s, _)
@@ -124,6 +126,11 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
             }
             ModelPattern::Peek(inner, _) => {
                 bindings.extend(collect_bindings(std::slice::from_ref(inner)));
+            }
+            ModelPattern::Group(alts, _) => {
+                for alt in alts {
+                    bindings.extend(collect_bindings(alt));
+                }
             }
             ModelPattern::Not(_, _) => {
                 // Not(...) bindings are ignored/dropped because it only succeeds if inner fails.

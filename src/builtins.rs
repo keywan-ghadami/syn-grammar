@@ -9,22 +9,116 @@ pub fn parse_ident_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<sy
     Ok(t)
 }
 
-pub fn parse_integer_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i32> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
-}
-
 pub fn parse_string_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<String> {
     let lit = input.parse::<syn::LitStr>()?;
     ctx.record_span(lit.span());
     Ok(lit.value())
 }
 
-pub fn parse_float_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<f64> {
+// Signed Integers
+pub fn parse_i8_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i8> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_i16_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i16> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_i32_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i32> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_i64_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i64> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_i128_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i128> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_isize_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<isize> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+// Unsigned Integers
+pub fn parse_u8_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u8> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_u16_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u16> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_u32_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u32> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_u64_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_u128_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u128> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+pub fn parse_usize_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<usize> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+// Floating Point
+pub fn parse_f32_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<f32> {
     let lit = input.parse::<syn::LitFloat>()?;
     ctx.record_span(lit.span());
     lit.base10_parse()
+}
+
+pub fn parse_f64_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<f64> {
+    let lit = input.parse::<syn::LitFloat>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse()
+}
+
+// Alternative Bases
+pub fn parse_hex_literal_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse() // syn handles 0x prefix if LitInt is parsed
+}
+
+pub fn parse_oct_literal_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse() // syn handles 0o prefix
+}
+
+pub fn parse_bin_literal_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
+    let lit = input.parse::<syn::LitInt>()?;
+    ctx.record_span(lit.span());
+    lit.base10_parse() // syn handles 0b prefix
 }
 
 pub fn parse_rust_type_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::Type> {

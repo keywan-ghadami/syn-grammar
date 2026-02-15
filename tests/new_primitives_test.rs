@@ -7,7 +7,7 @@ use syn_grammar::testing::Testable;
 fn test_float_primitive() {
     grammar! {
         grammar float_test {
-            rule main -> f64 = f:float -> { f }
+            pub rule main -> f64 = f:f64 -> { f }
         }
     }
 
@@ -28,13 +28,37 @@ fn test_float_primitive() {
         .assert_failure();
 }
 
+#[test]
+fn test_numeric_primitives() {
+    grammar! {
+        grammar num_test {
+            pub rule test_i8 -> i8 = v:i8 -> { v }
+            pub rule test_u64 -> u64 = v:u64 -> { v }
+            pub rule test_f32 -> f32 = v:f32 -> { v }
+            pub rule test_hex -> u64 = v:hex_literal -> { v }
+            pub rule test_oct -> u64 = v:oct_literal -> { v }
+            pub rule test_bin -> u64 = v:bin_literal -> { v }
+        }
+    }
+
+    assert_eq!(num_test::parse_test_i8.parse_str("127").unwrap(), 127i8);
+    assert_eq!(num_test::parse_test_u64.parse_str("1000").unwrap(), 1000u64);
+
+    let f: f32 = num_test::parse_test_f32.parse_str("1.5").unwrap();
+    assert!((f - 1.5).abs() < 1e-6);
+
+    assert_eq!(num_test::parse_test_hex.parse_str("0xFF").unwrap(), 255u64);
+    assert_eq!(num_test::parse_test_oct.parse_str("0o77").unwrap(), 63u64);
+    assert_eq!(num_test::parse_test_bin.parse_str("0b1010").unwrap(), 10u64);
+}
+
 // --- Test Whitespace Primitive ---
 #[test]
 fn test_whitespace_primitive() {
     grammar! {
         grammar ws_test {
             // Require whitespace between "a" and "b"
-            rule main -> () = "a" whitespace "b" -> { () }
+            pub rule main -> () = "a" whitespace "b" -> { () }
         }
     }
 
@@ -52,7 +76,7 @@ fn test_whitespace_primitive() {
 fn test_whitespace_punct_ident() {
     grammar! {
         grammar ws_punct {
-            rule main -> () = "@" whitespace "detached" -> { () }
+            pub rule main -> () = "@" whitespace "detached" -> { () }
         }
     }
 
@@ -73,7 +97,7 @@ fn test_whitespace_punct_ident() {
 fn test_whitespace_ident_ident() {
     grammar! {
         grammar ws_ident {
-            rule main -> () = "a" whitespace "b" -> { () }
+            pub rule main -> () = "a" whitespace "b" -> { () }
         }
     }
 
@@ -87,7 +111,7 @@ fn test_whitespace_ident_ident() {
 fn test_whitespace_between_rules() {
     grammar! {
         grammar ws_rules {
-            rule main -> () = a whitespace b -> { () }
+            pub rule main -> () = a whitespace b -> { () }
             rule a -> () = "a" -> { () }
             rule b -> () = "b" -> { () }
         }
