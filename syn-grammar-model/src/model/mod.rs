@@ -7,6 +7,7 @@ pub use types::*;
 
 use crate::parser;
 use proc_macro2::{Span, TokenStream};
+use syn::spanned::Spanned as _;
 use syn::{Attribute, Ident, ItemUse, Lit, LitStr, Type};
 
 #[derive(Debug, Clone)]
@@ -102,7 +103,7 @@ impl From<parser::Pattern> for ModelPattern {
         use parser::Pattern as P;
         match p {
             P::Cut(t) => ModelPattern::Cut(t.span()),
-            P.Lit(l) => ModelPattern::Lit(l),
+            P::Lit(l) => ModelPattern::Lit(l),
             P::RuleCall {
                 binding,
                 rule_name,

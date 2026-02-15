@@ -1,4 +1,4 @@
-use crate::rt::{self, ParseContext};
+use crate::rt::ParseContext;
 use proc_macro2::Span;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
@@ -148,7 +148,7 @@ pub fn parse_ident_impl<T: CommonBuiltins>(
     ctx: &mut ParseContext,
 ) -> Result<Identifier> {
     let t = input.parse_ident()?;
-    ctx.record_span(t.span.clone());
+    ctx.record_span(t.span);
     Ok(t)
 }
 
@@ -157,7 +157,7 @@ pub fn parse_string_impl<T: CommonBuiltins>(
     ctx: &mut ParseContext,
 ) -> Result<StringLiteral> {
     let s_lit = input.parse_string()?;
-    ctx.record_span(s_lit.span.clone());
+    ctx.record_span(s_lit.span);
     Ok(s_lit)
 }
 
@@ -494,7 +494,7 @@ pub fn parse_outer_attrs_impl(
     input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<Vec<syn::Attribute>> {
-    let attrs = syn::Attribute::parse_outer(*input)?;
+    let attrs = syn::Attribute::parse_outer(input)?;
     if let Some(last) = attrs.last() {
         ctx.record_span(last.span());
     }
