@@ -6,13 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Portable Primitives**: Introduced a distinction between `PORTABLE_BUILTINS` (`ident`, `integer`, `alpha`, etc.) and `SYN_SPEC_BUILTINS` (`rust_type`, `lit_str`, etc.). This clarifies the portability contract for authors of alternative backends (e.g., `winnow-grammar`), encouraging a rich, shared vocabulary of common parsing concepts.
-- **Portable Types**: Introduced backend-agnostic wrapper types `Identifier`, `StringLiteral`, and `Spanned<T>`. These types implement `ToTokens`, allowing them to be used seamlessly in `quote! { ... }` macros while providing a consistent API across different backends.
+- **Portable Types**: Introduced backend-agnostic wrapper types `Identifier`, `StringLiteral`, and `SpannedValue<T>`. These types implement `ToTokens`, allowing them to be used seamlessly in `quote! { ... }` macros while providing a consistent API across different backends.
 - **Numeric Built-ins**: Added a comprehensive set of portable numeric built-ins:
     - **Signed Integers**: `i8`, `i16`, `i32`, `i64`, `i128`, `isize` (and `int*` aliases).
     - **Unsigned Integers**: `u8`, `u16`, `u32`, `u64`, `u128`, `usize` (and `uint*` aliases).
     - **Floating Point**: `f32`, `f64`.
     - **Alternative Bases**: `hex_literal`, `oct_literal`, `bin_literal` (parses into `u64`).
-- **Spanned Primitives**: Added `spanned_` variants for all primitives (e.g., `spanned_i32` returns `Spanned<i32>`), allowing easy access to source location data.
+- **Spanned Primitives**: Added `spanned_` variants for all primitives (e.g., `spanned_i32` returns `SpannedValue<i32>`), allowing easy access to source location data.
 - **`whitespace` Primitive**: Added the `whitespace` assertion, which ensures a gap (non-adjacency) between two tokens.
 - **Lookahead Operators**: Added support for positive (`peek(...)`) and negative (`not(...)`) lookahead operators.
     - `peek(pattern)`: Succeeds if the pattern matches, but does not consume input.
@@ -37,6 +37,8 @@ All notable changes to this project will be documented in this file.
     - `ident` now returns `syn_grammar::Identifier` instead of `syn::Ident`.
     - `string` now returns `syn_grammar::StringLiteral` instead of `String`.
     - **Impact**: Action blocks that expect the previous `syn` types must be updated to use the new portable types (e.g., use `name.text` instead of `name.to_string()` or rely on `Display` impl).
+- **Renamed `Spanned<T>` to `SpannedValue<T>`**: The `Spanned<T>` struct has been renamed to `SpannedValue<T>` to avoid name collisions with the `syn::spanned::Spanned` trait.
+    - **Impact**: Code that uses `Spanned<T>` (e.g. return types of `spanned_*` built-ins) must be updated to use `SpannedValue<T>`.
 - **Built-in Rule Resolution**: The precedence of built-in rules (like `ident`, `string`) has changed. They are no longer hardcoded keywords but are now provided as default implementations in `syn_grammar::builtins`.
     - **Impact**: If you define a rule named `ident` in your grammar, it will now *shadow* the built-in `ident` parser instead of being ignored. This fixes a long-standing limitation but may change behavior if you accidentally relied on the shadowing being ignored.
 

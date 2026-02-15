@@ -94,70 +94,70 @@ impl Backend for SynBackend {
                 name: "bin_literal",
                 return_type: "u64",
             },
-            // Spanned Primitives (returning Spanned<T>)
+            // Spanned Primitives (returning SpannedValue<T>)
             BuiltIn {
                 name: "spanned_char",
-                return_type: "syn_grammar_model::types::Spanned<char>",
+                return_type: "syn_grammar_model::types::SpannedValue<char>",
             },
             BuiltIn {
                 name: "spanned_bool",
-                return_type: "syn_grammar_model::types::Spanned<bool>",
+                return_type: "syn_grammar_model::types::SpannedValue<bool>",
             },
             BuiltIn {
                 name: "spanned_i8",
-                return_type: "syn_grammar_model::types::Spanned<i8>",
+                return_type: "syn_grammar_model::types::SpannedValue<i8>",
             },
             BuiltIn {
                 name: "spanned_i16",
-                return_type: "syn_grammar_model::types::Spanned<i16>",
+                return_type: "syn_grammar_model::types::SpannedValue<i16>",
             },
             BuiltIn {
                 name: "spanned_i32",
-                return_type: "syn_grammar_model::types::Spanned<i32>",
+                return_type: "syn_grammar_model::types::SpannedValue<i32>",
             },
             BuiltIn {
                 name: "spanned_i64",
-                return_type: "syn_grammar_model::types::Spanned<i64>",
+                return_type: "syn_grammar_model::types::SpannedValue<i64>",
             },
             BuiltIn {
                 name: "spanned_i128",
-                return_type: "syn_grammar_model::types::Spanned<i128>",
+                return_type: "syn_grammar_model::types::SpannedValue<i128>",
             },
             BuiltIn {
                 name: "spanned_isize",
-                return_type: "syn_grammar_model::types::Spanned<isize>",
+                return_type: "syn_grammar_model::types::SpannedValue<isize>",
             },
             BuiltIn {
                 name: "spanned_u8",
-                return_type: "syn_grammar_model::types::Spanned<u8>",
+                return_type: "syn_grammar_model::types::SpannedValue<u8>",
             },
             BuiltIn {
                 name: "spanned_u16",
-                return_type: "syn_grammar_model::types::Spanned<u16>",
+                return_type: "syn_grammar_model::types::SpannedValue<u16>",
             },
             BuiltIn {
                 name: "spanned_u32",
-                return_type: "syn_grammar_model::types::Spanned<u32>",
+                return_type: "syn_grammar_model::types::SpannedValue<u32>",
             },
             BuiltIn {
                 name: "spanned_u64",
-                return_type: "syn_grammar_model::types::Spanned<u64>",
+                return_type: "syn_grammar_model::types::SpannedValue<u64>",
             },
             BuiltIn {
                 name: "spanned_u128",
-                return_type: "syn_grammar_model::types::Spanned<u128>",
+                return_type: "syn_grammar_model::types::SpannedValue<u128>",
             },
             BuiltIn {
                 name: "spanned_usize",
-                return_type: "syn_grammar_model::types::Spanned<usize>",
+                return_type: "syn_grammar_model::types::SpannedValue<usize>",
             },
             BuiltIn {
                 name: "spanned_f32",
-                return_type: "syn_grammar_model::types::Spanned<f32>",
+                return_type: "syn_grammar_model::types::SpannedValue<f32>",
             },
             BuiltIn {
                 name: "spanned_f64",
-                return_type: "syn_grammar_model::types::Spanned<f64>",
+                return_type: "syn_grammar_model::types::SpannedValue<f64>",
             },
             // Low-level token filters (currently return syn types or ())
             BuiltIn {

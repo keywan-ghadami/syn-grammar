@@ -3,7 +3,7 @@ use proc_macro2::Span;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 use syn::Result;
-use syn_grammar_model::model::types::{Identifier, Spanned as SpannedValue, StringLiteral};
+use syn_grammar_model::model::types::{Identifier, SpannedValue, StringLiteral};
 
 // A trait that all token streams must implement so that we can have
 // backend-agnostic builtins for common literal types.

@@ -91,47 +91,47 @@ impl ToTokens for StringLiteral {
 
 /// A generic wrapper that attaches a source span to a value.
 #[derive(Clone, Copy)]
-pub struct Spanned<T> {
+pub struct SpannedValue<T> {
     pub value: T,
     pub span: Span,
 }
 
-impl<T> Spanned<T> {
+impl<T> SpannedValue<T> {
     pub fn new(value: T, span: Span) -> Self {
         Self { value, span }
     }
 }
 
-impl<T: PartialEq> PartialEq for Spanned<T> {
+impl<T: PartialEq> PartialEq for SpannedValue<T> {
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value
     }
 }
 
-impl<T: Eq> Eq for Spanned<T> {}
+impl<T: Eq> Eq for SpannedValue<T> {}
 
-impl<T: Hash> Hash for Spanned<T> {
+impl<T: Hash> Hash for SpannedValue<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state);
     }
 }
 
-impl<T: fmt::Display> fmt::Display for Spanned<T> {
+impl<T: fmt::Display> fmt::Display for SpannedValue<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.value.fmt(f)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
+impl<T: fmt::Debug> fmt::Debug for SpannedValue<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Spanned")
+        f.debug_struct("SpannedValue")
             .field("value", &self.value)
             .field("span", &self.span)
             .finish()
     }
 }
 
-impl<T: ToTokens> ToTokens for Spanned<T> {
+impl<T: ToTokens> ToTokens for SpannedValue<T> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.value.to_tokens(tokens);
     }
