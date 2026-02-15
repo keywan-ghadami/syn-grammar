@@ -24,7 +24,7 @@ fn test_peek_basic() {
     peek_test::parse_main
         .parse_str("a c")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected `b`");
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn test_not_basic() {
     not_test::parse_main
         .parse_str("a b")
         .test()
-        .assert_failure();
+        .assert_failure_contains("unexpected match");
 }
 
 #[test]
@@ -84,5 +84,5 @@ fn test_not_complex() {
     not_complex::parse_main
         .parse_str("bad")
         .test()
-        .assert_failure();
+        .assert_failure_contains("unexpected match");
 }

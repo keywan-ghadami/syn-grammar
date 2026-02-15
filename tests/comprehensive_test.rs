@@ -71,7 +71,7 @@ fn test_repetition() {
     repetition_test::parse_plus
         .parse_str("")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected integer");
 
     repetition_test::parse_opt
         .parse_str("42")
@@ -135,7 +135,7 @@ fn test_cut_operator() {
     cut_test::parse_main
         .parse_str("let bad")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected integer");
 }
 
 // --- Test Left Recursion ---
@@ -197,7 +197,7 @@ fn test_keywords_vs_idents() {
     kw_test::parse_main
         .parse_str("fn fn")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected identifier");
 }
 
 // --- Test Basic Sequence ---
@@ -312,7 +312,7 @@ fn test_cut_in_repetition() {
     cut_rep::parse_main
         .parse_str("item 1 item")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected integer");
 }
 
 // --- Test Backtracking Priority ---
@@ -396,7 +396,7 @@ fn test_multi_token_literals() {
     multi_tok::parse_main
         .parse_str("? .")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected '?.', found space between tokens");
 }
 
 // --- Test Extended Literals ---
@@ -415,7 +415,7 @@ fn test_extended_literals() {
     ext_lit::parse_attr
         .parse_str("@ detached")
         .test()
-        .assert_failure();
+        .assert_failure_contains("expected '@detached', found space between tokens");
 }
 
 // --- Test Attributes on Rules ---
@@ -446,7 +446,10 @@ fn test_plus_operator_validation() {
         .parse_str("1 2")
         .test()
         .assert_success_is(vec![1, 2]);
-    plus_val::parse_list.parse_str("").test().assert_failure();
+    plus_val::parse_list
+        .parse_str("")
+        .test()
+        .assert_failure_contains("expected integer");
 }
 
 // --- Test Math Expression (Integration) ---

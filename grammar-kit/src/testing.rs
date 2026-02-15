@@ -148,7 +148,7 @@ impl<T: Debug, E: Display + Debug + 'static> TestResult<T, E> {
         }
         val
     }
-    
+
     // 8. Asserts failure AND checks if the message DOES NOT contain a specific text.
     pub fn assert_failure_not_contains(self, unexpected_part: &str) {
         let ctx = self.format_context();

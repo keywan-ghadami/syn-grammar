@@ -56,7 +56,7 @@ fn test_deepest_error_wins() {
         .parse_str("a b x")
         .test()
         .assert_failure_contains("expected `c`");
-    
+
     // Also ensure it does not contain expected `d`
     distinct::parse_main
         .parse_str("a b x")
