@@ -1,8 +1,9 @@
+use crate::backend::SynBackend;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashSet;
 use syn::Result;
-use syn_grammar_model::{analysis, model::*};
+use syn_grammar_model::{analysis, model::*, Backend};
 
 pub fn generate_sequence(
     patterns: &[ModelPattern],
@@ -84,7 +85,10 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             args,
         } => {
             let rule_name_str = rule_name.to_string();
-            if syn_grammar_model::PORTABLE_BUILTINS.contains(&rule_name_str.as_str()) {
+            let builtins = SynBackend::get_builtins();
+            let is_builtin = builtins.iter().any(|b| b.name == rule_name_str);
+
+            if is_builtin {
                 // Generate a token-filtering expression for the primitive.
                 let expr = match rule_name_str.as_str() {
                     "alpha" => quote! {
@@ -214,7 +218,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     Ok(quote! {
                        #(#init_vecs)*
                        // Pass ctx to attempt
-                       while let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                       while let Some(vals) = rt::attempt(input, ctx, |mut input, ctx| {
                            #inner_logic
                            Ok(#return_tuple)
                        })? {
@@ -228,7 +232,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 let inner_logic = generate_pattern_step(inner, kws)?;
                 Ok(quote! {
                     // Pass ctx to attempt
-                    while let Some(_) = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })? {}
+                    while let Some(_) = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })? {}
                 })
             }
         }
@@ -287,7 +291,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                            #(#push_vecs)*
                        }
                        // Pass ctx to attempt
-                       while let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                       while let Some(vals) = rt::attempt(input, ctx, |mut input, ctx| {
                            #inner_logic
                            Ok(#return_tuple)
                        })? {
@@ -302,7 +306,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 Ok(quote! {
                     #inner_logic
                     // Pass ctx to attempt
-                    while let Some(_) = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })? {}
+                    while let Some(_) = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })? {}
                 })
             }
         }
@@ -319,7 +323,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     Ok(quote! {
                         if input.peek(#peek) {
                             // Pass ctx to attempt
-                            let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
+                            let _ = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?;
                         }
                     })
                 } else {
@@ -330,7 +334,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                     Ok(quote! {
                         let (#(#vars),*) = if input.peek(#peek) {
-                            if let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                            if let Some(vals) = rt::attempt(input, ctx, |mut input, ctx| {
                                 #inner_logic
                                 Ok((#(#vars),*))
                             })? {
@@ -347,7 +351,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             } else if bindings.is_empty() {
                 Ok(quote! {
                     // Pass ctx to attempt
-                    let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
+                    let _ = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?;
                 })
             } else {
                 let vars: Vec<_> = bindings.iter().map(|b| quote!(#b)).collect();
@@ -355,7 +359,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
 
                 Ok(quote! {
-                    let (#(#vars),*) = if let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                    let (#(#vars),*) = if let Some(vals) = rt::attempt(input, ctx, |mut input, ctx| {
                             #inner_logic
                             Ok((#(#vars),*))
                     })? {
@@ -422,7 +426,15 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     let content;
                     let _ = syn::#macro_name!(content in input);
                     // TODO: Record span of brackets?
-                    let input = &content;
+                    let input = &content; // This shadows outer input.
+                    // But `syn::bracketed!` (etc) assigns `ParseBuffer` to `content`.
+                    // And `let input = &content`.
+                    // `content` is `ParseBuffer`.
+                    // `input` is `&ParseBuffer` (ParseStream).
+                    // This `input` is immutable.
+                    // If we call `parse_*_impl(&mut input, ...)`, we need `mut input`.
+                    // So we must shadow with `let mut input = &content;`
+                    let mut input = &content;
                     #inner_logic
                 }})
             } else if bindings.len() == 1 {
@@ -431,7 +443,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     let #bind = {
                         let content;
                         let _ = syn::#macro_name!(content in input);
-                        let input = &content;
+                        let mut input = &content;
                         #inner_logic
                         #bind
                     };
@@ -441,7 +453,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     let (#(#bindings),*) = {
                         let content;
                         let _ = syn::#macro_name!(content in input);
-                        let input = &content;
+                        let mut input = &content;
                         #inner_logic
                         (#(#bindings),*)
                     };
@@ -544,7 +556,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             if bindings.is_empty() {
                 Ok(quote! {
                     // Pass ctx to attempt_recover
-                    if rt::attempt_recover(input, ctx, |input, ctx| { #inner_logic Ok(()) })?.is_none() {
+                    if rt::attempt_recover(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?.is_none() {
                         rt::skip_until(input, |i| i.peek(#sync_peek))?;
                     }
                 })
@@ -554,7 +566,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                 if let Some(main_bind) = binding {
                     Ok(quote! {
-                        let #main_bind = match rt::attempt_recover(input, ctx, |input, ctx| {
+                        let #main_bind = match rt::attempt_recover(input, ctx, |mut input, ctx| {
                             #inner_logic
                             Ok((#(#bindings),*))
                         })? {
@@ -571,7 +583,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 } else {
                     // Fallback to tuple destructuring if no single binding on recover
                     Ok(quote! {
-                        let (#(#bindings),*) = match rt::attempt_recover(input, ctx, |input, ctx| {
+                        let (#(#bindings),*) = match rt::attempt_recover(input, ctx, |mut input, ctx| {
                             #inner_logic
                             Ok((#(#bindings),*))
                         })? {
@@ -595,7 +607,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
             if bindings.is_empty() {
                 Ok(quote! {
-                   let _ = rt::peek(input, ctx, |input, ctx| {
+                   let _ = rt::peek(input, ctx, |mut input, ctx| {
                        #inner_logic
                        Ok(())
                    })?;
@@ -605,7 +617,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 let tuple_ret = quote!(( #(#bindings),* ));
 
                 Ok(quote! {
-                    let #tuple_pat = rt::peek(input, ctx, |input, ctx| {
+                    let #tuple_pat = rt::peek(input, ctx, |mut input, ctx| {
                         #inner_logic
                         Ok(#tuple_ret)
                     })?;
@@ -617,7 +629,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             // Not does not export bindings.
             let inner_logic = generate_pattern_step(inner, kws)?;
             Ok(quote! {
-                rt::not_check(input, ctx, |input, ctx| {
+                rt::not_check(input, ctx, |mut input, ctx| {
                     #inner_logic
                     Ok(())
                 })?;
@@ -630,8 +642,8 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenSt
     // Call the _impl version and pass ctx
     let f = format_ident!("parse_{}_impl", rule_name);
     if args.is_empty() {
-        quote!(#f(input, ctx)?)
+        quote!(#f(&mut input, ctx)?)
     } else {
-        quote!(#f(input, ctx, #(#args),*)?)
+        quote!(#f(&mut input, ctx, #(#args),*)?)
     }
 }

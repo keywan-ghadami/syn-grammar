@@ -112,7 +112,7 @@ fn test_rule_name_in_error_message() {
     // 3. inner returns Err.
     // 4. main attempts inner: fails. Records "Error in rule 'main': ...".
     //
-    // The errors from (1) and (2) are deeper (at "wrong") than the error from (4) (at "start").
+    // The errors from (1) and (2) are deeper at "wrong" than the error from (4) at "start".
     // So the final error should be one of the inner ones, containing "Error in rule 'inner'".
 
     rule_context::parse_main

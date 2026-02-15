@@ -1,226 +1,377 @@
-use crate::rt::{self, ParseContext};
+use crate::rt::ParseContext;
+use proc_macro2::Span;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 use syn::Result;
+use syn_grammar_model::model::types::{Identifier, StringLiteral};
 
-pub fn parse_ident_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::Ident> {
-    let t = rt::parse_ident(input)?;
-    ctx.record_span(t.span());
+// A trait that all token streams must implement so that we can have
+// backend-agnostic builtins for common literal types.
+pub trait CommonBuiltins {
+    fn parse_ident(&mut self) -> Result<Identifier>;
+    fn parse_string(&mut self) -> Result<StringLiteral>;
+
+    fn parse_i8(&mut self) -> Result<(i8, Span)>;
+    fn parse_i16(&mut self) -> Result<(i16, Span)>;
+    fn parse_i32(&mut self) -> Result<(i32, Span)>;
+    fn parse_i64(&mut self) -> Result<(i64, Span)>;
+    fn parse_i128(&mut self) -> Result<(i128, Span)>;
+    fn parse_isize(&mut self) -> Result<(isize, Span)>;
+
+    fn parse_u8(&mut self) -> Result<(u8, Span)>;
+    fn parse_u16(&mut self) -> Result<(u16, Span)>;
+    fn parse_u32(&mut self) -> Result<(u32, Span)>;
+    fn parse_u64(&mut self) -> Result<(u64, Span)>;
+    fn parse_u128(&mut self) -> Result<(u128, Span)>;
+    fn parse_usize(&mut self) -> Result<(usize, Span)>;
+
+    fn parse_f32(&mut self) -> Result<(f32, Span)>;
+    fn parse_f64(&mut self) -> Result<(f64, Span)>;
+
+    fn parse_hex_literal(&mut self) -> Result<(u64, Span)>;
+    fn parse_oct_literal(&mut self) -> Result<(u64, Span)>;
+    fn parse_bin_literal(&mut self) -> Result<(u64, Span)>;
+}
+
+impl<'a> CommonBuiltins for ParseStream<'a> {
+    fn parse_ident(&mut self) -> Result<Identifier> {
+        let t: syn::Ident = self.parse()?;
+        Ok(Identifier::new(t.to_string(), t.span()))
+    }
+
+    fn parse_string(&mut self) -> Result<StringLiteral> {
+        let lit = self.parse::<syn::LitStr>()?;
+        Ok(StringLiteral::new(lit.value(), lit.span()))
+    }
+
+    fn parse_i8(&mut self) -> Result<(i8, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_i16(&mut self) -> Result<(i16, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_i32(&mut self) -> Result<(i32, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_i64(&mut self) -> Result<(i64, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_i128(&mut self) -> Result<(i128, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_isize(&mut self) -> Result<(isize, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_u8(&mut self) -> Result<(u8, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_u16(&mut self) -> Result<(u16, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_u32(&mut self) -> Result<(u32, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_u64(&mut self) -> Result<(u64, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_u128(&mut self) -> Result<(u128, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_usize(&mut self) -> Result<(usize, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_f32(&mut self) -> Result<(f32, Span)> {
+        let lit = self.parse::<syn::LitFloat>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_f64(&mut self) -> Result<(f64, Span)> {
+        let lit = self.parse::<syn::LitFloat>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_hex_literal(&mut self) -> Result<(u64, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_oct_literal(&mut self) -> Result<(u64, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+
+    fn parse_bin_literal(&mut self) -> Result<(u64, Span)> {
+        let lit = self.parse::<syn::LitInt>()?;
+        Ok((lit.base10_parse()?, lit.span()))
+    }
+}
+
+pub fn parse_ident_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<Identifier> {
+    let t = input.parse_ident()?;
+    ctx.record_span(t.span);
     Ok(t)
 }
 
-pub fn parse_string_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<String> {
-    let lit = input.parse::<syn::LitStr>()?;
-    ctx.record_span(lit.span());
-    Ok(lit.value())
+pub fn parse_string_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<StringLiteral> {
+    let s_lit = input.parse_string()?;
+    ctx.record_span(s_lit.span);
+    Ok(s_lit)
 }
 
 // Signed Integers
-pub fn parse_i8_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i8> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_i8_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<i8> {
+    let (val, span) = input.parse_i8()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_i16_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i16> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_i16_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<i16> {
+    let (val, span) = input.parse_i16()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_i32_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i32> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_i32_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<i32> {
+    let (val, span) = input.parse_i32()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_i64_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i64> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_i64_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<i64> {
+    let (val, span) = input.parse_i64()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_i128_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<i128> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_i128_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<i128> {
+    let (val, span) = input.parse_i128()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_isize_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<isize> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_isize_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<isize> {
+    let (val, span) = input.parse_isize()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
 // Unsigned Integers
-pub fn parse_u8_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u8> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_u8_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<u8> {
+    let (val, span) = input.parse_u8()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_u16_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u16> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_u16_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<u16> {
+    let (val, span) = input.parse_u16()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_u32_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u32> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_u32_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<u32> {
+    let (val, span) = input.parse_u32()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_u64_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_u64_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<u64> {
+    let (val, span) = input.parse_u64()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_u128_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u128> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_u128_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<u128> {
+    let (val, span) = input.parse_u128()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_usize_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<usize> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_usize_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<usize> {
+    let (val, span) = input.parse_usize()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
 // Floating Point
-pub fn parse_f32_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<f32> {
-    let lit = input.parse::<syn::LitFloat>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_f32_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<f32> {
+    let (val, span) = input.parse_f32()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_f64_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<f64> {
-    let lit = input.parse::<syn::LitFloat>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse()
+pub fn parse_f64_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<f64> {
+    let (val, span) = input.parse_f64()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
 // Alternative Bases
-pub fn parse_hex_literal_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse() // syn handles 0x prefix if LitInt is parsed
+pub fn parse_hex_literal_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<u64> {
+    let (val, span) = input.parse_hex_literal()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_oct_literal_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse() // syn handles 0o prefix
+pub fn parse_oct_literal_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<u64> {
+    let (val, span) = input.parse_oct_literal()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_bin_literal_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<u64> {
-    let lit = input.parse::<syn::LitInt>()?;
-    ctx.record_span(lit.span());
-    lit.base10_parse() // syn handles 0b prefix
+pub fn parse_bin_literal_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<u64> {
+    let (val, span) = input.parse_bin_literal()?;
+    ctx.record_span(span);
+    Ok(val)
 }
 
-pub fn parse_rust_type_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::Type> {
-    let t: syn::Type = input.parse()?;
-    // Type is Spanned
+// Syn Specific Built-ins (Modified to take &mut ParseStream for uniform codegen)
+
+pub fn parse_rust_type_impl(input: &mut ParseStream, ctx: &mut ParseContext) -> Result<syn::Type> {
+    let t: syn::Type = (*input).parse()?;
     ctx.record_span(t.span());
     Ok(t)
 }
 
-pub fn parse_rust_block_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::Block> {
-    let b: syn::Block = input.parse()?;
+pub fn parse_rust_block_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::Block> {
+    let b: syn::Block = (*input).parse()?;
     ctx.record_span(b.span());
     Ok(b)
 }
 
-pub fn parse_lit_str_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::LitStr> {
-    let t: syn::LitStr = input.parse()?;
+pub fn parse_lit_str_impl(input: &mut ParseStream, ctx: &mut ParseContext) -> Result<syn::LitStr> {
+    let t: syn::LitStr = (*input).parse()?;
     ctx.record_span(t.span());
     Ok(t)
 }
 
-pub fn parse_lit_int_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::LitInt> {
-    let t: syn::LitInt = input.parse()?;
+pub fn parse_lit_int_impl(input: &mut ParseStream, ctx: &mut ParseContext) -> Result<syn::LitInt> {
+    let t: syn::LitInt = (*input).parse()?;
     ctx.record_span(t.span());
     Ok(t)
 }
 
-pub fn parse_lit_char_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::LitChar> {
-    let t: syn::LitChar = input.parse()?;
+pub fn parse_lit_char_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::LitChar> {
+    let t: syn::LitChar = (*input).parse()?;
     ctx.record_span(t.span());
     Ok(t)
 }
 
-pub fn parse_lit_bool_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::LitBool> {
-    let t: syn::LitBool = input.parse()?;
+pub fn parse_lit_bool_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::LitBool> {
+    let t: syn::LitBool = (*input).parse()?;
     ctx.record_span(t.span());
     Ok(t)
 }
 
-pub fn parse_lit_float_impl(input: ParseStream, ctx: &mut ParseContext) -> Result<syn::LitFloat> {
-    let t: syn::LitFloat = input.parse()?;
+pub fn parse_lit_float_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::LitFloat> {
+    let t: syn::LitFloat = (*input).parse()?;
     ctx.record_span(t.span());
     Ok(t)
 }
 
 pub fn parse_outer_attrs_impl(
-    input: ParseStream,
+    input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<Vec<syn::Attribute>> {
     let attrs = syn::Attribute::parse_outer(input)?;
     if let Some(last) = attrs.last() {
         ctx.record_span(last.span());
-    } else {
-        // No attributes parsed, so no span to record.
-        // Logic might be slightly off if we wanted to record the "absence" of span,
-        // but typically whitespace check is against *something* that was consumed.
     }
     Ok(attrs)
 }
 
-// Spanned variants
+// Spanned variants - legacy/syn-specific
 pub fn parse_spanned_int_lit_impl(
-    input: ParseStream,
+    input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<(i32, proc_macro2::Span)> {
-    let l = input.parse::<syn::LitInt>()?;
+    let l = (*input).parse::<syn::LitInt>()?;
     ctx.record_span(l.span());
     Ok((l.base10_parse::<i32>()?, l.span()))
 }
 
 pub fn parse_spanned_string_lit_impl(
-    input: ParseStream,
+    input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<(String, proc_macro2::Span)> {
-    let l = input.parse::<syn::LitStr>()?;
+    let l = (*input).parse::<syn::LitStr>()?;
     ctx.record_span(l.span());
     Ok((l.value(), l.span()))
 }
 
 pub fn parse_spanned_float_lit_impl(
-    input: ParseStream,
+    input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<(f64, proc_macro2::Span)> {
-    let l = input.parse::<syn::LitFloat>()?;
+    let l = (*input).parse::<syn::LitFloat>()?;
     ctx.record_span(l.span());
     Ok((l.base10_parse::<f64>()?, l.span()))
 }
 
 pub fn parse_spanned_bool_lit_impl(
-    input: ParseStream,
+    input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<(bool, proc_macro2::Span)> {
-    let l = input.parse::<syn::LitBool>()?;
+    let l = (*input).parse::<syn::LitBool>()?;
     ctx.record_span(l.span());
     Ok((l.value, l.span()))
 }
 
 pub fn parse_spanned_char_lit_impl(
-    input: ParseStream,
+    input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<(char, proc_macro2::Span)> {
-    let l = input.parse::<syn::LitChar>()?;
+    let l = (*input).parse::<syn::LitChar>()?;
     ctx.record_span(l.span());
     Ok((l.value(), l.span()))
 }

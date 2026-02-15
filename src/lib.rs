@@ -23,3 +23,9 @@ pub use syn_grammar_macros::include_grammar;
 #[doc(hidden)]
 pub mod builtins;
 pub mod token_filter;
+
+// Export portable types
+pub mod types {
+    pub use syn_grammar_model::model::types::*;
+}
+pub use types::{Identifier, StringLiteral};

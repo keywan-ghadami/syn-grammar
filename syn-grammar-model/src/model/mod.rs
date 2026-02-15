@@ -1,4 +1,10 @@
 // Moved from macros/src/model.rs
+pub mod backend;
+pub mod types;
+
+pub use backend::*;
+pub use types::*;
+
 use crate::parser;
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;

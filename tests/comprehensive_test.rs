@@ -27,7 +27,7 @@ fn test_builtins() {
     grammar! {
         grammar builtins_test {
             pub rule test_int -> i32 = i:i32 -> { i }
-            pub rule test_str -> String = s:string -> { s }
+            pub rule test_str -> String = s:string -> { s.value }
         }
     }
 

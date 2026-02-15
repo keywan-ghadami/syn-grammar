@@ -3,7 +3,10 @@
 use crate::model::*;
 use std::collections::{HashMap, HashSet};
 
-pub fn validate(grammar: &GrammarDefinition, builtins: &[&str]) -> syn::Result<()> {
+pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
+    let builtins = B::get_builtins();
+    let builtin_names: HashSet<String> = builtins.iter().map(|b| b.name.to_string()).collect();
+
     let mut defined_rules = HashSet::new();
     for rule in &grammar.rules {
         if !defined_rules.insert(rule.name.to_string()) {
@@ -18,7 +21,7 @@ pub fn validate(grammar: &GrammarDefinition, builtins: &[&str]) -> syn::Result<(
         .rules
         .iter()
         .map(|r| r.name.to_string())
-        .chain(builtins.iter().map(|s| s.to_string()))
+        .chain(builtin_names.iter().cloned())
         .collect();
 
     // If the grammar inherits, we cannot validate rule calls exhaustively,
@@ -31,7 +34,7 @@ pub fn validate(grammar: &GrammarDefinition, builtins: &[&str]) -> syn::Result<(
         }
     }
 
-    validate_argument_counts(grammar)?;
+    validate_argument_counts(grammar, &builtin_names)?;
 
     Ok(())
 }
@@ -79,18 +82,7 @@ fn validate_pattern(
             validate_pattern(inner, all_defs, params)?;
         }
         ModelPattern::Not(inner, _) => {
-            // Bindings in `not(...)` are useless because `not` only succeeds if inner fails.
-            // We should ideally warn or error if inner has bindings, but for now just validate structure.
-            // Actually, we should validate the inner pattern structure, but we must ensure
-            // that we don't think variables are bound.
             validate_pattern(inner, all_defs, params)?;
-
-            // TODO: Check that `inner` does not define bindings.
-            // This requires a helper `collect_bindings` which is in `analysis`.
-            // But `validator` shouldn't depend on `analysis`?
-            // `analysis` depends on `model`. `validator` depends on `model`.
-            // They are siblings.
-            // For now, we just validate structure.
         }
         ModelPattern::Group(variants, _) => {
             for seq in variants {
@@ -113,7 +105,10 @@ fn validate_pattern(
 
 // Argument count validation
 // This is a separate pass because it needs the full rule map.
-fn validate_argument_counts(grammar: &GrammarDefinition) -> syn::Result<()> {
+fn validate_argument_counts(
+    grammar: &GrammarDefinition,
+    builtin_names: &HashSet<String>,
+) -> syn::Result<()> {
     let rule_map: HashMap<_, _> = grammar
         .rules
         .iter()
@@ -127,10 +122,11 @@ fn validate_argument_counts(grammar: &GrammarDefinition) -> syn::Result<()> {
                     rule_name, args, ..
                 } = pattern
                 {
-                    if let Some(target_rule) = rule_map.get(&rule_name.to_string()) {
+                    let name_str = rule_name.to_string();
+                    if let Some(target_rule) = rule_map.get(&name_str) {
                         if target_rule.params.len() != args.len() {
                             return Err(syn::Error::new(
-                                pattern.span(),
+                                rule_name.span(),
                                 format!(
                                     "Rule '{}' expects {} argument(s), but got {}.",
                                     rule_name,
@@ -142,14 +138,11 @@ fn validate_argument_counts(grammar: &GrammarDefinition) -> syn::Result<()> {
                     } else {
                         // It's a built-in or an inherited rule.
                         // We can't validate args for inherited rules here, so we only check built-ins.
-                        let is_builtin = crate::PORTABLE_BUILTINS
-                            .contains(&rule_name.to_string().as_str())
-                            || crate::SYN_SPECIFIC_BUILTINS
-                                .contains(&rule_name.to_string().as_str());
+                        let is_builtin = builtin_names.contains(&name_str);
 
                         if is_builtin && !args.is_empty() {
                             return Err(syn::Error::new(
-                                pattern.span(),
+                                rule_name.span(),
                                 format!("Built-in rule '{}' does not accept arguments.", rule_name,),
                             ));
                         }
@@ -164,20 +157,27 @@ fn validate_argument_counts(grammar: &GrammarDefinition) -> syn::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{PORTABLE_BUILTINS, SYN_SPECIFIC_BUILTINS};
     use quote::quote;
+
+    struct TestBackend;
+    impl Backend for TestBackend {
+        fn get_builtins() -> &'static [BuiltIn] {
+            &[
+                BuiltIn {
+                    name: "ident",
+                    return_type: "syn::Ident",
+                },
+                BuiltIn {
+                    name: "string",
+                    return_type: "String",
+                },
+            ]
+        }
+    }
 
     fn parse_model(input: proc_macro2::TokenStream) -> GrammarDefinition {
         let p_ast: crate::parser::GrammarDefinition = syn::parse2(input).unwrap();
         p_ast.into()
-    }
-
-    fn all_builtins() -> Vec<&'static str> {
-        PORTABLE_BUILTINS
-            .iter()
-            .cloned()
-            .chain(SYN_SPECIFIC_BUILTINS.iter().cloned())
-            .collect()
     }
 
     #[test]
@@ -188,7 +188,7 @@ mod tests {
             }
         };
         let model = parse_model(input);
-        let err = validate(&model, &all_builtins()).unwrap_err();
+        let err = validate::<TestBackend>(&model).unwrap_err();
         assert_eq!(err.to_string(), "Undefined rule: 'undefined_rule'");
     }
 
@@ -201,7 +201,7 @@ mod tests {
             }
         };
         let model = parse_model(input);
-        let err = validate(&model, &all_builtins()).unwrap_err();
+        let err = validate::<TestBackend>(&model).unwrap_err();
         assert_eq!(err.to_string(), "Duplicate rule definition: 'main'");
     }
 
@@ -218,7 +218,7 @@ mod tests {
         // Locate the expected span: rule 'main' -> variant 0 -> pattern 0 ('sub(1)')
         let expected_span = model.rules[0].variants[0].pattern[0].span();
 
-        let err = validate(&model, &all_builtins()).unwrap_err();
+        let err = validate::<TestBackend>(&model).unwrap_err();
         assert_eq!(
             err.to_string(),
             "Rule 'sub' expects 0 argument(s), but got 1."
@@ -238,7 +238,7 @@ mod tests {
         // Locate the expected span: rule 'main' -> variant 0 -> pattern 0 ('ident(1)')
         let expected_span = model.rules[0].variants[0].pattern[0].span();
 
-        let err = validate(&model, &all_builtins()).unwrap_err();
+        let err = validate::<TestBackend>(&model).unwrap_err();
         assert_eq!(
             err.to_string(),
             "Built-in rule 'ident' does not accept arguments."

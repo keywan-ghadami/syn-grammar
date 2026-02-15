@@ -152,12 +152,13 @@ Rules can be decorated with standard Rust attributes and documentation comments.
 ```rust
 use syn_grammar::grammar;
 use syn::Ident;
+use syn_grammar::Identifier;
 
 grammar! {
     grammar MyGrammar {
         /// Parses a valid identifier.
         #[cfg(feature = "extra")]
-        rule my_ident -> Ident = i:ident -> { i }
+        rule my_ident -> Identifier = i:ident -> { i }
     }
 }
 
@@ -247,8 +248,8 @@ These represent high-level, conceptually portable primitives that other backends
 
 | Parser | Description | Returns |
 |---|---|---|
-| `ident` | A Rust identifier | `syn::Ident` |
-| `string` | A string literal's content | `String` |
+| `ident` | A Rust identifier | `syn_grammar::Identifier` |
+| `string` | A string literal's content | `syn_grammar::StringLiteral` |
 | `alpha` | An alphabetic identifier | `syn::Ident` |
 | `digit` | A numeric identifier | `syn::Ident` |
 | `whitespace` | Ensures token separation | `()` |
@@ -329,10 +330,11 @@ Match a sequence of patterns. Use `name:pattern` to bind the result to a variabl
 ```rust
 use syn_grammar::grammar;
 use syn::Ident;
+use syn_grammar::Identifier;
 
 // Mock Stmt for the example
 pub enum Stmt {
-    Assign(Ident, i32),
+    Assign(Identifier, i32),
 }
 
 grammar! {
@@ -351,18 +353,20 @@ grammar! {
 #### Span Binding (`@`)
 You can capture the `Span` of a parsed rule or built-in using the syntax `name:rule @ span_var`. This is useful for error reporting or constructing spanned AST nodes.
 
-**Note**: The rule being bound must return a type that implements `syn::spanned::Spanned` (e.g., `syn::Ident`, `syn::Type`, `syn::LitStr`). Primitive types like `i32` or `String` do not support this.
+**Note**: The rule being bound must return a type that implements `syn::spanned::Spanned` (e.g., `syn::Ident`, `syn::Type`, `syn::LitStr`, and `syn_grammar::Identifier`). Primitive types like `i32` or `String` do not support this.
 
 ```rust
 use syn_grammar::grammar;
+use syn_grammar::Identifier;
 
 grammar! {
     grammar Spanned {
-        rule main -> (syn::Ident, proc_macro2::Span) = 
+        rule main -> (Identifier, proc_macro2::Span) = 
             // Binds the identifier to `id` and its span to `s`
             id:ident @ s -> { (id, s) }
     }
 }
+# fn main() {}
 ```
 
 #### Alternatives (`|`)
@@ -481,9 +485,10 @@ The cut operator `=>` allows you to commit to a specific alternative. If the pat
 ```rust
 use syn_grammar::grammar;
 use syn::Ident;
+use syn_grammar::Identifier;
 
 pub enum Stmt {
-    Let(Ident, i32),
+    Let(Identifier, i32),
     Expr(i32),
 }
 
