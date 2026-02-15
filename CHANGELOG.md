@@ -2,15 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.7.0] - 2024-10-27
+## [0.7.0] - Unreleased
 
 ### Added
 - **Numeric Built-ins**: Added a comprehensive set of portable numeric built-ins:
     - **Signed Integers**: `i8`, `i16`, `i32`, `i64`, `i128`, `isize` (and `int*` aliases).
     - **Unsigned Integers**: `u8`, `u16`, `u32`, `u64`, `u128`, `usize` (and `uint*` aliases).
-    - **Floating Point**: `f32`, `f64` (and `float*` aliases).
+    - **Floating Point**: `f32`, `f64`.
     - **Alternative Bases**: `hex_literal`, `oct_literal`, `bin_literal` (parses into `u64`).
-- **`float` Primitive**: Added the `float` high-level primitive, which parses a floating-point literal and returns `f64`.
 - **`whitespace` Primitive**: Added the `whitespace` assertion, which ensures a gap (non-adjacency) between two tokens.
 - **Lookahead Operators**: Added support for positive (`peek(...)`) and negative (`not(...)`) lookahead operators.
     - `peek(pattern)`: Succeeds if the pattern matches, but does not consume input.
@@ -18,10 +17,16 @@ All notable changes to this project will be documented in this file.
 - **Portable Primitives**: Introduced a distinction between `PORTABLE_BUILTINS` (`ident`, `integer`, `alpha`, etc.) and `SYN_SPECIFIC_BUILTINS` (`rust_type`, `lit_str`, etc.). This clarifies the portability contract for authors of alternative backends (e.g., `winnow-grammar`), encouraging a rich, shared vocabulary of common parsing concepts.
 - **`alpha` Primitive**: Added the `alpha` built-in primitive, which matches an identifier composed entirely of alphabetic characters.
 - **ADR for Primitives**: Added an Architecture Decision Record (`docs/adr/adr1.md`) to document the design for handling character-level, byte-level, and token-level primitives across different backends.
+- **Restored Tests**: Added back `test_rule_arguments` and `test_multiple_arguments` to ensure rule parameter functionality works as expected.
 
 ### Changed
 - **Backend-Agnostic Model**: The `syn-grammar-model` crate now exposes `parse_grammar_with_builtins`. This allows backend authors to validate grammars against their own set of built-in rules.
 - **Backend Author Guide**: `EXTENDING.md` has been rewritten to focus on how to build custom parser generator backends using `syn-grammar` as the frontend DSL.
+
+### Fixed
+- **Repetition Syntax**: Fixed a regression where repetition patterns were incorrectly requiring brackets `[...]` instead of parentheses `(...)`.
+- **Linter Warnings**: Resolved multiple `clippy` warnings (unused variables, collapsible if-blocks, approximate constants).
+- **Float Testing**: Improved float primitive tests to use proper epsilon comparison for accuracy.
 
 ### Breaking Changes
 - **Built-in Rule Resolution**: The precedence of built-in rules (like `ident`, `string`) has changed. They are no longer hardcoded keywords but are now provided as default implementations in `syn_grammar::builtins`.

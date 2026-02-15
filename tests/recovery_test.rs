@@ -1,6 +1,5 @@
 use syn::parse::Parser;
 use syn_grammar::grammar;
-use syn_grammar::testing::Testable;
 
 #[derive(Debug, PartialEq)]
 pub struct Stmt;

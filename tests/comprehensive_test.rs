@@ -232,6 +232,39 @@ fn test_epsilon_alternative() {
         .assert_success_is(None);
 }
 
+// --- Test Rule Arguments ---
+#[test]
+fn test_rule_arguments() {
+    grammar! {
+        grammar args {
+            pub rule main -> i32 = "start" v:value(10) -> { v }
+            rule value(offset: i32) -> i32 = i:i32 -> { i + offset }
+        }
+    }
+
+    args::parse_main
+        .parse_str("start 5")
+        .test()
+        .assert_success_is(15);
+}
+
+// --- Test Multiple Arguments ---
+#[test]
+fn test_multiple_arguments() {
+    grammar! {
+        grammar multi_args {
+            pub rule main -> i32 = "calc" v:calc(2, 3) -> { v }
+            rule calc(mult: i32, base: i32) -> i32 = i:i32 -> { base + (i * mult) }
+        }
+    }
+
+    // 10 * 2 + 3 = 23
+    multi_args::parse_main
+        .parse_str("calc 10")
+        .test()
+        .assert_success_is(23);
+}
+
 // --- Test Complex Return Types ---
 // For simplicity in this test, we won't return Result<_,_> because syn::Error doesn't impl PartialEq easily.
 // We'll wrap in Option.

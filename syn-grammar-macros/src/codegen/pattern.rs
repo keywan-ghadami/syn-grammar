@@ -344,29 +344,27 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         };
                     })
                 }
+            } else if bindings.is_empty() {
+                Ok(quote! {
+                    // Pass ctx to attempt
+                    let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
+                })
             } else {
-                if bindings.is_empty() {
-                    Ok(quote! {
-                        // Pass ctx to attempt
-                        let _ = rt::attempt(input, ctx, |input, ctx| { #inner_logic Ok(()) })?;
-                    })
-                } else {
-                    let vars: Vec<_> = bindings.iter().map(|b| quote!(#b)).collect();
-                    let some_vars: Vec<_> = bindings.iter().map(|b| quote!(Some(#b))).collect();
-                    let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
+                let vars: Vec<_> = bindings.iter().map(|b| quote!(#b)).collect();
+                let some_vars: Vec<_> = bindings.iter().map(|b| quote!(Some(#b))).collect();
+                let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
 
-                    Ok(quote! {
-                        let (#(#vars),*) = if let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
-                             #inner_logic
-                             Ok((#(#vars),*))
-                        })? {
-                            let (#(#vars),*) = vals;
-                            (#(#some_vars),*)
-                        } else {
-                            (#(#none_vars),*)
-                        };
-                    })
-                }
+                Ok(quote! {
+                    let (#(#vars),*) = if let Some(vals) = rt::attempt(input, ctx, |input, ctx| {
+                            #inner_logic
+                            Ok((#(#vars),*))
+                    })? {
+                        let (#(#vars),*) = vals;
+                        (#(#some_vars),*)
+                    } else {
+                        (#(#none_vars),*)
+                    };
+                })
             }
         }
         ModelPattern::Group(alts, _) => {
@@ -539,6 +537,9 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             })?;
 
             let bindings = analysis::collect_bindings(std::slice::from_ref(&effective_body));
+
+            // Fix: Mark span as unused to silence clippy warning
+            let _ = span;
 
             if bindings.is_empty() {
                 Ok(quote! {

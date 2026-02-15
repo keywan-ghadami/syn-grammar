@@ -13,13 +13,13 @@ fn test_float_primitive() {
 
     // Happy path
     float_test::parse_main
-        .parse_str("3.14")
+        .parse_str("1.23456")
         .test()
         .assert_success();
 
     // Verify value
-    let val = float_test::parse_main.parse_str("3.14").unwrap();
-    assert!((val - 3.14).abs() < 1e-6);
+    let val = float_test::parse_main.parse_str("1.23456").unwrap();
+    assert!((val - 1.23456).abs() < 1e-6);
 
     // Integers should fail (syn::LitFloat does not match integer literals unless they have . or exponent)
     float_test::parse_main
