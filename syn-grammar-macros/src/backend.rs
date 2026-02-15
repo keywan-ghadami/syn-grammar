@@ -94,6 +94,71 @@ impl Backend for SynBackend {
                 name: "bin_literal",
                 return_type: "u64",
             },
+            // Spanned Primitives (returning Spanned<T>)
+            BuiltIn {
+                name: "spanned_char",
+                return_type: "syn_grammar_model::types::Spanned<char>",
+            },
+            BuiltIn {
+                name: "spanned_bool",
+                return_type: "syn_grammar_model::types::Spanned<bool>",
+            },
+            BuiltIn {
+                name: "spanned_i8",
+                return_type: "syn_grammar_model::types::Spanned<i8>",
+            },
+            BuiltIn {
+                name: "spanned_i16",
+                return_type: "syn_grammar_model::types::Spanned<i16>",
+            },
+            BuiltIn {
+                name: "spanned_i32",
+                return_type: "syn_grammar_model::types::Spanned<i32>",
+            },
+            BuiltIn {
+                name: "spanned_i64",
+                return_type: "syn_grammar_model::types::Spanned<i64>",
+            },
+            BuiltIn {
+                name: "spanned_i128",
+                return_type: "syn_grammar_model::types::Spanned<i128>",
+            },
+            BuiltIn {
+                name: "spanned_isize",
+                return_type: "syn_grammar_model::types::Spanned<isize>",
+            },
+            BuiltIn {
+                name: "spanned_u8",
+                return_type: "syn_grammar_model::types::Spanned<u8>",
+            },
+            BuiltIn {
+                name: "spanned_u16",
+                return_type: "syn_grammar_model::types::Spanned<u16>",
+            },
+            BuiltIn {
+                name: "spanned_u32",
+                return_type: "syn_grammar_model::types::Spanned<u32>",
+            },
+            BuiltIn {
+                name: "spanned_u64",
+                return_type: "syn_grammar_model::types::Spanned<u64>",
+            },
+            BuiltIn {
+                name: "spanned_u128",
+                return_type: "syn_grammar_model::types::Spanned<u128>",
+            },
+            BuiltIn {
+                name: "spanned_usize",
+                return_type: "syn_grammar_model::types::Spanned<usize>",
+            },
+            BuiltIn {
+                name: "spanned_f32",
+                return_type: "syn_grammar_model::types::Spanned<f32>",
+            },
+            BuiltIn {
+                name: "spanned_f64",
+                return_type: "syn_grammar_model::types::Spanned<f64>",
+            },
             // Low-level token filters (currently return syn types or ())
             BuiltIn {
                 name: "alpha",

@@ -1,15 +1,18 @@
-use crate::rt::ParseContext;
+use crate::rt::{self, ParseContext};
 use proc_macro2::Span;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 use syn::Result;
-use syn_grammar_model::model::types::{Identifier, StringLiteral};
+use syn_grammar_model::model::types::{Identifier, Spanned as SpannedValue, StringLiteral};
 
 // A trait that all token streams must implement so that we can have
 // backend-agnostic builtins for common literal types.
 pub trait CommonBuiltins {
     fn parse_ident(&mut self) -> Result<Identifier>;
     fn parse_string(&mut self) -> Result<StringLiteral>;
+
+    fn parse_char(&mut self) -> Result<(char, Span)>;
+    fn parse_bool(&mut self) -> Result<(bool, Span)>;
 
     fn parse_i8(&mut self) -> Result<(i8, Span)>;
     fn parse_i16(&mut self) -> Result<(i16, Span)>;
@@ -42,6 +45,16 @@ impl<'a> CommonBuiltins for ParseStream<'a> {
     fn parse_string(&mut self) -> Result<StringLiteral> {
         let lit = self.parse::<syn::LitStr>()?;
         Ok(StringLiteral::new(lit.value(), lit.span()))
+    }
+
+    fn parse_char(&mut self) -> Result<(char, Span)> {
+        let lit = self.parse::<syn::LitChar>()?;
+        Ok((lit.value(), lit.span()))
+    }
+
+    fn parse_bool(&mut self) -> Result<(bool, Span)> {
+        let lit = self.parse::<syn::LitBool>()?;
+        Ok((lit.value, lit.span()))
     }
 
     fn parse_i8(&mut self) -> Result<(i8, Span)> {
@@ -135,7 +148,7 @@ pub fn parse_ident_impl<T: CommonBuiltins>(
     ctx: &mut ParseContext,
 ) -> Result<Identifier> {
     let t = input.parse_ident()?;
-    ctx.record_span(t.span);
+    ctx.record_span(t.span.clone());
     Ok(t)
 }
 
@@ -144,8 +157,166 @@ pub fn parse_string_impl<T: CommonBuiltins>(
     ctx: &mut ParseContext,
 ) -> Result<StringLiteral> {
     let s_lit = input.parse_string()?;
-    ctx.record_span(s_lit.span);
+    ctx.record_span(s_lit.span.clone());
     Ok(s_lit)
+}
+
+pub fn parse_char_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<char> {
+    let (val, span) = input.parse_char()?;
+    ctx.record_span(span);
+    Ok(val)
+}
+
+pub fn parse_bool_impl<T: CommonBuiltins>(input: &mut T, ctx: &mut ParseContext) -> Result<bool> {
+    let (val, span) = input.parse_bool()?;
+    ctx.record_span(span);
+    Ok(val)
+}
+
+// Spanned Primitives
+
+pub fn parse_spanned_char_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<char>> {
+    let (val, span) = input.parse_char()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_bool_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<bool>> {
+    let (val, span) = input.parse_bool()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_i8_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<i8>> {
+    let (val, span) = input.parse_i8()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_i16_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<i16>> {
+    let (val, span) = input.parse_i16()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_i32_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<i32>> {
+    let (val, span) = input.parse_i32()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_i64_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<i64>> {
+    let (val, span) = input.parse_i64()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_i128_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<i128>> {
+    let (val, span) = input.parse_i128()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_isize_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<isize>> {
+    let (val, span) = input.parse_isize()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_u8_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<u8>> {
+    let (val, span) = input.parse_u8()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_u16_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<u16>> {
+    let (val, span) = input.parse_u16()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_u32_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<u32>> {
+    let (val, span) = input.parse_u32()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_u64_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<u64>> {
+    let (val, span) = input.parse_u64()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_u128_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<u128>> {
+    let (val, span) = input.parse_u128()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_usize_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<usize>> {
+    let (val, span) = input.parse_usize()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_f32_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<f32>> {
+    let (val, span) = input.parse_f32()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
+}
+
+pub fn parse_spanned_f64_impl<T: CommonBuiltins>(
+    input: &mut T,
+    ctx: &mut ParseContext,
+) -> Result<SpannedValue<f64>> {
+    let (val, span) = input.parse_f64()?;
+    ctx.record_span(span);
+    Ok(SpannedValue::new(val, span))
 }
 
 // Signed Integers
@@ -323,55 +494,9 @@ pub fn parse_outer_attrs_impl(
     input: &mut ParseStream,
     ctx: &mut ParseContext,
 ) -> Result<Vec<syn::Attribute>> {
-    let attrs = syn::Attribute::parse_outer(input)?;
+    let attrs = syn::Attribute::parse_outer(*input)?;
     if let Some(last) = attrs.last() {
         ctx.record_span(last.span());
     }
     Ok(attrs)
-}
-
-// Spanned variants - legacy/syn-specific
-pub fn parse_spanned_int_lit_impl(
-    input: &mut ParseStream,
-    ctx: &mut ParseContext,
-) -> Result<(i32, proc_macro2::Span)> {
-    let l = (*input).parse::<syn::LitInt>()?;
-    ctx.record_span(l.span());
-    Ok((l.base10_parse::<i32>()?, l.span()))
-}
-
-pub fn parse_spanned_string_lit_impl(
-    input: &mut ParseStream,
-    ctx: &mut ParseContext,
-) -> Result<(String, proc_macro2::Span)> {
-    let l = (*input).parse::<syn::LitStr>()?;
-    ctx.record_span(l.span());
-    Ok((l.value(), l.span()))
-}
-
-pub fn parse_spanned_float_lit_impl(
-    input: &mut ParseStream,
-    ctx: &mut ParseContext,
-) -> Result<(f64, proc_macro2::Span)> {
-    let l = (*input).parse::<syn::LitFloat>()?;
-    ctx.record_span(l.span());
-    Ok((l.base10_parse::<f64>()?, l.span()))
-}
-
-pub fn parse_spanned_bool_lit_impl(
-    input: &mut ParseStream,
-    ctx: &mut ParseContext,
-) -> Result<(bool, proc_macro2::Span)> {
-    let l = (*input).parse::<syn::LitBool>()?;
-    ctx.record_span(l.span());
-    Ok((l.value, l.span()))
-}
-
-pub fn parse_spanned_char_lit_impl(
-    input: &mut ParseStream,
-    ctx: &mut ParseContext,
-) -> Result<(char, proc_macro2::Span)> {
-    let l = (*input).parse::<syn::LitChar>()?;
-    ctx.record_span(l.span());
-    Ok((l.value(), l.span()))
 }
