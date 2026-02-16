@@ -218,6 +218,7 @@ Generic parameters support standard Rust trait bounds, which are enforced on the
 ```rust
 use std::collections::HashMap;
 use std::hash::Hash;
+use syn_grammar::grammar;
 
 grammar! {
     grammar Map {
