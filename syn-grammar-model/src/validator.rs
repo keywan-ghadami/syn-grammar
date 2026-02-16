@@ -34,6 +34,47 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
 
     validate_argument_counts(grammar, &builtin_names)?;
 
+    // Perform advanced analysis
+    let analysis = crate::analysis::analyze_grammar(grammar);
+
+    // 1. Detect Infinite Recursion (Error)
+    for cycle in &analysis.cycles {
+        // We filter out self-loops (length 1) because the macro handles direct left recursion (e.g. A -> A b).
+        // We only report indirect recursion (A -> B -> A) or complex cycles that are not supported.
+        if cycle.len() > 1 {
+            let cycle_str = cycle
+                .iter()
+                .chain(std::iter::once(&cycle[0]))
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" -> ");
+            let msg = format!(
+                "Indirect left recursion detected (unsupported): {}",
+                cycle_str
+            );
+
+            let rule_name = &cycle[0];
+            let rule = grammar.rules.iter().find(|r| r.name == *rule_name).unwrap();
+            return Err(syn::Error::new(rule.name.span(), msg));
+        }
+    }
+
+    // 2. Warn about Unused Rules
+    if should_validate_rule_calls {
+        let mut unused: Vec<_> = analysis.unused_rules.iter().collect();
+        unused.sort();
+        for rule_name in unused {
+            if !rule_name.starts_with('_') {
+                eprintln!("warning: Unused rule: '{}'", rule_name);
+            }
+        }
+
+        // 3. Warn about Ambiguity
+        for warning in &analysis.warnings {
+            eprintln!("warning: {}", warning);
+        }
+    }
+
     Ok(())
 }
 

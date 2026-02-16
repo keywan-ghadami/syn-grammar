@@ -1,7 +1,7 @@
 use crate::model::*;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 use syn::{parse_quote, Lit, Result};
 
 /// Collects all custom keywords from the grammar
@@ -319,6 +319,458 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Recover { .. } => true,
         ModelPattern::Peek(_, _) => true,
         ModelPattern::Not(_, _) => true,
+    }
+}
+
+// ==============================================================================
+//  Graph Analysis & Diagnostics (Infinite Recursion, Ambiguity, Unused Rules)
+// ==============================================================================
+
+pub struct GrammarAnalysis {
+    pub nullable_rules: HashSet<String>,
+    pub cycles: Vec<Vec<String>>,
+    pub unused_rules: HashSet<String>,
+    pub first_sets: HashMap<String, HashSet<String>>,
+    pub warnings: Vec<String>,
+}
+
+pub fn analyze_grammar(grammar: &GrammarDefinition) -> GrammarAnalysis {
+    let mut nullable_rules = HashSet::new();
+
+    // 1. Compute Nullable Fixpoint
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for rule in &grammar.rules {
+            let rule_name = rule.name.to_string();
+            if nullable_rules.contains(&rule_name) {
+                continue;
+            }
+
+            let mut is_rule_nullable = false;
+            for variant in &rule.variants {
+                if is_sequence_nullable(&variant.pattern, &nullable_rules) {
+                    is_rule_nullable = true;
+                    break;
+                }
+            }
+
+            if is_rule_nullable {
+                nullable_rules.insert(rule_name);
+                changed = true;
+            }
+        }
+    }
+
+    // 2. Detect Cycles
+    let cycles = find_cycles(grammar, &nullable_rules);
+
+    // 3. Unused Rules
+    let unused_rules = find_unused_rules(grammar);
+
+    // 4. FIRST sets and Ambiguity
+    let (first_sets, warnings) = compute_first_sets_and_warnings(grammar, &nullable_rules);
+
+    GrammarAnalysis {
+        nullable_rules,
+        cycles,
+        unused_rules,
+        first_sets,
+        warnings,
+    }
+}
+
+fn is_sequence_nullable(patterns: &[ModelPattern], nullable_rules: &HashSet<String>) -> bool {
+    for p in patterns {
+        if !is_pattern_nullable_precise(p, nullable_rules) {
+            return false;
+        }
+    }
+    true
+}
+
+fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<String>) -> bool {
+    match pattern {
+        ModelPattern::Cut(_) => true,
+        ModelPattern::Lit(_) => false,
+        ModelPattern::RuleCall { rule_name, .. } => nullable_rules.contains(&rule_name.to_string()),
+        ModelPattern::Group(alts, _) => alts
+            .iter()
+            .any(|seq| is_sequence_nullable(seq, nullable_rules)),
+        ModelPattern::Optional(_, _)
+        | ModelPattern::Repeat(_, _)
+        | ModelPattern::Recover { .. }
+        | ModelPattern::Peek(_, _)
+        | ModelPattern::Not(_, _) => true, // Peek/Not consume nothing
+        ModelPattern::Plus(inner, _) => is_pattern_nullable_precise(inner, nullable_rules),
+        ModelPattern::SpanBinding(inner, _, _) => {
+            is_pattern_nullable_precise(inner, nullable_rules)
+        }
+        ModelPattern::Bracketed(_, _)
+        | ModelPattern::Braced(_, _)
+        | ModelPattern::Parenthesized(_, _) => false,
+    }
+}
+
+fn find_cycles(grammar: &GrammarDefinition, nullable_rules: &HashSet<String>) -> Vec<Vec<String>> {
+    let mut adj = HashMap::new();
+    for rule in &grammar.rules {
+        let mut deps = HashSet::new();
+        for variant in &rule.variants {
+            collect_nullable_deps(&variant.pattern, nullable_rules, &mut deps);
+        }
+        adj.insert(rule.name.to_string(), deps);
+    }
+
+    let mut cycles = Vec::new();
+    let mut visited = HashSet::new();
+    let mut stack = Vec::new();
+    let mut on_stack = HashSet::new();
+
+    for rule in &grammar.rules {
+        let name = rule.name.to_string();
+        if !visited.contains(&name) {
+            find_cycles_dfs(
+                &name,
+                &adj,
+                &mut visited,
+                &mut stack,
+                &mut on_stack,
+                &mut cycles,
+            );
+        }
+    }
+    cycles
+}
+
+fn find_cycles_dfs(
+    u: &String,
+    adj: &HashMap<String, HashSet<String>>,
+    visited: &mut HashSet<String>,
+    stack: &mut Vec<String>,
+    on_stack: &mut HashSet<String>,
+    cycles: &mut Vec<Vec<String>>,
+) {
+    visited.insert(u.clone());
+    stack.push(u.clone());
+    on_stack.insert(u.clone());
+
+    if let Some(neighbors) = adj.get(u) {
+        for v in neighbors {
+            if on_stack.contains(v) {
+                // Found cycle: v ... u -> v
+                if let Some(pos) = stack.iter().position(|x| x == v) {
+                    cycles.push(stack[pos..].to_vec());
+                }
+            } else if !visited.contains(v) {
+                find_cycles_dfs(v, adj, visited, stack, on_stack, cycles);
+            }
+        }
+    }
+
+    on_stack.remove(u);
+    stack.pop();
+}
+
+fn collect_nullable_deps(
+    patterns: &[ModelPattern],
+    nullable_rules: &HashSet<String>,
+    deps: &mut HashSet<String>,
+) {
+    for p in patterns {
+        match p {
+            ModelPattern::RuleCall { rule_name, .. } => {
+                deps.insert(rule_name.to_string());
+                if !nullable_rules.contains(&rule_name.to_string()) {
+                    return;
+                }
+            }
+            ModelPattern::Group(alts, _) => {
+                let mut group_nullable = false;
+                for alt in alts {
+                    collect_nullable_deps(alt, nullable_rules, deps);
+                    if is_sequence_nullable(alt, nullable_rules) {
+                        group_nullable = true;
+                    }
+                }
+                if !group_nullable {
+                    return;
+                }
+            }
+            ModelPattern::Optional(inner, _) | ModelPattern::Repeat(inner, _) => {
+                collect_nullable_deps(std::slice::from_ref(inner), nullable_rules, deps);
+            }
+            ModelPattern::Plus(inner, _) => {
+                collect_nullable_deps(std::slice::from_ref(inner), nullable_rules, deps);
+                if !is_pattern_nullable_precise(inner, nullable_rules) {
+                    return;
+                }
+            }
+            ModelPattern::SpanBinding(inner, _, _) => {
+                collect_nullable_deps(std::slice::from_ref(inner), nullable_rules, deps);
+                if !is_pattern_nullable_precise(inner, nullable_rules) {
+                    return;
+                }
+            }
+            ModelPattern::Peek(inner, _) | ModelPattern::Not(inner, _) => {
+                collect_nullable_deps(std::slice::from_ref(inner), nullable_rules, deps);
+                // Peek/Not consume nothing, so we continue to next pattern
+            }
+            ModelPattern::Recover { body, .. } => {
+                collect_nullable_deps(std::slice::from_ref(body), nullable_rules, deps);
+            }
+            ModelPattern::Lit(_)
+            | ModelPattern::Bracketed(..)
+            | ModelPattern::Braced(..)
+            | ModelPattern::Parenthesized(..) => {
+                return;
+            }
+            ModelPattern::Cut(_) => {}
+        }
+    }
+}
+
+fn find_unused_rules(grammar: &GrammarDefinition) -> HashSet<String> {
+    let mut used = HashSet::new();
+    let mut queue = VecDeque::new();
+
+    for rule in &grammar.rules {
+        if rule.is_pub {
+            used.insert(rule.name.to_string());
+            queue.push_back(rule.name.to_string());
+        }
+    }
+
+    if used.is_empty() && !grammar.rules.is_empty() {
+        let first = grammar.rules[0].name.to_string();
+        used.insert(first.clone());
+        queue.push_back(first);
+    }
+
+    let rule_map: HashMap<_, _> = grammar
+        .rules
+        .iter()
+        .map(|r| (r.name.to_string(), r))
+        .collect();
+
+    while let Some(current_name) = queue.pop_front() {
+        if let Some(rule) = rule_map.get(&current_name) {
+            for variant in &rule.variants {
+                collect_called_rules(&variant.pattern, &mut |callee| {
+                    if used.insert(callee.clone()) {
+                        queue.push_back(callee);
+                    }
+                });
+            }
+        }
+    }
+
+    grammar
+        .rules
+        .iter()
+        .map(|r| r.name.to_string())
+        .filter(|n| !used.contains(n))
+        .collect()
+}
+
+fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F) {
+    for p in patterns {
+        match p {
+            ModelPattern::RuleCall { rule_name, .. } => cb(rule_name.to_string()),
+            ModelPattern::Group(alts, _) => {
+                for alt in alts {
+                    collect_called_rules(alt, cb);
+                }
+            }
+            ModelPattern::Optional(inner, _)
+            | ModelPattern::Repeat(inner, _)
+            | ModelPattern::Plus(inner, _)
+            | ModelPattern::SpanBinding(inner, _, _)
+            | ModelPattern::Peek(inner, _)
+            | ModelPattern::Not(inner, _) => {
+                collect_called_rules(std::slice::from_ref(inner), cb);
+            }
+            ModelPattern::Recover { body, sync, .. } => {
+                collect_called_rules(std::slice::from_ref(body), cb);
+                collect_called_rules(std::slice::from_ref(sync), cb);
+            }
+            ModelPattern::Bracketed(inner, _)
+            | ModelPattern::Braced(inner, _)
+            | ModelPattern::Parenthesized(inner, _) => {
+                collect_called_rules(inner, cb);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn compute_first_sets_and_warnings(
+    grammar: &GrammarDefinition,
+    nullable_rules: &HashSet<String>,
+) -> (HashMap<String, HashSet<String>>, Vec<String>) {
+    let mut first_sets: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut warnings = Vec::new();
+
+    for rule in &grammar.rules {
+        first_sets.insert(rule.name.to_string(), HashSet::new());
+    }
+
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for rule in &grammar.rules {
+            let name = rule.name.to_string();
+            let mut current_first = first_sets.get(&name).cloned().unwrap_or_default();
+            let start_len = current_first.len();
+
+            for variant in &rule.variants {
+                collect_first_from_sequence(
+                    &variant.pattern,
+                    &first_sets,
+                    nullable_rules,
+                    &mut current_first,
+                );
+            }
+
+            if current_first.len() != start_len {
+                first_sets.insert(name, current_first);
+                changed = true;
+            }
+        }
+    }
+
+    for rule in &grammar.rules {
+        for (i, v1) in rule.variants.iter().enumerate() {
+            let mut first_v1 = HashSet::new();
+            collect_first_from_sequence(&v1.pattern, &first_sets, nullable_rules, &mut first_v1);
+
+            for (j, v2) in rule.variants.iter().enumerate().skip(i + 1) {
+                let mut first_v2 = HashSet::new();
+                collect_first_from_sequence(
+                    &v2.pattern,
+                    &first_sets,
+                    nullable_rules,
+                    &mut first_v2,
+                );
+
+                let intersection: Vec<_> = first_v1.intersection(&first_v2).collect();
+                if !intersection.is_empty() {
+                    let mut intersection_sorted =
+                        intersection.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+                    intersection_sorted.sort();
+                    warnings.push(format!(
+                        "Rule '{}': Alternative {} and {} have overlapping first tokens: {:?}",
+                        rule.name,
+                        i + 1,
+                        j + 1,
+                        intersection_sorted
+                    ));
+                }
+            }
+        }
+    }
+
+    (first_sets, warnings)
+}
+
+fn collect_first_from_sequence(
+    patterns: &[ModelPattern],
+    first_sets: &HashMap<String, HashSet<String>>,
+    nullable_rules: &HashSet<String>,
+    acc: &mut HashSet<String>,
+) {
+    for p in patterns {
+        match p {
+            ModelPattern::Lit(Lit::Str(s)) => {
+                acc.insert(format!("\"{}\"", s.value()));
+                return;
+            }
+            ModelPattern::Lit(_) => {
+                acc.insert("LIT".to_string());
+                return;
+            }
+            ModelPattern::RuleCall { rule_name, .. } => {
+                let name = rule_name.to_string();
+                if let Some(fs) = first_sets.get(&name) {
+                    acc.extend(fs.clone());
+                } else {
+                    acc.insert(format!("<{}>", name));
+                }
+                if !nullable_rules.contains(&name) {
+                    return;
+                }
+            }
+            ModelPattern::Group(alts, _) => {
+                let mut group_nullable = false;
+                for alt in alts {
+                    collect_first_from_sequence(alt, first_sets, nullable_rules, acc);
+                    if is_sequence_nullable(alt, nullable_rules) {
+                        group_nullable = true;
+                    }
+                }
+                if !group_nullable {
+                    return;
+                }
+            }
+            ModelPattern::Bracketed(..) => {
+                acc.insert("Bracket".to_string());
+                return;
+            }
+            ModelPattern::Braced(..) => {
+                acc.insert("Brace".to_string());
+                return;
+            }
+            ModelPattern::Parenthesized(..) => {
+                acc.insert("Paren".to_string());
+                return;
+            }
+
+            ModelPattern::Optional(inner, _)
+            | ModelPattern::Repeat(inner, _)
+            | ModelPattern::Peek(inner, _) => {
+                collect_first_from_sequence(
+                    std::slice::from_ref(inner),
+                    first_sets,
+                    nullable_rules,
+                    acc,
+                );
+                continue;
+            }
+            ModelPattern::Plus(inner, _) => {
+                collect_first_from_sequence(
+                    std::slice::from_ref(inner),
+                    first_sets,
+                    nullable_rules,
+                    acc,
+                );
+                if !is_pattern_nullable_precise(inner, nullable_rules) {
+                    return;
+                }
+            }
+            ModelPattern::SpanBinding(inner, _, _) => {
+                collect_first_from_sequence(
+                    std::slice::from_ref(inner),
+                    first_sets,
+                    nullable_rules,
+                    acc,
+                );
+                if !is_pattern_nullable_precise(inner, nullable_rules) {
+                    return;
+                }
+            }
+            ModelPattern::Not(_inner, _) => {
+                continue;
+            }
+            ModelPattern::Recover { body, .. } => {
+                collect_first_from_sequence(
+                    std::slice::from_ref(body),
+                    first_sets,
+                    nullable_rules,
+                    acc,
+                );
+            }
+            _ => {}
+        }
     }
 }
 
