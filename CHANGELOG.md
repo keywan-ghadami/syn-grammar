@@ -21,6 +21,11 @@ All notable changes to this project will be documented in this file.
 - **Architecture**: Introduced `Backend` trait and `CommonBuiltins` to decouple the grammar definition from the `syn` implementation, paving the way for other backends.
 - **ADR for Primitives**: Added an Architecture Decision Record (`docs/adr/adr1.md`) to document the design for handling character-level, byte-level, and token-level primitives across different backends.
 - **ADR for Portable Types**: Added an Architecture Decision Record (`docs/adr/adr2.md`) to document the design for portable types and explicit backend contracts.
+- **Higher-Order Generic Rules**: Added support for generic rules with untyped grammar parameters (patterns) and generic type parameters (e.g., `rule list<T>(item) -> Vec<T>`).
+- **Monomorphization**: Implemented compile-time monomorphization of generic rules, allowing the creation of reusable grammar patterns without runtime overhead.
+- **Generic Arguments in Rules**: Generic parameters now support standard Rust trait bounds, which are enforced on the inferred types.
+- **Numeric Argument Support**: Updated the parser to support numeric literals as arguments to rules (e.g., `value(10)`), enabling more flexible rule parameterization.
+- **ADR for Generic Rules**: Added an Architecture Decision Record (`docs/adr/adr3.md`) documenting the design of higher-order generic rules and macro-time monomorphization.
 - **Restored Tests**: Added back `test_rule_arguments` and `test_multiple_arguments` to ensure rule parameter functionality works as expected.
 
 ### Changed
