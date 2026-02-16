@@ -20,6 +20,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 - **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
 - **Rule Arguments**: Pass context or parameters between rules.
+- **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
 - **Grammar Inheritance**: Reuse rules from other grammars.
 - **Testing Utilities**: Fluent API for testing your parsers with pretty-printed error reporting.
 
@@ -166,7 +167,7 @@ grammar! {
 
 ### Rule Arguments
 
-Rules can accept arguments, allowing you to pass context or state down the parser chain.
+Rules can accept arguments, allowing you to pass context or state down the parser chain. These are **runtime parameters** (typed) that are passed to the generated function.
 
 ```rust
 use syn_grammar::grammar;
@@ -178,6 +179,53 @@ grammar! {
 
         rule value(offset: i32) -> i32 =
             i:i32 -> { i + offset }
+    }
+}
+```
+
+### Higher-Order Generic Rules
+
+You can define reusable grammar patterns using generic rules. These rules accept **grammar parameters** (untyped arguments representing patterns/rules) and **generic type parameters**.
+
+When a generic rule is used, the macro performs **monomorphization**: it creates a concrete version of the rule for the specific arguments provided.
+
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Generic {
+        // A generic rule `list` that parses zero or more `item`s.
+        // `item` is a grammar parameter (passed as a pattern).
+        // `T` is a type parameter, inferred from the return type of `item`.
+        rule list<T>(item) -> Vec<T> = 
+            items:item* -> { items }
+
+        pub rule integers -> Vec<i32> = 
+            // Reuse `list` with `i32` rule. 
+            // `T` is inferred as `i32`.
+            l:list(i32) -> { l }
+            
+        pub rule strings -> Vec<syn::LitStr> = 
+            // Reuse `list` with `lit_str` rule.
+            // `T` is inferred as `syn::LitStr`.
+            l:list(lit_str) -> { l }
+    }
+}
+```
+
+Generic parameters support standard Rust trait bounds, which are enforced on the inferred types.
+
+```rust
+use std::collections::HashMap;
+use std::hash::Hash;
+
+grammar! {
+    grammar Map {
+        rule map<K: Hash + Eq, V>(k, v) -> HashMap<K, V> =
+            entries:entry(k, v)* -> { entries.into_iter().collect() }
+
+        rule entry<K, V>(k, v) -> (K, V) =
+            key:k ":" val:v -> { (key, val) }
     }
 }
 ```
