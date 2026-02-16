@@ -24,8 +24,6 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
         .chain(builtin_names.iter().cloned())
         .collect();
 
-    // If the grammar inherits, we cannot validate rule calls exhaustively,
-    // as some rules are defined in the parent. We defer to the Rust compiler.
     let should_validate_rule_calls = grammar.inherits.is_none();
 
     if should_validate_rule_calls {
@@ -49,7 +47,7 @@ fn validate_rule(rule: &Rule, all_defs: &HashSet<String>) -> syn::Result<()> {
 fn validate_pattern_sequence(
     patterns: &[ModelPattern],
     all_defs: &HashSet<String>,
-    params: &[(syn::Ident, syn::Type)],
+    params: &[(syn::Ident, Option<syn::Type>)],
 ) -> syn::Result<()> {
     for pattern in patterns {
         validate_pattern(pattern, all_defs, params)?;
@@ -60,19 +58,23 @@ fn validate_pattern_sequence(
 fn validate_pattern(
     pattern: &ModelPattern,
     all_defs: &HashSet<String>,
-    params: &[(syn::Ident, syn::Type)],
+    params: &[(syn::Ident, Option<syn::Type>)],
 ) -> syn::Result<()> {
     match pattern {
         ModelPattern::RuleCall {
             rule_name, args: _, ..
         } => {
-            if !all_defs.contains(&rule_name.to_string()) {
+            // Check if rule_name is in all_defs OR in params (as a grammar parameter)
+            let is_param = params
+                .iter()
+                .any(|(p_name, ty)| p_name == rule_name && ty.is_none());
+
+            if !all_defs.contains(&rule_name.to_string()) && !is_param {
                 return Err(syn::Error::new(
                     rule_name.span(),
                     format!("Undefined rule: '{}'", rule_name),
                 ));
             }
-            // Argument count validation is now a separate pass.
         }
         ModelPattern::Repeat(inner, _)
         | ModelPattern::Plus(inner, _)
@@ -104,7 +106,6 @@ fn validate_pattern(
 }
 
 // Argument count validation
-// This is a separate pass because it needs the full rule map.
 fn validate_argument_counts(
     grammar: &GrammarDefinition,
     builtin_names: &HashSet<String>,
@@ -117,38 +118,73 @@ fn validate_argument_counts(
 
     for rule in &grammar.rules {
         for variant in &rule.variants {
-            for pattern in &variant.pattern {
-                if let ModelPattern::RuleCall {
-                    rule_name, args, ..
-                } = pattern
-                {
-                    let name_str = rule_name.to_string();
-                    if let Some(target_rule) = rule_map.get(&name_str) {
-                        if target_rule.params.len() != args.len() {
-                            return Err(syn::Error::new(
-                                rule_name.span(),
-                                format!(
-                                    "Rule '{}' expects {} argument(s), but got {}.",
-                                    rule_name,
-                                    target_rule.params.len(),
-                                    args.len()
-                                ),
-                            ));
-                        }
-                    } else {
-                        // It's a built-in or an inherited rule.
-                        // We can't validate args for inherited rules here, so we only check built-ins.
-                        let is_builtin = builtin_names.contains(&name_str);
+            // Recursive validation of arguments
+            validate_args_recursive(&variant.pattern, &rule_map, builtin_names)?;
+        }
+    }
+    Ok(())
+}
 
-                        if is_builtin && !args.is_empty() {
-                            return Err(syn::Error::new(
-                                rule_name.span(),
-                                format!("Built-in rule '{}' does not accept arguments.", rule_name,),
-                            ));
-                        }
+fn validate_args_recursive(
+    patterns: &[ModelPattern],
+    rule_map: &HashMap<String, &Rule>,
+    builtin_names: &HashSet<String>,
+) -> syn::Result<()> {
+    for pattern in patterns {
+        match pattern {
+            ModelPattern::RuleCall {
+                rule_name, args, ..
+            } => {
+                let name_str = rule_name.to_string();
+                if let Some(target_rule) = rule_map.get(&name_str) {
+                    if target_rule.params.len() != args.len() {
+                        return Err(syn::Error::new(
+                            rule_name.span(),
+                            format!(
+                                "Rule '{}' expects {} argument(s), but got {}.",
+                                rule_name,
+                                target_rule.params.len(),
+                                args.len()
+                            ),
+                        ));
+                    }
+                } else {
+                    let is_builtin = builtin_names.contains(&name_str);
+                    if is_builtin && !args.is_empty() {
+                        return Err(syn::Error::new(
+                            rule_name.span(),
+                            format!("Built-in rule '{}' does not accept arguments.", rule_name,),
+                        ));
                     }
                 }
+                // Recursively check arguments (they are patterns)
+                validate_args_recursive(args, rule_map, builtin_names)?;
             }
+            ModelPattern::Repeat(inner, _)
+            | ModelPattern::Plus(inner, _)
+            | ModelPattern::Optional(inner, _)
+            | ModelPattern::SpanBinding(inner, _, _)
+            | ModelPattern::Peek(inner, _) => {
+                validate_args_recursive(std::slice::from_ref(inner), rule_map, builtin_names)?;
+            }
+            ModelPattern::Not(inner, _) => {
+                validate_args_recursive(std::slice::from_ref(inner), rule_map, builtin_names)?;
+            }
+            ModelPattern::Group(variants, _) => {
+                for seq in variants {
+                    validate_args_recursive(seq, rule_map, builtin_names)?;
+                }
+            }
+            ModelPattern::Bracketed(seq, _)
+            | ModelPattern::Braced(seq, _)
+            | ModelPattern::Parenthesized(seq, _) => {
+                validate_args_recursive(seq, rule_map, builtin_names)?;
+            }
+            ModelPattern::Recover { body, sync, .. } => {
+                validate_args_recursive(std::slice::from_ref(body), rule_map, builtin_names)?;
+                validate_args_recursive(std::slice::from_ref(sync), rule_map, builtin_names)?;
+            }
+            _ => {}
         }
     }
     Ok(())
@@ -188,8 +224,11 @@ mod tests {
             }
         };
         let model = parse_model(input);
-        let err = validate::<TestBackend>(&model).unwrap_err();
-        assert_eq!(err.to_string(), "Undefined rule: 'undefined_rule'");
+        let err = validate::<TestBackend>(&model);
+        match err {
+            Ok(_) => panic!("Expected undefined rule error"),
+            Err(e) => assert_eq!(e.to_string(), "Undefined rule: 'undefined_rule'"),
+        }
     }
 
     #[test]
@@ -215,7 +254,6 @@ mod tests {
         };
         let model = parse_model(input);
 
-        // Locate the expected span: rule 'main' -> variant 0 -> pattern 0 ('sub(1)')
         let expected_span = model.rules[0].variants[0].pattern[0].span();
 
         let err = validate::<TestBackend>(&model).unwrap_err();
@@ -235,7 +273,6 @@ mod tests {
         };
         let model = parse_model(input);
 
-        // Locate the expected span: rule 'main' -> variant 0 -> pattern 0 ('ident(1)')
         let expected_span = model.rules[0].variants[0].pattern[0].span();
 
         let err = validate::<TestBackend>(&model).unwrap_err();

@@ -2,7 +2,7 @@ use crate::backend::SynBackend;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashSet;
-use syn::Result;
+use syn::{Lit, Result};
 use syn_grammar_model::{analysis, model::*, Backend};
 
 pub fn generate_sequence(
@@ -29,54 +29,61 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     match pattern {
         ModelPattern::Cut(_) => Ok(quote!()),
         ModelPattern::Lit(lit) => {
-            let token_types = analysis::resolve_token_types(lit, kws)?;
+            if let Lit::Str(lit) = lit {
+                let token_types = analysis::resolve_token_types(lit, kws)?;
 
-            if token_types.len() <= 1 {
-                let parses = token_types.iter().map(|ty| {
-                    quote! {
-                        let _t = input.parse::<#ty>()?;
-                        ctx.record_span(syn::spanned::Spanned::span(&_t));
-                    }
-                });
-                Ok(quote! { #(#parses)* })
-            } else {
-                let mut steps = Vec::new();
-                let mut checks = Vec::new();
-
-                for (i, ty) in token_types.iter().enumerate() {
-                    let var = format_ident!("_t{}", i);
-                    steps.push(quote! {
-                        let #var = input.parse::<#ty>()?;
+                if token_types.len() <= 1 {
+                    let parses = token_types.iter().map(|ty| {
+                        quote! {
+                            let _t = input.parse::<#ty>()?;
+                            ctx.record_span(syn::spanned::Spanned::span(&_t));
+                        }
                     });
+                    Ok(quote! { #(#parses)* })
+                } else {
+                    let mut steps = Vec::new();
+                    let mut checks = Vec::new();
 
-                    // Record span for the last token
-                    if i == token_types.len() - 1 {
+                    for (i, ty) in token_types.iter().enumerate() {
+                        let var = format_ident!("_t{}", i);
                         steps.push(quote! {
-                            ctx.record_span(syn::spanned::Spanned::span(&#var));
+                            let #var = input.parse::<#ty>()?;
                         });
+
+                        // Record span for the last token
+                        if i == token_types.len() - 1 {
+                            steps.push(quote! {
+                                ctx.record_span(syn::spanned::Spanned::span(&#var));
+                            });
+                        }
+
+                        if i > 0 {
+                            let prev = format_ident!("_t{}", i - 1);
+                            let err_msg =
+                                format!("expected '{}', found space between tokens", lit.value());
+                            checks.push(quote! {
+                                if #prev.span().end() != #var.span().start() {
+                                    return Err(syn::Error::new(
+                                        #var.span(),
+                                        #err_msg
+                                    ));
+                                }
+                            });
+                        }
                     }
 
-                    if i > 0 {
-                        let prev = format_ident!("_t{}", i - 1);
-                        let err_msg =
-                            format!("expected '{}', found space between tokens", lit.value());
-                        checks.push(quote! {
-                            if #prev.span().end() != #var.span().start() {
-                                return Err(syn::Error::new(
-                                    #var.span(),
-                                    #err_msg
-                                ));
-                            }
-                        });
-                    }
+                    Ok(quote! {
+                        {
+                            #(#steps)*
+                            #(#checks)*
+                        }
+                    })
                 }
-
-                Ok(quote! {
-                    {
-                        #(#steps)*
-                        #(#checks)*
-                    }
-                })
+            } else {
+                Err(syn::Error::new(
+                    lit.span(),
+                    "Non-string literals are not supported as matchers.",
+                ))
             }
         }
         ModelPattern::RuleCall {
@@ -638,12 +645,26 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     }
 }
 
-fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[syn::Lit]) -> TokenStream {
+fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[ModelPattern]) -> TokenStream {
     // Call the _impl version and pass ctx
     let f = format_ident!("parse_{}_impl", rule_name);
-    if args.is_empty() {
+
+    let arg_exprs: Vec<TokenStream> = args
+        .iter()
+        .map(|arg| match arg {
+            ModelPattern::Lit(l) => quote!(#l),
+            ModelPattern::RuleCall {
+                rule_name, args, ..
+            } if args.is_empty() => {
+                quote!(#rule_name)
+            }
+            _ => quote!(compile_error!("Complex pattern used as runtime argument")),
+        })
+        .collect();
+
+    if arg_exprs.is_empty() {
         quote!(#f(&mut input, ctx)?)
     } else {
-        quote!(#f(&mut input, ctx, #(#args),*)?)
+        quote!(#f(&mut input, ctx, #(#arg_exprs),*)?)
     }
 }

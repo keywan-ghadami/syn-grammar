@@ -1,8 +1,7 @@
-// Entire file content ...
 // Moved from macros/src/parser.rs
 use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::{token, Attribute, Ident, ItemUse, Lit, LitStr, Result, Token, Type};
+use syn::{token, Attribute, Generics, Ident, ItemUse, Lit, Result, Token, Type};
 
 mod rt {
     use syn::ext::IdentExt;
@@ -89,17 +88,19 @@ impl Parse for InheritanceSpec {
 
 pub struct RuleParameter {
     pub name: Ident,
-    pub _colon: Token![:],
-    pub ty: Type,
+    pub ty: Option<Type>,
 }
 
 impl Parse for RuleParameter {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(RuleParameter {
-            name: input.parse()?,
-            _colon: input.parse()?,
-            ty: input.parse()?,
-        })
+        let name: Ident = input.parse()?;
+        let ty = if input.peek(Token![:]) {
+            let _ = input.parse::<Token![:]>()?;
+            Some(input.parse()?)
+        } else {
+            None
+        };
+        Ok(RuleParameter { name, ty })
     }
 }
 
@@ -107,6 +108,7 @@ pub struct Rule {
     pub attrs: Vec<Attribute>,
     pub is_pub: Option<Token![pub]>,
     pub name: Ident,
+    pub generics: Generics,
     pub params: Vec<RuleParameter>,
     pub return_type: Type,
     pub variants: Vec<RuleVariant>,
@@ -124,6 +126,9 @@ impl Parse for Rule {
 
         let _ = input.parse::<kw::rule>()?;
         let name = rt::parse_ident(input)?;
+
+        // Parse generics if present (e.g., <T, U>)
+        let generics: Generics = input.parse()?;
 
         let params = if input.peek(token::Paren) {
             let content;
@@ -150,6 +155,7 @@ impl Parse for Rule {
             attrs,
             is_pub,
             name,
+            generics,
             params,
             return_type,
             variants,
@@ -202,11 +208,11 @@ impl RuleVariant {
 #[derive(Debug, Clone)]
 pub enum Pattern {
     Cut(Token![=>]),
-    Lit(LitStr),
+    Lit(Lit),
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
-        args: Vec<Lit>,
+        args: Vec<Pattern>,
     },
     Group(Vec<Vec<Pattern>>, token::Paren),
     Bracketed(Vec<Pattern>, token::Bracket),
@@ -266,7 +272,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         }
         let token = input.parse::<Token![=>]>()?;
         Ok(Pattern::Cut(token))
-    } else if input.peek(LitStr) {
+    } else if input.peek(Lit) {
         if binding.is_some() {
             return Err(input
                 .error("Literals cannot be bound directly (wrap in a rule or group if needed)."));
@@ -347,7 +353,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
     }
 }
 
-fn parse_args(input: ParseStream) -> Result<Vec<Lit>> {
+fn parse_args(input: ParseStream) -> Result<Vec<Pattern>> {
     let mut args = Vec::new();
     if input.peek(token::Paren) {
         let content;

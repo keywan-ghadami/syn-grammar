@@ -9,6 +9,7 @@ use syn_grammar_model::parse_grammar;
 // Include modules
 mod backend;
 mod codegen;
+mod monomorphize;
 
 use backend::SynBackend;
 
@@ -31,10 +32,14 @@ use backend::SynBackend;
 pub fn grammar(input: TokenStream) -> TokenStream {
     // 1-3. Reusable pipeline: Parse, Transform, Validate
     // We convert proc_macro::TokenStream to proc_macro2::TokenStream via .into()
-    let m_ast = match parse_grammar::<SynBackend>(input.into()) {
+    let mut m_ast = match parse_grammar::<SynBackend>(input.into()) {
         Ok(ast) => ast,
         Err(e) => return e.to_compile_error().into(),
     };
+
+    // 3.5. Monomorphization
+    let monomorphizer = monomorphize::Monomorphizer::new(m_ast.rules);
+    m_ast.rules = monomorphizer.process();
 
     // 4. Code Generation: From model to finished Rust code (codegen.rs)
     match codegen::generate_rust(m_ast) {

@@ -8,7 +8,7 @@ pub use types::*;
 use crate::parser;
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned as _;
-use syn::{Attribute, Ident, ItemUse, Lit, LitStr, Type};
+use syn::{Attribute, Generics, Ident, ItemUse, Lit, Type};
 
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
@@ -23,7 +23,8 @@ pub struct Rule {
     pub attrs: Vec<Attribute>,
     pub is_pub: bool,
     pub name: Ident,
-    pub params: Vec<(Ident, Type)>,
+    pub generics: Generics,
+    pub params: Vec<(Ident, Option<Type>)>,
     pub return_type: Type,
     pub variants: Vec<RuleVariant>,
 }
@@ -37,11 +38,11 @@ pub struct RuleVariant {
 #[derive(Debug, Clone)]
 pub enum ModelPattern {
     Cut(Span),
-    Lit(LitStr),
+    Lit(Lit),
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
-        args: Vec<Lit>,
+        args: Vec<ModelPattern>,
     },
     Group(Vec<Vec<ModelPattern>>, Span),
     Bracketed(Vec<ModelPattern>, Span),
@@ -78,6 +79,7 @@ impl From<parser::Rule> for Rule {
             attrs: p.attrs,
             is_pub: p.is_pub.is_some(),
             name: p.name,
+            generics: p.generics,
             params: p
                 .params
                 .into_iter()
@@ -111,7 +113,7 @@ impl From<parser::Pattern> for ModelPattern {
             } => ModelPattern::RuleCall {
                 binding,
                 rule_name,
-                args,
+                args: args.into_iter().map(ModelPattern::from).collect(),
             },
             P::Group(alts, token) => ModelPattern::Group(
                 alts.into_iter()

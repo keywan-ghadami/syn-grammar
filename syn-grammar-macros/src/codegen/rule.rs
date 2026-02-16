@@ -11,6 +11,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let impl_name = format_ident!("parse_{}_impl", name);
     let ret_type = &rule.return_type;
     let attrs = &rule.attrs;
+    let generics = &rule.generics; // Include where clause if present
 
     // Filter attributes for the implementation function
     // Structural & Lint attributes must be on both.
@@ -39,18 +40,14 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let params: Vec<_> = rule
         .params
         .iter()
-        .map(|(name, ty)| {
-            quote! { , #name : #ty }
-        })
+        .filter_map(|(name, ty)| ty.as_ref().map(|t| quote! { , #name : #t }))
         .collect();
 
     // Params for the impl call (forwarding arguments)
     let param_names: Vec<_> = rule
         .params
         .iter()
-        .map(|(name, _)| {
-            quote! { , #name }
-        })
+        .filter_map(|(name, ty)| ty.as_ref().map(|_| quote! { , #name }))
         .collect();
 
     let is_public = rule.is_pub || name == "main";
@@ -58,6 +55,9 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
 
     // Check for direct left recursion
     let (recursive_refs, base_refs) = analysis::split_left_recursive(name, &rule.variants);
+
+    // Add where clause from generics
+    let where_clause = &generics.where_clause;
 
     let body = if recursive_refs.is_empty() {
         generate_variants_internal(&rule.variants, true, custom_keywords)?
@@ -93,7 +93,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     Ok(quote! {
         #(#attrs)*
         #default_doc
-        #vis fn #fn_name(input: ParseStream #(#params)*) -> Result<#ret_type> {
+        #vis fn #fn_name(input: ParseStream #(#params)*) -> Result<#ret_type> #where_clause {
             let mut ctx = rt::ParseContext::new();
             match #impl_name(input, &mut ctx #(#param_names)*) {
                 Ok(val) => Ok(val),
@@ -109,7 +109,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
 
         #[doc(hidden)]
         #(#impl_attrs)*
-        pub fn #impl_name(mut input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> {
+        pub fn #impl_name(mut input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> #where_clause {
             ctx.enter_rule(stringify!(#name));
             let res = (|| -> syn::Result<#ret_type> {
                 #body

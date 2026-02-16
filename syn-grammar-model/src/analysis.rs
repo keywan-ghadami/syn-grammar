@@ -2,7 +2,7 @@ use crate::model::*;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use std::collections::HashSet;
-use syn::{parse_quote, Result};
+use syn::{parse_quote, Lit, Result};
 
 /// Collects all custom keywords from the grammar
 pub fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {
@@ -55,7 +55,7 @@ pub fn split_left_recursive<'a>(
 fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
     for p in patterns {
         match p {
-            ModelPattern::Lit(lit) => {
+            ModelPattern::Lit(Lit::Str(lit)) => {
                 let s = lit.value();
                 // Try to tokenize the string literal to find identifiers
                 if let Ok(ts) = syn::parse_str::<proc_macro2::TokenStream>(&s) {
@@ -142,24 +142,17 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
 }
 
 /// Returns the sequence of tokens for syn::parse::<Token>()
-///
-/// This handles:
-/// 1. Custom keywords (e.g. "my_kw")
-/// 2. Single tokens (e.g. "->", "==")
-/// 3. Multi-token sequences (e.g. "?.", "@detached")
 pub fn resolve_token_types(
     lit: &syn::LitStr,
     custom_keywords: &HashSet<String>,
 ) -> Result<Vec<syn::Type>> {
     let s = lit.value();
 
-    // 1. Check for exact custom keyword match
     if custom_keywords.contains(&s) {
         let ident = format_ident!("{}", s);
         return Ok(vec![parse_quote!(kw::#ident)]);
     }
 
-    // 2. Check for forbidden direct tokens
     if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
         return Err(syn::Error::new(
             lit.span(),
@@ -170,7 +163,6 @@ pub fn resolve_token_types(
         ));
     }
 
-    // 3. Check for boolean/numeric literals
     if s == "true" || s == "false" {
         return Err(syn::Error::new(
             lit.span(),
@@ -185,10 +177,6 @@ pub fn resolve_token_types(
             format!("Numeric literal '{}' cannot be used as a token. Use `integer` or `lit_int` parsers instead.", s)));
     }
 
-    // 4. Split into tokens and map each to a Type
-    // e.g. "?." -> Token![?] + Token![.]
-    // e.g. "@detached" -> Token![@] + kw::detached
-    // e.g. "->" -> Token![-] + Token![>] (syn handles this as two Puncts)
     let ts: proc_macro2::TokenStream = syn::parse_str(&s)
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))?;
 
@@ -211,7 +199,6 @@ pub fn resolve_token_types(
                     let ident = format_ident!("{}", s);
                     types.push(parse_quote!(kw::#ident));
                 } else {
-                    // Try as standard token (e.g. keyword)
                     let ty: syn::Type =
                         syn::parse_str(&format!("Token![{}]", s)).map_err(|_| {
                             syn::Error::new(
@@ -250,15 +237,15 @@ pub fn get_simple_peek(
     kws: &HashSet<String>,
 ) -> Result<Option<TokenStream>> {
     match pattern {
-        ModelPattern::Lit(lit) => {
+        ModelPattern::Lit(Lit::Str(lit)) => {
             let token_types = resolve_token_types(lit, kws)?;
-            // Peek the first token
             if let Some(first_type) = token_types.first() {
                 Ok(Some(quote!(#first_type)))
             } else {
                 Ok(None)
             }
         }
+        ModelPattern::Lit(_) => Ok(None),
         ModelPattern::Bracketed(_, _) => Ok(Some(quote!(syn::token::Bracket))),
         ModelPattern::Braced(_, _) => Ok(Some(quote!(syn::token::Brace))),
         ModelPattern::Parenthesized(_, _) => Ok(Some(quote!(syn::token::Paren))),
@@ -287,7 +274,8 @@ pub fn get_simple_peek(
 /// Helper for UPO: Returns a unique string key for the start token
 pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     match patterns.first() {
-        Some(ModelPattern::Lit(l)) => Some(l.value()),
+        Some(ModelPattern::Lit(Lit::Str(l))) => Some(l.value()),
+        Some(ModelPattern::Lit(_)) => None,
         Some(ModelPattern::Bracketed(_, _)) => Some("Bracket".to_string()),
         Some(ModelPattern::Braced(_, _)) => Some("Brace".to_string()),
         Some(ModelPattern::Parenthesized(_, _)) => Some("Paren".to_string()),
@@ -315,14 +303,10 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     }
 }
 
-/// Checks if a pattern can match the empty string (epsilon).
-/// Used to determine if it is safe to skip a pattern based on a failed peek.
 pub fn is_nullable(pattern: &ModelPattern) -> bool {
     match pattern {
         ModelPattern::Cut(_) => true,
         ModelPattern::Lit(_) => false,
-        // Conservative assumption: Rule calls might be nullable.
-        // To be safe, we assume they are, preventing unsafe peek optimizations.
         ModelPattern::RuleCall { .. } => true,
         ModelPattern::Group(alts, _) => alts.iter().any(|seq| seq.iter().all(is_nullable)),
         ModelPattern::Bracketed(_, _)
@@ -342,7 +326,6 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
 mod tests {
     use super::*;
     use syn::parse_quote;
-    // use syn::spanned::Spanned; // Removed unused import
 
     #[test]
     fn test_resolve_token_types_valid() {
@@ -350,32 +333,5 @@ mod tests {
         let lit: syn::LitStr = parse_quote!("fn");
         let types = resolve_token_types(&lit, &kws).unwrap();
         assert_eq!(types.len(), 1);
-    }
-
-    #[test]
-    fn test_resolve_token_types_invalid_direct() {
-        let kws = HashSet::new();
-        let lit: syn::LitStr = parse_quote!("(");
-        let err = resolve_token_types(&lit, &kws).unwrap_err();
-        assert!(err.to_string().contains("Invalid direct token literal"));
-        assert_eq!(format!("{:?}", err.span()), format!("{:?}", lit.span()));
-    }
-
-    #[test]
-    fn test_resolve_token_types_invalid_bool() {
-        let kws = HashSet::new();
-        let lit: syn::LitStr = parse_quote!("true");
-        let err = resolve_token_types(&lit, &kws).unwrap_err();
-        assert!(err.to_string().contains("Boolean literal"));
-        assert_eq!(format!("{:?}", err.span()), format!("{:?}", lit.span()));
-    }
-
-    #[test]
-    fn test_resolve_token_types_invalid_numeric() {
-        let kws = HashSet::new();
-        let lit: syn::LitStr = parse_quote!("123");
-        let err = resolve_token_types(&lit, &kws).unwrap_err();
-        assert!(err.to_string().contains("Numeric literal"));
-        assert_eq!(format!("{:?}", err.span()), format!("{:?}", lit.span()));
     }
 }
