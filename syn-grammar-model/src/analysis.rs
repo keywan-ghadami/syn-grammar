@@ -615,6 +615,7 @@ fn compute_first_sets_and_warnings(
         first_sets.insert(rule.name.to_string(), HashSet::new());
     }
 
+    // 1. Compute Nullable Fixpoint for FIRST sets
     let mut changed = true;
     while changed {
         changed = false;
@@ -639,31 +640,28 @@ fn compute_first_sets_and_warnings(
         }
     }
 
+    // 2. Generate Shadowing Warnings (Exact Duplicate and Prefix Shadowing)
     for rule in &grammar.rules {
         for (i, v1) in rule.variants.iter().enumerate() {
-            let mut first_v1 = HashSet::new();
-            collect_first_from_sequence(&v1.pattern, &first_sets, nullable_rules, &mut first_v1);
-
+            // Check against subsequent variants
             for (j, v2) in rule.variants.iter().enumerate().skip(i + 1) {
-                let mut first_v2 = HashSet::new();
-                collect_first_from_sequence(
-                    &v2.pattern,
-                    &first_sets,
-                    nullable_rules,
-                    &mut first_v2,
-                );
-
-                let intersection: Vec<_> = first_v1.intersection(&first_v2).collect();
-                if !intersection.is_empty() {
-                    let mut intersection_sorted =
-                        intersection.iter().map(|s| s.as_str()).collect::<Vec<_>>();
-                    intersection_sorted.sort();
+                if sequence_structure_eq(&v1.pattern, &v2.pattern) {
                     warnings.push(format!(
-                        "Rule '{}': Alternative {} and {} have overlapping first tokens: {:?}",
+                        "Rule '{}': Alternative {} and {} are identical. Alternative {} is dead code.",
                         rule.name,
                         i + 1,
                         j + 1,
-                        intersection_sorted
+                        j + 1
+                    ));
+                    continue; // No need to check prefix if identical
+                }
+
+                if sequence_is_prefix(&v1.pattern, &v2.pattern) {
+                    warnings.push(format!(
+                        "Rule '{}': Alternative {} shadows Alternative {} (prefix). Swap the order for longest-match.",
+                        rule.name,
+                        i + 1,
+                        j + 1
                     ));
                 }
             }
@@ -771,6 +769,87 @@ fn collect_first_from_sequence(
             }
             _ => {}
         }
+    }
+}
+
+// ==============================================================================
+//  Shadowing / Dead Code Analysis Helpers
+// ==============================================================================
+
+fn peel(p: &ModelPattern) -> &ModelPattern {
+    match p {
+        ModelPattern::SpanBinding(inner, _, _) => peel(inner),
+        _ => p,
+    }
+}
+
+fn sequence_structure_eq(seq1: &[ModelPattern], seq2: &[ModelPattern]) -> bool {
+    if seq1.len() != seq2.len() {
+        return false;
+    }
+    seq1.iter()
+        .zip(seq2.iter())
+        .all(|(p1, p2)| pattern_structure_eq(p1, p2))
+}
+
+fn sequence_is_prefix(prefix: &[ModelPattern], full: &[ModelPattern]) -> bool {
+    if prefix.len() >= full.len() {
+        return false;
+    }
+    prefix
+        .iter()
+        .zip(full.iter())
+        .all(|(p1, p2)| pattern_structure_eq(p1, p2))
+}
+
+fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
+    let p1 = peel(p1);
+    let p2 = peel(p2);
+
+    match (p1, p2) {
+        (ModelPattern::Cut(_), ModelPattern::Cut(_)) => true,
+        (ModelPattern::Lit(l1), ModelPattern::Lit(l2)) => l1 == l2,
+        (
+            ModelPattern::RuleCall {
+                rule_name: r1,
+                args: a1,
+                ..
+            },
+            ModelPattern::RuleCall {
+                rule_name: r2,
+                args: a2,
+                ..
+            },
+        ) => r1 == r2 && sequence_structure_eq(a1, a2),
+        (ModelPattern::Group(g1, _), ModelPattern::Group(g2, _)) => {
+            if g1.len() != g2.len() {
+                return false;
+            }
+            g1.iter()
+                .zip(g2.iter())
+                .all(|(s1, s2)| sequence_structure_eq(s1, s2))
+        }
+        (ModelPattern::Bracketed(inner1, _), ModelPattern::Bracketed(inner2, _))
+        | (ModelPattern::Braced(inner1, _), ModelPattern::Braced(inner2, _))
+        | (ModelPattern::Parenthesized(inner1, _), ModelPattern::Parenthesized(inner2, _)) => {
+            sequence_structure_eq(inner1, inner2)
+        }
+        (ModelPattern::Optional(inner1, _), ModelPattern::Optional(inner2, _))
+        | (ModelPattern::Repeat(inner1, _), ModelPattern::Repeat(inner2, _))
+        | (ModelPattern::Plus(inner1, _), ModelPattern::Plus(inner2, _))
+        | (ModelPattern::Peek(inner1, _), ModelPattern::Peek(inner2, _))
+        | (ModelPattern::Not(inner1, _), ModelPattern::Not(inner2, _)) => {
+            pattern_structure_eq(inner1, inner2)
+        }
+        (
+            ModelPattern::Recover {
+                body: b1, sync: s1, ..
+            },
+            ModelPattern::Recover {
+                body: b2, sync: s2, ..
+            },
+        ) => pattern_structure_eq(b1, b2) && pattern_structure_eq(s1, s2),
+        _ => false,
     }
 }
 
