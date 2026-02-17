@@ -27,10 +27,12 @@ All notable changes to this project will be documented in this file.
 - **Numeric Argument Support**: Updated the parser to support numeric literals as arguments to rules (e.g., `value(10)`), enabling more flexible rule parameterization.
 - **ADR for Generic Rules**: Added an Architecture Decision Record (`docs/adr/adr3.md`) documenting the design of higher-order generic rules and macro-time monomorphization.
 - **Restored Tests**: Added back `test_rule_arguments` and `test_multiple_arguments` to ensure rule parameter functionality works as expected.
+- **Shadowing Detection**: Compile-time validation now reports errors when a grammar rule alternative is shadowed by a previous prefix alternative or is an exact duplicate.
 
 ### Changed
 - **Backend-Agnostic Model**: The `syn-grammar-model` crate now exposes `parse_grammar_with_builtins`. This allows backend authors to validate grammars against their own set of built-in rules.
 - **Backend Author Guide**: `EXTENDING.md` has been rewritten to focus on how to build custom parser generator backends using `syn-grammar` as the frontend DSL.
+- **Validation Errors**: Shadowing and duplicate alternatives are now treated as hard errors instead of warnings to ensure grammar correctness.
 
 ### Fixed
 - **Repetition Syntax**: Fixed a regression where repetition patterns were incorrectly requiring brackets `[...]` instead of parentheses `(...)`.

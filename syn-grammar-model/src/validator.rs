@@ -69,9 +69,13 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
             }
         }
 
-        // 3. Warn about Ambiguity
-        for warning in &analysis.warnings {
-            eprintln!("warning: {}", warning);
+        // 3. Shadowing / Ambiguity Errors
+        if !analysis.errors.is_empty() {
+            let mut err = analysis.errors[0].clone();
+            for error in analysis.errors.iter().skip(1) {
+                err.combine(error.clone());
+            }
+            return Err(err);
         }
     }
 
@@ -322,5 +326,50 @@ mod tests {
             "Built-in rule 'ident' does not accept arguments."
         );
         assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
+    }
+
+    #[test]
+    fn test_shadowing_identical() {
+        let input = quote! {
+            grammar test {
+                rule main -> ()
+                    = "a" -> { () }
+                    | "a" -> { () }
+            }
+        };
+        let model = parse_model(input);
+        let err = validate::<TestBackend>(&model).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Alternative 1 and 2 are identical"));
+    }
+
+    #[test]
+    fn test_shadowing_prefix() {
+        let input = quote! {
+            grammar test {
+                rule main -> ()
+                    = "a" -> { () }
+                    | "a" "b" -> { () }
+            }
+        };
+        let model = parse_model(input);
+        let err = validate::<TestBackend>(&model).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Alternative 1 shadows Alternative 2"));
+    }
+
+    #[test]
+    fn test_no_shadowing() {
+        let input = quote! {
+            grammar test {
+                rule main -> ()
+                    = "a" "b" -> { () }
+                    | "a" -> { () }
+            }
+        };
+        let model = parse_model(input);
+        validate::<TestBackend>(&model).unwrap();
     }
 }

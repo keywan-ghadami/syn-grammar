@@ -331,7 +331,7 @@ pub struct GrammarAnalysis {
     pub cycles: Vec<Vec<String>>,
     pub unused_rules: HashSet<String>,
     pub first_sets: HashMap<String, HashSet<String>>,
-    pub warnings: Vec<String>,
+    pub errors: Vec<syn::Error>,
 }
 
 pub fn analyze_grammar(grammar: &GrammarDefinition) -> GrammarAnalysis {
@@ -368,15 +368,15 @@ pub fn analyze_grammar(grammar: &GrammarDefinition) -> GrammarAnalysis {
     // 3. Unused Rules
     let unused_rules = find_unused_rules(grammar);
 
-    // 4. FIRST sets and Ambiguity
-    let (first_sets, warnings) = compute_first_sets_and_warnings(grammar, &nullable_rules);
+    // 4. FIRST sets and Errors
+    let (first_sets, errors) = compute_first_sets_and_errors(grammar, &nullable_rules);
 
     GrammarAnalysis {
         nullable_rules,
         cycles,
         unused_rules,
         first_sets,
-        warnings,
+        errors,
     }
 }
 
@@ -604,12 +604,12 @@ fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F)
     }
 }
 
-fn compute_first_sets_and_warnings(
+fn compute_first_sets_and_errors(
     grammar: &GrammarDefinition,
     nullable_rules: &HashSet<String>,
-) -> (HashMap<String, HashSet<String>>, Vec<String>) {
+) -> (HashMap<String, HashSet<String>>, Vec<syn::Error>) {
     let mut first_sets: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
 
     for rule in &grammar.rules {
         first_sets.insert(rule.name.to_string(), HashSet::new());
@@ -640,35 +640,48 @@ fn compute_first_sets_and_warnings(
         }
     }
 
-    // 2. Generate Shadowing Warnings (Exact Duplicate and Prefix Shadowing)
+    // 2. Generate Shadowing Errors (Exact Duplicate and Prefix Shadowing)
     for rule in &grammar.rules {
         for (i, v1) in rule.variants.iter().enumerate() {
             // Check against subsequent variants
             for (j, v2) in rule.variants.iter().enumerate().skip(i + 1) {
+                // Determine span for error reporting
+                let span = if let Some(first_pat) = v2.pattern.first() {
+                    first_pat.span()
+                } else {
+                    rule.name.span()
+                };
+
                 if sequence_structure_eq(&v1.pattern, &v2.pattern) {
-                    warnings.push(format!(
-                        "Rule '{}': Alternative {} and {} are identical. Alternative {} is dead code.",
-                        rule.name,
-                        i + 1,
-                        j + 1,
-                        j + 1
+                    errors.push(syn::Error::new(
+                        span,
+                        format!(
+                            "Rule '{}': Alternative {} and {} are identical. Alternative {} is dead code.",
+                            rule.name,
+                            i + 1,
+                            j + 1,
+                            j + 1
+                        )
                     ));
                     continue; // No need to check prefix if identical
                 }
 
                 if sequence_is_prefix(&v1.pattern, &v2.pattern) {
-                    warnings.push(format!(
-                        "Rule '{}': Alternative {} shadows Alternative {} (prefix). Swap the order for longest-match.",
-                        rule.name,
-                        i + 1,
-                        j + 1
+                    errors.push(syn::Error::new(
+                        span,
+                        format!(
+                            "Rule '{}': Alternative {} shadows Alternative {} (prefix). Swap the order for longest-match.",
+                            rule.name,
+                            i + 1,
+                            j + 1
+                        )
                     ));
                 }
             }
         }
     }
 
-    (first_sets, warnings)
+    (first_sets, errors)
 }
 
 fn collect_first_from_sequence(

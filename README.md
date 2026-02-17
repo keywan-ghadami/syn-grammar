@@ -22,6 +22,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Rule Arguments**: Pass context or parameters between rules.
 - **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
 - **Grammar Inheritance**: Reuse rules from other grammars.
+- **Shadowing Detection**: Compile-time detection of shadowed alternatives and dead code (e.g., putting a shorter match before a longer one).
 - **Testing Utilities**: Fluent API for testing your parsers with pretty-printed error reporting.
 
 ## Installation
@@ -609,6 +610,22 @@ grammar! {
         rule term -> i32 = i:i32 -> { i }
     }
 }
+```
+
+### Shadowing Detection
+
+Recursive descent parsers evaluate alternatives in order. If an earlier alternative is a prefix of a later one (e.g., `rule = "a" | "a" "b"`), the later alternative might never be reached (dead code) or might be shadowed (the parser consumes "a" and returns, never trying "a" then "b").
+
+`syn-grammar` analyzes your grammar at compile time and emits errors if it detects:
+- **Exact Duplicates**: Two alternatives are identical.
+- **Prefix Shadowing**: An earlier alternative is a proper prefix of a later one (and thus shadows it).
+
+To fix shadowing, ensure longer/more specific alternatives come first.
+
+```rust,ignore
+rule main 
+    = "a" "b" ... // Longer first
+    | "a" ...     // Shorter second
 ```
 
 ### Backtracking
