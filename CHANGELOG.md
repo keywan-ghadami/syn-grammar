@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1]
+
+### Fixed
+- **Typed Parameter Validation**: Fixed a bug where rule parameters with explicit types (e.g., `rule list<T>(item: Type)`) were incorrectly flagged as "Undefined rule" by the validator. The validator now correctly recognizes all parameters, regardless of whether they have explicit types or not.
+
 ## [0.7.0]
 
 ### Added

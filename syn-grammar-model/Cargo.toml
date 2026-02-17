@@ -1,6 +1,6 @@
 [package]
 name = "syn-grammar-model"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 description = "Shared model and parser for syn-grammar"
 license = "MIT OR Apache-2.0"
