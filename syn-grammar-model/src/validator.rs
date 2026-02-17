@@ -110,9 +110,7 @@ fn validate_pattern(
             rule_name, args: _, ..
         } => {
             // Check if rule_name is in all_defs OR in params (as a grammar parameter)
-            let is_param = params
-                .iter()
-                .any(|(p_name, ty)| p_name == rule_name && ty.is_none());
+            let is_param = params.iter().any(|(p_name, _)| p_name == rule_name);
 
             if !all_defs.contains(&rule_name.to_string()) && !is_param {
                 return Err(syn::Error::new(
@@ -371,5 +369,17 @@ mod tests {
         };
         let model = parse_model(input);
         validate::<TestBackend>(&model).unwrap();
+    }
+
+    #[test]
+    fn test_bug_typed_param() {
+        let input = quote! {
+            grammar test {
+                rule list<T>(item: Type) -> () = item -> { () }
+            }
+        };
+        let model = parse_model(input);
+        // This fails in 0.7.0 with "Undefined rule: 'item'"
+        validate::<TestBackend>(&model).expect("Validation failed for typed parameter");
     }
 }
