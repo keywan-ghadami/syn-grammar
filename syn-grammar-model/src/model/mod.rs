@@ -38,7 +38,10 @@ pub struct RuleVariant {
 #[derive(Debug, Clone)]
 pub enum ModelPattern {
     Cut(Span),
-    Lit(Lit),
+    Lit {
+        binding: Option<Ident>,
+        lit: Lit,
+    },
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
@@ -105,7 +108,7 @@ impl From<parser::Pattern> for ModelPattern {
         use parser::Pattern as P;
         match p {
             P::Cut(t) => ModelPattern::Cut(t.span()),
-            P::Lit(l) => ModelPattern::Lit(l),
+            P::Lit { binding, lit } => ModelPattern::Lit { binding, lit },
             P::RuleCall {
                 binding,
                 rule_name,
@@ -164,7 +167,7 @@ impl ModelPattern {
     pub fn span(&self) -> Span {
         match self {
             ModelPattern::Cut(s) => *s,
-            ModelPattern::Lit(l) => l.span(),
+            ModelPattern::Lit { lit, .. } => lit.span(),
             ModelPattern::RuleCall { rule_name, .. } => rule_name.span(),
             ModelPattern::Optional(_, s)
             | ModelPattern::Repeat(_, s)

@@ -201,7 +201,7 @@ impl Monomorphizer {
 
     fn infer_type(&self, pattern: &ModelPattern) -> Option<Type> {
         match pattern {
-            ModelPattern::Lit(_) => Some(parse_quote!(())),
+            ModelPattern::Lit { .. } => Some(parse_quote!(())),
             ModelPattern::RuleCall { rule_name, .. } => self.rule_types.get(rule_name).cloned(),
             _ => None,
         }

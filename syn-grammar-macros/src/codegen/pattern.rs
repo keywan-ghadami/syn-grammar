@@ -28,27 +28,36 @@ pub fn generate_sequence_steps(
 fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Result<TokenStream> {
     match pattern {
         ModelPattern::Cut(_) => Ok(quote!()),
-        ModelPattern::Lit(lit) => {
+        ModelPattern::Lit { binding, lit } => {
             if let Lit::Str(lit) = lit {
                 let token_types = analysis::resolve_token_types(lit, kws)?;
 
                 if token_types.len() <= 1 {
                     let parses = token_types.iter().map(|ty| {
-                        quote! {
-                            let _t = input.parse::<#ty>()?;
-                            ctx.record_span(syn::spanned::Spanned::span(&_t));
+                        if let Some(bind) = binding {
+                            quote! {
+                                let #bind = input.parse::<#ty>()?;
+                                ctx.record_span(syn::spanned::Spanned::span(&#bind));
+                            }
+                        } else {
+                            quote! {
+                                let _t = input.parse::<#ty>()?;
+                                ctx.record_span(syn::spanned::Spanned::span(&_t));
+                            }
                         }
                     });
                     Ok(quote! { #(#parses)* })
                 } else {
                     let mut steps = Vec::new();
                     let mut checks = Vec::new();
+                    let mut results = Vec::new();
 
                     for (i, ty) in token_types.iter().enumerate() {
                         let var = format_ident!("_t{}", i);
                         steps.push(quote! {
                             let #var = input.parse::<#ty>()?;
                         });
+                        results.push(var.clone());
 
                         // Record span for the last token
                         if i == token_types.len() - 1 {
@@ -72,10 +81,17 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         }
                     }
 
+                    let bind_stmt = if let Some(bind) = binding {
+                        quote! { let #bind = ( #(#results),* ); }
+                    } else {
+                        quote! {}
+                    };
+
                     Ok(quote! {
                         {
                             #(#steps)*
                             #(#checks)*
+                            #bind_stmt
                         }
                     })
                 }
@@ -506,10 +522,22 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         (Box::new(new_inner), temp)
                     }
                 }
+                ModelPattern::Lit { binding, lit } => {
+                    if let Some(b) = binding {
+                        (inner.clone(), b.clone())
+                    } else {
+                        let temp = format_ident!("_val_{}", span_var);
+                        let new_inner = ModelPattern::Lit {
+                            binding: Some(temp.clone()),
+                            lit: lit.clone(),
+                        };
+                        (Box::new(new_inner), temp)
+                    }
+                }
                 _ => {
                     return Err(syn::Error::new(
                         span_var.span(),
-                        "Span binding (@) is currently only supported on rule calls and recover() blocks.",
+                        "Span binding (@) is currently only supported on rule calls, recover() blocks and literals.",
                     ));
                 }
             };
@@ -652,7 +680,7 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[ModelPattern]) -> Tok
     let arg_exprs: Vec<TokenStream> = args
         .iter()
         .map(|arg| match arg {
-            ModelPattern::Lit(l) => quote!(#l),
+            ModelPattern::Lit { lit, .. } => quote!(#lit),
             ModelPattern::RuleCall {
                 rule_name, args, ..
             } if args.is_empty() => {

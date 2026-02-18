@@ -55,7 +55,9 @@ pub fn split_left_recursive<'a>(
 fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
     for p in patterns {
         match p {
-            ModelPattern::Lit(Lit::Str(lit)) => {
+            ModelPattern::Lit {
+                lit: Lit::Str(lit), ..
+            } => {
                 let s = lit.value();
                 // Try to tokenize the string literal to find identifiers
                 if let Ok(ts) = syn::parse_str::<proc_macro2::TokenStream>(&s) {
@@ -100,6 +102,9 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     let mut bindings = Vec::new();
     for p in patterns {
         match p {
+            ModelPattern::Lit {
+                binding: Some(b), ..
+            } => bindings.push(b.clone()),
             ModelPattern::RuleCall {
                 binding: Some(b), ..
             } => bindings.push(b.clone()),
@@ -237,7 +242,9 @@ pub fn get_simple_peek(
     kws: &HashSet<String>,
 ) -> Result<Option<TokenStream>> {
     match pattern {
-        ModelPattern::Lit(Lit::Str(lit)) => {
+        ModelPattern::Lit {
+            lit: Lit::Str(lit), ..
+        } => {
             let token_types = resolve_token_types(lit, kws)?;
             if let Some(first_type) = token_types.first() {
                 Ok(Some(quote!(#first_type)))
@@ -245,7 +252,7 @@ pub fn get_simple_peek(
                 Ok(None)
             }
         }
-        ModelPattern::Lit(_) => Ok(None),
+        ModelPattern::Lit { .. } => Ok(None),
         ModelPattern::Bracketed(_, _) => Ok(Some(quote!(syn::token::Bracket))),
         ModelPattern::Braced(_, _) => Ok(Some(quote!(syn::token::Brace))),
         ModelPattern::Parenthesized(_, _) => Ok(Some(quote!(syn::token::Paren))),
@@ -274,8 +281,10 @@ pub fn get_simple_peek(
 /// Helper for UPO: Returns a unique string key for the start token
 pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     match patterns.first() {
-        Some(ModelPattern::Lit(Lit::Str(l))) => Some(l.value()),
-        Some(ModelPattern::Lit(_)) => None,
+        Some(ModelPattern::Lit {
+            lit: Lit::Str(l), ..
+        }) => Some(l.value()),
+        Some(ModelPattern::Lit { .. }) => None,
         Some(ModelPattern::Bracketed(_, _)) => Some("Bracket".to_string()),
         Some(ModelPattern::Braced(_, _)) => Some("Brace".to_string()),
         Some(ModelPattern::Parenthesized(_, _)) => Some("Paren".to_string()),
@@ -306,7 +315,7 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
 pub fn is_nullable(pattern: &ModelPattern) -> bool {
     match pattern {
         ModelPattern::Cut(_) => true,
-        ModelPattern::Lit(_) => false,
+        ModelPattern::Lit { .. } => false,
         ModelPattern::RuleCall { .. } => true,
         ModelPattern::Group(alts, _) => alts.iter().any(|seq| seq.iter().all(is_nullable)),
         ModelPattern::Bracketed(_, _)
@@ -392,7 +401,7 @@ fn is_sequence_nullable(patterns: &[ModelPattern], nullable_rules: &HashSet<Stri
 fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<String>) -> bool {
     match pattern {
         ModelPattern::Cut(_) => true,
-        ModelPattern::Lit(_) => false,
+        ModelPattern::Lit { .. } => false,
         ModelPattern::RuleCall { rule_name, .. } => nullable_rules.contains(&rule_name.to_string()),
         ModelPattern::Group(alts, _) => alts
             .iter()
@@ -519,7 +528,7 @@ fn collect_nullable_deps(
             ModelPattern::Recover { body, .. } => {
                 collect_nullable_deps(std::slice::from_ref(body), nullable_rules, deps);
             }
-            ModelPattern::Lit(_)
+            ModelPattern::Lit { .. }
             | ModelPattern::Bracketed(..)
             | ModelPattern::Braced(..)
             | ModelPattern::Parenthesized(..) => {
@@ -692,11 +701,13 @@ fn collect_first_from_sequence(
 ) {
     for p in patterns {
         match p {
-            ModelPattern::Lit(Lit::Str(s)) => {
+            ModelPattern::Lit {
+                lit: Lit::Str(s), ..
+            } => {
                 acc.insert(format!("\"{}\"", s.value()));
                 return;
             }
-            ModelPattern::Lit(_) => {
+            ModelPattern::Lit { .. } => {
                 acc.insert("LIT".to_string());
                 return;
             }
@@ -821,7 +832,7 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
 
     match (p1, p2) {
         (ModelPattern::Cut(_), ModelPattern::Cut(_)) => true,
-        (ModelPattern::Lit(l1), ModelPattern::Lit(l2)) => l1 == l2,
+        (ModelPattern::Lit { lit: l1, .. }, ModelPattern::Lit { lit: l2, .. }) => l1 == l2,
         (
             ModelPattern::RuleCall {
                 rule_name: r1,

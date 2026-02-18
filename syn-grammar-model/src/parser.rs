@@ -208,7 +208,10 @@ impl RuleVariant {
 #[derive(Debug, Clone)]
 pub enum Pattern {
     Cut(Token![=>]),
-    Lit(Lit),
+    Lit {
+        binding: Option<Ident>,
+        lit: Lit,
+    },
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
@@ -273,11 +276,10 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         let token = input.parse::<Token![=>]>()?;
         Ok(Pattern::Cut(token))
     } else if input.peek(Lit) {
-        if binding.is_some() {
-            return Err(input
-                .error("Literals cannot be bound directly (wrap in a rule or group if needed)."));
-        }
-        Ok(Pattern::Lit(input.parse()?))
+        Ok(Pattern::Lit {
+            binding,
+            lit: input.parse()?,
+        })
     } else if input.peek(token::Bracket) {
         if binding.is_some() {
             return Err(input.error("Bracketed groups cannot be bound directly."));

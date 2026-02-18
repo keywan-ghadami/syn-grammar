@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - Unreleased
+
+### Added
+- **Literal Bindings**: Added support for binding string literals directly to variables in grammar rules (e.g., `label:"literal"`). This resolves to the `syn::Token` corresponding to the literal.
+- **Optional Literal Bindings**: Added support for optional literal bindings (e.g., `label:"literal"?`), which resolve to `Option<Token>`.
+- **Span Binding on Literals**: Extended the span binding syntax (`@`) to support string literals (e.g., `"literal" @ span`), allowing direct capture of a literal's span.
+
 ## [0.7.1]
 
 ### Fixed
