@@ -1,6 +1,6 @@
 [package]
 name = "syn-grammar-macros"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 description = "Procedural macros for syn-grammar"
 license = "MIT OR Apache-2.0"
@@ -17,7 +17,7 @@ authors = ["Keywan Ghadami"]
 proc-macro = true
 
 [dependencies]
-syn-grammar-model = { path = "../syn-grammar-model", version = "0.7.1" }
+syn-grammar-model = { path = "../syn-grammar-model", version = "0.8.0" }
 # 1. Parsing the DSL (We need "full" for syntax checks and parsing)
 syn = { version = "2.0", features = ["full", "parsing", "printing", "extra-traits", "visit-mut"] }
 

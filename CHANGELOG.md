@@ -2,12 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.7.2] - Unreleased
+## [0.8.0]
 
 ### Added
 - **Literal Bindings**: Added support for binding string literals directly to variables in grammar rules (e.g., `label:"literal"`). This resolves to the `syn::Token` corresponding to the literal.
 - **Optional Literal Bindings**: Added support for optional literal bindings (e.g., `label:"literal"?`), which resolve to `Option<Token>`.
 - **Span Binding on Literals**: Extended the span binding syntax (`@`) to support string literals (e.g., `"literal" @ span`), allowing direct capture of a literal's span.
+
+### Breaking Changes
+- **Backend API**: The internal data model and macro infrastructure were updated to support the new literal binding features. This constitutes a breaking change for downstream backend implementers (e.g., `winnow-grammar`) who must now handle these new syntax-tree nodes. This change is not breaking for end-users who only write grammars.
 
 ## [0.7.1]
 
