@@ -61,6 +61,7 @@ impl ScopeStack {
 struct ErrorState {
     err: syn::Error,
     is_deep: bool,
+    priority: u8,
 }
 
 /// Holds the state for backtracking and error reporting.
@@ -75,6 +76,7 @@ pub struct ParseContext {
     rule_stack: Vec<String>,
     #[cfg(feature = "syn")]
     pub last_span: Option<Span>,
+    fail_triggered: bool,
 }
 
 #[cfg(feature = "rt")]
@@ -88,6 +90,7 @@ impl ParseContext {
             rule_stack: Vec::new(),
             #[cfg(feature = "syn")]
             last_span: None,
+            fail_triggered: false,
         }
     }
 
@@ -97,6 +100,10 @@ impl ParseContext {
 
     pub fn check_fatal(&self) -> bool {
         self.is_fatal
+    }
+
+    pub fn trigger_fail(&mut self) {
+        self.fail_triggered = true;
     }
 
     pub fn enter_rule(&mut self, name: &str) {
@@ -119,8 +126,14 @@ impl ParseContext {
         // Heuristic: Compare the error location to the start of the attempt.
         let is_deep = err.span().start() != start_span.start();
 
+        let priority = if self.fail_triggered { 1 } else { 0 };
+        self.fail_triggered = false; // Reset after consuming
+
         #[cfg(feature = "trace")]
-        eprintln!("[TRACE] record_error: '{}', is_deep: {}", err, is_deep);
+        eprintln!(
+            "[TRACE] record_error: '{}', is_deep: {}, priority: {}",
+            err, is_deep, priority
+        );
 
         // Enrich error with rule name if available
         let err = if let Some(rule_name) = self.rule_stack.last() {
@@ -130,24 +143,55 @@ impl ParseContext {
             err
         };
 
+        let new_error_state = ErrorState {
+            err,
+            is_deep,
+            priority,
+        };
+
         match &mut self.best_error {
             None => {
                 #[cfg(feature = "trace")]
-                eprintln!("[TRACE] New best error (was None): {}", err);
-                self.best_error = Some(ErrorState { err, is_deep });
+                eprintln!("[TRACE] New best error (was None): {}", new_error_state.err);
+                self.best_error = Some(new_error_state);
             }
             Some(existing) => {
-                // We want to prioritize DEEP errors.
-                // If the new error is deep, we take it (even if existing was deep - last deep wins).
-                // If the new error is shallow, we take it ONLY if existing was shallow (last shallow wins).
-                // If existing was deep and new is shallow, we KEEP existing.
-                if is_deep || !existing.is_deep {
+                // Higher priority always wins.
+                if new_error_state.priority > existing.priority {
                     #[cfg(feature = "trace")]
-                    eprintln!("[TRACE] Updating best error: {}", err);
-                    self.best_error = Some(ErrorState { err, is_deep });
-                } else {
-                    #[cfg(feature = "trace")]
-                    eprintln!("[TRACE] Ignoring error (existing is deeper): existing deep={}, new deep={}", existing.is_deep, is_deep);
+                    eprintln!(
+                        "[TRACE] Overwriting due to higher priority: {}",
+                        new_error_state.err
+                    );
+                    self.best_error = Some(new_error_state);
+                    return;
+                }
+
+                // If priorities are equal, use depth logic.
+                if new_error_state.priority == existing.priority {
+                    if !existing.is_deep {
+                        // Existing is shallow. Always update (Deep beats Shallow, Last Shallow wins).
+                        #[cfg(feature = "trace")]
+                        eprintln!("[TRACE] Overwriting shallow error: {}", new_error_state.err);
+                        self.best_error = Some(new_error_state);
+                    } else if new_error_state.is_deep {
+                        // Both are deep. Prefer the one that is logically "further" in the input.
+                        let new_start = new_error_state.err.span().start();
+                        let old_start = existing.err.span().start();
+
+                        let is_deeper = new_start.line > old_start.line
+                            || (new_start.line == old_start.line
+                                && new_start.column > old_start.column);
+
+                        if is_deeper {
+                            #[cfg(feature = "trace")]
+                            eprintln!(
+                                "[TRACE] Overwriting deep error with deeper error: {}",
+                                new_error_state.err
+                            );
+                            self.best_error = Some(new_error_state);
+                        }
+                    }
                 }
             }
         }

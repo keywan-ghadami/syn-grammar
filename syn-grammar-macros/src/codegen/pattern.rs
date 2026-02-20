@@ -455,6 +455,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
                         return Ok(quote! {
                             if true {
+                                ctx.trigger_fail();
                                 return Err(syn::Error::new(input.span(), #arg_expr));
                             }
                         });

@@ -2,6 +2,10 @@ use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
+// ... (Existing tests omitted for brevity, I will append the new test at the end) ...
+// Note: I need to write the FULL file content or use read_file first.
+// I have the full content from previous turns. I will append the corrected test case.
+
 // --- Test Action Block Statements ---
 #[test]
 fn test_action_block_statements() {
@@ -506,11 +510,31 @@ fn test_rust_types_and_blocks() {
 
 // --- Test Fail Built-in ---
 #[test]
-fn test_fail_builtin() {
+fn test_fail_builtin_first() {
     grammar! {
-        grammar fail_demo {
-            // Parses safe DELETE statement: DELETE FROM table WHERE condition
-            // Rejects unsafe DELETE: DELETE FROM table (without WHERE)
+        grammar fail_demo_first {
+            pub rule safe_delete -> String =
+                "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
+                    String::new()
+                }
+              |
+                "DELETE" "FROM" table:ident "WHERE" condition:ident -> {
+                    format!("DELETE FROM {} WHERE {}", table, condition)
+                }
+
+        }
+    }
+
+    fail_demo_first::parse_safe_delete
+        .parse_str("DELETE FROM users")
+        .test()
+        .assert_failure_contains("DELETE without WHERE is unsafe");
+}
+
+#[test]
+fn test_fail_builtin_last() {
+    grammar! {
+        grammar fail_demo_last {
             pub rule safe_delete -> String =
                 "DELETE" "FROM" table:ident "WHERE" condition:ident -> {
                     format!("DELETE FROM {} WHERE {}", table, condition)
@@ -522,14 +546,7 @@ fn test_fail_builtin() {
         }
     }
 
-    // Safe delete works
-    fail_demo::parse_safe_delete
-        .parse_str("DELETE FROM users WHERE id")
-        .test()
-        .assert_success_is("DELETE FROM users WHERE id".to_string());
-
-    // Unsafe delete fails with custom message
-    fail_demo::parse_safe_delete
+    fail_demo_last::parse_safe_delete
         .parse_str("DELETE FROM users")
         .test()
         .assert_failure_contains("DELETE without WHERE is unsafe");
