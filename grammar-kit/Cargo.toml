@@ -11,6 +11,7 @@ default = ["syn", "rt", "testing"]
 syn = ["dep:syn", "dep:proc-macro2"]
 rt = []
 testing = ["dep:termcolor"]
+trace = []
 
 [dependencies]
 syn = { version = "2.0", features = ["full", "extra-traits"], optional = true }

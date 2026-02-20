@@ -222,7 +222,10 @@ pub fn generate_variants_internal(
              let failure_rec = if let Some(l) = label_str {
                  quote! {
                      if !ctx.is_best_error_deep() {
+                         // DEBUG: eprintln!("DEBUG: Pushing failure: {}", #l);
                          _shallow_failures.push(#l);
+                     } else {
+                         // DEBUG: eprintln!("DEBUG: Skipping failure push due to deep error");
                      }
                  }
              } else {
@@ -373,28 +376,34 @@ pub fn generate_variants_internal(
     };
 
     Ok(quote! {
+        // DEBUG: eprintln!("DEBUG: Starting generate_variants_internal. is_top_level: {}", #is_top_level);
         let mut _shallow_failures = Vec::<&str>::new();
         #(#arms)*
 
-        let _is_deep = ctx.is_best_error_deep();
-        if let Some(best_err) = ctx.take_best_error() { // Use ctx
-            if _is_deep {
-                Err(best_err)
-            } else if !_shallow_failures.is_empty() {
-                 _shallow_failures.sort();
-                 _shallow_failures.dedup();
-                 Err(input.error(format!("expected one of: {}", _shallow_failures.join(", "))))
-            } else {
-                Err(best_err)
+        // DEBUG: eprintln!("DEBUG: Checking errors. is_deep: {}", ctx.is_best_error_deep());
+
+        if ctx.is_best_error_deep() {
+            // DEBUG: eprintln!("DEBUG: is_deep is TRUE");
+            if let Some(best_err) = ctx.take_best_error() {
+                // DEBUG: eprintln!("DEBUG: Returning deep best_err: {}", best_err);
+                return Err(best_err);
             }
+        }
+
+        // DEBUG: eprintln!("DEBUG: Final shallow failures: {:?}", _shallow_failures);
+
+        if !_shallow_failures.is_empty() {
+             _shallow_failures.sort();
+             _shallow_failures.dedup();
+             let msg = format!("expected one of: {}", _shallow_failures.join(", "));
+             // DEBUG: eprintln!("DEBUG: Returning gathered failures: {}", msg);
+             Err(input.error(msg))
+        } else if let Some(best_err) = ctx.take_best_error() {
+            // DEBUG: eprintln!("DEBUG: returning best error fallback: {}", best_err);
+            Err(best_err)
         } else {
-            if !_shallow_failures.is_empty() {
-                 _shallow_failures.sort();
-                 _shallow_failures.dedup();
-                 Err(input.error(format!("expected one of: {}", _shallow_failures.join(", "))))
-            } else {
-                Err(input.error(#error_msg))
-            }
+            // DEBUG: eprintln!("DEBUG: no best error, no shallow failures. Msg: {}", #error_msg);
+            Err(input.error(#error_msg))
         }
     })
 }

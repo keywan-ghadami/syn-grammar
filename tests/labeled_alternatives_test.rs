@@ -58,7 +58,7 @@ fn test_deep_error_wins() {
         .test()
         .assert_failure();
     println!("Error: {}", err);
-    assert!(err.to_string().contains("expected 'b'"));
+    assert!(err.to_string().contains("expected `b`"));
     assert!(!err.to_string().contains("expected one of:"));
 }
 

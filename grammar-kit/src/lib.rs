@@ -100,11 +100,17 @@ impl ParseContext {
     }
 
     pub fn enter_rule(&mut self, name: &str) {
+        #[cfg(feature = "trace")]
+        eprintln!("[TRACE] enter_rule: {}", name);
         self.rule_stack.push(name.to_string());
     }
 
     pub fn exit_rule(&mut self) {
-        self.rule_stack.pop();
+        let _name = self.rule_stack.pop();
+        #[cfg(feature = "trace")]
+        if let Some(n) = _name {
+            eprintln!("[TRACE] exit_rule: {}", n);
+        }
     }
 
     /// Records an error if it is "deeper" than the current best error.
@@ -112,6 +118,9 @@ impl ParseContext {
     pub fn record_error(&mut self, err: syn::Error, start_span: Span) {
         // Heuristic: Compare the error location to the start of the attempt.
         let is_deep = err.span().start() != start_span.start();
+
+        #[cfg(feature = "trace")]
+        eprintln!("[TRACE] record_error: '{}', is_deep: {}", err, is_deep);
 
         // Enrich error with rule name if available
         let err = if let Some(rule_name) = self.rule_stack.last() {
@@ -123,12 +132,22 @@ impl ParseContext {
 
         match &mut self.best_error {
             None => {
+                #[cfg(feature = "trace")]
+                eprintln!("[TRACE] New best error (was None): {}", err);
                 self.best_error = Some(ErrorState { err, is_deep });
             }
             Some(existing) => {
-                // If new is deep and existing is shallow -> Overwrite
-                if is_deep && !existing.is_deep {
+                // We want to prioritize DEEP errors.
+                // If the new error is deep, we take it (even if existing was deep - last deep wins).
+                // If the new error is shallow, we take it ONLY if existing was shallow (last shallow wins).
+                // If existing was deep and new is shallow, we KEEP existing.
+                if is_deep || !existing.is_deep {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] Updating best error: {}", err);
                     self.best_error = Some(ErrorState { err, is_deep });
+                } else {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] Ignoring error (existing is deeper): existing deep={}, new deep={}", existing.is_deep, is_deep);
                 }
             }
         }
@@ -136,12 +155,22 @@ impl ParseContext {
 
     #[cfg(feature = "syn")]
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
-        self.best_error.take().map(|s| s.err)
+        let err = self.best_error.take().map(|s| s.err);
+        #[cfg(feature = "trace")]
+        if let Some(e) = &err {
+            eprintln!("[TRACE] take_best_error: {}", e);
+        } else {
+            eprintln!("[TRACE] take_best_error: None");
+        }
+        err
     }
 
     #[cfg(feature = "syn")]
     pub fn is_best_error_deep(&self) -> bool {
-        self.best_error.as_ref().map(|e| e.is_deep).unwrap_or(false)
+        let is_deep = self.best_error.as_ref().map(|e| e.is_deep).unwrap_or(false);
+        #[cfg(feature = "trace")]
+        eprintln!("[TRACE] is_best_error_deep: {}", is_deep);
+        is_deep
     }
 
     // --- Span Tracking ---
