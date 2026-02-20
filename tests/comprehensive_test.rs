@@ -2,10 +2,6 @@ use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
-// ... (Existing tests omitted for brevity, I will append the new test at the end) ...
-// Note: I need to write the FULL file content or use read_file first.
-// I have the full content from previous turns. I will append the corrected test case.
-
 // --- Test Action Block Statements ---
 #[test]
 fn test_action_block_statements() {
@@ -516,14 +512,13 @@ fn test_fail_builtin() {
             // Parses safe DELETE statement: DELETE FROM table WHERE condition
             // Rejects unsafe DELETE: DELETE FROM table (without WHERE)
             pub rule safe_delete -> String =
-                "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
-                    String::new()
-                }
-              |
                 "DELETE" "FROM" table:ident "WHERE" condition:ident -> {
                     format!("DELETE FROM {} WHERE {}", table, condition)
                 }
-
+              |
+                "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
+                    String::new()
+                }
         }
     }
 
