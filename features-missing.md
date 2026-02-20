@@ -44,22 +44,7 @@ Explicit support for declaring external rules or importing entire grammar module
 *   **`extern rule name -> Type;`**: Declares a rule that is implemented elsewhere (e.g., manually implemented or in another module).
 *   **`import grammar Path;`**: Imports all rules from another grammar definition.
 
-## 4. Parametric List Rules (High Priority)
-
-**Context:**
-Parsing lists of items (e.g., arguments `a, b, c`) is a common requirement.
-We previously considered infix operators like `**` and `++`, but these were rejected in favor of a more robust, generic approach.
-
-**Missing Feature:**
-Implementation of **Architecture Decision Record (ADR) 004**.
-
-**Proposed Syntax (from ADR 004):**
-*   **`separated(rule, ",")`**: Matches `rule` separated by `,`.
-*   **`repeated(rule)`**: Matches `rule` repeated.
-*   **`separated<Vec>(rule, ",")`**: explicit container type.
-
-**Reference:**
-See `docs/adr/adr04-list.md` for the full specification and rationale.
+## 4. done
 
 ## 5. Labeled Alternatives for Error Reporting (Medium Priority)
 

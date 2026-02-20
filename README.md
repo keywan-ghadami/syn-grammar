@@ -20,6 +20,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 - **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
 - **Until**: Use `until(...)` to consume tokens until a terminator pattern is found.
+- **List Rules**: Built-in `separated` and `repeated` rules for concise list parsing.
 - **Rule Arguments**: Pass context or parameters between rules.
 - **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
 - **Grammar Inheritance**: Reuse rules from other grammars.
@@ -451,6 +452,32 @@ grammar! {
 }
 ```
 
+#### Parametric List Rules (ADR 004)
+For parsing lists of items, use the built-in `separated` and `repeated` rules. These are more efficient and readable than manual recursion.
+
+- `separated(rule, separator, min=0, trailing=false)`: Parses items separated by a delimiter.
+- `repeated(rule, min=0)`: Parses items without a delimiter.
+
+You can specify the container type using generics (default is `Vec`).
+
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Lists {
+        // [ 1, 2, 3 ]
+        rule array -> Vec<i32> = 
+            [ items:separated(i32, ",") ] -> { items }
+
+        // { key value key value }
+        rule map -> Vec<(String, i32)> = 
+            { entries:repeated(entry) } -> { entries }
+            
+        rule entry -> (String, i32) = k:ident v:i32 -> { (k.to_string(), v) }
+    }
+}
+```
+
 #### Groups `(...)`
 Group patterns together to apply repetitions or ensure precedence.
 
@@ -609,6 +636,16 @@ fn test_calc() {
 }
 # fn main() {}
 ```
+
+## Contributing
+
+To contribute to `syn-grammar`, please ensure high quality by following these steps before committing:
+
+1.  **Format Code**: Run `cargo fmt` to ensure consistent style.
+2.  **Lint Code**: Run `cargo clippy --workspace --all-targets -- -D warnings` to catch common mistakes and enforce best practices.
+3.  **Run Tests**: Run `cargo test --workspace` to ensure all functionality works as expected.
+
+See `scripts/pre-commit.sh` for the exact commands used in CI.
 
 ## Advanced Topics
 

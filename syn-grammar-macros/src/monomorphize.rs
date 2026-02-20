@@ -73,7 +73,11 @@ impl Monomorphizer {
                 rule_name, args, ..
             } => {
                 for arg in args.iter_mut() {
-                    self.expand_pattern(arg);
+                    match arg {
+                        Argument::Positional(p) | Argument::Named(_, p) => {
+                            self.expand_pattern(p);
+                        }
+                    }
                 }
 
                 if let Some(template) = self.templates.get(rule_name).cloned() {
@@ -112,8 +116,17 @@ impl Monomorphizer {
         }
     }
 
-    fn instantiate(&mut self, template: &Rule, args: &[ModelPattern]) -> Ident {
-        let args_repr = args
+    fn instantiate(&mut self, template: &Rule, args: &[Argument]) -> Ident {
+        // Extract ModelPatterns from Arguments (ignoring names for instantiation key)
+        let model_patterns: Vec<&ModelPattern> = args
+            .iter()
+            .map(|a| match a {
+                Argument::Positional(p) => p,
+                Argument::Named(_, p) => p, // Should we error? Or just use value? Using value is safer for key.
+            })
+            .collect();
+
+        let args_repr = model_patterns
             .iter()
             .map(|a| format!("{:?}", a))
             .collect::<Vec<_>>()
@@ -140,8 +153,8 @@ impl Monomorphizer {
 
         let param_map: HashMap<Ident, ModelPattern> = grammar_params
             .iter()
-            .zip(args.iter())
-            .map(|(k, v)| (k.clone(), v.clone()))
+            .zip(model_patterns.iter())
+            .map(|(k, v)| (k.clone(), (*v).clone()))
             .collect();
 
         let mut new_rule = template.clone();
@@ -168,7 +181,7 @@ impl Monomorphizer {
 
         if generic_params.len() <= args.len() {
             for (i, gp) in generic_params.iter().enumerate() {
-                let arg = &args[i];
+                let arg = model_patterns[i];
                 if let Some(ty) = self.infer_type(arg) {
                     type_map.insert(gp.clone(), ty);
                 }
@@ -248,7 +261,11 @@ impl<'a> ParamSubstituter<'a> {
                     }
                 } else {
                     for arg in args {
-                        self.visit_pattern(arg);
+                        match arg {
+                            Argument::Positional(p) | Argument::Named(_, p) => {
+                                self.visit_pattern(p);
+                            }
+                        }
                     }
                 }
             }

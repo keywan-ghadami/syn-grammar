@@ -36,6 +36,12 @@ pub struct RuleVariant {
 }
 
 #[derive(Debug, Clone)]
+pub enum Argument {
+    Positional(ModelPattern),
+    Named(Ident, ModelPattern),
+}
+
+#[derive(Debug, Clone)]
 pub enum ModelPattern {
     Cut(Span),
     Lit {
@@ -45,7 +51,8 @@ pub enum ModelPattern {
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
-        args: Vec<ModelPattern>,
+        generics: Vec<Type>,
+        args: Vec<Argument>,
     },
     Group(Vec<Vec<ModelPattern>>, Span),
     Bracketed(Vec<ModelPattern>, Span),
@@ -108,6 +115,15 @@ impl From<parser::RuleVariant> for RuleVariant {
     }
 }
 
+impl From<parser::Argument> for Argument {
+    fn from(a: parser::Argument) -> Self {
+        match a {
+            parser::Argument::Positional(p) => Argument::Positional(p.into()),
+            parser::Argument::Named(id, p) => Argument::Named(id, p.into()),
+        }
+    }
+}
+
 impl From<parser::Pattern> for ModelPattern {
     fn from(p: parser::Pattern) -> Self {
         use parser::Pattern as P;
@@ -117,11 +133,13 @@ impl From<parser::Pattern> for ModelPattern {
             P::RuleCall {
                 binding,
                 rule_name,
+                generics,
                 args,
             } => ModelPattern::RuleCall {
                 binding,
                 rule_name,
-                args: args.into_iter().map(ModelPattern::from).collect(),
+                generics,
+                args: args.into_iter().map(Argument::from).collect(),
             },
             P::Group(alts, token) => ModelPattern::Group(
                 alts.into_iter()

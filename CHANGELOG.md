@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 ## [0.9.0]
 
 ### Added
+- **Parametric List Rules (ADR 004)**: Added `separated` and `repeated` built-in rules for concise list parsing.
+    - `separated(rule, sep, min=0, trailing=false)`: Parses a list of items separated by a delimiter.
+    - `repeated(rule, min=0)`: Parses a list of items without a separator.
+    - Supports custom container types via generics (e.g., `separated<HashSet>(...)`), defaulting to `Vec`.
+- **Named Arguments**: Added support for named arguments in rule calls (e.g., `rule(arg, key=value)`), used by the new list rules.
+- **Generic Arguments in Rules**: Added support for generic type arguments in rule calls (e.g., `rule<T>(...)`), enabling the container specification for list rules.
 - **Until**: Added support for the `until` pattern (e.g., `body:until(";")`), which consumes tokens until a terminator pattern is found. The terminator is not consumed. This is useful for parsing unstructured content or content with a known delimiter.
 - **Fail Built-in**: Added `fail` and `fail("message")` built-in rule. It always fails, optionally with a custom error message. This is useful for implementing custom error reporting or rejecting specific patterns in alternatives.
 

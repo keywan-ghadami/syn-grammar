@@ -207,6 +207,30 @@ impl RuleVariant {
 }
 
 #[derive(Debug, Clone)]
+pub enum Argument {
+    Positional(Pattern),
+    Named(Ident, Pattern),
+}
+
+impl Parse for Argument {
+    fn parse(input: ParseStream) -> Result<Self> {
+        // Check for Named: Ident = ...
+        // But Pattern can also start with Ident.
+        // Ambiguity: `x` could be a rule call `x` or named arg `x = ...`.
+        // We peek for `=` to distinguish.
+
+        if input.peek(Ident) && input.peek2(Token![=]) {
+            let name: Ident = input.parse()?;
+            let _ = input.parse::<Token![=]>()?;
+            let val: Pattern = input.parse()?;
+            Ok(Argument::Named(name, val))
+        } else {
+            Ok(Argument::Positional(input.parse()?))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Pattern {
     Cut(Token![=>]),
     Lit {
@@ -216,7 +240,8 @@ pub enum Pattern {
     RuleCall {
         binding: Option<Ident>,
         rule_name: Ident,
-        args: Vec<Pattern>,
+        generics: Vec<Type>, // Added generics support
+        args: Vec<Argument>, // Changed from Vec<Pattern>
     },
     Group(Vec<Vec<Pattern>>, token::Paren),
     Bracketed(Vec<Pattern>, token::Bracket),
@@ -363,16 +388,40 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         })
     } else {
         let rule_name: Ident = rt::parse_ident(input)?;
+
+        // Parse generics: rule<T, U>
+        let generics = if input.peek(Token![<]) {
+            let _ = input.parse::<Token![<]>()?;
+            let mut types = Vec::new();
+            loop {
+                types.push(input.parse::<Type>()?);
+                if input.peek(Token![,]) {
+                    let _ = input.parse::<Token![,]>()?;
+                    if input.peek(Token![>]) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            let _ = input.parse::<Token![>]>()?;
+            types
+        } else {
+            Vec::new()
+        };
+
         let args = parse_args(input)?;
+
         Ok(Pattern::RuleCall {
             binding,
             rule_name,
+            generics,
             args,
         })
     }
 }
 
-fn parse_args(input: ParseStream) -> Result<Vec<Pattern>> {
+fn parse_args(input: ParseStream) -> Result<Vec<Argument>> {
     let mut args = Vec::new();
     if input.peek(token::Paren) {
         let content;

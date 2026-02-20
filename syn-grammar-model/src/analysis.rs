@@ -74,6 +74,15 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
                     }
                 }
             }
+            ModelPattern::RuleCall { args, .. } => {
+                for arg in args {
+                    match arg {
+                        Argument::Positional(p) | Argument::Named(_, p) => {
+                            collect_from_patterns(std::slice::from_ref(p), kws);
+                        }
+                    }
+                }
+            }
             ModelPattern::Group(alts, _) => {
                 alts.iter().for_each(|alt| collect_from_patterns(alt, kws))
             }
@@ -603,7 +612,18 @@ fn find_unused_rules(grammar: &GrammarDefinition) -> HashSet<String> {
 fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F) {
     for p in patterns {
         match p {
-            ModelPattern::RuleCall { rule_name, .. } => cb(rule_name.to_string()),
+            ModelPattern::RuleCall {
+                rule_name, args, ..
+            } => {
+                cb(rule_name.to_string());
+                for arg in args {
+                    match arg {
+                        Argument::Positional(p) | Argument::Named(_, p) => {
+                            collect_called_rules(std::slice::from_ref(p), cb);
+                        }
+                    }
+                }
+            }
             ModelPattern::Group(alts, _) => {
                 for alt in alts {
                     collect_called_rules(alt, cb);
@@ -853,6 +873,22 @@ fn sequence_is_prefix(prefix: &[ModelPattern], full: &[ModelPattern]) -> bool {
         .all(|(p1, p2)| pattern_structure_eq(p1, p2))
 }
 
+fn arguments_structure_eq(args1: &[Argument], args2: &[Argument]) -> bool {
+    if args1.len() != args2.len() {
+        return false;
+    }
+    args1
+        .iter()
+        .zip(args2.iter())
+        .all(|(a1, a2)| match (a1, a2) {
+            (Argument::Positional(p1), Argument::Positional(p2)) => pattern_structure_eq(p1, p2),
+            (Argument::Named(n1, p1), Argument::Named(n2, p2)) => {
+                n1 == n2 && pattern_structure_eq(p1, p2)
+            }
+            _ => false,
+        })
+}
+
 fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
     let p1 = peel(p1);
     let p2 = peel(p2);
@@ -871,7 +907,7 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
                 args: a2,
                 ..
             },
-        ) => r1 == r2 && sequence_structure_eq(a1, a2),
+        ) => r1 == r2 && arguments_structure_eq(a1, a2),
         (ModelPattern::Group(g1, _), ModelPattern::Group(g2, _)) => {
             if g1.len() != g2.len() {
                 return false;

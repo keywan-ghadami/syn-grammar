@@ -107,16 +107,34 @@ fn validate_pattern(
 ) -> syn::Result<()> {
     match pattern {
         ModelPattern::RuleCall {
-            rule_name, args: _, ..
+            rule_name, args, ..
         } => {
             // Check if rule_name is in all_defs OR in params (as a grammar parameter)
             let is_param = params.iter().any(|(p_name, _)| p_name == rule_name);
 
-            if !all_defs.contains(&rule_name.to_string()) && !is_param {
+            // Special case: separated and repeated are built-ins we are adding logic for,
+            // but they might not be in B::get_builtins() if B doesn't declare them.
+            // For now, let's assume they are either in builtins or we bypass check for them if generic.
+            // Actually, ADR 004 says they are "Built-in Parametric Rules".
+
+            // Note: If 'separated' is not in all_defs, we might error.
+            // The backend should probably export them or we hardcode them here?
+            // "separated" and "repeated" are portable built-ins.
+            let is_portable_builtin = rule_name == "separated" || rule_name == "repeated";
+
+            if !all_defs.contains(&rule_name.to_string()) && !is_param && !is_portable_builtin {
                 return Err(syn::Error::new(
                     rule_name.span(),
                     format!("Undefined rule: '{}'", rule_name),
                 ));
+            }
+
+            for arg in args {
+                match arg {
+                    Argument::Positional(p) | Argument::Named(_, p) => {
+                        validate_pattern(p, all_defs, params)?;
+                    }
+                }
             }
         }
         ModelPattern::Repeat(inner, _)
@@ -170,7 +188,11 @@ fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
                 ));
             }
             for arg in args {
-                validate_no_bindings(arg)?;
+                match arg {
+                    Argument::Positional(p) | Argument::Named(_, p) => {
+                        validate_no_bindings(p)?;
+                    }
+                }
             }
         }
         ModelPattern::Group(variants, _) => {
@@ -248,7 +270,22 @@ fn validate_args_recursive(
                 rule_name, args, ..
             } => {
                 let name_str = rule_name.to_string();
+
+                // Allow named args for specific built-ins or generic checks?
+                // For user-defined rules, we currently only support positional args.
+                // If we see Named args for user rule, it's an error unless we implement named params for user rules.
+
                 if let Some(target_rule) = rule_map.get(&name_str) {
+                    // Check if any args are named
+                    for arg in args {
+                        if let Argument::Named(n, _) = arg {
+                            return Err(syn::Error::new(
+                                n.span(),
+                                "Named arguments are not supported for user-defined rules yet.",
+                            ));
+                        }
+                    }
+
                     if target_rule.params.len() != args.len() {
                         return Err(syn::Error::new(
                             rule_name.span(),
@@ -264,7 +301,13 @@ fn validate_args_recursive(
                     // It might be a builtin. We allow arguments for builtins.
                 }
                 // Recursively check arguments (they are patterns)
-                validate_args_recursive(args, rule_map)?;
+                for arg in args {
+                    match arg {
+                        Argument::Positional(p) | Argument::Named(_, p) => {
+                            validate_args_recursive(std::slice::from_ref(p), rule_map)?;
+                        }
+                    }
+                }
             }
             ModelPattern::Repeat(inner, _)
             | ModelPattern::Plus(inner, _)

@@ -105,13 +105,290 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         ModelPattern::RuleCall {
             binding,
             rule_name,
+            generics,
             args,
         } => {
             let rule_name_str = rule_name.to_string();
             let builtins = SynBackend::get_builtins();
             let is_builtin = builtins.iter().any(|b| b.name == rule_name_str);
 
-            if is_builtin {
+            if rule_name_str == "separated" {
+                // separated(rule, sep, min=0, trailing=false)
+                if args.len() < 2 {
+                    return Err(syn::Error::new(
+                        rule_name.span(),
+                        "separated requires at least 2 arguments: (rule, separator)",
+                    ));
+                }
+
+                let rule_arg = match &args[0] {
+                    Argument::Positional(p) => p,
+                    Argument::Named(_, p) => p,
+                };
+                let sep_arg = match &args[1] {
+                    Argument::Positional(p) => p,
+                    Argument::Named(_, p) => p,
+                };
+
+                let mut min = 0usize;
+                let mut trailing = false;
+
+                // Parse optional args
+                for arg in &args[2..] {
+                    match arg {
+                        Argument::Named(id, val) => {
+                            if id == "min" {
+                                if let ModelPattern::Lit {
+                                    lit: Lit::Int(i), ..
+                                } = val
+                                {
+                                    min = i.base10_parse()?;
+                                }
+                            } else if id == "trailing" {
+                                if let ModelPattern::Lit {
+                                    lit: Lit::Bool(b), ..
+                                } = val
+                                {
+                                    trailing = b.value;
+                                }
+                            }
+                        }
+                        Argument::Positional(val) => {
+                            // Assume positional min
+                            if let ModelPattern::Lit {
+                                lit: Lit::Int(i), ..
+                            } = val
+                            {
+                                min = i.base10_parse()?;
+                            }
+                        }
+                    }
+                }
+
+                let container_ty = if let Some(ty) = generics.first() {
+                    quote!(#ty)
+                } else {
+                    quote!(Vec)
+                };
+
+                // Inject binding if missing
+                let (rule_arg_with_binding, item_binding) = match rule_arg {
+                    ModelPattern::RuleCall {
+                        binding: None,
+                        rule_name,
+                        generics,
+                        args,
+                    } => {
+                        let temp = format_ident!("_item");
+                        let new_pat = ModelPattern::RuleCall {
+                            binding: Some(temp.clone()),
+                            rule_name: rule_name.clone(),
+                            generics: generics.clone(),
+                            args: args.clone(),
+                        };
+                        (new_pat, vec![temp])
+                    }
+                    ModelPattern::Lit { binding: None, lit } => {
+                        let temp = format_ident!("_item");
+                        let new_pat = ModelPattern::Lit {
+                            binding: Some(temp.clone()),
+                            lit: lit.clone(),
+                        };
+                        (new_pat, vec![temp])
+                    }
+                    _ => (
+                        rule_arg.clone(),
+                        analysis::collect_bindings(std::slice::from_ref(rule_arg)),
+                    ),
+                };
+
+                let rule_parser = generate_pattern_step(&rule_arg_with_binding, kws)?;
+                let sep_parser = generate_pattern_step(sep_arg, kws)?;
+                let sep_peek = analysis::get_simple_peek(sep_arg, kws).ok().flatten();
+
+                let push_stmt = if item_binding.len() == 1 {
+                    let b = &item_binding[0];
+                    quote! { _items.push(#b); }
+                } else if item_binding.is_empty() {
+                    quote! { _items.push(()); }
+                } else {
+                    let b = &item_binding;
+                    quote! { _items.push((#(#b),*)); }
+                };
+
+                let sep_logic = if let Some(peek) = sep_peek {
+                    quote! {
+                        if input.peek(#peek) {
+                            #sep_parser
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                } else {
+                    quote! {
+                        if rt::attempt(input, ctx, |mut input, ctx| { #sep_parser Ok(()) })?.is_some() {
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                };
+
+                let refined_loop = quote! {
+                    let mut _items = #container_ty::new();
+                    let mut _first = true;
+                    loop {
+                        if !_first {
+                            // Expect separator
+                            if !{#sep_logic} {
+                                break;
+                            }
+                        }
+
+                        // Attempt parse item
+                        let _checkpoint = input.cursor();
+                        let _item_res = rt::attempt(input, ctx, |mut input, ctx| {
+                             #rule_parser
+                             Ok( (#(#item_binding),*) )
+                        })?;
+
+                        if let Some(val) = _item_res {
+                            let (#(#item_binding),*) = val;
+                            #push_stmt
+                            _first = false;
+                        } else {
+                            if !_first && !#trailing {
+                                // Clear best error because we want to report specific error
+                                let _ = ctx.take_best_error();
+                                return Err(input.error("expected item after separator"));
+                            }
+                            break;
+                        }
+                    }
+                    if _items.len() < (#min as usize) {
+                        // Clear best error because we want to report logic error
+                        let _ = ctx.take_best_error();
+                        return Err(input.error(concat!("expected at least ", #min, " items")));
+                    }
+                    _items
+                };
+
+                if let Some(bind) = binding {
+                    Ok(quote! { let #bind = { #refined_loop }; })
+                } else {
+                    Ok(quote! { let _ = { #refined_loop }; })
+                }
+            } else if rule_name_str == "repeated" {
+                // repeated(rule, min=0)
+                if args.is_empty() {
+                    return Err(syn::Error::new(
+                        rule_name.span(),
+                        "repeated requires at least 1 argument: (rule)",
+                    ));
+                }
+                let rule_arg = match &args[0] {
+                    Argument::Positional(p) => p,
+                    Argument::Named(_, p) => p,
+                };
+
+                let mut min = 0usize;
+                // Parse optional args
+                for arg in &args[1..] {
+                    match arg {
+                        Argument::Named(id, val) => {
+                            if id == "min" {
+                                if let ModelPattern::Lit {
+                                    lit: Lit::Int(i), ..
+                                } = val
+                                {
+                                    min = i.base10_parse()?;
+                                }
+                            }
+                        }
+                        Argument::Positional(val) => {
+                            if let ModelPattern::Lit {
+                                lit: Lit::Int(i), ..
+                            } = val
+                            {
+                                min = i.base10_parse()?;
+                            }
+                        }
+                    }
+                }
+
+                let container_ty = if let Some(ty) = generics.first() {
+                    quote!(#ty)
+                } else {
+                    quote!(Vec)
+                };
+
+                // Inject binding if missing
+                let (rule_arg_with_binding, item_binding) = match rule_arg {
+                    ModelPattern::RuleCall {
+                        binding: None,
+                        rule_name,
+                        generics,
+                        args,
+                    } => {
+                        let temp = format_ident!("_item");
+                        let new_pat = ModelPattern::RuleCall {
+                            binding: Some(temp.clone()),
+                            rule_name: rule_name.clone(),
+                            generics: generics.clone(),
+                            args: args.clone(),
+                        };
+                        (new_pat, vec![temp])
+                    }
+                    ModelPattern::Lit { binding: None, lit } => {
+                        let temp = format_ident!("_item");
+                        let new_pat = ModelPattern::Lit {
+                            binding: Some(temp.clone()),
+                            lit: lit.clone(),
+                        };
+                        (new_pat, vec![temp])
+                    }
+                    _ => (
+                        rule_arg.clone(),
+                        analysis::collect_bindings(std::slice::from_ref(rule_arg)),
+                    ),
+                };
+
+                let rule_parser = generate_pattern_step(&rule_arg_with_binding, kws)?;
+
+                let push_stmt = if item_binding.len() == 1 {
+                    let b = &item_binding[0];
+                    quote! { _items.push(#b); }
+                } else if item_binding.is_empty() {
+                    quote! { _items.push(()); }
+                } else {
+                    let b = &item_binding;
+                    quote! { _items.push((#(#b),*)); }
+                };
+
+                let loop_logic = quote! {
+                    let mut _items = #container_ty::new();
+                    while let Some(val) = rt::attempt(input, ctx, |mut input, ctx| {
+                        #rule_parser
+                        Ok( (#(#item_binding),*) )
+                    })? {
+                        let (#(#item_binding),*) = val;
+                        #push_stmt
+                    }
+                     if _items.len() < (#min as usize) {
+                        // Clear best error
+                        let _ = ctx.take_best_error();
+                        return Err(input.error(concat!("expected at least ", #min, " items")));
+                    }
+                    _items
+                };
+
+                if let Some(bind) = binding {
+                    Ok(quote! { let #bind = { #loop_logic }; })
+                } else {
+                    Ok(quote! { let _ = { #loop_logic }; })
+                }
+            } else if is_builtin {
                 // Generate a token-filtering expression for the primitive.
                 let expr = match rule_name_str.as_str() {
                     "alpha" => quote! {
@@ -164,19 +441,21 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         });
                     }
                     "fail" => {
-                        let msg = if let Some(ModelPattern::Lit {
-                            lit: syn::Lit::Str(s),
-                            ..
-                        }) = args.first()
-                        {
-                            s.value()
+                        let arg_expr = if let Some(arg) = args.first() {
+                            match arg {
+                                Argument::Positional(ModelPattern::Lit {
+                                    lit: syn::Lit::Str(s),
+                                    ..
+                                }) => s.value(),
+                                _ => "Explicit failure".to_string(),
+                            }
                         } else {
                             "Explicit failure".to_string()
                         };
-                        // Use a trick to avoid unreachable code warning for subsequent statements
+
                         return Ok(quote! {
                             if true {
-                                return Err(syn::Error::new(input.span(), #msg));
+                                return Err(syn::Error::new(input.span(), #arg_expr));
                             }
                         });
                     }
@@ -506,6 +785,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 ModelPattern::RuleCall {
                     binding,
                     rule_name,
+                    generics,
                     args,
                 } => {
                     if let Some(b) = binding {
@@ -515,6 +795,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         let new_inner = ModelPattern::RuleCall {
                             binding: Some(temp.clone()),
                             rule_name: rule_name.clone(),
+                            generics: generics.clone(),
                             args: args.clone(),
                         };
                         (Box::new(new_inner), temp)
@@ -578,10 +859,12 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     ModelPattern::RuleCall {
                         binding: None,
                         rule_name,
+                        generics,
                         args,
                     } => Box::new(ModelPattern::RuleCall {
                         binding: Some(bind.clone()),
                         rule_name: rule_name.clone(),
+                        generics: generics.clone(),
                         args: args.clone(),
                     }),
                     // If the body is already binding, we might have an issue if we try to override it.
@@ -720,20 +1003,20 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     }
 }
 
-fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[ModelPattern]) -> TokenStream {
+fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[Argument]) -> TokenStream {
     // Call the _impl version and pass ctx
     let f = format_ident!("parse_{}_impl", rule_name);
 
     let arg_exprs: Vec<TokenStream> = args
         .iter()
         .map(|arg| match arg {
-            ModelPattern::Lit { lit, .. } => quote!(#lit),
-            ModelPattern::RuleCall {
-                rule_name, args, ..
-            } if args.is_empty() => {
-                quote!(#rule_name)
-            }
-            _ => quote!(compile_error!("Complex pattern used as runtime argument")),
+            Argument::Positional(p) | Argument::Named(_, p) => match p {
+                ModelPattern::Lit { lit, .. } => quote!(#lit),
+                ModelPattern::RuleCall {
+                    rule_name, args, ..
+                } if args.is_empty() => quote!(#rule_name),
+                _ => quote!(compile_error!("Complex pattern used as runtime argument")),
+            },
         })
         .collect();
 
