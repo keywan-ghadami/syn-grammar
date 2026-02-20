@@ -93,6 +93,9 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
             ModelPattern::Peek(i, _) | ModelPattern::Not(i, _) => {
                 collect_from_patterns(std::slice::from_ref(i), kws)
             }
+            ModelPattern::Until { pattern, .. } => {
+                collect_from_patterns(std::slice::from_ref(pattern), kws);
+            }
             _ => {}
         }
     }
@@ -139,6 +142,14 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
             }
             ModelPattern::Not(_, _) => {
                 // Not(...) bindings are ignored/dropped because it only succeeds if inner fails.
+            }
+            ModelPattern::Until {
+                binding, pattern, ..
+            } => {
+                if let Some(b) = binding {
+                    bindings.push(b.clone());
+                }
+                bindings.extend(collect_bindings(std::slice::from_ref(pattern)));
             }
             _ => {}
         }
@@ -274,6 +285,7 @@ pub fn get_simple_peek(
         }
         ModelPattern::Peek(inner, _) => get_simple_peek(inner, kws),
         ModelPattern::Not(_, _) => Ok(None),
+        ModelPattern::Until { .. } => Ok(None),
         _ => Ok(None),
     }
 }
@@ -308,6 +320,7 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         }
         Some(ModelPattern::Peek(inner, _)) => get_peek_token_string(std::slice::from_ref(&**inner)),
         Some(ModelPattern::Not(_, _)) => None,
+        Some(ModelPattern::Until { .. }) => None,
         _ => None,
     }
 }
@@ -328,6 +341,7 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Recover { .. } => true,
         ModelPattern::Peek(_, _) => true,
         ModelPattern::Not(_, _) => true,
+        ModelPattern::Until { .. } => true,
     }
 }
 
@@ -410,7 +424,8 @@ fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<
         | ModelPattern::Repeat(_, _)
         | ModelPattern::Recover { .. }
         | ModelPattern::Peek(_, _)
-        | ModelPattern::Not(_, _) => true, // Peek/Not consume nothing
+        | ModelPattern::Not(_, _)
+        | ModelPattern::Until { .. } => true, // Peek/Not consume nothing
         ModelPattern::Plus(inner, _) => is_pattern_nullable_precise(inner, nullable_rules),
         ModelPattern::SpanBinding(inner, _, _) => {
             is_pattern_nullable_precise(inner, nullable_rules)
@@ -528,6 +543,9 @@ fn collect_nullable_deps(
             ModelPattern::Recover { body, .. } => {
                 collect_nullable_deps(std::slice::from_ref(body), nullable_rules, deps);
             }
+            ModelPattern::Until { pattern, .. } => {
+                collect_nullable_deps(std::slice::from_ref(pattern), nullable_rules, deps);
+            }
             ModelPattern::Lit { .. }
             | ModelPattern::Bracketed(..)
             | ModelPattern::Braced(..)
@@ -596,7 +614,8 @@ fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F)
             | ModelPattern::Plus(inner, _)
             | ModelPattern::SpanBinding(inner, _, _)
             | ModelPattern::Peek(inner, _)
-            | ModelPattern::Not(inner, _) => {
+            | ModelPattern::Not(inner, _)
+            | ModelPattern::Until { pattern: inner, .. } => {
                 collect_called_rules(std::slice::from_ref(inner), cb);
             }
             ModelPattern::Recover { body, sync, .. } => {
@@ -791,6 +810,14 @@ fn collect_first_from_sequence(
                     acc,
                 );
             }
+            ModelPattern::Until { pattern, .. } => {
+                collect_first_from_sequence(
+                    std::slice::from_ref(pattern),
+                    first_sets,
+                    nullable_rules,
+                    acc,
+                );
+            }
             _ => {}
         }
     }
@@ -873,6 +900,9 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
                 body: b2, sync: s2, ..
             },
         ) => pattern_structure_eq(b1, b2) && pattern_structure_eq(s1, s2),
+        (ModelPattern::Until { pattern: p1, .. }, ModelPattern::Until { pattern: p2, .. }) => {
+            pattern_structure_eq(p1, p2)
+        }
         _ => false,
     }
 }

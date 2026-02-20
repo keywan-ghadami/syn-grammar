@@ -670,6 +670,36 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 })?;
             })
         }
+
+        ModelPattern::Until {
+            binding, pattern, ..
+        } => {
+            let inner_logic = generate_pattern_step(pattern, kws)?;
+
+            let loop_body = quote! {
+                let mut _tokens = Vec::new();
+                while !input.is_empty() {
+                    let is_match = rt::peek(input, ctx, |mut input, ctx| {
+                         #inner_logic
+                         Ok(())
+                    }).is_ok();
+
+                    if is_match {
+                        break;
+                    }
+
+                    let t: proc_macro2::TokenTree = input.parse()?;
+                    _tokens.push(t);
+                }
+                proc_macro2::TokenStream::from_iter(_tokens)
+            };
+
+            if let Some(bind) = binding {
+                Ok(quote! { let #bind = { #loop_body }; })
+            } else {
+                Ok(quote! { let _ = { #loop_body }; })
+            }
+        }
     }
 }
 

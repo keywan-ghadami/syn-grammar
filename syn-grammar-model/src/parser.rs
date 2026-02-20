@@ -35,6 +35,7 @@ pub mod kw {
     syn::custom_keyword!(recover);
     syn::custom_keyword!(peek);
     syn::custom_keyword!(not);
+    syn::custom_keyword!(until);
 }
 
 pub struct GrammarDefinition {
@@ -233,6 +234,11 @@ pub enum Pattern {
     },
     Peek(Box<Pattern>, kw::peek),
     Not(Box<Pattern>, kw::not),
+    Until {
+        binding: Option<Ident>,
+        pattern: Box<Pattern>,
+        kw_token: kw::until,
+    },
 }
 
 impl Parse for Pattern {
@@ -344,6 +350,17 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         syn::parenthesized!(content in input);
         let inner = content.parse()?;
         Ok(Pattern::Not(Box::new(inner), kw_token))
+    } else if input.peek(kw::until) {
+        // until returns a TokenStream, so it can be bound.
+        let kw_token = input.parse::<kw::until>()?;
+        let content;
+        syn::parenthesized!(content in input);
+        let pattern = content.parse()?;
+        Ok(Pattern::Until {
+            binding,
+            pattern: Box::new(pattern),
+            kw_token,
+        })
     } else {
         let rule_name: Ident = rt::parse_ident(input)?;
         let args = parse_args(input)?;

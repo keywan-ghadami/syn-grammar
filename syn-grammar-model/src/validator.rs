@@ -143,7 +143,80 @@ fn validate_pattern(
             validate_pattern(body, all_defs, params)?;
             validate_pattern(sync, all_defs, params)?;
         }
+        ModelPattern::Until { pattern, .. } => {
+            validate_pattern(pattern, all_defs, params)?;
+            validate_no_bindings(pattern)?;
+        }
         _ => {}
+    }
+    Ok(())
+}
+
+fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
+    match pattern {
+        ModelPattern::Lit { binding, .. } => {
+            if binding.is_some() {
+                return Err(syn::Error::new(
+                    binding.as_ref().unwrap().span(),
+                    "Bindings are not allowed inside 'until' patterns.",
+                ));
+            }
+        }
+        ModelPattern::RuleCall { binding, args, .. } => {
+            if binding.is_some() {
+                return Err(syn::Error::new(
+                    binding.as_ref().unwrap().span(),
+                    "Bindings are not allowed inside 'until' patterns.",
+                ));
+            }
+            for arg in args {
+                validate_no_bindings(arg)?;
+            }
+        }
+        ModelPattern::Group(variants, _) => {
+            for seq in variants {
+                for p in seq {
+                    validate_no_bindings(p)?;
+                }
+            }
+        }
+        ModelPattern::Bracketed(seq, _)
+        | ModelPattern::Braced(seq, _)
+        | ModelPattern::Parenthesized(seq, _) => {
+            for p in seq {
+                validate_no_bindings(p)?;
+            }
+        }
+        ModelPattern::Optional(inner, _)
+        | ModelPattern::Repeat(inner, _)
+        | ModelPattern::Plus(inner, _)
+        | ModelPattern::Peek(inner, _)
+        | ModelPattern::Not(inner, _)
+        | ModelPattern::Until { pattern: inner, .. } => {
+            validate_no_bindings(inner)?;
+        }
+        ModelPattern::SpanBinding(_, ident, _) => {
+            return Err(syn::Error::new(
+                ident.span(),
+                "Span bindings (@) are not allowed inside 'until' patterns.",
+            ));
+        }
+        ModelPattern::Recover {
+            binding,
+            body,
+            sync,
+            ..
+        } => {
+            if binding.is_some() {
+                return Err(syn::Error::new(
+                    binding.as_ref().unwrap().span(),
+                    "Bindings are not allowed inside 'until' patterns.",
+                ));
+            }
+            validate_no_bindings(body)?;
+            validate_no_bindings(sync)?;
+        }
+        ModelPattern::Cut(_) => {}
     }
     Ok(())
 }
@@ -226,6 +299,9 @@ fn validate_args_recursive(
             ModelPattern::Recover { body, sync, .. } => {
                 validate_args_recursive(std::slice::from_ref(body), rule_map, builtin_names)?;
                 validate_args_recursive(std::slice::from_ref(sync), rule_map, builtin_names)?;
+            }
+            ModelPattern::Until { pattern, .. } => {
+                validate_args_recursive(std::slice::from_ref(pattern), rule_map, builtin_names)?;
             }
             _ => {}
         }
@@ -381,5 +457,20 @@ mod tests {
         let model = parse_model(input);
         // This fails in 0.7.0 with "Undefined rule: 'item'"
         validate::<TestBackend>(&model).expect("Validation failed for typed parameter");
+    }
+
+    #[test]
+    fn test_until_binding_fail() {
+        let input = quote! {
+            grammar test {
+                rule main -> () = until(x: "a") -> { () }
+            }
+        };
+        let model = parse_model(input);
+        let err = validate::<TestBackend>(&model).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Bindings are not allowed inside 'until' patterns."
+        );
     }
 }

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0]
+
+### Added
+- **Until**: Added support for the `until` pattern (e.g., `body:until(";")`), which consumes tokens until a terminator pattern is found. The terminator is not consumed. This is useful for parsing unstructured content or content with a known delimiter.
+
 ## [0.8.0]
 
 ### Added

@@ -19,6 +19,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 - **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
+- **Until**: Use `until(...)` to consume tokens until a terminator pattern is found.
 - **Rule Arguments**: Pass context or parameters between rules.
 - **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
 - **Grammar Inheritance**: Reuse rules from other grammars.
@@ -500,6 +501,24 @@ grammar! {
         
         // Matches "a" only if NOT followed by "c"
         rule neg -> () = "a" not("c") -> { () }
+    }
+}
+```
+
+#### Until (`until`)
+Consume tokens until a pattern matches. The matching pattern is **not** consumed.
+This is useful for parsing content where you don't know the structure but know the terminator.
+The result is a `proc_macro2::TokenStream`.
+
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Until {
+        // Consumes everything until a semicolon is found.
+        // The semicolon remains in the input stream.
+        rule stmt -> String = 
+            body:until(";") ";" -> { body.to_string() }
     }
 }
 ```

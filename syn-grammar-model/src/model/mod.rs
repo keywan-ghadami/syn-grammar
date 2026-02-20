@@ -63,6 +63,11 @@ pub enum ModelPattern {
     },
     Peek(Box<ModelPattern>, Span),
     Not(Box<ModelPattern>, Span),
+    Until {
+        binding: Option<Ident>,
+        pattern: Box<ModelPattern>,
+        span: Span,
+    },
 }
 
 impl From<parser::GrammarDefinition> for GrammarDefinition {
@@ -159,6 +164,15 @@ impl From<parser::Pattern> for ModelPattern {
             },
             P::Peek(p, token) => ModelPattern::Peek(Box::new(ModelPattern::from(*p)), token.span()),
             P::Not(p, token) => ModelPattern::Not(Box::new(ModelPattern::from(*p)), token.span()),
+            P::Until {
+                binding,
+                pattern,
+                kw_token,
+            } => ModelPattern::Until {
+                binding,
+                pattern: Box::new(ModelPattern::from(*pattern)),
+                span: kw_token.span(),
+            },
         }
     }
 }
@@ -179,6 +193,7 @@ impl ModelPattern {
             | ModelPattern::Braced(_, s)
             | ModelPattern::Parenthesized(_, s) => *s,
             ModelPattern::Peek(_, s) | ModelPattern::Not(_, s) => *s,
+            ModelPattern::Until { span, .. } => *span,
         }
     }
 }
