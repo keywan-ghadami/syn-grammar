@@ -625,6 +625,20 @@ This behavior mimics function call syntax in languages like Rust.
 
 **Tip:** Always use a space if you intend to write a sequence. Always omit the space if you intend to pass arguments.
 
+### Unsupported Syntax & Differences from EBNF
+
+`syn-grammar` uses a syntax inspired by EBNF but tailored for Rust and the `syn` ecosystem. Some common EBNF or PEG operators are not supported directly or have different syntax.
+
+#### Unsupported Operators
+
+The following operators commonly found in other grammar definitions are **not supported** in `syn-grammar`. You must use the functional equivalent.
+
+| Operator | Meaning | Correct Syntax in `syn-grammar` |
+|---|---|---|
+| `!` | Negative Lookahead | Use `not(pattern)` |
+| `&` | Positive Lookahead | Use `peek(pattern)` |
+| `~` | Cut / Commit | Use `=>` (arrow syntax) |
+
 ## Testing
 
 `syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`). When tests fail, errors are pretty-printed with source context and underlining.
