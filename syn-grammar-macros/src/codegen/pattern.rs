@@ -695,7 +695,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
             let temp_variants = alts
                 .iter()
-                .map(|pat_seq| {
+                .map(|(pat_seq, label)| {
                     let bindings = analysis::collect_bindings(pat_seq);
                     let action_expr = if bindings.is_empty() {
                         quote!(())
@@ -704,6 +704,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     };
                     RuleVariant {
                         pattern: pat_seq.clone(),
+                        label: label.clone(), // Pass label
                         action: quote!({ #action_expr }),
                     }
                 })

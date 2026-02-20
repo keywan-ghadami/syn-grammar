@@ -87,7 +87,7 @@ impl Monomorphizer {
                 }
             }
             ModelPattern::Group(alts, _) => {
-                for seq in alts {
+                for (seq, _) in alts {
                     for p in seq {
                         self.expand_pattern(p);
                     }
@@ -270,7 +270,7 @@ impl<'a> ParamSubstituter<'a> {
                 }
             }
             ModelPattern::Group(alts, _) => {
-                for seq in alts {
+                for (seq, _) in alts {
                     for p in seq {
                         self.visit_pattern(p);
                     }

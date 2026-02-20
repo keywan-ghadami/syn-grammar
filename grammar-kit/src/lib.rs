@@ -139,6 +139,11 @@ impl ParseContext {
         self.best_error.take().map(|s| s.err)
     }
 
+    #[cfg(feature = "syn")]
+    pub fn is_best_error_deep(&self) -> bool {
+        self.best_error.as_ref().map(|e| e.is_deep).unwrap_or(false)
+    }
+
     // --- Span Tracking ---
 
     #[cfg(feature = "syn")]

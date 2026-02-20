@@ -176,6 +176,7 @@ impl Rule {
 
 pub struct RuleVariant {
     pub pattern: Vec<Pattern>,
+    pub label: Option<String>,
     pub action: TokenStream,
 }
 
@@ -184,9 +185,17 @@ impl RuleVariant {
         let mut variants = Vec::new();
         loop {
             let mut pattern = Vec::new();
-            while !input.peek(Token![->]) && !input.peek(Token![|]) {
+            while !input.peek(Token![->]) && !input.peek(Token![|]) && !input.peek(Token![#]) {
                 pattern.push(input.parse()?);
             }
+
+            let label = if input.peek(Token![#]) {
+                let _ = input.parse::<Token![#]>()?;
+                let lit: syn::LitStr = input.parse()?;
+                Some(lit.value())
+            } else {
+                None
+            };
 
             let _ = input.parse::<Token![->]>()?;
 
@@ -194,7 +203,11 @@ impl RuleVariant {
             syn::braced!(content in input);
             let action = content.parse()?;
 
-            variants.push(RuleVariant { pattern, action });
+            variants.push(RuleVariant {
+                pattern,
+                label,
+                action,
+            });
 
             if input.peek(Token![|]) {
                 let _ = input.parse::<Token![|]>()?;
@@ -243,7 +256,7 @@ pub enum Pattern {
         generics: Vec<Type>, // Added generics support
         args: Vec<Argument>, // Changed from Vec<Pattern>
     },
-    Group(Vec<Vec<Pattern>>, token::Paren),
+    Group(Vec<(Vec<Pattern>, Option<String>)>, token::Paren),
     Bracketed(Vec<Pattern>, token::Bracket),
     Braced(Vec<Pattern>, token::Brace),
     Parenthesized(Vec<Pattern>, kw::paren, token::Paren),
@@ -307,10 +320,13 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         let token = input.parse::<Token![=>]>()?;
         Ok(Pattern::Cut(token))
     } else if input.peek(Lit) {
-        Ok(Pattern::Lit {
-            binding,
-            lit: input.parse()?,
-        })
+        let lit: Lit = input.parse()?;
+        // Convert char literals to string literals for consistency
+        let lit = match lit {
+            Lit::Char(c) => Lit::Str(syn::LitStr::new(&c.value().to_string(), c.span())),
+            _ => lit,
+        };
+        Ok(Pattern::Lit { binding, lit })
     } else if input.peek(token::Bracket) {
         if binding.is_some() {
             return Err(input.error("Bracketed groups cannot be bound directly."));
@@ -388,6 +404,28 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         })
     } else {
         let rule_name: Ident = rt::parse_ident(input)?;
+
+        // Check for aliases
+        let is_alias = get_alias(&rule_name.to_string()).is_some();
+        if is_alias {
+            // Check if it looks like a rule call (generics or contiguous parens)
+            let has_generics = input.peek(Token![<]);
+            let has_args = if input.peek(token::Paren) {
+                let paren_span = input.cursor().span();
+                spans_are_contiguous(rule_name.span(), paren_span)
+            } else {
+                false
+            };
+
+            if !has_generics && !has_args {
+                let token_str = get_alias(&rule_name.to_string()).unwrap();
+                return Ok(Pattern::Lit {
+                    binding,
+                    lit: Lit::Str(syn::LitStr::new(token_str, rule_name.span())),
+                });
+            }
+        }
+
         let mut last_span = rule_name.span();
 
         // Parse generics: rule<T, U>
@@ -455,14 +493,23 @@ fn parse_pattern_list(input: ParseStream) -> Result<Vec<Pattern>> {
     Ok(list)
 }
 
-fn parse_group_content(input: ParseStream) -> Result<Vec<Vec<Pattern>>> {
+fn parse_group_content(input: ParseStream) -> Result<Vec<(Vec<Pattern>, Option<String>)>> {
     let mut alts = Vec::new();
     loop {
         let mut seq = Vec::new();
-        while !input.is_empty() && !input.peek(Token![|]) {
+        while !input.is_empty() && !input.peek(Token![|]) && !input.peek(Token![#]) {
             seq.push(input.parse()?);
         }
-        alts.push(seq);
+
+        let label = if input.peek(Token![#]) {
+            let _ = input.parse::<Token![#]>()?;
+            let lit: syn::LitStr = input.parse()?;
+            Some(lit.value())
+        } else {
+            None
+        };
+
+        alts.push((seq, label));
         if input.peek(Token![|]) {
             let _ = input.parse::<Token![|]>()?;
         } else {
@@ -481,4 +528,34 @@ fn spans_are_contiguous(first: proc_macro2::Span, second: proc_macro2::Span) -> 
     }
 
     first_end.column == second_start.column
+}
+
+fn get_alias(name: &str) -> Option<&'static str> {
+    match name {
+        "PLUS" => Some("+"),
+        "MINUS" => Some("-"),
+        "STAR" => Some("*"),
+        "SLASH" => Some("/"),
+        "DOT" => Some("."),
+        "COMMA" => Some(","),
+        "SEMI" => Some(";"),
+        "COLON" => Some(":"),
+        "LPAREN" => Some("("),
+        "RPAREN" => Some(")"),
+        "LBRACE" => Some("{"),
+        "RBRACE" => Some("}"),
+        "LBRACKET" => Some("["),
+        "RBRACKET" => Some("]"),
+        "EQ" => Some("="),
+        "LT" => Some("<"),
+        "GT" => Some(">"),
+        "AND" => Some("&"),
+        "OR" => Some("|"),
+        "NOT" => Some("!"),
+        "POUND" => Some("#"),
+        "AT" => Some("@"),
+        "DOLLAR" => Some("$"),
+        "QUESTION" => Some("?"),
+        _ => None,
+    }
 }

@@ -32,6 +32,7 @@ pub struct Rule {
 #[derive(Debug, Clone)]
 pub struct RuleVariant {
     pub pattern: Vec<ModelPattern>,
+    pub label: Option<String>, // Added
     pub action: TokenStream,
 }
 
@@ -54,7 +55,7 @@ pub enum ModelPattern {
         generics: Vec<Type>,
         args: Vec<Argument>,
     },
-    Group(Vec<Vec<ModelPattern>>, Span),
+    Group(Vec<(Vec<ModelPattern>, Option<String>)>, Span), // Updated
     Bracketed(Vec<ModelPattern>, Span),
     Braced(Vec<ModelPattern>, Span),
     Parenthesized(Vec<ModelPattern>, Span),
@@ -110,6 +111,7 @@ impl From<parser::RuleVariant> for RuleVariant {
     fn from(p: parser::RuleVariant) -> Self {
         Self {
             pattern: p.pattern.into_iter().map(Into::into).collect(),
+            label: p.label, // Added
             action: p.action,
         }
     }
@@ -143,7 +145,7 @@ impl From<parser::Pattern> for ModelPattern {
             },
             P::Group(alts, token) => ModelPattern::Group(
                 alts.into_iter()
-                    .map(|seq| seq.into_iter().map(ModelPattern::from).collect())
+                    .map(|(seq, label)| (seq.into_iter().map(ModelPattern::from).collect(), label))
                     .collect(),
                 token.span.join(),
             ),

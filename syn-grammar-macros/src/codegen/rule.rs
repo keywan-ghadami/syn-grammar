@@ -206,6 +206,29 @@ pub fn generate_variants_internal(
     let arms = variants
         .iter()
         .map(|variant| {
+            // Label determination
+            let label_str = if let Some(l) = &variant.label {
+                 Some(l.clone())
+             } else if variant.pattern.len() == 1 {
+                 if let ModelPattern::RuleCall { rule_name, .. } = &variant.pattern[0] {
+                     Some(rule_name.to_string())
+                 } else {
+                     None
+                 }
+             } else {
+                 None
+             };
+
+             let failure_rec = if let Some(l) = label_str {
+                 quote! {
+                     if !ctx.is_best_error_deep() {
+                         _shallow_failures.push(#l);
+                     }
+                 }
+             } else {
+                 quote! {}
+             };
+
             let cut_info = analysis::find_cut(&variant.pattern);
             let first_pat = variant.pattern.first();
             let is_nullable = first_pat.is_none_or(analysis::is_nullable);
@@ -235,7 +258,7 @@ pub fn generate_variants_internal(
                 false
             };
 
-            if let Some(cut) = cut_info {
+            let logic = if let Some(cut) = cut_info {
                 let pre_cut = cut.pre_cut;
                 let post_cut = cut.post_cut;
 
@@ -286,13 +309,13 @@ pub fn generate_variants_internal(
                 };
 
                 if let Some(token_code) = peek_token_obj {
-                    Ok(quote! {
+                     quote! {
                         if input.peek(#token_code) {
                             #logic_block
                         }
-                    })
+                    }
                 } else {
-                    Ok(logic_block)
+                    logic_block
                 }
             } else {
                 let logic = pattern::generate_sequence(
@@ -303,7 +326,7 @@ pub fn generate_variants_internal(
 
                 if is_unique {
                     let token_code = peek_token_obj.as_ref().unwrap();
-                    Ok(quote! {
+                     quote! {
                         if input.peek(#token_code) {
                             let mut run = || -> syn::Result<_> {
                                 #logic
@@ -316,25 +339,30 @@ pub fn generate_variants_internal(
                                 }
                             }
                         }
-                    })
+                    }
                 } else if let Some(token_code) = peek_token_obj {
-                    Ok(quote! {
+                     quote! {
                         if input.peek(#token_code) {
                             // Pass ctx to attempt
                             if let Some(res) = rt::attempt(input, ctx, |mut input, ctx| { #logic })? {
                                 return Ok(res);
                             }
                         }
-                    })
+                    }
                 } else {
-                    Ok(quote! {
+                     quote! {
                         // Pass ctx to attempt
                         if let Some(res) = rt::attempt(input, ctx, |mut input, ctx| { #logic })? {
                             return Ok(res);
                         }
-                    })
+                    }
                 }
-            }
+            };
+
+            Ok(quote! {
+                #logic
+                #failure_rec
+            })
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -345,12 +373,28 @@ pub fn generate_variants_internal(
     };
 
     Ok(quote! {
+        let mut _shallow_failures = Vec::<&str>::new();
         #(#arms)*
 
+        let _is_deep = ctx.is_best_error_deep();
         if let Some(best_err) = ctx.take_best_error() { // Use ctx
-            Err(best_err)
+            if _is_deep {
+                Err(best_err)
+            } else if !_shallow_failures.is_empty() {
+                 _shallow_failures.sort();
+                 _shallow_failures.dedup();
+                 Err(input.error(format!("expected one of: {}", _shallow_failures.join(", "))))
+            } else {
+                Err(best_err)
+            }
         } else {
-            Err(input.error(#error_msg))
+            if !_shallow_failures.is_empty() {
+                 _shallow_failures.sort();
+                 _shallow_failures.dedup();
+                 Err(input.error(format!("expected one of: {}", _shallow_failures.join(", "))))
+            } else {
+                Err(input.error(#error_msg))
+            }
         }
     })
 }

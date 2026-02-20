@@ -611,14 +611,14 @@ This behavior mimics function call syntax in languages like Rust.
 
 *   **Rule Call with Arguments (No Gap)**:
     If a rule name is immediately followed by a parenthesis `(` **without whitespace**, it is interpreted as a call to that rule with arguments.
-    ```rust
+    ```rust,ignore
     // Calls rule `my_rule` passing `arg1` and `arg2`.
     my_rule(arg1, arg2)
     ```
 
 *   **Sequence with Group (Gap)**:
     If there is **whitespace** between a rule name and a parenthesis `(`, it is interpreted as two separate items in a sequence: the rule `my_rule` (with no arguments) followed by a parenthesized group `( ... )`.
-    ```rust
+    ```rust,ignore
     // Matches `my_rule`, followed by a group containing `item1` and `item2`.
     my_rule (item1 item2)
     ```
