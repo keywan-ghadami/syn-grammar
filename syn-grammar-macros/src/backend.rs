@@ -189,6 +189,10 @@ impl Backend for SynBackend {
                 return_type: "()",
             },
             BuiltIn {
+                name: "fail",
+                return_type: "()",
+            },
+            BuiltIn {
                 name: "whitespace",
                 return_type: "()",
             },

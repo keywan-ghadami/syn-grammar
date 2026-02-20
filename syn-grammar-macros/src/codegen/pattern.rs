@@ -163,6 +163,23 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                             }
                         });
                     }
+                    "fail" => {
+                        let msg = if let Some(ModelPattern::Lit {
+                            lit: syn::Lit::Str(s),
+                            ..
+                        }) = args.first()
+                        {
+                            s.value()
+                        } else {
+                            "Explicit failure".to_string()
+                        };
+                        // Use a trick to avoid unreachable code warning for subsequent statements
+                        return Ok(quote! {
+                            if true {
+                                return Err(syn::Error::new(input.span(), #msg));
+                            }
+                        });
+                    }
                     "whitespace" => {
                         return Ok(quote! {
                             if !ctx.check_whitespace(input.span()) {

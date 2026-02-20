@@ -503,3 +503,33 @@ fn test_rust_types_and_blocks() {
         .test()
         .assert_success();
 }
+
+// --- Test Fail Built-in ---
+#[test]
+fn test_fail_builtin() {
+    grammar! {
+        grammar fail_demo {
+            // Parses safe DELETE statement: DELETE FROM table WHERE condition
+            // Rejects unsafe DELETE: DELETE FROM table (without WHERE)
+            pub rule safe_delete -> String =
+                "DELETE" "FROM" table:ident "WHERE" condition:ident -> {
+                    format!("DELETE FROM {} WHERE {}", table, condition)
+                }
+              | "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
+                    String::new()
+                }
+        }
+    }
+
+    // Safe delete works
+    fail_demo::parse_safe_delete
+        .parse_str("DELETE FROM users WHERE id")
+        .test()
+        .assert_success_is("DELETE FROM users WHERE id".to_string());
+
+    // Unsafe delete fails with custom message
+    fail_demo::parse_safe_delete
+        .parse_str("DELETE FROM users")
+        .test()
+        .assert_failure_contains("DELETE without WHERE is unsafe");
+}
