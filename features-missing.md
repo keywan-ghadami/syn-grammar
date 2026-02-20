@@ -17,19 +17,9 @@ A clear strategy or syntax to resolve this ambiguity, ensuring that the parser c
 
 ## 2. Syntax for Not (!) and Peek (&) Operators (High Priority)
 
-**Context:**
-Currently, `syn-grammar` supports `not(...)` and `peek(...)` functional syntax.
-While functional, standard EBNF and PEG grammars often use `!` for negative lookahead and `&` for positive lookahead.
+document that they are not supported in a specific section for unsupported syntax with guide to the correct syntax
 
-**Missing Feature:**
-Shorthand prefix operators for lookaheads.
 
-**Proposed Syntax:**
-*   **`!rule`**: Equivalent to `not(rule)`. Succeeds if `rule` does *not* match. Does not consume input.
-*   **`&rule`**: Equivalent to `peek(rule)`. Succeeds if `rule` matches. Does not consume input.
-
-**Why it's intuitive:**
-Matches standard PEG notation, reducing verbosity and making grammars easier to read for those familiar with parser theory.
 
 ## 3. Support for "Extern" or Imported Rules (High Priority)
 
