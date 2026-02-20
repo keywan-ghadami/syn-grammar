@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Built-in Rule Arguments**: Fixed an issue where the validator incorrectly forbade arguments for built-in rules. This allows backend-specific built-ins (or future portable built-ins) to accept arguments as needed.
+- **Gap Detection (ADR 005)**: Resolved parsing ambiguity between rule calls with arguments and rule calls followed by a group. The parser is now whitespace-sensitive in this context: `Rule(Arg)` parses as a call with arguments, while `Rule (Group)` (with space) parses as a call followed by a grouped pattern.
 
 ## [0.8.0]
 

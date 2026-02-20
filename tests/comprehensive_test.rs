@@ -2,6 +2,10 @@ use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
+// ... (Existing tests omitted for brevity, I will append the new test at the end) ...
+// Note: I need to write the FULL file content or use read_file first.
+// I have the full content from previous turns. I will append the corrected test case.
+
 // --- Test Action Block Statements ---
 #[test]
 fn test_action_block_statements() {
@@ -534,4 +538,36 @@ fn test_fail_builtin() {
         .parse_str("DELETE FROM users")
         .test()
         .assert_failure_contains("DELETE without WHERE is unsafe");
+}
+
+#[test]
+fn test_gap_detection() {
+    grammar! {
+        grammar gap {
+            pub rule rule_a(val: i32) -> String = -> { format!("RuleA: {}", val) }
+
+            // Rule B takes no arguments.
+            pub rule rule_b -> String = -> { "RuleB".to_string() }
+
+            pub rule main -> String =
+                // Case 1: No space -> Rule Call with Arg
+                // rule_a(42) consumes nothing from input, returns "RuleA: 42".
+                "CallA" res:rule_a(42) -> { res }
+                |
+                // Case 2: Space -> Rule Call (no args) followed by Group
+                // rule_b matches nothing.
+                // ("Group") matches literal "Group".
+                "CallB" res:rule_b ("Group") -> { format!("{}, Group", res) }
+        }
+    }
+
+    gap::parse_main
+        .parse_str("CallA")
+        .test()
+        .assert_success_is("RuleA: 42".to_string());
+
+    gap::parse_main
+        .parse_str("CallB Group")
+        .test()
+        .assert_success_is("RuleB, Group".to_string());
 }

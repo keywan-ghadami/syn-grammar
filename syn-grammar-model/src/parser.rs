@@ -388,6 +388,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         })
     } else {
         let rule_name: Ident = rt::parse_ident(input)?;
+        let mut last_span = rule_name.span();
 
         // Parse generics: rule<T, U>
         let generics = if input.peek(Token![<]) {
@@ -404,13 +405,23 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
                     break;
                 }
             }
-            let _ = input.parse::<Token![>]>()?;
+            let gt_token = input.parse::<Token![>]>()?;
+            last_span = gt_token.span;
             types
         } else {
             Vec::new()
         };
 
-        let args = parse_args(input)?;
+        let args = if input.peek(token::Paren) {
+            let paren_span = input.cursor().span();
+            if spans_are_contiguous(last_span, paren_span) {
+                parse_args(input)?
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
 
         Ok(Pattern::RuleCall {
             binding,
@@ -459,4 +470,15 @@ fn parse_group_content(input: ParseStream) -> Result<Vec<Vec<Pattern>>> {
         }
     }
     Ok(alts)
+}
+
+fn spans_are_contiguous(first: proc_macro2::Span, second: proc_macro2::Span) -> bool {
+    let first_end = first.end();
+    let second_start = second.start();
+
+    if first_end.line != second_start.line {
+        return false;
+    }
+
+    first_end.column == second_start.column
 }

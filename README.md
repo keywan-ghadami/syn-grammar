@@ -603,6 +603,28 @@ grammar! {
 # fn main() {}
 ```
 
+### Whitespace Sensitivity: Rule Calls vs. Grouping
+
+In standard EBNF, whitespace is typically insignificant. However, `syn-grammar` uses whitespace to resolve the ambiguity between **Rule Calls with Arguments** and **Sequences starting with a Group**.
+
+This behavior mimics function call syntax in languages like Rust.
+
+*   **Rule Call with Arguments (No Gap)**:
+    If a rule name is immediately followed by a parenthesis `(` **without whitespace**, it is interpreted as a call to that rule with arguments.
+    ```rust
+    // Calls rule `my_rule` passing `arg1` and `arg2`.
+    my_rule(arg1, arg2)
+    ```
+
+*   **Sequence with Group (Gap)**:
+    If there is **whitespace** between a rule name and a parenthesis `(`, it is interpreted as two separate items in a sequence: the rule `my_rule` (with no arguments) followed by a parenthesized group `( ... )`.
+    ```rust
+    // Matches `my_rule`, followed by a group containing `item1` and `item2`.
+    my_rule (item1 item2)
+    ```
+
+**Tip:** Always use a space if you intend to write a sequence. Always omit the space if you intend to pass arguments.
+
 ## Testing
 
 `syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`). When tests fail, errors are pretty-printed with source context and underlining.

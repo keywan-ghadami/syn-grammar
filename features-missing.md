@@ -1,25 +1,13 @@
-# Missing Features for Intuitive Grammar Definitions
+8# Missing Features for Intuitive Grammar Definitions
 
 This document outlines features that would make `syn-grammar` significantly more intuitive and ergonomic, based on an analysis of the current codebase and comparison with other parser generators.
 
 ## 1. Resolve Parsing Ambiguity (High Priority)
-
-**Context:**
-The current parser grammar has potential ambiguities when distinguishing between a rule call with arguments and a rule followed by a grouped expression.
-For example, does `ident ( ... )` mean "call rule `ident` with arguments `...`" or "match rule `ident` then match a group `( ... )`"?
-
-**Missing Feature:**
-A clear strategy or syntax to resolve this ambiguity, ensuring that the parser correctly interprets the user's intent.
-
-**Proposed Solution:**
-*   **Enforce Restrictions:** Disallow whitespace between the rule name and the opening parenthesis for function calls (e.g., `rule(arg)` is a call, `rule (arg)` is a sequence).
-*   **Alternative Syntax:** Use a specific sigil for calls (e.g., `@rule(...)`) or groups (e.g., `group(...)`).
+- done
 
 ## 2. Syntax for Not (!) and Peek (&) Operators (High Priority)
 
 document that they are not supported in a specific section for unsupported syntax with guide to the correct syntax
-
-
 
 ## 3. Support for "Extern" or Imported Rules (High Priority)
 
@@ -76,3 +64,5 @@ Syntactic sugar for default values within the binding itself.
 
 **Proposed Syntax:**
 *   **`x:rule? = 0`**: If `rule` is missing, bind `x` to `0`.
+
+---
