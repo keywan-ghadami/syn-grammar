@@ -512,12 +512,14 @@ fn test_fail_builtin() {
             // Parses safe DELETE statement: DELETE FROM table WHERE condition
             // Rejects unsafe DELETE: DELETE FROM table (without WHERE)
             pub rule safe_delete -> String =
+                "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
+                    String::new()
+                }
+              |
                 "DELETE" "FROM" table:ident "WHERE" condition:ident -> {
                     format!("DELETE FROM {} WHERE {}", table, condition)
                 }
-              | "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
-                    String::new()
-                }
+
         }
     }
 
