@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **Until**: Added support for the `until` pattern (e.g., `body:until(";")`), which consumes tokens until a terminator pattern is found. The terminator is not consumed. This is useful for parsing unstructured content or content with a known delimiter.
 
+### Fixed
+- **Built-in Rule Arguments**: Fixed an issue where the validator incorrectly forbade arguments for built-in rules. This allows backend-specific built-ins (or future portable built-ins) to accept arguments as needed.
+
 ## [0.8.0]
 
 ### Added

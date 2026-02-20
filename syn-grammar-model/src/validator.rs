@@ -32,7 +32,7 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
         }
     }
 
-    validate_argument_counts(grammar, &builtin_names)?;
+    validate_argument_counts(grammar)?;
 
     // Perform advanced analysis
     let analysis = crate::analysis::analyze_grammar(grammar);
@@ -222,10 +222,7 @@ fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
 }
 
 // Argument count validation
-fn validate_argument_counts(
-    grammar: &GrammarDefinition,
-    builtin_names: &HashSet<String>,
-) -> syn::Result<()> {
+fn validate_argument_counts(grammar: &GrammarDefinition) -> syn::Result<()> {
     let rule_map: HashMap<_, _> = grammar
         .rules
         .iter()
@@ -235,7 +232,7 @@ fn validate_argument_counts(
     for rule in &grammar.rules {
         for variant in &rule.variants {
             // Recursive validation of arguments
-            validate_args_recursive(&variant.pattern, &rule_map, builtin_names)?;
+            validate_args_recursive(&variant.pattern, &rule_map)?;
         }
     }
     Ok(())
@@ -244,7 +241,6 @@ fn validate_argument_counts(
 fn validate_args_recursive(
     patterns: &[ModelPattern],
     rule_map: &HashMap<String, &Rule>,
-    builtin_names: &HashSet<String>,
 ) -> syn::Result<()> {
     for pattern in patterns {
         match pattern {
@@ -265,43 +261,37 @@ fn validate_args_recursive(
                         ));
                     }
                 } else {
-                    let is_builtin = builtin_names.contains(&name_str);
-                    if is_builtin && !args.is_empty() {
-                        return Err(syn::Error::new(
-                            rule_name.span(),
-                            format!("Built-in rule '{}' does not accept arguments.", rule_name,),
-                        ));
-                    }
+                    // It might be a builtin. We allow arguments for builtins.
                 }
                 // Recursively check arguments (they are patterns)
-                validate_args_recursive(args, rule_map, builtin_names)?;
+                validate_args_recursive(args, rule_map)?;
             }
             ModelPattern::Repeat(inner, _)
             | ModelPattern::Plus(inner, _)
             | ModelPattern::Optional(inner, _)
             | ModelPattern::SpanBinding(inner, _, _)
             | ModelPattern::Peek(inner, _) => {
-                validate_args_recursive(std::slice::from_ref(inner), rule_map, builtin_names)?;
+                validate_args_recursive(std::slice::from_ref(inner), rule_map)?;
             }
             ModelPattern::Not(inner, _) => {
-                validate_args_recursive(std::slice::from_ref(inner), rule_map, builtin_names)?;
+                validate_args_recursive(std::slice::from_ref(inner), rule_map)?;
             }
             ModelPattern::Group(variants, _) => {
                 for seq in variants {
-                    validate_args_recursive(seq, rule_map, builtin_names)?;
+                    validate_args_recursive(seq, rule_map)?;
                 }
             }
             ModelPattern::Bracketed(seq, _)
             | ModelPattern::Braced(seq, _)
             | ModelPattern::Parenthesized(seq, _) => {
-                validate_args_recursive(seq, rule_map, builtin_names)?;
+                validate_args_recursive(seq, rule_map)?;
             }
             ModelPattern::Recover { body, sync, .. } => {
-                validate_args_recursive(std::slice::from_ref(body), rule_map, builtin_names)?;
-                validate_args_recursive(std::slice::from_ref(sync), rule_map, builtin_names)?;
+                validate_args_recursive(std::slice::from_ref(body), rule_map)?;
+                validate_args_recursive(std::slice::from_ref(sync), rule_map)?;
             }
             ModelPattern::Until { pattern, .. } => {
-                validate_args_recursive(std::slice::from_ref(pattern), rule_map, builtin_names)?;
+                validate_args_recursive(std::slice::from_ref(pattern), rule_map)?;
             }
             _ => {}
         }
@@ -379,25 +369,6 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "Rule 'sub' expects 0 argument(s), but got 1."
-        );
-        assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
-    }
-
-    #[test]
-    fn test_builtin_args() {
-        let input = quote! {
-            grammar test {
-                rule main -> () = ident(1) -> { () }
-            }
-        };
-        let model = parse_model(input);
-
-        let expected_span = model.rules[0].variants[0].pattern[0].span();
-
-        let err = validate::<TestBackend>(&model).unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "Built-in rule 'ident' does not accept arguments."
         );
         assert_eq!(format!("{:?}", err.span()), format!("{:?}", expected_span));
     }
