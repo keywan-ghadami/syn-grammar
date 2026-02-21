@@ -171,55 +171,112 @@ grammar! {
 
 #[test]
 fn test_action_block_statements() {
-    action_block_test::parse_main.parse_str("a").test().assert_success_is(3);
+    action_block_test::parse_main
+        .parse_str("a")
+        .test()
+        .assert_success_is(3);
 }
 
 #[test]
 fn test_builtins() {
-    builtins_test::parse_ident.parse_str("abc").test().assert_success_is("abc".to_string());
-    builtins_test::parse_end.parse_str("").test().assert_success_is(());
+    builtins_test::parse_ident
+        .parse_str("abc")
+        .test()
+        .assert_success_is("abc".to_string());
+    builtins_test::parse_end
+        .parse_str("")
+        .test()
+        .assert_success_is(());
 }
 
 #[test]
 fn test_repetition() {
-    repetition_test::parse_star.parse_str("").test().assert_success_is(vec![]);
-    repetition_test::parse_star.parse_str("a a").test().assert_success_is(vec![1, 1]);
-    repetition_test::parse_plus.parse_str("a").test().assert_success_is(vec![1]);
-    repetition_test::parse_plus.parse_str("a a").test().assert_success_is(vec![1, 1]);
-    repetition_test::parse_plus.parse_str("").test().assert_is_err();
-    repetition_test::parse_optional.parse_str("").test().assert_success_is(None);
-    repetition_test::parse_optional.parse_str("a").test().assert_success_is(Some(1));
+    repetition_test::parse_star
+        .parse_str("")
+        .test()
+        .assert_success_is(vec![]);
+    repetition_test::parse_star
+        .parse_str("a a")
+        .test()
+        .assert_success_is(vec![1, 1]);
+    repetition_test::parse_plus
+        .parse_str("a")
+        .test()
+        .assert_success_is(vec![1]);
+    repetition_test::parse_plus
+        .parse_str("a a")
+        .test()
+        .assert_success_is(vec![1, 1]);
+    repetition_test::parse_plus
+        .parse_str("")
+        .test()
+        .assert_is_err();
+    repetition_test::parse_optional
+        .parse_str("")
+        .test()
+        .assert_success_is(None);
+    repetition_test::parse_optional
+        .parse_str("a")
+        .test()
+        .assert_success_is(Some(1));
 }
 
 #[test]
 fn test_nested_repetition_complex() {
-    nested_repetition_test::parse_main.parse_str("a, a a, a").test().assert_success_is(vec![vec![1], vec![1, 1], vec![1]]);
+    nested_repetition_test::parse_main
+        .parse_str("a, a a, a")
+        .test()
+        .assert_success_is(vec![vec![1], vec![1, 1], vec![1]]);
 }
 
 #[test]
 fn test_cut_operator() {
-    cut_test::parse_main.parse_str("a b").test().assert_success_is(1);
+    cut_test::parse_main
+        .parse_str("a b")
+        .test()
+        .assert_success_is(1);
     let res = cut_test::parse_main.parse_str("a c").test();
     res.assert_is_err();
 }
 
 #[test]
 fn test_keywords_vs_idents() {
-    kw_test::parse_main.parse_str("fn").test().assert_success_is(1);
-    kw_test::parse_main.parse_str("struct").test().assert_success_is(2);
-    kw_test::parse_main.parse_str("a").test().assert_success_is(3);
-    kw_test::parse_main.parse_str("fnx").test().assert_success_is(3);
+    kw_test::parse_main
+        .parse_str("fn")
+        .test()
+        .assert_success_is(1);
+    kw_test::parse_main
+        .parse_str("struct")
+        .test()
+        .assert_success_is(2);
+    kw_test::parse_main
+        .parse_str("a")
+        .test()
+        .assert_success_is(3);
+    kw_test::parse_main
+        .parse_str("fnx")
+        .test()
+        .assert_success_is(3);
 }
 
 #[test]
 fn test_basic_sequence() {
-    seq_test::parse_main.parse_str("a b").test().assert_success_is((1, 2));
+    seq_test::parse_main
+        .parse_str("a b")
+        .test()
+        .assert_success_is((1, 2));
 }
 
 #[test]
 fn test_epsilon_alternative() {
-    epsilon_test::parse_main.parse_str("a").test().assert_success_is(1);
-    epsilon_test::parse_main.parse_str("").test().assert_success_is(0);
+    epsilon_test::parse_main
+        .parse_str("a")
+        .test()
+        .assert_success_is(1);
+    epsilon_test::parse_main
+        .parse_str("")
+        .test()
+        .assert_success_is(0);
 }
 
 #[test]
@@ -229,7 +286,10 @@ fn test_rule_arguments() {
 
 #[test]
 fn test_multiple_arguments() {
-    multi_args::parse_main.parse_str("a").test().assert_success_is(3);
+    multi_args::parse_main
+        .parse_str("a")
+        .test()
+        .assert_success_is(3);
 }
 
 #[test]
@@ -240,13 +300,22 @@ fn test_complex_return_types() {
 
 #[test]
 fn test_cut_in_repetition() {
-    cut_rep::parse_main.parse_str("a b a b c").test().assert_success_is(());
-    cut_rep::parse_main.parse_str("a c").test().assert_error_contains(0, "expected `b`");
+    cut_rep::parse_main
+        .parse_str("a b a b c")
+        .test()
+        .assert_success_is(());
+    cut_rep::parse_main
+        .parse_str("a c")
+        .test()
+        .assert_error_contains(0, "expected `b`");
 }
 
 #[test]
 fn test_backtracking_priority() {
-    prio::parse_main.parse_str("a b").test().assert_success_is(1);
+    prio::parse_main
+        .parse_str("a b")
+        .test()
+        .assert_success_is(1);
     prio::parse_main.parse_str("a").test().assert_success_is(2);
 }
 
@@ -258,34 +327,64 @@ fn test_use_statements() {
 
 #[test]
 fn test_multi_token_literals() {
-    multi_token::parse_main.parse_str("?.").test().assert_success_is(());
+    multi_token::parse_main
+        .parse_str("?.")
+        .test()
+        .assert_success_is(());
 }
 
 #[test]
 fn test_attributes_on_rules() {
-    attributes::parse_main.parse_str("a").test().assert_success_is(());
+    attributes::parse_main
+        .parse_str("a")
+        .test()
+        .assert_success_is(());
 }
 
 #[test]
 fn test_plus_operator_validation() {
-    plus_validation::parse_main.parse_str("").test().assert_is_err();
-    plus_validation::parse_main.parse_str("a b a").test().assert_success_is(vec![(), (), ()]);
+    plus_validation::parse_main
+        .parse_str("")
+        .test()
+        .assert_is_err();
+    plus_validation::parse_main
+        .parse_str("a b a")
+        .test()
+        .assert_success_is(vec![(), (), ()]);
 }
 
 #[test]
 fn test_rust_types_and_blocks() {
-    rust_stuff::parse_ty.parse_str("i32").test().assert_success_is("i32".to_string());
-    rust_stuff::parse_block.parse_str("{ }").test().assert_success_is(1);
+    rust_stuff::parse_ty
+        .parse_str("i32")
+        .test()
+        .assert_success_is("i32".to_string());
+    rust_stuff::parse_block
+        .parse_str("{ }")
+        .test()
+        .assert_success_is(1);
 }
 
 #[test]
 fn test_fail_builtin_first() {
-    fail_test_1::parse_main.parse_str("1").test().assert_success_is(1);
-    fail_test_1::parse_main.parse_str("DEBUG 1").test().assert_success_is(1);
+    fail_test_1::parse_main
+        .parse_str("1")
+        .test()
+        .assert_success_is(1);
+    fail_test_1::parse_main
+        .parse_str("DEBUG 1")
+        .test()
+        .assert_success_is(1);
 }
 
 #[test]
 fn test_fail_builtin_last() {
-    fail_test_2::parse_main.parse_str("1").test().assert_success_is(1);
-    fail_test_2::parse_main.parse_str("1 DEBUG").test().assert_success_is(1);
+    fail_test_2::parse_main
+        .parse_str("1")
+        .test()
+        .assert_success_is(1);
+    fail_test_2::parse_main
+        .parse_str("1 DEBUG")
+        .test()
+        .assert_success_is(1);
 }

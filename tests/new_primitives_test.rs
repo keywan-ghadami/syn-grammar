@@ -41,10 +41,22 @@ fn test_numeric_primitives() {
         }
     }
 
-    inner::num_test::parse_int.parse_str("123").test().assert_success_is(123);
-    inner::num_test::parse_hex.parse_str("ff").test().assert_success_is(255);
-    inner::num_test::parse_oct.parse_str("77").test().assert_success_is(63);
-    inner::num_test::parse_bin.parse_str("11").test().assert_success_is(3);
+    inner::num_test::parse_int
+        .parse_str("123")
+        .test()
+        .assert_success_is(123);
+    inner::num_test::parse_hex
+        .parse_str("ff")
+        .test()
+        .assert_success_is(255);
+    inner::num_test::parse_oct
+        .parse_str("77")
+        .test()
+        .assert_success_is(63);
+    inner::num_test::parse_bin
+        .parse_str("11")
+        .test()
+        .assert_success_is(3);
 }
 
 #[test]
@@ -80,10 +92,22 @@ fn test_whitespace_primitive() {
         }
     }
 
-    inner::ws_test::parse_main.parse_str("a").test().assert_success_is(());
-    inner::ws_test::parse_main.parse_str(" a").test().assert_success_is(());
-    inner::ws_test::parse_main.parse_str("  a").test().assert_success_is(());
-    inner::ws_test::parse_main.parse_str("\t a").test().assert_success_is(());
+    inner::ws_test::parse_main
+        .parse_str("a")
+        .test()
+        .assert_success_is(());
+    inner::ws_test::parse_main
+        .parse_str(" a")
+        .test()
+        .assert_success_is(());
+    inner::ws_test::parse_main
+        .parse_str("  a")
+        .test()
+        .assert_success_is(());
+    inner::ws_test::parse_main
+        .parse_str("\t a")
+        .test()
+        .assert_success_is(());
 }
 
 #[test]

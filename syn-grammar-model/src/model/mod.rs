@@ -1,219 +1,226 @@
-// Moved from macros/src/model.rs
+use crate::parser;
+use proc_macro2::{Ident, TokenStream};
+
 pub mod backend;
 pub mod types;
 
-pub use backend::*;
-pub use types::*;
-
-use crate::parser;
-use proc_macro2::{Span, TokenStream};
-use syn::spanned::Spanned as _;
-use syn::{Attribute, Generics, Ident, ItemUse, Lit, Path, Type};
-
 #[derive(Debug, Clone)]
-pub struct GrammarDefinition {
+pub struct Grammar {
     pub name: Ident,
-    pub inherits: Option<Ident>,
-    pub uses: Vec<ItemUse>,
     pub rules: Vec<Rule>,
+    pub uses: Vec<syn::ItemUse>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Rule {
-    pub attrs: Vec<Attribute>,
-    pub is_pub: bool,
     pub name: Ident,
-    pub generics: Generics,
-    pub params: Vec<(Ident, Option<Type>)>,
-    pub return_type: Type,
+    pub generics: syn::Generics,
+    pub params: Vec<RuleParameter>,
+    pub return_type: syn::Type,
     pub variants: Vec<RuleVariant>,
+    pub is_pub: bool,
+    pub attrs: Vec<syn::Attribute>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuleParameter {
+    pub name: Ident,
+    pub ty: syn::Type,
 }
 
 #[derive(Debug, Clone)]
 pub struct RuleVariant {
-    pub pattern: Vec<ModelPattern>,
-    pub label: Option<String>, // Added
+    pub pattern: Vec<Pattern>,
     pub action: TokenStream,
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Pattern {
+    Cut,
+    Lit {
+        binding: Option<Ident>,
+        lit: syn::Lit,
+    },
+    RuleCall {
+        binding: Option<Ident>,
+        rule_name: Ident,
+        generics: Vec<syn::Type>,
+        args: Vec<Argument>,
+    },
+    Group(Vec<(Vec<Pattern>, Option<TokenStream>, Option<String>)>),
+    Bracketed(Vec<Pattern>),
+    Braced(Vec<Pattern>),
+    Parenthesized(Vec<Pattern>),
+    Optional(Box<Pattern>),
+    Repeat(Box<Pattern>),
+    Plus(Box<Pattern>),
+    SpanBinding(Box<Pattern>, Ident),
+    Recover {
+        binding: Option<Ident>,
+        body: Box<Pattern>,
+        sync: Box<Pattern>,
+    },
+    Peek(Box<Pattern>),
+    Not(Box<Pattern>),
+    Until {
+        binding: Option<Ident>,
+        pattern: Box<Pattern>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum Argument {
-    Positional(ModelPattern),
-    Named(Ident, ModelPattern),
+    Positional(Pattern),
+    Named(Ident, Pattern),
 }
 
-#[derive(Debug, Clone)]
-pub enum ModelPattern {
-    Cut(Span),
-    Lit {
-        binding: Option<Ident>,
-        lit: Lit,
-    },
-    RuleCall {
-        binding: Option<Ident>,
-        rule_path: Path,
-        generics: Vec<Type>,
-        args: Vec<Argument>,
-    },
-    Group(Vec<(Vec<ModelPattern>, Option<String>)>, Span), // Updated
-    Bracketed(Vec<ModelPattern>, Span),
-    Braced(Vec<ModelPattern>, Span),
-    Parenthesized(Vec<ModelPattern>, Span),
-    Optional(Box<ModelPattern>, Span),
-    Repeat(Box<ModelPattern>, Span),
-    Plus(Box<ModelPattern>, Span),
-    SpanBinding(Box<ModelPattern>, Ident, Span),
-    Recover {
-        binding: Option<Ident>,
-        body: Box<ModelPattern>,
-        sync: Box<ModelPattern>,
-        span: Span,
-    },
-    Peek(Box<ModelPattern>, Span),
-    Not(Box<ModelPattern>, Span),
-    Until {
-        binding: Option<Ident>,
-        pattern: Box<ModelPattern>,
-        span: Span,
-    },
-}
-
-impl From<parser::GrammarDefinition> for GrammarDefinition {
-    fn from(p: parser::GrammarDefinition) -> Self {
-        Self {
-            name: p.name,
-            inherits: p.inherits.map(|spec| spec.name),
-            uses: p.uses,
-            rules: p.rules.into_iter().map(Into::into).collect(),
-        }
+pub fn morphism<F: Morphism>(p: parser::GrammarDefinition) -> Grammar {
+    Grammar {
+        name: p.name,
+        rules: p.rules.into_iter().map(F::rule).collect(),
+        uses: p.uses,
     }
 }
 
-impl From<parser::Rule> for Rule {
-    fn from(p: parser::Rule) -> Self {
-        Self {
-            attrs: p.attrs,
-            is_pub: p.is_pub.is_some(),
+pub trait Morphism {
+    fn rule(p: parser::Rule) -> Rule;
+    fn rule_parameter(p: parser::RuleParameter) -> RuleParameter;
+    fn rule_variant(p: parser::RuleVariant) -> RuleVariant;
+    fn pattern(p: parser::Pattern) -> Pattern;
+    fn argument(p: parser::Argument) -> Argument;
+}
+
+impl<F: Morphism> Morphism for &F {
+    fn rule(p: parser::Rule) -> Rule {
+        F::rule(p)
+    }
+
+    fn rule_parameter(p: parser::RuleParameter) -> RuleParameter {
+        F::rule_parameter(p)
+    }
+
+    fn rule_variant(p: parser::RuleVariant) -> RuleVariant {
+        F::rule_variant(p)
+    }
+
+    fn pattern(p: parser::Pattern) -> Pattern {
+        F::pattern(p)
+    }
+
+    fn argument(p: parser::Argument) -> Argument {
+        F::argument(p)
+    }
+}
+
+pub struct IdentityMorphism;
+
+impl Morphism for IdentityMorphism {
+    fn rule(p: parser::Rule) -> Rule {
+        Rule {
             name: p.name,
             generics: p.generics,
             params: p
                 .params
                 .into_iter()
-                .map(|param| (param.name, param.ty))
+                .map(IdentityMorphism::rule_parameter)
                 .collect(),
             return_type: p.return_type,
-            variants: p.variants.into_iter().map(Into::into).collect(),
+            variants: p
+                .variants
+                .into_iter()
+                .map(IdentityMorphism::rule_variant)
+                .collect(),
+            is_pub: p.is_pub.is_some(),
+            attrs: p.attrs,
         }
     }
-}
 
-impl From<parser::RuleVariant> for RuleVariant {
-    fn from(p: parser::RuleVariant) -> Self {
-        Self {
-            pattern: p.pattern.into_iter().map(Into::into).collect(),
-            label: p.label, // Added
+    fn rule_parameter(p: parser::RuleParameter) -> RuleParameter {
+        RuleParameter {
+            name: p.name,
+            ty: p.ty.unwrap(),
+        }
+    }
+
+    fn rule_variant(p: parser::RuleVariant) -> RuleVariant {
+        RuleVariant {
+            pattern: p.pattern.into_iter().map(IdentityMorphism::pattern).collect(),
             action: p.action,
+            label: p.label,
         }
     }
-}
 
-impl From<parser::Argument> for Argument {
-    fn from(a: parser::Argument) -> Self {
-        match a {
-            parser::Argument::Positional(p) => Argument::Positional(p.into()),
-            parser::Argument::Named(id, p) => Argument::Named(id, p.into()),
-        }
-    }
-}
-
-impl From<parser::Pattern> for ModelPattern {
-    fn from(p: parser::Pattern) -> Self {
-        use parser::Pattern as P;
+    fn pattern(p: parser::Pattern) -> Pattern {
         match p {
-            P::Cut(t) => ModelPattern::Cut(t.span()),
-            P::Lit { binding, lit } => ModelPattern::Lit { binding, lit },
-            P::RuleCall {
+            parser::Pattern::Cut(_) => Pattern::Cut,
+            parser::Pattern::Lit { binding, lit } => Pattern::Lit { binding, lit },
+            parser::Pattern::RuleCall {
                 binding,
                 rule_path,
                 generics,
                 args,
-            } => ModelPattern::RuleCall {
+            } => Pattern::RuleCall {
                 binding,
-                rule_path,
+                rule_name: rule_path.segments.last().unwrap().ident.clone(),
                 generics,
-                args: args.into_iter().map(Argument::from).collect(),
+                args: args.into_iter().map(IdentityMorphism::argument).collect(),
             },
-            P::Group(alts, token) => ModelPattern::Group(
+            parser::Pattern::Group(alts, _) => Pattern::Group(
                 alts.into_iter()
-                    .map(|(seq, label)| (seq.into_iter().map(ModelPattern::from).collect(), label))
+                    .map(|(seq, action, label)| {
+                        (
+                            seq.into_iter().map(IdentityMorphism::pattern).collect(),
+                            action,
+                            label,
+                        )
+                    })
                     .collect(),
-                token.span.join(),
             ),
-            P::Bracketed(p, token) => ModelPattern::Bracketed(
-                p.into_iter().map(ModelPattern::from).collect(),
-                token.span.join(),
+            parser::Pattern::Bracketed(seq, _) => Pattern::Bracketed(
+                seq.into_iter().map(IdentityMorphism::pattern).collect(),
             ),
-            P::Braced(p, token) => ModelPattern::Braced(
-                p.into_iter().map(ModelPattern::from).collect(),
-                token.span.join(),
-            ),
-            P::Parenthesized(p, _, token) => ModelPattern::Parenthesized(
-                p.into_iter().map(ModelPattern::from).collect(),
-                token.span.join(),
-            ),
-            P::Optional(p, token) => {
-                ModelPattern::Optional(Box::new(ModelPattern::from(*p)), token.span())
+            parser::Pattern::Braced(seq, _) => {
+                Pattern::Braced(seq.into_iter().map(IdentityMorphism::pattern).collect())
             }
-            P::Repeat(p, token) => {
-                ModelPattern::Repeat(Box::new(ModelPattern::from(*p)), token.span())
+            parser::Pattern::Parenthesized(seq, _, _) => Pattern::Parenthesized(
+                seq.into_iter().map(IdentityMorphism::pattern).collect(),
+            ),
+            parser::Pattern::Optional(p, _) => {
+                Pattern::Optional(Box::new(IdentityMorphism::pattern(*p)))
             }
-            P::Plus(p, token) => ModelPattern::Plus(Box::new(ModelPattern::from(*p)), token.span()),
-            P::SpanBinding(p, ident, token) => {
-                ModelPattern::SpanBinding(Box::new(ModelPattern::from(*p)), ident, token.span)
+            parser::Pattern::Repeat(p, _) => Pattern::Repeat(Box::new(IdentityMorphism::pattern(*p))),
+            parser::Pattern::Plus(p, _) => Pattern::Plus(Box::new(IdentityMorphism::pattern(*p))),
+            parser::Pattern::SpanBinding(p, id, _) => {
+                Pattern::SpanBinding(Box::new(IdentityMorphism::pattern(*p)), id)
             }
-            P::Recover {
+            parser::Pattern::Recover {
                 binding,
                 body,
                 sync,
-                kw_token,
-            } => ModelPattern::Recover {
+                ..
+            } => Pattern::Recover {
                 binding,
-                body: Box::new(ModelPattern::from(*body)),
-                sync: Box::new(ModelPattern::from(*sync)),
-                span: kw_token.span(),
+                body: Box::new(IdentityMorphism::pattern(*body)),
+                sync: Box::new(IdentityMorphism::pattern(*sync)),
             },
-            P::Peek(p, token) => ModelPattern::Peek(Box::new(ModelPattern::from(*p)), token.span()),
-            P::Not(p, token) => ModelPattern::Not(Box::new(ModelPattern::from(*p)), token.span()),
-            P::Until {
+            parser::Pattern::Peek(p, _) => Pattern::Peek(Box::new(IdentityMorphism::pattern(*p))),
+            parser::Pattern::Not(p, _) => Pattern::Not(Box::new(IdentityMorphism::pattern(*p))),
+            parser::Pattern::Until {
+                binding, pattern, ..
+            } => Pattern::Until {
                 binding,
-                pattern,
-                kw_token,
-            } => ModelPattern::Until {
-                binding,
-                pattern: Box::new(ModelPattern::from(*pattern)),
-                span: kw_token.span(),
+                pattern: Box::new(IdentityMorphism::pattern(*pattern)),
             },
         }
     }
-}
 
-impl ModelPattern {
-    pub fn span(&self) -> Span {
-        match self {
-            ModelPattern::Cut(s) => *s,
-            ModelPattern::Lit { lit, .. } => lit.span(),
-            ModelPattern::RuleCall { rule_path, .. } => rule_path.span(),
-            ModelPattern::Optional(_, s)
-            | ModelPattern::Repeat(_, s)
-            | ModelPattern::Plus(_, s) => *s,
-            ModelPattern::SpanBinding(_, _, s) => *s,
-            ModelPattern::Recover { span, .. } => *span,
-            ModelPattern::Group(_, s) => *s,
-            ModelPattern::Bracketed(_, s)
-            | ModelPattern::Braced(_, s)
-            | ModelPattern::Parenthesized(_, s) => *s,
-            ModelPattern::Peek(_, s) | ModelPattern::Not(_, s) => *s,
-            ModelPattern::Until { span, .. } => *span,
+    fn argument(p: parser::Argument) -> Argument {
+        match p {
+            parser::Argument::Positional(p) => {
+                Argument::Positional(IdentityMorphism::pattern(p))
+            }
+            parser::Argument::Named(n, p) => Argument::Named(n, IdentityMorphism::pattern(p)),
         }
     }
 }
