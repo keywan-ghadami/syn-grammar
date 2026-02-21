@@ -10,7 +10,7 @@ fn test_generic_rule() {
                 items:item* -> { items }
 
             pub rule main -> Vec<i32> =
-                l:list!(i32) -> { l }
+                l:list<>(i32) -> { l }
         }
     }
 
@@ -27,7 +27,7 @@ fn test_generic_map() {
             use std::collections::HashMap;
 
             rule map<K: std::hash::Hash + Eq, V>(k, v) -> HashMap<K, V> =
-                entries:entry!(k, v)* -> {
+                entries:entry<>(k, v)* -> {
                     entries.into_iter().collect()
                 }
 
@@ -35,7 +35,7 @@ fn test_generic_map() {
                 key:k ":" val:v -> { (key, val) }
 
             pub rule main -> HashMap<String, i32> =
-                m:map!(string, i32) -> {
+                m:map<>(string, i32) -> {
                     m.into_iter().map(|(k, v)| (k.value, v)).collect()
                 }
         }

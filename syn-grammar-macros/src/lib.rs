@@ -28,14 +28,14 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     let def = &file.grammar;
     let grammar_name = &def.name;
     let rules_macro_name = quote::format_ident!("{}_rules", grammar_name);
+    // Generate unique alias for grammar_core to avoid conflicts when multiple grammars are defined in the same scope
+    let core_alias = quote::format_ident!("_grammar_core_{}", grammar_name);
 
     let rules = &def.rules;
     let rules_tokens = quote! { #(#rules)* };
 
-    // We use a local alias for grammar_core to ensure we can match it as an identifier
-    // in macro_rules! without dealing with paths.
     let mut current_chain = quote! {
-        _grammar_core! { #def }
+        #core_alias! { #def }
     };
 
     for include in file.includes.iter().rev() {
@@ -49,18 +49,19 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     quote! {
         #[macro_export]
         macro_rules! #rules_macro_name {
-            ($alias:ident, { $next:ident! { $($inner:tt)* } }) => {
+            ($alias:ident, { $next:ident! { $($inner:tt)* } } $($rest:tt)*) => {
                 $next! {
                     $($inner)*
                     ruleset {
                         #rules_tokens
                     } as $alias;
+                    $($rest)*
                 }
             };
         }
 
         #[allow(unused_imports)]
-        use syn_grammar::grammar_core as _grammar_core;
+        use syn_grammar::grammar_core as #core_alias;
         #current_chain
     }
     .into()

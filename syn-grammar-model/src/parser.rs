@@ -40,6 +40,33 @@ pub mod kw {
     syn::custom_keyword!(until);
 }
 
+fn parse_path_no_args(input: ParseStream) -> Result<Path> {
+    let leading_colon = if input.peek(Token![::]) {
+        Some(input.parse::<Token![::]>()?)
+    } else {
+        None
+    };
+
+    let mut segments = syn::punctuated::Punctuated::new();
+    loop {
+        let ident: Ident = rt::parse_ident(input)?; 
+        let arguments = syn::PathArguments::None;
+        segments.push_value(syn::PathSegment { ident, arguments });
+
+        if input.peek(Token![::]) {
+            let punct = input.parse::<Token![::]>()?;
+            segments.push_punct(punct);
+        } else {
+            break;
+        }
+    }
+
+    Ok(Path {
+        leading_colon,
+        segments,
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct RuleSet {
     pub alias: Ident,
@@ -77,7 +104,6 @@ impl Parse for GrammarDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut rules = Vec::new();
 
-        // Support rulesets before grammar
         while input.peek(kw::ruleset) {
             let set: RuleSet = input.parse()?;
             rules.extend(set.rules);
@@ -100,7 +126,6 @@ impl Parse for GrammarDefinition {
             uses.push(content.parse()?);
         }
 
-        // Parse rulesets inside the grammar block
         while content.peek(kw::ruleset) {
             let set: RuleSet = content.parse()?;
             rules.extend(set.rules);
@@ -109,7 +134,6 @@ impl Parse for GrammarDefinition {
         let main_rules = Rule::parse_all(&content)?;
         rules.extend(main_rules);
 
-        // Support rulesets after grammar
         while input.peek(kw::ruleset) {
             let set: RuleSet = input.parse()?;
             rules.extend(set.rules);
@@ -141,12 +165,10 @@ impl ToTokens for GrammarDefinition {
 }
 
 fn mangle_rule(rule: &mut Rule, alias: &Ident) {
-    // Mangle rule definition name: name -> alias__name
     let old_name = rule.name.clone();
     let new_name = syn::Ident::new(&format!("{}__{}", alias, old_name), old_name.span());
     rule.name = new_name;
 
-    // Mangle recursive calls inside patterns
     for variant in &mut rule.variants {
         for pattern in &mut variant.pattern {
             mangle_pattern(pattern, alias);
@@ -159,12 +181,10 @@ fn mangle_pattern(pattern: &mut Pattern, alias: &Ident) {
         Pattern::RuleCall {
             rule_path, args, ..
         } => {
-            // Only mangle if it's a simple identifier (local call)
             if rule_path.segments.len() == 1 {
                 let segment = &mut rule_path.segments[0];
                 if segment.arguments.is_none() {
                     let old_ident = segment.ident.clone();
-                    // We change it to alias::old_ident
                     let new_path: Path = syn::parse_quote!(#alias::#old_ident);
                     *rule_path = new_path;
                 }
@@ -281,7 +301,6 @@ impl Parse for Rule {
         let _ = input.parse::<kw::rule>()?;
         let name = rt::parse_ident(input)?;
 
-        // Parse generics if present (e.g., <T, U>)
         let generics: Generics = input.parse()?;
 
         let params = if input.peek(token::Paren) {
@@ -333,7 +352,6 @@ impl ToTokens for Rule {
             quote! { ( #(#params),* ) }
         };
 
-        // Join variants with |
         let mut variants_tokens = TokenStream::new();
         for (i, v) in variants.iter().enumerate() {
             if i > 0 {
@@ -430,11 +448,6 @@ pub enum Argument {
 
 impl Parse for Argument {
     fn parse(input: ParseStream) -> Result<Self> {
-        // Check for Named: Ident = ...
-        // But Pattern can also start with Ident.
-        // Ambiguity: `x` could be a rule call `x` or named arg `x = ...`.
-        // We peek for `=` to distinguish.
-
         if input.peek(Ident) && input.peek2(Token![=]) {
             let name: Ident = input.parse()?;
             let _ = input.parse::<Token![=]>()?;
@@ -556,7 +569,6 @@ impl ToTokens for Pattern {
                     token::Gt::default().to_tokens(tokens);
                 }
                 if !args.is_empty() {
-                    token::Not::default().to_tokens(tokens);
                     token::Paren::default().surround(tokens, |t| {
                         for (i, a) in args.iter().enumerate() {
                             if i > 0 {
@@ -683,7 +695,6 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         Ok(Pattern::Cut(token))
     } else if input.peek(Lit) {
         let lit: Lit = input.parse()?;
-        // Convert char literals to string literals for consistency
         let lit = match lit {
             Lit::Char(c) => Lit::Str(syn::LitStr::new(&c.value().to_string(), c.span())),
             _ => lit,
@@ -754,7 +765,6 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         let inner = content.parse()?;
         Ok(Pattern::Not(Box::new(inner), kw_token))
     } else if input.peek(kw::until) {
-        // until returns a TokenStream, so it can be bound.
         let kw_token = input.parse::<kw::until>()?;
         let content;
         syn::parenthesized!(content in input);
@@ -765,7 +775,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
             kw_token,
         })
     } else {
-        let rule_path: Path = input.parse()?;
+        let rule_path = parse_path_no_args(input)?;
 
         let is_simple_ident = rule_path.leading_colon.is_none()
             && rule_path.segments.len() == 1
@@ -773,19 +783,10 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
 
         if is_simple_ident {
             let rule_name = &rule_path.segments[0].ident;
-            // Check for aliases
             let is_alias = get_alias(&rule_name.to_string()).is_some();
             if is_alias {
-                // Check if it looks like a rule call (generics or contiguous parens)
                 let has_generics = input.peek(Token![<]);
-                let has_args = if input.peek(Token![!]) {
-                    // Check if it's a macro-like call
-                    true
-                } else {
-                    false
-                };
-
-                if !has_generics && !has_args {
+                if !has_generics {
                     let token_str = get_alias(&rule_name.to_string()).unwrap();
                     return Ok(Pattern::Lit {
                         binding,
@@ -795,29 +796,29 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
             }
         }
 
-        // Parse generics: rule<T, U>
-        let generics = if input.peek(Token![<]) {
+        let (generics, has_generics) = if input.peek(Token![<]) {
             let _ = input.parse::<Token![<]>()?;
             let mut types = Vec::new();
-            loop {
-                types.push(input.parse::<Type>()?);
-                if input.peek(Token![,]) {
-                    let _ = input.parse::<Token![,]>()?;
-                    if input.peek(Token![>]) {
+            if !input.peek(Token![>]) {
+                loop {
+                    types.push(input.parse::<Type>()?);
+                    if input.peek(Token![,]) {
+                        let _ = input.parse::<Token![,]>()?;
+                        if input.peek(Token![>]) {
+                            break;
+                        }
+                    } else {
                         break;
                     }
-                } else {
-                    break;
                 }
             }
             let _gt_token = input.parse::<Token![>]>()?;
-            types
+            (types, true)
         } else {
-            Vec::new()
+            (Vec::new(), false)
         };
 
-        let args = if input.peek(Token![!]) {
-            let _ = input.parse::<Token![!]>()?;
+        let args = if has_generics && input.peek(token::Paren) {
             parse_args(input)?
         } else {
             Vec::new()

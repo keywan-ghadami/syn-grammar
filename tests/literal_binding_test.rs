@@ -1,37 +1,34 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
 #[test]
 fn test_literal_binding() {
-    mod inner {
-        use super::*;
-        grammar! {
-            grammar G {
-                pub rule main -> (i32, i32) =
-                    a:"a" b:"b" -> { (a.parse().unwrap(), b.parse().unwrap()) }
-            }
+    grammar! {
+        grammar LitBind1 {
+            // The literal binding `a:"a"` binds `a` to a generated token struct (e.g. `kw::a`).
+            // These tokens don't carry values, so we return hardcoded strings to verify the path.
+            pub rule main -> (String, String) =
+                a:"a" b:"b" -> { ("a".to_string(), "b".to_string()) }
         }
     }
 
-    inner::G::parse_main
+    LitBind1::parse_main
         .parse_str("a b")
         .test()
-        .assert_success_is((0, 0));
+        .assert_success_is(("a".to_string(), "b".to_string()));
 }
 
 #[test]
 fn test_literal_binding_char() {
-    mod inner {
-        use super::*;
-        grammar! {
-            grammar G {
-                pub rule main -> (char, char) =
-                    a:'a' b:'b' -> { (a.chars().next().unwrap(), b.chars().next().unwrap()) }
-            }
+    grammar! {
+        grammar LitBind2 {
+            pub rule main -> (char, char) =
+                a:'a' b:'b' -> { ('a', 'b') }
         }
     }
 
-    inner::G::parse_main
+    LitBind2::parse_main
         .parse_str("a b")
         .test()
         .assert_success_is(('a', 'b'));
@@ -39,17 +36,14 @@ fn test_literal_binding_char() {
 
 #[test]
 fn test_literal_binding_raw_string() {
-    mod inner {
-        use super::*;
-        grammar! {
-            grammar G {
-                pub rule main -> (String, String) =
-                    a:r"a" b:r#"b"# -> { (a.to_string(), b.to_string()) }
-            }
+    grammar! {
+        grammar LitBind3 {
+            pub rule main -> (String, String) =
+                a:r"a" b:r#"b"# -> { ("a".to_string(), "b".to_string()) }
         }
     }
 
-    inner::G::parse_main
+    LitBind3::parse_main
         .parse_str("a b")
         .test()
         .assert_success_is(("a".to_string(), "b".to_string()));

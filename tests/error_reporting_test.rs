@@ -1,24 +1,38 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
-mod err_test_1 {
-    use super::*;
-    grammar! {
-        grammar err_test_1 {
-            pub rule main -> () = call!(deepest_err);
-            rule deepest_err -> () = "a" "b" "c" -> { () };
-        }
+// Top-level definitions to avoid module nesting and macro export warnings.
+// Each grammar has a unique name in this file to prevent conflicts.
+
+grammar! {
+    grammar err_test_1 {
+        pub rule main -> () = deepest_err -> { () }
+        rule deepest_err -> () = "a" "b" "c" -> { () }
     }
 }
 
-mod digit_test_1 {
-    use super::*;
-    grammar! {
-        grammar digit_test_1 {
-            pub rule main -> () = l:letter+ d:digit+ -> { () };
-            rule letter -> () = "a" | "b" | "c" -> { () };
-            rule digit -> () = "0" | "1" | "2" -> { () };
-        }
+grammar! {
+    grammar digit_test_1 {
+        pub rule main -> () = l:letter+ d:digit+ -> { () }
+        rule letter -> () = ("a" | "b" | "c") -> { () }
+        // "0", "1", "2" are not allowed as token literals in syn-grammar, using identifiers
+        rule digit -> () = ("zero" | "one" | "two") -> { () }
+    }
+}
+
+grammar! {
+    grammar prio_test {
+        pub rule main -> () = (d:deep | s:shallow) -> { () }
+        rule deep -> () = "a" "b" "c" -> { () }
+        rule shallow -> () = "d" "e" -> { () }
+    }
+}
+
+grammar! {
+    grammar rule_name_test {
+        pub rule main -> () = a:inner_rule -> { () }
+        rule inner_rule -> () = "a" "b" -> { () }
     }
 }
 
@@ -30,20 +44,9 @@ fn test_deepest_error_wins() {
         .assert_error_contains(0, "expected `c`");
 
     digit_test_1::parse_main
-        .parse_str("a b 1 c")
+        .parse_str("a b one c")
         .test()
-        .assert_error_contains(0, "expected `0`, `1`, or `2`");
-}
-
-mod prio_test {
-    use super::*;
-    grammar! {
-        grammar prio_test {
-            pub rule main -> () = d:deep | s:shallow -> { () };
-            rule deep -> () = "a" "b" "c" -> { () };
-            rule shallow -> () = "d" "e" -> { () };
-        }
-    }
+        .assert_error_contains(0, "expected `zero`, `one`, or `two`");
 }
 
 #[test]
@@ -52,16 +55,6 @@ fn test_deep_vs_shallow() {
         .parse_str("a b d")
         .test()
         .assert_error_contains(0, "expected `c`");
-}
-
-mod rule_name_test {
-    use super::*;
-    grammar! {
-        grammar rule_name_test {
-            pub rule main -> () = a:inner_rule -> { () };
-            rule inner_rule -> () = "a" "b" -> { () };
-        }
-    }
 }
 
 #[test]

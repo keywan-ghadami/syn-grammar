@@ -1,3 +1,4 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
@@ -7,7 +8,7 @@ fn test_float_primitive() {
         use super::*;
         grammar! {
             grammar float_test {
-                pub rule main -> f32 = f:FLOAT -> { f.parse().unwrap() };
+                pub rule main -> f32 = f:f32 -> { f }
             }
         }
     }
@@ -32,10 +33,10 @@ fn test_numeric_primitives() {
         use super::*;
         grammar! {
             grammar num_test {
-                pub rule int -> i32 = i:INT -> { i.parse().unwrap() };
-                pub rule hex -> i32 = h:HEX -> { i32::from_str_radix(h, 16).unwrap() };
-                pub rule oct -> i32 = o:OCT -> { i32::from_str_radix(o, 8).unwrap() };
-                pub rule bin -> i32 = b:BIN -> { i32::from_str_radix(b, 2).unwrap() };
+                pub rule int -> i32 = i:i32 -> { i }
+                pub rule hex -> i32 = h:hex_literal -> { h as i32 }
+                pub rule oct -> i32 = o:oct_literal -> { o as i32 }
+                pub rule bin -> i32 = b:bin_literal -> { b as i32 }
             }
         }
     }
@@ -52,7 +53,7 @@ fn test_string_primitive() {
         use super::*;
         grammar! {
             grammar str_test {
-                pub rule main -> String = s:STRING -> { s };
+                pub rule main -> String = s:string -> { s.value }
             }
         }
     }
@@ -64,7 +65,7 @@ fn test_string_primitive() {
     inner::str_test::parse_main
         .parse_str(r#""hello \"b\"""#)
         .test()
-        .assert_success_is("hello \\\"b\\\"".to_string());
+        .assert_success_is("hello \"b\"".to_string());
 }
 
 #[test]
@@ -74,7 +75,7 @@ fn test_whitespace_primitive() {
         grammar! {
             grammar ws_test {
                 // Requires a non-whitespace token to be present after the ws
-                pub rule main -> () = WS "a" -> {()};
+                pub rule main -> () = whitespace "a" -> {()}
             }
         }
     }
@@ -91,7 +92,7 @@ fn test_whitespace_punct_ident() {
         use super::*;
         grammar! {
             grammar ws_punct_ident_test {
-                pub rule main -> () = "+=" "a" -> {()};
+                pub rule main -> () = "+=" "a" -> {()}
             }
         }
     }
@@ -108,7 +109,7 @@ fn test_whitespace_ident_ident() {
         use super::*;
         grammar! {
             grammar ws_ident_ident_test {
-                pub rule main -> () = "a" "b" -> {()};
+                pub rule main -> () = "a" "b" -> {()}
             }
         }
     }
@@ -124,9 +125,9 @@ fn test_whitespace_between_rules() {
         use super::*;
         grammar! {
             grammar ws_between_rules_test {
-                pub rule main -> () = a b -> {()};
-                rule a -> () = "a" -> {()};
-                rule b -> () = "b" -> {()};
+                pub rule main -> () = a b -> {()}
+                rule a -> () = "a" -> {()}
+                rule b -> () = "b" -> {()}
             }
         }
     }
