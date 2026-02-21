@@ -2,6 +2,7 @@ use crate::backend::SynBackend;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashSet;
+use syn::spanned::Spanned;
 use syn::{Lit, Result};
 use syn_grammar_model::{analysis, model::*, Backend};
 
@@ -104,19 +105,20 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
         }
         ModelPattern::RuleCall {
             binding,
-            rule_name,
+            rule_path,
             generics,
             args,
         } => {
-            let rule_name_str = rule_name.to_string();
+            let rule_name_ident = rule_path.get_ident();
             let builtins = SynBackend::get_builtins();
-            let is_builtin = builtins.iter().any(|b| b.name == rule_name_str);
+            let is_builtin =
+                rule_name_ident.is_some_and(|ident| builtins.iter().any(|b| ident == b.name));
 
-            if rule_name_str == "separated" {
+            if rule_path.is_ident("separated") {
                 // separated(rule, sep, min=0, trailing=false)
                 if args.len() < 2 {
                     return Err(syn::Error::new(
-                        rule_name.span(),
+                        rule_path.span(),
                         "separated requires at least 2 arguments: (rule, separator)",
                     ));
                 }
@@ -175,14 +177,14 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 let (rule_arg_with_binding, item_binding) = match rule_arg {
                     ModelPattern::RuleCall {
                         binding: None,
-                        rule_name,
+                        rule_path,
                         generics,
                         args,
                     } => {
                         let temp = format_ident!("_item");
                         let new_pat = ModelPattern::RuleCall {
                             binding: Some(temp.clone()),
-                            rule_name: rule_name.clone(),
+                            rule_path: rule_path.clone(),
                             generics: generics.clone(),
                             args: args.clone(),
                         };
@@ -279,11 +281,11 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 } else {
                     Ok(quote! { let _ = { #refined_loop }; })
                 }
-            } else if rule_name_str == "repeated" {
+            } else if rule_path.is_ident("repeated") {
                 // repeated(rule, min=0)
                 if args.is_empty() {
                     return Err(syn::Error::new(
-                        rule_name.span(),
+                        rule_path.span(),
                         "repeated requires at least 1 argument: (rule)",
                     ));
                 }
@@ -327,14 +329,14 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 let (rule_arg_with_binding, item_binding) = match rule_arg {
                     ModelPattern::RuleCall {
                         binding: None,
-                        rule_name,
+                        rule_path,
                         generics,
                         args,
                     } => {
                         let temp = format_ident!("_item");
                         let new_pat = ModelPattern::RuleCall {
                             binding: Some(temp.clone()),
-                            rule_name: rule_name.clone(),
+                            rule_path: rule_path.clone(),
                             generics: generics.clone(),
                             args: args.clone(),
                         };
@@ -389,6 +391,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     Ok(quote! { let _ = { #loop_logic }; })
                 }
             } else if is_builtin {
+                let rule_name_str = rule_name_ident.unwrap().to_string();
                 // Generate a token-filtering expression for the primitive.
                 let expr = match rule_name_str.as_str() {
                     "alpha" => quote! {
@@ -469,7 +472,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                     }
                     // Defer to built-in rules for high-level primitives like "ident", "integer", "float"
                     _ => {
-                        let func_call = generate_rule_call_expr(rule_name, args);
+                        let func_call = generate_rule_call_expr(rule_path, args);
                         quote! { #func_call }
                     }
                 };
@@ -481,7 +484,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 };
                 Ok(result)
             } else {
-                let func_call = generate_rule_call_expr(rule_name, args);
+                let func_call = generate_rule_call_expr(rule_path, args);
                 Ok(if let Some(bind) = binding {
                     quote! { let #bind = #func_call; }
                 } else {
@@ -786,7 +789,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
             let (inner_pat, binding_name) = match &**inner {
                 ModelPattern::RuleCall {
                     binding,
-                    rule_name,
+                    rule_path,
                     generics,
                     args,
                 } => {
@@ -796,7 +799,7 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                         let temp = format_ident!("_val_{}", span_var);
                         let new_inner = ModelPattern::RuleCall {
                             binding: Some(temp.clone()),
-                            rule_name: rule_name.clone(),
+                            rule_path: rule_path.clone(),
                             generics: generics.clone(),
                             args: args.clone(),
                         };
@@ -860,12 +863,12 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
                 match &**body {
                     ModelPattern::RuleCall {
                         binding: None,
-                        rule_name,
+                        rule_path,
                         generics,
                         args,
                     } => Box::new(ModelPattern::RuleCall {
                         binding: Some(bind.clone()),
-                        rule_name: rule_name.clone(),
+                        rule_path: rule_path.clone(),
                         generics: generics.clone(),
                         args: args.clone(),
                     }),
@@ -1005,9 +1008,15 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
     }
 }
 
-fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[Argument]) -> TokenStream {
+fn generate_rule_call_expr(rule_path: &syn::Path, args: &[Argument]) -> TokenStream {
     // Call the _impl version and pass ctx
-    let f = format_ident!("parse_{}_impl", rule_name);
+    let mangled_name = rule_path
+        .segments
+        .iter()
+        .map(|s| s.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("__");
+    let f = format_ident!("parse_{}_impl", mangled_name);
 
     let arg_exprs: Vec<TokenStream> = args
         .iter()
@@ -1015,8 +1024,11 @@ fn generate_rule_call_expr(rule_name: &syn::Ident, args: &[Argument]) -> TokenSt
             Argument::Positional(p) | Argument::Named(_, p) => match p {
                 ModelPattern::Lit { lit, .. } => quote!(#lit),
                 ModelPattern::RuleCall {
-                    rule_name, args, ..
-                } if args.is_empty() => quote!(#rule_name),
+                    rule_path, args, ..
+                } if args.is_empty() && rule_path.get_ident().is_some() => {
+                    let ident = rule_path.get_ident().unwrap();
+                    quote!(#ident)
+                }
                 _ => quote!(compile_error!("Complex pattern used as runtime argument")),
             },
         })

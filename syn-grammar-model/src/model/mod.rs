@@ -8,7 +8,7 @@ pub use types::*;
 use crate::parser;
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned as _;
-use syn::{Attribute, Generics, Ident, ItemUse, Lit, Type};
+use syn::{Attribute, Generics, Ident, ItemUse, Lit, Path, Type};
 
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
@@ -51,7 +51,7 @@ pub enum ModelPattern {
     },
     RuleCall {
         binding: Option<Ident>,
-        rule_name: Ident,
+        rule_path: Path,
         generics: Vec<Type>,
         args: Vec<Argument>,
     },
@@ -134,12 +134,12 @@ impl From<parser::Pattern> for ModelPattern {
             P::Lit { binding, lit } => ModelPattern::Lit { binding, lit },
             P::RuleCall {
                 binding,
-                rule_name,
+                rule_path,
                 generics,
                 args,
             } => ModelPattern::RuleCall {
                 binding,
-                rule_name,
+                rule_path,
                 generics,
                 args: args.into_iter().map(Argument::from).collect(),
             },
@@ -202,7 +202,7 @@ impl ModelPattern {
         match self {
             ModelPattern::Cut(s) => *s,
             ModelPattern::Lit { lit, .. } => lit.span(),
-            ModelPattern::RuleCall { rule_name, .. } => rule_name.span(),
+            ModelPattern::RuleCall { rule_path, .. } => rule_path.span(),
             ModelPattern::Optional(_, s)
             | ModelPattern::Repeat(_, s)
             | ModelPattern::Plus(_, s) => *s,

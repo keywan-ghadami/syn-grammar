@@ -41,8 +41,8 @@ pub fn split_left_recursive<'a>(
     let mut base = Vec::new();
 
     for v in variants {
-        if let Some(ModelPattern::RuleCall { rule_name: r, .. }) = v.pattern.first() {
-            if r == rule_name {
+        if let Some(ModelPattern::RuleCall { rule_path: r, .. }) = v.pattern.first() {
+            if r.is_ident(rule_name) {
                 recursive.push(v);
                 continue;
             }
@@ -425,7 +425,13 @@ fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<
     match pattern {
         ModelPattern::Cut(_) => true,
         ModelPattern::Lit { .. } => false,
-        ModelPattern::RuleCall { rule_name, .. } => nullable_rules.contains(&rule_name.to_string()),
+        ModelPattern::RuleCall { rule_path, .. } => {
+            let name = rule_path.segments.last().unwrap().ident.to_string();
+            // Note: This simple name check might be insufficient for qualified paths,
+            // but for simple recursion checks it serves the baseline.
+            // Ideally we should resolve paths, but here we assume local names match.
+            nullable_rules.contains(&name)
+        }
         ModelPattern::Group(alts, _) => alts
             .iter()
             .any(|(seq, _)| is_sequence_nullable(seq, nullable_rules)),
@@ -512,9 +518,10 @@ fn collect_nullable_deps(
 ) {
     for p in patterns {
         match p {
-            ModelPattern::RuleCall { rule_name, .. } => {
-                deps.insert(rule_name.to_string());
-                if !nullable_rules.contains(&rule_name.to_string()) {
+            ModelPattern::RuleCall { rule_path, .. } => {
+                let name = rule_path.segments.last().unwrap().ident.to_string();
+                deps.insert(name.clone());
+                if !nullable_rules.contains(&name) {
                     return;
                 }
             }
@@ -613,9 +620,12 @@ fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F)
     for p in patterns {
         match p {
             ModelPattern::RuleCall {
-                rule_name, args, ..
+                rule_path, args, ..
             } => {
-                cb(rule_name.to_string());
+                // Check if it's a simple call
+                if let Some(ident) = rule_path.get_ident() {
+                    cb(ident.to_string());
+                }
                 for arg in args {
                     match arg {
                         Argument::Positional(p) | Argument::Named(_, p) => {
@@ -750,8 +760,8 @@ fn collect_first_from_sequence(
                 acc.insert("LIT".to_string());
                 return;
             }
-            ModelPattern::RuleCall { rule_name, .. } => {
-                let name = rule_name.to_string();
+            ModelPattern::RuleCall { rule_path, .. } => {
+                let name = rule_path.segments.last().unwrap().ident.to_string();
                 if let Some(fs) = first_sets.get(&name) {
                     acc.extend(fs.clone());
                 } else {
@@ -898,12 +908,12 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
         (ModelPattern::Lit { lit: l1, .. }, ModelPattern::Lit { lit: l2, .. }) => l1 == l2,
         (
             ModelPattern::RuleCall {
-                rule_name: r1,
+                rule_path: r1,
                 args: a1,
                 ..
             },
             ModelPattern::RuleCall {
-                rule_name: r2,
+                rule_path: r2,
                 args: a2,
                 ..
             },

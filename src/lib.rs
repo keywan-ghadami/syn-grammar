@@ -16,9 +16,7 @@ pub use grammar_kit::testing;
 // 3. Re-export the macro
 // This allows the user to write: `use syn_grammar::grammar;`
 pub use syn_grammar_macros::grammar;
-
-#[doc(hidden)]
-pub use syn_grammar_macros::include_grammar;
+pub use syn_grammar_macros::grammar_core;
 
 #[doc(hidden)]
 pub mod builtins;

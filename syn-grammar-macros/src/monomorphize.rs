@@ -3,8 +3,9 @@ use proc_macro2::Span;
 use quote::format_ident;
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
+use syn::spanned::Spanned;
 use syn::visit_mut::VisitMut;
-use syn::{parse_quote, Ident, Type};
+use syn::{parse_quote, Ident, Path, Type};
 use syn_grammar_model::model::*;
 use syn_grammar_model::Backend;
 
@@ -70,7 +71,7 @@ impl Monomorphizer {
     fn expand_pattern(&mut self, pattern: &mut ModelPattern) {
         match pattern {
             ModelPattern::RuleCall {
-                rule_name, args, ..
+                rule_path, args, ..
             } => {
                 for arg in args.iter_mut() {
                     match arg {
@@ -80,9 +81,10 @@ impl Monomorphizer {
                     }
                 }
 
-                if let Some(template) = self.templates.get(rule_name).cloned() {
+                let flattened_name = flatten_path(rule_path);
+                if let Some(template) = self.templates.get(&flattened_name).cloned() {
                     let new_name = self.instantiate(&template, args);
-                    *rule_name = new_name;
+                    *rule_path = Path::from(new_name);
                     args.clear();
                 }
             }
@@ -122,7 +124,7 @@ impl Monomorphizer {
             .iter()
             .map(|a| match a {
                 Argument::Positional(p) => p,
-                Argument::Named(_, p) => p, // Should we error? Or just use value? Using value is safer for key.
+                Argument::Named(_, p) => p,
             })
             .collect();
 
@@ -215,10 +217,23 @@ impl Monomorphizer {
     fn infer_type(&self, pattern: &ModelPattern) -> Option<Type> {
         match pattern {
             ModelPattern::Lit { .. } => Some(parse_quote!(())),
-            ModelPattern::RuleCall { rule_name, .. } => self.rule_types.get(rule_name).cloned(),
+            ModelPattern::RuleCall { rule_path, .. } => {
+                let name = flatten_path(rule_path);
+                self.rule_types.get(&name).cloned()
+            }
             _ => None,
         }
     }
+}
+
+fn flatten_path(path: &Path) -> Ident {
+    let s = path
+        .segments
+        .iter()
+        .map(|s| s.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("__");
+    Ident::new(&s, path.span())
 }
 
 struct ParamSubstituter<'a> {
@@ -230,12 +245,21 @@ impl<'a> ParamSubstituter<'a> {
         match pattern {
             ModelPattern::RuleCall {
                 binding,
-                rule_name,
+                rule_path,
                 args,
                 ..
             } => {
                 let old_binding = binding.clone();
-                if let Some(replacement) = self.param_map.get(rule_name) {
+                // Check if rule_path matches a parameter
+                let is_match = if let Some(ident) = rule_path.get_ident() {
+                    self.param_map.contains_key(ident)
+                } else {
+                    false
+                };
+
+                if is_match {
+                    let ident = rule_path.get_ident().unwrap();
+                    let replacement = self.param_map.get(ident).unwrap();
                     *pattern = replacement.clone();
 
                     if let Some(b) = old_binding {

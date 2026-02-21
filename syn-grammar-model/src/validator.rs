@@ -2,6 +2,7 @@
 
 use crate::model::*;
 use std::collections::{HashMap, HashSet};
+use syn::spanned::Spanned;
 
 pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
     let builtins = B::get_builtins();
@@ -107,10 +108,17 @@ fn validate_pattern(
 ) -> syn::Result<()> {
     match pattern {
         ModelPattern::RuleCall {
-            rule_name, args, ..
+            rule_path, args, ..
         } => {
+            let rule_name_ident = rule_path.segments.last().unwrap().ident.clone();
+            let rule_name_str = rule_name_ident.to_string();
+
             // Check if rule_name is in all_defs OR in params (as a grammar parameter)
-            let is_param = params.iter().any(|(p_name, _)| p_name == rule_name);
+            let is_param = if let Some(ident) = rule_path.get_ident() {
+                params.iter().any(|(p_name, _)| p_name == ident)
+            } else {
+                false
+            };
 
             // Special case: separated and repeated are built-ins we are adding logic for,
             // but they might not be in B::get_builtins() if B doesn't declare them.
@@ -120,12 +128,16 @@ fn validate_pattern(
             // Note: If 'separated' is not in all_defs, we might error.
             // The backend should probably export them or we hardcode them here?
             // "separated" and "repeated" are portable built-ins.
-            let is_portable_builtin = rule_name == "separated" || rule_name == "repeated";
+            let is_portable_builtin =
+                rule_name_ident == "separated" || rule_name_ident == "repeated";
 
-            if !all_defs.contains(&rule_name.to_string()) && !is_param && !is_portable_builtin {
+            if !all_defs.contains(&rule_name_str) && !is_param && !is_portable_builtin {
+                // If it's a qualified path, maybe it refers to something we can't check?
+                // But with mangling, all rules should be local.
+                // So if it's not in all_defs, it's an error.
                 return Err(syn::Error::new(
-                    rule_name.span(),
-                    format!("Undefined rule: '{}'", rule_name),
+                    rule_path.span(),
+                    format!("Undefined rule: '{}'", rule_name_str),
                 ));
             }
 
@@ -267,15 +279,15 @@ fn validate_args_recursive(
     for pattern in patterns {
         match pattern {
             ModelPattern::RuleCall {
-                rule_name, args, ..
+                rule_path, args, ..
             } => {
-                let name_str = rule_name.to_string();
+                let rule_name_str = rule_path.segments.last().unwrap().ident.to_string();
 
                 // Allow named args for specific built-ins or generic checks?
                 // For user-defined rules, we currently only support positional args.
                 // If we see Named args for user rule, it's an error unless we implement named params for user rules.
 
-                if let Some(target_rule) = rule_map.get(&name_str) {
+                if let Some(target_rule) = rule_map.get(&rule_name_str) {
                     // Check if any args are named
                     for arg in args {
                         if let Argument::Named(n, _) = arg {
@@ -288,10 +300,10 @@ fn validate_args_recursive(
 
                     if target_rule.params.len() != args.len() {
                         return Err(syn::Error::new(
-                            rule_name.span(),
+                            rule_path.span(),
                             format!(
                                 "Rule '{}' expects {} argument(s), but got {}.",
-                                rule_name,
+                                rule_name_str,
                                 target_rule.params.len(),
                                 args.len()
                             ),
@@ -400,7 +412,7 @@ mod tests {
     fn test_rule_args_mismatch() {
         let input = quote! {
             grammar test {
-                rule main -> () = sub(1) -> { () }
+                rule main -> () = sub!(1) -> { () }
                 rule sub -> () = "hello" -> { () }
             }
         };

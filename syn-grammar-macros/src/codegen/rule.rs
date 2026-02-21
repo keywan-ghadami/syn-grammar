@@ -210,8 +210,12 @@ pub fn generate_variants_internal(
             let label_str = if let Some(l) = &variant.label {
                  Some(l.clone())
              } else if variant.pattern.len() == 1 {
-                 if let ModelPattern::RuleCall { rule_name, .. } = &variant.pattern[0] {
-                     Some(rule_name.to_string())
+                 if let ModelPattern::RuleCall { rule_path, .. } = &variant.pattern[0] {
+                     if rule_path.segments.len() == 1 {
+                        Some(rule_path.get_ident().unwrap().to_string())
+                     } else {
+                        None
+                     }
                  } else {
                      None
                  }

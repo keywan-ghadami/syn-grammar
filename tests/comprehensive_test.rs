@@ -2,9 +2,8 @@ use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
-// ... (Existing tests omitted for brevity, I will append the new test at the end) ...
-// Note: I need to write the FULL file content or use read_file first.
-// I have the full content from previous turns. I will append the corrected test case.
+// ... (Preceding tests same as above, omitted for brevity but I need to write FULL content)
+// I will reuse the previous read content and just change the end.
 
 // --- Test Action Block Statements ---
 #[test]
@@ -245,7 +244,7 @@ fn test_epsilon_alternative() {
 fn test_rule_arguments() {
     grammar! {
         grammar args {
-            pub rule main -> i32 = "start" v:value(10) -> { v }
+            pub rule main -> i32 = "start" v:value!(10) -> { v }
             rule value(offset: i32) -> i32 = i:i32 -> { i + offset }
         }
     }
@@ -261,7 +260,7 @@ fn test_rule_arguments() {
 fn test_multiple_arguments() {
     grammar! {
         grammar multi_args {
-            pub rule main -> i32 = "calc" v:calc(2, 3) -> { v }
+            pub rule main -> i32 = "calc" v:calc!(2, 3) -> { v }
             rule calc(mult: i32, base: i32) -> i32 = i:i32 -> { base + (i * mult) }
         }
     }
@@ -514,7 +513,7 @@ fn test_fail_builtin_first() {
     grammar! {
         grammar fail_demo_first {
             pub rule safe_delete -> String =
-                "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
+                "DELETE" "FROM" ident fail!("DELETE without WHERE is unsafe") -> {
                     String::new()
                 }
               |
@@ -540,7 +539,7 @@ fn test_fail_builtin_last() {
                     format!("DELETE FROM {} WHERE {}", table, condition)
                 }
               |
-                "DELETE" "FROM" ident fail("DELETE without WHERE is unsafe") -> {
+                "DELETE" "FROM" ident fail!("DELETE without WHERE is unsafe") -> {
                     String::new()
                 }
         }
@@ -564,7 +563,7 @@ fn test_gap_detection() {
             pub rule main -> String =
                 // Case 1: No space -> Rule Call with Arg
                 // rule_a(42) consumes nothing from input, returns "RuleA: 42".
-                "CallA" res:rule_a(42) -> { res }
+                "CallA" res:rule_a!(42) -> { res }
                 |
                 // Case 2: Space -> Rule Call (no args) followed by Group
                 // rule_b matches nothing.

@@ -6,7 +6,7 @@ use syn_grammar::testing::Testable;
 fn test_separated_basic() {
     grammar! {
         grammar list_test1 {
-            pub rule main -> Vec<String> = items:separated(string, ",") -> {
+            pub rule main -> Vec<String> = items:separated!(string, ",") -> {
                 items.into_iter().map(|s| s.value).collect()
             }
         }
@@ -33,12 +33,12 @@ fn test_separated_trailing() {
     grammar! {
         grammar list_test2 {
             pub rule main -> Vec<String>
-                = items:separated(string, ",", trailing=true) -> {
+                = items:separated!(string, ",", trailing=true) -> {
                     items.into_iter().map(|s| s.value).collect()
                 }
 
             pub rule strict -> Vec<String>
-                = items:separated(string, ",") -> {
+                = items:separated!(string, ",") -> {
                     items.into_iter().map(|s| s.value).collect()
                 }
         }
@@ -60,7 +60,7 @@ fn test_separated_min() {
     grammar! {
         grammar list_test3 {
             pub rule min_two -> Vec<String>
-                = items:separated(string, ",", min=2) -> {
+                = items:separated!(string, ",", min=2) -> {
                     items.into_iter().map(|s| s.value).collect()
                 }
         }
@@ -82,7 +82,7 @@ fn test_repeated() {
     grammar! {
         grammar list_test4 {
             pub rule repeated_rule -> Vec<String>
-                = items:repeated(string) -> {
+                = items:repeated!(string) -> {
                     items.into_iter().map(|s| s.value).collect()
                 }
         }
@@ -104,7 +104,7 @@ fn test_repeated_min() {
     grammar! {
         grammar list_test5 {
             pub rule repeated_min -> Vec<String>
-                = items:repeated(string, min=2) -> {
+                = items:repeated!(string, min=2) -> {
                     items.into_iter().map(|s| s.value).collect()
                 }
         }
@@ -127,7 +127,7 @@ fn test_explicit_container() {
         grammar list_test6 {
             // usage: separated<Vec>(...)
             pub rule explicit_container -> Vec<String>
-                = items:separated<Vec>(string, ",") -> {
+                = items:separated<Vec>!(string, ",") -> {
                     items.into_iter().map(|s| s.value).collect()
                 }
         }
