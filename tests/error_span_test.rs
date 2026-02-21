@@ -14,25 +14,25 @@ use syn_grammar::grammar;
 //
 // We can at least verify that the code compiles and runs, ensuring our refactoring didn't break anything.
 
+grammar! {
+    grammar span_test {
+        rule main -> () =
+            "a" => "b" -> { () }
+            | ( "c" "d" ) -> { () }
+            | [ "e" ] -> { () }
+            | { "f" } -> { () }
+            | paren("g") -> { () }
+            | "h"? -> { () }
+            | "i"* -> { () }
+            | "j"+ -> { () }
+            | recover(inner, "k") "k" -> { () }
+
+        rule inner -> () = "z" -> { () }
+    }
+}
+
 #[test]
 fn test_span_propagation_compiles() {
-    grammar! {
-        grammar span_test {
-            rule main -> () =
-                "a" => "b" -> { () }
-              | ( "c" "d" ) -> { () }
-              | [ "e" ] -> { () }
-              | { "f" } -> { () }
-              | paren("g") -> { () }
-              | "h"? -> { () }
-              | "i"* -> { () }
-              | "j"+ -> { () }
-              | recover(inner, "k") "k" -> { () }
-
-            rule inner -> () = "z" -> { () }
-        }
-    }
-
     // Just ensure it compiles and runs
     let _ = span_test::parse_main;
 }

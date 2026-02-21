@@ -1,7 +1,8 @@
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
+use syn::parse::Parser;
 
-mod base {
+pub mod base {
     use super::*;
     grammar! {
         grammar Base {
@@ -29,7 +30,7 @@ fn test_composition_basic() {
         .assert_success_is(0);
 }
 
-mod g1 {
+pub mod g1 {
     use super::*;
     grammar! {
         grammar G1 {
@@ -38,7 +39,7 @@ mod g1 {
     }
 }
 
-mod g2 {
+pub mod g2 {
     use super::*;
     grammar! {
         grammar G2 {

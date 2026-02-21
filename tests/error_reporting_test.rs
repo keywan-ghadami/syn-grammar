@@ -23,7 +23,7 @@ grammar! {
 
 grammar! {
     grammar prio_test {
-        pub rule main -> () = (d:deep | s:shallow) -> { () }
+        pub rule main -> () = (deep | shallow) -> { () }
         rule deep -> () = "a" "b" "c" -> { () }
         rule shallow -> () = "d" "e" -> { () }
     }
@@ -41,12 +41,12 @@ fn test_deepest_error_wins() {
     err_test_1::parse_main
         .parse_str("a b d")
         .test()
-        .assert_error_contains(0, "expected `c`");
+        .assert_failure_contains("expected `c`");
 
     digit_test_1::parse_main
         .parse_str("a b one c")
         .test()
-        .assert_error_contains(0, "expected `zero`, `one`, or `two`");
+        .assert_failure_contains("expected `zero`, `one`, or `two`");
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn test_deep_vs_shallow() {
     prio_test::parse_main
         .parse_str("a b d")
         .test()
-        .assert_error_contains(0, "expected `c`");
+        .assert_failure_contains("expected `c`");
 }
 
 #[test]
@@ -62,5 +62,5 @@ fn test_rule_name_in_error_message() {
     rule_name_test::parse_main
         .parse_str("a c")
         .test()
-        .assert_error_contains(0, "in rule `inner_rule`");
+        .assert_failure_contains("in rule `inner_rule`");
 }
