@@ -88,14 +88,14 @@ mod kw {
 }
 
 struct Include {
-    macro_name: syn::Ident,
+    macro_name: syn::Path,
     alias: syn::Ident,
 }
 
 impl Parse for Include {
     fn parse(input: ParseStream) -> Result<Self> {
         let _include_token: kw::include = input.parse()?;
-        let macro_name: syn::Ident = input.parse()?;
+        let macro_name: syn::Path = input.parse()?;
         let _as_token: Token![as] = input.parse()?;
         let alias: syn::Ident = input.parse()?;
         Ok(Include { macro_name, alias })

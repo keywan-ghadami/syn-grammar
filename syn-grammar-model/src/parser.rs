@@ -1,6 +1,6 @@
 // Moved from macros/src/parser.rs
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens, TokenStreamExt};
+use proc_macro2::{Delimiter, TokenStream};
+use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::{token, Attribute, Generics, Ident, ItemUse, Lit, Path, Result, Token, Type};
 
@@ -49,7 +49,7 @@ fn parse_path_no_args(input: ParseStream) -> Result<Path> {
 
     let mut segments = syn::punctuated::Punctuated::new();
     loop {
-        let ident: Ident = rt::parse_ident(input)?; 
+        let ident: Ident = rt::parse_ident(input)?;
         let arguments = syn::PathArguments::None;
         segments.push_value(syn::PathSegment { ident, arguments });
 
@@ -78,15 +78,10 @@ impl Parse for RuleSet {
         let _ = input.parse::<kw::ruleset>()?;
         let content;
         let _ = syn::braced!(content in input);
-        let mut rules = Rule::parse_all(&content)?;
+        let rules = Rule::parse_all(&content)?;
         let _ = input.parse::<Token![as]>()?;
         let alias: Ident = input.parse()?;
         let _ = input.parse::<Token![;]>()?;
-
-        // Mangle rules
-        for rule in &mut rules {
-            mangle_rule(rule, &alias);
-        }
 
         Ok(RuleSet { alias, rules })
     }
@@ -98,15 +93,15 @@ pub struct GrammarDefinition {
     pub inherits: Option<InheritanceSpec>,
     pub uses: Vec<ItemUse>,
     pub rules: Vec<Rule>,
+    pub included_rules: Vec<RuleSet>,
 }
 
 impl Parse for GrammarDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut rules = Vec::new();
+        let mut included_rules = Vec::<RuleSet>::new();
 
         while input.peek(kw::ruleset) {
-            let set: RuleSet = input.parse()?;
-            rules.extend(set.rules);
+            included_rules.push(input.parse()?);
         }
 
         let _ = input.parse::<kw::grammar>()?;
@@ -127,23 +122,38 @@ impl Parse for GrammarDefinition {
         }
 
         while content.peek(kw::ruleset) {
-            let set: RuleSet = content.parse()?;
-            rules.extend(set.rules);
+            included_rules.push(content.parse()?);
         }
 
-        let main_rules = Rule::parse_all(&content)?;
-        rules.extend(main_rules);
+        let mut main_rules = Rule::parse_all(&content)?;
 
-        while input.peek(kw::ruleset) {
-            let set: RuleSet = input.parse()?;
-            rules.extend(set.rules);
+        // Mangle the call sites inside the main grammar's rules to refer to the
+        // correctly-mangled included rule names.
+        for rule in &mut main_rules {
+            for variant in &mut rule.variants {
+                for pattern in &mut variant.pattern {
+                    mangle_external_call_sites(pattern, &included_rules);
+                }
+            }
+        }
+
+        let mut all_rules = main_rules;
+
+        // Add the now-mangled definitions of the included rules.
+        for set in &included_rules {
+            let mut mangled_rules = set.rules.clone();
+            for rule in &mut mangled_rules {
+                mangle_rule_definition(rule, &set.alias);
+            }
+            all_rules.extend(mangled_rules);
         }
 
         Ok(GrammarDefinition {
             name,
             inherits,
             uses,
-            rules,
+            rules: all_rules,
+            included_rules,
         })
     }
 }
@@ -164,19 +174,23 @@ impl ToTokens for GrammarDefinition {
     }
 }
 
-fn mangle_rule(rule: &mut Rule, alias: &Ident) {
+/// Renames a rule's definition (e.g., `rule a` -> `rule b__a`) and also mangles
+/// any internal rule calls within that rule (e.g., `c` -> `b::c`).
+fn mangle_rule_definition(rule: &mut Rule, alias: &Ident) {
     let old_name = rule.name.clone();
     let new_name = syn::Ident::new(&format!("{}__{}", alias, old_name), old_name.span());
     rule.name = new_name;
 
     for variant in &mut rule.variants {
         for pattern in &mut variant.pattern {
-            mangle_pattern(pattern, alias);
+            mangle_internal_call_site(pattern, alias);
         }
     }
 }
 
-fn mangle_pattern(pattern: &mut Pattern, alias: &Ident) {
+/// Mangles rule calls *within* an included ruleset. This turns a simple call like `a`
+/// into a namespaced one like `b::a` so that it can be correctly resolved later.
+fn mangle_internal_call_site(pattern: &mut Pattern, alias: &Ident) {
     match pattern {
         Pattern::RuleCall {
             rule_path, args, ..
@@ -192,14 +206,16 @@ fn mangle_pattern(pattern: &mut Pattern, alias: &Ident) {
 
             for arg in args {
                 match arg {
-                    Argument::Positional(p) | Argument::Named(_, p) => mangle_pattern(p, alias),
+                    Argument::Positional(p) | Argument::Named(_, p) => {
+                        mangle_internal_call_site(p, alias)
+                    }
                 }
             }
         }
         Pattern::Group(alts, _) => {
-            for (seq, _) in alts {
+            for (seq, _, _) in alts {
                 for p in seq {
-                    mangle_pattern(p, alias);
+                    mangle_internal_call_site(p, alias);
                 }
             }
         }
@@ -207,7 +223,7 @@ fn mangle_pattern(pattern: &mut Pattern, alias: &Ident) {
         | Pattern::Braced(seq, _)
         | Pattern::Parenthesized(seq, _, _) => {
             for p in seq {
-                mangle_pattern(p, alias);
+                mangle_internal_call_site(p, alias);
             }
         }
         Pattern::Optional(p, _)
@@ -217,11 +233,74 @@ fn mangle_pattern(pattern: &mut Pattern, alias: &Ident) {
         | Pattern::Peek(p, _)
         | Pattern::Not(p, _)
         | Pattern::Until { pattern: p, .. } => {
-            mangle_pattern(p, alias);
+            mangle_internal_call_site(p, alias);
         }
         Pattern::Recover { body, sync, .. } => {
-            mangle_pattern(body, alias);
-            mangle_pattern(sync, alias);
+            mangle_internal_call_site(body, alias);
+            mangle_internal_call_site(sync, alias);
+        }
+        _ => {}
+    }
+}
+
+/// Mangles rule calls from a parent grammar to an included grammar. This turns
+/// a namespaced call like `b::a` into a flattened, mangled call like `b__a`.
+fn mangle_external_call_sites(pattern: &mut Pattern, included_rules: &[RuleSet]) {
+    match pattern {
+        Pattern::RuleCall {
+            rule_path, args, ..
+        } => {
+            if rule_path.segments.len() == 2 {
+                let alias_candidate = &rule_path.segments[0].ident;
+                if included_rules.iter().any(|rs| rs.alias == *alias_candidate) {
+                    let rule_ident = rule_path.segments[1].ident.clone();
+                    let new_name = format_ident!(
+                        "{}__{}",
+                        alias_candidate,
+                        rule_ident,
+                        span = rule_ident.span()
+                    );
+                    let mut new_segments = syn::punctuated::Punctuated::new();
+                    new_segments.push(syn::PathSegment::from(new_name));
+                    rule_path.segments = new_segments;
+                    rule_path.leading_colon = None;
+                }
+            }
+
+            for arg in args {
+                match arg {
+                    Argument::Positional(p) | Argument::Named(_, p) => {
+                        mangle_external_call_sites(p, included_rules)
+                    }
+                }
+            }
+        }
+        Pattern::Group(alts, _) => {
+            for (seq, _, _) in alts {
+                for p in seq {
+                    mangle_external_call_sites(p, included_rules);
+                }
+            }
+        }
+        Pattern::Bracketed(seq, _)
+        | Pattern::Braced(seq, _)
+        | Pattern::Parenthesized(seq, _, _) => {
+            for p in seq {
+                mangle_external_call_sites(p, included_rules);
+            }
+        }
+        Pattern::Optional(p, _)
+        | Pattern::Repeat(p, _)
+        | Pattern::Plus(p, _)
+        | Pattern::SpanBinding(p, _, _)
+        | Pattern::Peek(p, _)
+        | Pattern::Not(p, _)
+        | Pattern::Until { pattern: p, .. } => {
+            mangle_external_call_sites(p, included_rules);
+        }
+        Pattern::Recover { body, sync, .. } => {
+            mangle_external_call_sites(body, included_rules);
+            mangle_external_call_sites(sync, included_rules);
         }
         _ => {}
     }
@@ -389,7 +468,11 @@ impl RuleVariant {
         let mut variants = Vec::new();
         loop {
             let mut pattern = Vec::new();
-            while !input.peek(Token![->]) && !input.peek(Token![|]) && !input.peek(Token![#]) {
+            while !input.is_empty()
+                && !input.peek(Token![->])
+                && !input.peek(Token![|])
+                && !input.peek(Token![#])
+            {
                 pattern.push(input.parse()?);
             }
 
@@ -485,7 +568,10 @@ pub enum Pattern {
         generics: Vec<Type>,
         args: Vec<Argument>,
     },
-    Group(Vec<(Vec<Pattern>, Option<String>)>, token::Paren),
+    Group(
+        Vec<(Vec<Pattern>, Option<TokenStream>, Option<String>)>,
+        token::Paren,
+    ),
     Bracketed(Vec<Pattern>, token::Bracket),
     Braced(Vec<Pattern>, token::Brace),
     Parenthesized(Vec<Pattern>, kw::paren, token::Paren),
@@ -581,12 +667,16 @@ impl ToTokens for Pattern {
             }
             Pattern::Group(alts, _) => {
                 token::Paren::default().surround(tokens, |t| {
-                    for (i, (seq, label)) in alts.iter().enumerate() {
+                    for (i, (seq, action, label)) in alts.iter().enumerate() {
                         if i > 0 {
                             token::Or::default().to_tokens(t);
                         }
                         for p in seq {
                             p.to_tokens(t);
+                        }
+                        if let Some(a) = action {
+                            token::RArrow::default().to_tokens(t);
+                            token::Brace::default().surround(t, |t2| a.to_tokens(t2));
                         }
                         if let Some(l) = label {
                             token::Pound::default().to_tokens(t);
@@ -856,25 +946,40 @@ fn parse_pattern_list(input: ParseStream) -> Result<Vec<Pattern>> {
     Ok(list)
 }
 
-fn parse_group_content(input: ParseStream) -> Result<Vec<(Vec<Pattern>, Option<String>)>> {
+fn parse_group_content(
+    input: ParseStream,
+) -> Result<Vec<(Vec<Pattern>, Option<TokenStream>, Option<String>)>> {
     let mut alts = Vec::new();
     loop {
         let mut seq = Vec::new();
-        while !input.is_empty() && !input.peek(Token![|]) && !input.peek(Token![#]) {
+        while !input.is_empty()
+            && !input.peek(Token![|])
+            && !input.peek(Token![#])
+            && !input.peek(Token![->])
+        {
             seq.push(input.parse()?);
         }
 
+        let action = if input.peek(Token![->]) {
+            let _: Token![->] = input.parse()?;
+            let content;
+            syn::braced!(content in input);
+            Some(content.parse()?)
+        } else {
+            None
+        };
+
         let label = if input.peek(Token![#]) {
-            let _ = input.parse::<Token![#]>()?;
+            let _: Token![#] = input.parse()?;
             let lit: syn::LitStr = input.parse()?;
             Some(lit.value())
         } else {
             None
         };
 
-        alts.push((seq, label));
+        alts.push((seq, action, label));
         if input.peek(Token![|]) {
-            let _ = input.parse::<Token![|]>()?;
+            let _: Token![|] = input.parse()?;
         } else {
             break;
         }

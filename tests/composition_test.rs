@@ -1,22 +1,22 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
-use syn::parse::Parser;
 
-pub mod base {
-    use super::*;
+pub mod basemod {
+    use syn_grammar::grammar;
     grammar! {
-        grammar Base {
+        grammar base {
             pub rule digit -> i32 = "a" -> { 0 }
         }
     }
 }
 
-mod derived {
-    use super::*;
-    use super::base::Base_rules;
+pub mod derived {
+    use crate::base_rules;
+    use syn_grammar::grammar;
     grammar! {
-        include Base_rules as b;
-        grammar Derived {
+        include base_rules as b;
+        grammar derived {
             pub rule main -> i32 = d:b::digit -> { d }
         }
     }
@@ -24,14 +24,14 @@ mod derived {
 
 #[test]
 fn test_composition_basic() {
-    derived::Derived::parse_main
+    derived::derived::parse_main
         .parse_str("a")
         .test()
         .assert_success_is(0);
 }
 
 pub mod g1 {
-    use super::*;
+    use syn_grammar::grammar;
     grammar! {
         grammar G1 {
             pub rule value -> i32 = "a" -> { 1 }
@@ -40,7 +40,7 @@ pub mod g1 {
 }
 
 pub mod g2 {
-    use super::*;
+    use syn_grammar::grammar;
     grammar! {
         grammar G2 {
             pub rule value -> i32 = "b" -> { 2 }
@@ -49,9 +49,9 @@ pub mod g2 {
 }
 
 mod combined {
-    use super::*;
-    use super::g1::G1_rules;
-    use super::g2::G2_rules;
+    use crate::G1_rules;
+    use crate::G2_rules;
+    use syn_grammar::grammar;
     grammar! {
         include G1_rules as g1;
         include G2_rules as g2;
