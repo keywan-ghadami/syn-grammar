@@ -11,20 +11,19 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 ## Features
 
 - **Inline Grammars**: Define your grammar directly in your Rust code using the `grammar!` macro.
-- **EBNF Syntax**: Familiar syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`), and grouping `(...)`.
+- **Namespaced Grammar Composition**: Safely compose grammars from multiple files using a hygienic `include` syntax, preventing name collisions.
+- **EBNF Syntax**: Familiar syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`), and explicit grouping `(...)`.
+- **Unambiguous Delimiter Matching**: Clear syntax with `paren(...)`, `[...]`, and `{...}` to match literal delimiters in the input.
 - **Type-Safe Actions**: Directly map parsing rules to Rust types and AST nodes using action blocks (`-> { ... }`).
 - **Seamless Syn Integration**: First-class support for parsing Rust tokens like identifiers, literals, types, and blocks.
-- **Portable Primitives**: A core set of built-ins (`ident`, `u32`, `i64`, `alpha`) are conceptually portable, allowing other backends like `winnow-grammar` to provide their own efficient implementations.
+- **Portable Primitives**: A core set of built-ins (`ident`, `u32`, `i64`, `alpha`) are conceptually portable.
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
-- **Backtracking & Ambiguity**: Automatically handles ambiguous grammars with speculative parsing.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 - **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
-- **Until**: Use `until(...)` to consume tokens until a terminator pattern is found.
-- **List Rules**: Built-in `separated` and `repeated` rules for concise list parsing.
-- **Rule Arguments**: Pass context or parameters between rules.
+- **Rule Arguments**: Pass context between rules using a clear, generic-style `rule<...>(...)` syntax.
 - **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
-- **Grammar Inheritance**: Reuse rules from other grammars.
-- **Shadowing Detection**: Compile-time detection of shadowed alternatives and dead code (e.g., putting a shorter match before a longer one).
+- **100% Static Validation**: All checks, including for left-recursion and shadowing, are performed at compile time across all included files.
+- **Perfect Spans**: Error messages point to the exact line and file where a syntax error occurred, even in included files.
 - **Testing Utilities**: Fluent API for testing your parsers with pretty-printed error reporting.
 
 ## Installation
@@ -75,7 +74,7 @@ Since `syn-grammar` is built on top of `syn`, it uses the **Rust Tokenizer**. Th
 
 ## Quick Start
 
-Here is a complete example of a calculator grammar that parses mathematical expressions into an `i32`.
+Here is a complete example of a calculator grammar that parses mathematical expressions, including parenthesized sub-expressions.
 
 ```rust
 use syn_grammar::grammar;
@@ -83,7 +82,6 @@ use syn::parse::Parser; // Required for .parse_str()
 
 grammar! {
     grammar Calc {
-        // The return type of the rule is defined after `->`
         pub rule expression -> i32 =
             l:expression "+" r:term -> { l + r }
           | l:expression "-" r:term -> { l - r }
@@ -95,15 +93,15 @@ grammar! {
           | f:factor            -> { f }
 
         rule factor -> i32 =
-            i:i32               -> { i }
-          | paren(e:expression) -> { e }
+            i:i32                     -> { i }
+          | paren(e:expression) -> { e } // Matches literal ( ... ) in the input
     }
 }
 
 fn main() {
     // The macro generates a module `Calc` containing a function `parse_expression`
     // corresponding to the `expression` rule.
-    let result = Calc::parse_expression.parse_str("10 - 2 * 3");
+    let result = Calc::parse_expression.parse_str("10 - (2 * 3)");
     assert_eq!(result.unwrap(), 4);
 }
 ```
@@ -115,70 +113,104 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 - These functions take a `syn::parse::ParseStream` and return a `syn::Result<T>`.
 - All necessary imports and helper functions to make the parser work, including `use super::*;` for convenience.
 
+## Composing Grammars with `include`
+
+`syn-grammar` allows you to split your grammar across multiple files and compose them safely using a namespaced `include` system. This is the modern, recommended way to manage large grammars.
+
+### Example
+
+Let's say we have a base grammar for numbers.
+
+```rust
+// in file: base.rs
+use syn_grammar::grammar;
+
+grammar! {
+    // This defines the `Base` parser module AND
+    // the `Base_rules` macro for inclusion.
+    grammar Base {
+        pub rule num -> i32 = i:i32 -> { i }
+    }
+}
+```
+
+Now, we can include and use it in our main grammar.
+
+```rust
+// in file: main.rs
+use syn_grammar::grammar;
+
+// Make the `Base_rules` macro available.
+#[macro_use]
+mod base;
+
+grammar! {
+    // Include the rules from `Base` under the namespace `b`.
+    include Base_rules as b;
+
+    grammar Derived {
+        rule main -> i32 =
+            "add" a:b::num b:b::num -> { a + b }
+    }
+}
+```
+
+### Deprecated Syntax
+The old colon-based inheritance (`grammar Derived : Base`) is now deprecated and will be removed in a future version. Please migrate to the `include` syntax.
+
 ## Detailed Syntax Guide
 
-### Use Statements
+### Unambiguous Parsing: Grouping vs. Delimiters
 
-You can include standard Rust `use` statements directly within your grammar block. These are passed through to the generated parser module, allowing you to easily import types needed for your rules.
+`syn-grammar` uses a clear, explicit syntax to distinguish between grouping for operator precedence and matching literal delimiters in the input. This eliminates ambiguity.
+
+#### 1. Precedence Grouping: `( ... )`
+Use standard parentheses `( ... )` **exclusively** to group patterns for operators like `|`, `*`, `+`, and `?`. These parentheses control the parser's logic and do not correspond to any tokens in the input.
 
 ```rust
 use syn_grammar::grammar;
-
+# use syn_grammar::Identifier;
 grammar! {
-    grammar MyGrammar {
-        use std::collections::HashMap;
-        use syn::Ident;
-
-        rule map -> HashMap<String, String> = 
-            // ... implementation using HashMap
-            "test" -> { HashMap::new() }
+    grammar G {
+        // Correctly parses `run app` or `build app`
+        // The `()` are for logical grouping only.
+        rule command -> (Identifier, Identifier) =
+            (verb:("run" | "build")) "app" -> { (verb, t.0) }
     }
 }
 ```
 
-### Rules
+#### 2. Delimiter Matching: `paren(...)`, `[...]`, `{...}`
+To match literal delimiters that appear in the source code, you **must** use the following syntax:
 
-A grammar consists of a set of rules. Each rule has a name, a return type, and a pattern to match.
+- `paren(pattern)`: Matches `( pattern )`.
+- `[ pattern ]`: Matches `[ pattern ]`.
+- `{ pattern }`: Matches `{ pattern }`.
 
-```text
-rule name -> ReturnType = pattern -> { action_code }
-```
-
-- **`name`**: The name of the rule (e.g., `expr`).
-- **`ReturnType`**: The Rust type returned by the rule (e.g., `Expr`, `i32`, `Vec<String>`).
-- **`pattern`**: The EBNF pattern defining what to parse.
-- **`action_code`**: A Rust block that constructs the return value from the bound variables.
-
-#### Attributes and Doc Comments
-
-Rules can be decorated with standard Rust attributes and documentation comments. These are passed through to the generated function.
+The `paren` keyword is necessary to avoid ambiguity with precedence grouping.
 
 ```rust
 use syn_grammar::grammar;
-use syn::Ident;
-use syn_grammar::Identifier;
-
 grammar! {
-    grammar MyGrammar {
-        /// Parses a valid identifier.
-        #[cfg(feature = "extra")]
-        rule my_ident -> Identifier = i:ident -> { i }
+    grammar D {
+        // Correctly parses `(10, 20)`
+        rule tuple -> (i32, i32) =
+            paren(x:i32, y:i32) -> { (x, y) }
     }
 }
-
 ```
 
-### Rule Arguments
+### Rule Arguments and Generic Calls
 
-Rules can accept arguments, allowing you to pass context or state down the parser chain. These are **runtime parameters** (typed) that are passed to the generated function.
+Rule calls with arguments use a syntax similar to Rust's generic function calls. The presence of angle brackets (`<...>`) unambiguously signals a parameterized call.
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Args {
-        rule main -> i32 = 
-            "start" v:value(10) -> { v }
+        rule main -> i32 =
+            // Call `value` with argument 10. Empty brackets `<>` are required.
+            "start" v:value<>(10) -> { v }
 
         rule value(offset: i32) -> i32 =
             i:i32 -> { i + offset }
@@ -194,24 +226,15 @@ When a generic rule is used, the macro performs **monomorphization**: it creates
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Generic {
         // A generic rule `list` that parses zero or more `item`s.
-        // `item` is a grammar parameter (passed as a pattern).
-        // `T` is a type parameter, inferred from the return type of `item`.
-        rule list<T>(item) -> Vec<T> = 
+        rule list<T>(item) -> Vec<T> =
             items:item* -> { items }
 
-        pub rule integers -> Vec<i32> = 
-            // Reuse `list` with `i32` rule. 
-            // `T` is inferred as `i32`.
-            l:list(i32) -> { l }
-            
-        pub rule strings -> Vec<syn::LitStr> = 
-            // Reuse `list` with `lit_str` rule.
-            // `T` is inferred as `syn::LitStr`.
-            l:list(lit_str) -> { l }
+        pub rule integers -> Vec<i32> =
+            // Reuse `list` with the `i32` rule.
+            l:list<>(i32) -> { l }
     }
 }
 ```
@@ -222,38 +245,15 @@ Generic parameters support standard Rust trait bounds, which are enforced on the
 use std::collections::HashMap;
 use std::hash::Hash;
 use syn_grammar::grammar;
-
 grammar! {
     grammar Map {
         rule map<K: Hash + Eq, V>(k, v) -> HashMap<K, V> =
-            entries:entry(k, v)* -> { entries.into_iter().collect() }
+            entries:entry<>(k, v)* -> { entries.into_iter().collect() }
 
         rule entry<K, V>(k, v) -> (K, V) =
             key:k ":" val:v -> { (key, val) }
     }
 }
-```
-
-### Grammar Inheritance
-
-You can inherit rules from another grammar module. This is useful for splitting large grammars or reusing common rules.
-
-```rust
-use syn_grammar::grammar;
-
-grammar! {
-    grammar Base {
-        pub rule num -> i32 = i:i32 -> { i }
-    }
-}
-
-grammar! {
-    grammar Derived : Base {
-        rule main -> i32 = 
-            "add" a:num b:num -> { a + b }
-    }
-}
-# fn main() {}
 ```
 
 ### Patterns
@@ -263,7 +263,6 @@ Match specific tokens using string literals.
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Kws {
         rule kw -> () = "fn" "name" -> { () }
@@ -276,7 +275,6 @@ You can match sequences of tokens that must appear strictly adjacent to each oth
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Tokens {
         // Matches "?." (e.g. in `foo?.bar`)
@@ -426,7 +424,6 @@ Match one of several alternatives. The first one that matches wins.
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Choice {
         rule choice -> bool = 
@@ -443,7 +440,6 @@ grammar! {
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar List {
         rule list -> Vec<i32> = 
@@ -452,62 +448,27 @@ grammar! {
 }
 ```
 
-#### Parametric List Rules (ADR 004)
+#### Parametric List Rules (`separated`, `repeated`)
 For parsing lists of items, use the built-in `separated` and `repeated` rules. These are more efficient and readable than manual recursion.
 
-- `separated(rule, separator, min=0, trailing=false)`: Parses items separated by a delimiter.
-- `repeated(rule, min=0)`: Parses items without a delimiter.
+- `separated<...>(rule, separator, min=0, trailing=false)`: Parses items separated by a delimiter.
+- `repeated<...>(rule, min=0)`: Parses items without a delimiter.
 
 You can specify the container type using generics (default is `Vec`).
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Lists {
         // [ 1, 2, 3 ]
         rule array -> Vec<i32> = 
-            [ items:separated(i32, ",") ] -> { items }
+            [ items:separated<>(i32, ",") ] -> { items }
 
         // { key value key value }
         rule map -> Vec<(String, i32)> = 
-            { entries:repeated(entry) } -> { entries }
+            { entries:repeated<>(entry) } -> { entries }
             
         rule entry -> (String, i32) = k:ident v:i32 -> { (k.to_string(), v) }
-    }
-}
-```
-
-#### Groups `(...)`
-Group patterns together to apply repetitions or ensure precedence.
-
-```rust
-use syn_grammar::grammar;
-
-grammar! {
-    grammar Group {
-        rule complex -> () = 
-            ("a" | "b")+ "c" -> { () }
-    }
-}
-```
-
-#### Delimiters
-Match content inside delimiters.
-
-**Note**: You cannot match delimiters using string literals (e.g., `\"[\"` or `\"}\"`) because `syn` parses them as structural `TokenTree`s. You must use the syntax below.
-
-- `paren(pattern)`: Matches `( pattern )`.
-- `[ pattern ]`: Matches `[ pattern ]`.
-- `{ pattern }`: Matches `{ pattern }`.
-
-```rust
-use syn_grammar::grammar;
-
-grammar! {
-    grammar Tuple {
-        rule tuple -> (i32, i32) = 
-            paren(a:i32 "," b:i32) -> { (a, b) }
     }
 }
 ```
@@ -520,7 +481,6 @@ Lookahead operators allow you to check for a pattern without consuming input.
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Lookahead {
         // Matches "a" only if followed by "b", but "b" is not consumed
@@ -539,7 +499,6 @@ The result is a `proc_macro2::TokenStream`.
 
 ```rust
 use syn_grammar::grammar;
-
 grammar! {
     grammar Until {
         // Consumes everything until a semicolon is found.
@@ -602,28 +561,6 @@ grammar! {
 }
 # fn main() {}
 ```
-
-### Whitespace Sensitivity: Rule Calls vs. Grouping
-
-In standard EBNF, whitespace is typically insignificant. However, `syn-grammar` uses whitespace to resolve the ambiguity between **Rule Calls with Arguments** and **Sequences starting with a Group**.
-
-This behavior mimics function call syntax in languages like Rust.
-
-*   **Rule Call with Arguments (No Gap)**:
-    If a rule name is immediately followed by a parenthesis `(` **without whitespace**, it is interpreted as a call to that rule with arguments.
-    ```rust,ignore
-    // Calls rule `my_rule` passing `arg1` and `arg2`.
-    my_rule(arg1, arg2)
-    ```
-
-*   **Sequence with Group (Gap)**:
-    If there is **whitespace** between a rule name and a parenthesis `(`, it is interpreted as two separate items in a sequence: the rule `my_rule` (with no arguments) followed by a parenthesized group `( ... )`.
-    ```rust,ignore
-    // Matches `my_rule`, followed by a group containing `item1` and `item2`.
-    my_rule (item1 item2)
-    ```
-
-**Tip:** Always use a space if you intend to write a sequence. Always omit the space if you intend to pass arguments.
 
 ### Unsupported Syntax & Differences from EBNF
 

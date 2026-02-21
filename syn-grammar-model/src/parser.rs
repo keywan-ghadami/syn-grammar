@@ -2,7 +2,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
-use syn::spanned::Spanned;
 use syn::{token, Attribute, Generics, Ident, ItemUse, Lit, Path, Result, Token, Type};
 
 mod rt {
@@ -42,6 +41,31 @@ pub mod kw {
 }
 
 #[derive(Debug, Clone)]
+pub struct RuleSet {
+    pub alias: Ident,
+    pub rules: Vec<Rule>,
+}
+
+impl Parse for RuleSet {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let _ = input.parse::<kw::ruleset>()?;
+        let content;
+        let _ = syn::braced!(content in input);
+        let mut rules = Rule::parse_all(&content)?;
+        let _ = input.parse::<Token![as]>()?;
+        let alias: Ident = input.parse()?;
+        let _ = input.parse::<Token![;]>()?;
+
+        // Mangle rules
+        for rule in &mut rules {
+            mangle_rule(rule, &alias);
+        }
+
+        Ok(RuleSet { alias, rules })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct GrammarDefinition {
     pub name: Ident,
     pub inherits: Option<InheritanceSpec>,
@@ -55,19 +79,8 @@ impl Parse for GrammarDefinition {
 
         // Support rulesets before grammar
         while input.peek(kw::ruleset) {
-            let _ = input.parse::<kw::ruleset>()?;
-            let content;
-            let _ = syn::braced!(content in input);
-            let mut set_rules = Rule::parse_all(&content)?;
-            let _ = input.parse::<Token![as]>()?;
-            let alias: Ident = input.parse()?;
-            let _ = input.parse::<Token![;]>()?;
-
-            // Mangle rules
-            for rule in &mut set_rules {
-                mangle_rule(rule, &alias);
-            }
-            rules.extend(set_rules);
+            let set: RuleSet = input.parse()?;
+            rules.extend(set.rules);
         }
 
         let _ = input.parse::<kw::grammar>()?;
@@ -87,24 +100,19 @@ impl Parse for GrammarDefinition {
             uses.push(content.parse()?);
         }
 
+        // Parse rulesets inside the grammar block
+        while content.peek(kw::ruleset) {
+            let set: RuleSet = content.parse()?;
+            rules.extend(set.rules);
+        }
+
         let main_rules = Rule::parse_all(&content)?;
         rules.extend(main_rules);
 
         // Support rulesets after grammar
         while input.peek(kw::ruleset) {
-            let _ = input.parse::<kw::ruleset>()?;
-            let content;
-            let _ = syn::braced!(content in input);
-            let mut set_rules = Rule::parse_all(&content)?;
-            let _ = input.parse::<Token![as]>()?;
-            let alias: Ident = input.parse()?;
-            let _ = input.parse::<Token![;]>()?;
-
-            // Mangle rules
-            for rule in &mut set_rules {
-                mangle_rule(rule, &alias);
-            }
-            rules.extend(set_rules);
+            let set: RuleSet = input.parse()?;
+            rules.extend(set.rules);
         }
 
         Ok(GrammarDefinition {

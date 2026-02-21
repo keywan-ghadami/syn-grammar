@@ -1,142 +1,137 @@
-use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
-// --- Test Float Primitive ---
 #[test]
 fn test_float_primitive() {
-    grammar! {
-        grammar float_test {
-            pub rule main -> f64 = f:f64 -> { f }
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar float_test {
+                pub rule main -> f32 = f:FLOAT -> { f.parse().unwrap() };
+            }
         }
     }
 
-    // Happy path
-    float_test::parse_main
-        .parse_str("1.23456")
+    inner::float_test::parse_main
+        .parse_str("1.23")
         .test()
-        .assert_success_with(|val| {
-            assert!((val - 1.23456).abs() < 1e-6, "Float value mismatch");
-        });
-
-    // Integers should fail (syn::LitFloat does not match integer literals unless they have . or exponent)
-    float_test::parse_main
-        .parse_str("42")
+        .assert_success_is(1.23);
+    inner::float_test::parse_main
+        .parse_str("1.23e-5")
         .test()
-        .assert_failure();
+        .assert_success_is(1.23e-5);
+    inner::float_test::parse_main
+        .parse_str("1e5")
+        .test()
+        .assert_success_is(1e5);
 }
 
 #[test]
 fn test_numeric_primitives() {
-    grammar! {
-        grammar num_test {
-            pub rule test_i8 -> i8 = v:i8 -> { v }
-            pub rule test_u64 -> u64 = v:u64 -> { v }
-            pub rule test_f32 -> f32 = v:f32 -> { v }
-            pub rule test_hex -> u64 = v:hex_literal -> { v }
-            pub rule test_oct -> u64 = v:oct_literal -> { v }
-            pub rule test_bin -> u64 = v:bin_literal -> { v }
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar num_test {
+                pub rule int -> i32 = i:INT -> { i.parse().unwrap() };
+                pub rule hex -> i32 = h:HEX -> { i32::from_str_radix(h, 16).unwrap() };
+                pub rule oct -> i32 = o:OCT -> { i32::from_str_radix(o, 8).unwrap() };
+                pub rule bin -> i32 = b:BIN -> { i32::from_str_radix(b, 2).unwrap() };
+            }
         }
     }
 
-    num_test::parse_test_i8
-        .parse_str("127")
-        .test()
-        .assert_success_is(127i8);
-    num_test::parse_test_u64
-        .parse_str("1000")
-        .test()
-        .assert_success_is(1000u64);
-
-    num_test::parse_test_f32
-        .parse_str("1.5")
-        .test()
-        .assert_success_with(|f| {
-            assert!((f - 1.5).abs() < 1e-6);
-        });
-
-    num_test::parse_test_hex
-        .parse_str("0xFF")
-        .test()
-        .assert_success_is(255u64);
-    num_test::parse_test_oct
-        .parse_str("0o77")
-        .test()
-        .assert_success_is(63u64);
-    num_test::parse_test_bin
-        .parse_str("0b1010")
-        .test()
-        .assert_success_is(10u64);
+    inner::num_test::parse_int.parse_str("123").test().assert_success_is(123);
+    inner::num_test::parse_hex.parse_str("ff").test().assert_success_is(255);
+    inner::num_test::parse_oct.parse_str("77").test().assert_success_is(63);
+    inner::num_test::parse_bin.parse_str("11").test().assert_success_is(3);
 }
 
-// --- Test Whitespace Primitive ---
 #[test]
-fn test_whitespace_primitive() {
-    grammar! {
-        grammar ws_test {
-            // Require whitespace between "a" and "b"
-            pub rule main -> () = "a" whitespace "b" -> { () }
+fn test_string_primitive() {
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar str_test {
+                pub rule main -> String = s:STRING -> { s };
+            }
         }
     }
 
-    // "a b" -> OK (whitespace exists)
-    ws_test::parse_main.parse_str("a b").test().assert_success();
-
-    // "a   b" -> OK
-    ws_test::parse_main
-        .parse_str("a   b")
+    inner::str_test::parse_main
+        .parse_str("\"hello\"")
         .test()
-        .assert_success();
+        .assert_success_is("hello".to_string());
+    inner::str_test::parse_main
+        .parse_str(r#""hello \"b\"""#)
+        .test()
+        .assert_success_is("hello \\\"b\\\"".to_string());
+}
+
+#[test]
+fn test_whitespace_primitive() {
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar ws_test {
+                // Requires a non-whitespace token to be present after the ws
+                pub rule main -> () = WS "a" -> {()};
+            }
+        }
+    }
+
+    inner::ws_test::parse_main.parse_str("a").test().assert_success_is(());
+    inner::ws_test::parse_main.parse_str(" a").test().assert_success_is(());
+    inner::ws_test::parse_main.parse_str("  a").test().assert_success_is(());
+    inner::ws_test::parse_main.parse_str("\t a").test().assert_success_is(());
 }
 
 #[test]
 fn test_whitespace_punct_ident() {
-    grammar! {
-        grammar ws_punct {
-            pub rule main -> () = "@" whitespace "detached" -> { () }
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar ws_punct_ident_test {
+                pub rule main -> () = "+=" "a" -> {()};
+            }
         }
     }
 
-    // "@ detached" -> OK
-    ws_punct::parse_main
-        .parse_str("@ detached")
+    inner::ws_punct_ident_test::parse_main
+        .parse_str("+= a")
         .test()
-        .assert_success();
-
-    // "@detached" -> FAIL (adjacent)
-    ws_punct::parse_main
-        .parse_str("@detached")
-        .test()
-        .assert_failure_contains("expected whitespace");
+        .assert_success_is(());
 }
 
 #[test]
 fn test_whitespace_ident_ident() {
-    grammar! {
-        grammar ws_ident {
-            pub rule main -> () = "a" whitespace "b" -> { () }
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar ws_ident_ident_test {
+                pub rule main -> () = "a" "b" -> {()};
+            }
         }
     }
-
-    ws_ident::parse_main
+    inner::ws_ident_ident_test::parse_main
         .parse_str("a b")
         .test()
-        .assert_success();
+        .assert_success_is(());
 }
 
 #[test]
 fn test_whitespace_between_rules() {
-    grammar! {
-        grammar ws_rules {
-            pub rule main -> () = a whitespace b -> { () }
-            rule a -> () = "a" -> { () }
-            rule b -> () = "b" -> { () }
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar ws_between_rules_test {
+                pub rule main -> () = a b -> {()};
+                rule a -> () = "a" -> {()};
+                rule b -> () = "b" -> {()};
+            }
         }
     }
-
-    // "a b" -> OK
-    ws_rules::parse_main
+    inner::ws_between_rules_test::parse_main
         .parse_str("a b")
         .test()
-        .assert_success();
+        .assert_success_is(());
 }

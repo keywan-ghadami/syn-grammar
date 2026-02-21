@@ -1,56 +1,56 @@
-use syn::parse::Parser;
-use syn::spanned::Spanned;
 use syn_grammar::grammar;
+use syn_grammar::testing::Testable;
 
-grammar! {
-    grammar test_opt {
-        rule main -> bool =
-            "fn"
-            m:"mut"?
-            name:ident
-            -> { m.is_some() }
+#[test]
+fn test_literal_binding() {
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar G {
+                pub rule main -> (i32, i32) =
+                    a:"a" b:"b" -> { (a.parse().unwrap(), b.parse().unwrap()) }
+            }
+        }
     }
+
+    inner::G::parse_main
+        .parse_str("a b")
+        .test()
+        .assert_success_is((0, 0));
 }
 
 #[test]
-fn test_literal_binding_optional() {
-    let input = "fn mut foo";
-    let res = test_opt::parse_main.parse_str(input).unwrap();
-    assert!(res);
-
-    let input = "fn foo";
-    let res = test_opt::parse_main.parse_str(input).unwrap();
-    assert!(!res);
-}
-
-grammar! {
-    grammar bind_lit {
-        rule main -> syn::Token![fn] =
-            f:"fn"
-            -> { f }
+fn test_literal_binding_char() {
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar G {
+                pub rule main -> (char, char) =
+                    a:'a' b:'b' -> { (a.chars().next().unwrap(), b.chars().next().unwrap()) }
+            }
+        }
     }
+
+    inner::G::parse_main
+        .parse_str("a b")
+        .test()
+        .assert_success_is(('a', 'b'));
 }
 
 #[test]
-fn test_literal_binding_direct() {
-    let input = "fn";
-    let res = bind_lit::parse_main.parse_str(input).unwrap();
-    // It returns the token
-    assert_eq!(res.span().start().line, 1);
-}
-
-grammar! {
-    grammar span_bind {
-        rule main -> proc_macro2::Span =
-            "fn" @ s
-            -> { s }
+fn test_literal_binding_raw_string() {
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar G {
+                pub rule main -> (String, String) =
+                    a:r"a" b:r#"b"# -> { (a.to_string(), b.to_string()) }
+            }
+        }
     }
-}
 
-#[test]
-fn test_literal_span_binding() {
-    let input = "fn";
-    let res = span_bind::parse_main.parse_str(input).unwrap();
-    // It returns the span
-    assert_eq!(res.start().line, 1);
+    inner::G::parse_main
+        .parse_str("a b")
+        .test()
+        .assert_success_is(("a".to_string(), "b".to_string()));
 }

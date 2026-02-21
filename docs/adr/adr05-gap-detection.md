@@ -1,108 +1,40 @@
-# ADR-05: Resolve Parsing Ambiguity with Gap Detection in the Grammar Parser
+# ADR-05: Unambiguous Syntax for Rule Calls, Grouping, and Delimiters
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Context:**
 
-The current parser for the `grammar!` macro has an ambiguity when it encounters a pattern like `ident (...)`. This can be interpreted in two ways:
+The grammar DSL has a critical three-way ambiguity between:
+1.  **Rule Call with Arguments:** `my_rule(a, b)`
+2.  **Precedence Grouping:** `("a" | "b")` which controls parser logic but does not consume `()`.
+3.  **Delimiter Matching:** A pattern that consumes a literal `(` and `)` from the input stream.
 
-1.  **Rule call with arguments:** `ident(...)` (e.g., `MyRule(a, b)`)
-2.  **A sequence of two patterns:** A call to the rule `ident` followed by a grouped expression `(...)` (e.g., `MyRule (a | b)`).
-
-This ambiguity is particularly problematic because `syn` (and Rust macro parsing in general) treats whitespace as insignificant between tokens. `ident (...)` and `ident(...)` result in the same token stream. To distinguish between them, we must inspect the `Span` of the tokens to see if they are adjacent in the source code.
+A single syntax like `(...)` for both grouping and delimiter matching is fundamentally ambiguous, especially in complex patterns involving repetition, such as `( (a) )*`. The parser cannot reliably infer the user's intent. Previous design iterations attempting to unify this syntax were flawed.
 
 **Decision:**
 
-We will resolve this ambiguity by making the grammar parser whitespace-sensitive in this specific context. The logic will be implemented in `syn-grammar-model/src/parser.rs`.
+To eliminate all ambiguity, we will enforce a clear, explicit syntax for each distinct operation. This design prioritizes correctness and readability over minimal verbosity.
 
-- If there is **no whitespace** between an identifier (`ident`) (or the closing angle bracket `>` of generics) and a subsequent opening parenthesis (`(`), the parser will model this as a `ModelPattern::RuleCall` with arguments.
-- If there is **whitespace** (a "gap"), the parser will model this as a `ModelPattern::RuleCall` with *no* arguments, followed by a separate `ModelPattern::Group` (which will be parsed in the next iteration).
+1.  **Rule Calls:** All parameterized rule calls **must** use a generic-style syntax, `rule<...>(...)`. The presence of `<...>` unambiguously marks it as a function-like call.
+    - `my_rule<>(arg)`: Call a non-generic rule with arguments.
+    - `list<T>(item)`: Call a generic rule with type and value arguments.
+    - A rule name *without* `<...>` is a simple, non-parameterized call.
 
-**Detailed Implementation Plan:**
+2.  **Precedence Grouping:** The `( ... )` syntax is used **exclusively** for logical grouping to control the order of operations for `|`, `*`, `+`, and `?`. It does not consume parentheses from the input.
+    - `("a" | "b") "c"`: Correctly parses `a c` or `b c`.
 
-The changes will be focused on `syn-grammar-model/src/parser.rs`, specifically within the function that parses a `Pattern` (likely `parse_atom` or similar).
+3.  **Delimiter Matching:** To match literal delimiters in the input stream, the following syntax is used:
+    - `paren(...)`: Matches a literal `(` and `)` in the input.
+    - `[ ... ]`: Matches a literal `[` and `]` in the input.
+    - `{ ... }`: Matches a literal `{` and `}` in the input.
 
-1.  **Span Contiguity Check:**
-    We need a utility to determine if two spans are immediately adjacent.
+The special `paren(...)` keyword is necessary because `()` is the only delimiter that would otherwise be ambiguous with precedence grouping.
 
-    ```rust
-    use proc_macro2::{LineColumn, Span};
+**Examples of the Final Syntax:**
 
-    fn spans_are_contiguous(first: Span, second: Span) -> bool {
-        let first_end: LineColumn = first.end();
-        let second_start: LineColumn = second.start();
+- `rule call_with_args = my_rule<>(1, 2);`
+- `rule group_for_or = ("a" | "b");`
+- `rule match_a_tuple = paren(i32, i32);`
+- `rule repeated_tuples = (paren(i32))*;` // Correctly combines grouping and delimiter matching
 
-        // Must be on the same line.
-        if first_end.line != second_start.line {
-            return false;
-        }
-
-        // The column of the second's start must immediately follow the column of the first's end.
-        first_end.column == second_start.column
-    }
-    ```
-
-2.  **Modifying `parse_atom` (or equivalent):**
-
-    The logic for parsing a rule call currently looks something like this:
-    ```rust
-    // Current (simplified)
-    let rule_name: Ident = input.parse()?;
-    let generics = ...; // parse generics
-    let args = parse_args(input)?; // always consumes (...) if present
-    ```
-
-    We need to change it to:
-
-    ```rust
-    // Proposed
-    let rule_name: Ident = input.parse()?;
-    
-    // Track the end of the previous token.
-    let mut previous_end_span = rule_name.span();
-
-    // Parse generics: rule<T, U>
-    let generics = if input.peek(Token![<]) {
-        // ... parsing generics ...
-        let closing_gt: Token![>] = input.parse()?; // The '>' token
-        previous_end_span = closing_gt.span(); // Update end span
-        parsed_generics
-    } else {
-        Vec::new()
-    };
-
-    // Check for arguments
-    let args = if input.peek(token::Paren) {
-        // Peek the next token's span without consuming it
-        let paren_span = input.cursor().span();
-        
-        if spans_are_contiguous(previous_end_span, paren_span) {
-            // No gap: It's arguments for this rule.
-            parse_args(input)? 
-        } else {
-            // Gap exists: It's a separate group.
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
-
-    Ok(Pattern::RuleCall {
-        // ...
-        args,
-    })
-    ```
-
-3.  **Handling `parse_args`:**
-    The `parse_args` function currently consumes a parenthesized group. It should remain largely the same, but it is now conditionally called.
-
-4.  **Edge Cases:**
-    - **Comments:** `syn`'s default behavior skips comments. If a comment is between `ident` and `(`, `syn` might treat them as adjacent tokens in the stream, but their spans will reflect the gap. `spans_are_contiguous` handles this correctly because the column numbers will differ significantly or the line numbers will differ.
-    - **Macros:** If the grammar definition itself is generated by another macro, span information might be synthetic. However, `syn` usually preserves relative spans well enough for this to work in `proc_macro` contexts.
-
-**Verification:**
-
-We will add a specific test case in `tests/` that defines a grammar with:
-1. `RuleA(x)` (call with arg)
-2. `RuleB (y)` (call followed by group)
-And asserts that the parsed model reflects this difference.
+This design provides a robust and intuitive syntax for the grammar DSL, ensuring that every pattern has one and only one meaning.

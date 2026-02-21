@@ -182,7 +182,7 @@ pub fn resolve_token_types(
         return Err(syn::Error::new(
             lit.span(),
             format!(
-                "Invalid direct token literal: '{}'. Use paren(...), [...] or {{...}} instead.",
+                "Invalid direct token literal: '{}'. Use `(...)`, `[...]` or `{{...}}` syntax to match delimiters.",
                 s
             ),
         ));

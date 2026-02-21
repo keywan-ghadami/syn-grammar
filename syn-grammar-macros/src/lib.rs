@@ -49,13 +49,12 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     quote! {
         #[macro_export]
         macro_rules! #rules_macro_name {
-            ($alias:ident, { $next:ident! { $($inner:tt)* } $($trailing:tt)* }) => {
+            ($alias:ident, { $next:ident! { $($inner:tt)* } }) => {
                 $next! {
                     $($inner)*
                     ruleset {
                         #rules_tokens
                     } as $alias;
-                    $($trailing)*
                 }
             };
         }
