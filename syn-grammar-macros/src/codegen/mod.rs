@@ -3,12 +3,23 @@ mod rule;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use std::collections::HashSet;
 use syn::Result;
 use syn_grammar_model::{analysis, model::*};
+
+pub struct CodegenContext<'a> {
+    pub grammar: &'a GrammarDefinition,
+    pub custom_keywords: &'a HashSet<String>,
+}
 
 pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let grammar_name = &grammar.name;
     let custom_keywords = analysis::collect_custom_keywords(&grammar);
+
+    let ctx = CodegenContext {
+        grammar: &grammar,
+        custom_keywords: &custom_keywords,
+    };
 
     let kw_defs = (!custom_keywords.is_empty()).then(|| {
         let defs = custom_keywords.iter().map(|k| {
@@ -19,13 +30,18 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     });
 
     let uses = &grammar.uses;
-
-    // Remove defined_rule_names collection as it's no longer needed for builtin logic
+    
+    // Generate imports inside the module
+    let imports = grammar.imports.iter().map(|imp| {
+        let path = &imp.path;
+        let alias = &imp.alias;
+        quote! { use #path as #alias; }
+    });
 
     let rules = grammar
         .rules
         .iter()
-        .map(|r| rule::generate_rule(r, &custom_keywords))
+        .map(|r| rule::generate_rule(r, &ctx))
         .collect::<Result<Vec<_>>>()?;
 
     // Capture the rules as a TokenStream to reuse for both code generation and string introspection
@@ -59,6 +75,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             #kw_defs
 
             #(#uses)*
+            #(#imports)*
 
             #rules_stream
         }

@@ -19,14 +19,21 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
         }
     }
 
+    // Include extern rules as defined
+    let mut extern_defs = HashSet::new();
+    for er in &grammar.extern_rules {
+        extern_defs.insert(er.name.to_string());
+    }
+
     let all_defs: HashSet<_> = grammar
         .rules
         .iter()
         .map(|r| r.name.to_string())
+        .chain(extern_defs.iter().cloned())
         .chain(builtin_names.iter().cloned())
         .collect();
 
-    let should_validate_rule_calls = grammar.uses.is_empty(); // Changed from checking inherits.is_none() because 'inherits' is gone? No, `uses` is Vec. If uses is not empty, we assume user includes other grammars.
+    let should_validate_rule_calls = grammar.uses.is_empty();
 
     if should_validate_rule_calls {
         for rule in &grammar.rules {
@@ -41,8 +48,6 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
 
     // 1. Detect Infinite Recursion (Error)
     for cycle in &analysis.cycles {
-        // We filter out self-loops (length 1) because the macro handles direct left recursion (e.g. A -> A b).
-        // We only report indirect recursion (A -> B -> A) or complex cycles that are not supported.
         if cycle.len() > 1 {
             let cycle_str = cycle
                 .iter()
@@ -111,35 +116,27 @@ fn validate_pattern(
         ModelPattern::RuleCall {
             rule_path, args, ..
         } => {
-            let rule_name_ident = rule_path.segments.last().unwrap().ident.clone();
-            let rule_name_str = rule_name_ident.to_string();
-
-            // Check if rule_name is in all_defs OR in params (as a grammar parameter)
-            let is_param = if let Some(ident) = rule_path.get_ident() {
-                params.iter().any(|p| p.name == *ident)
+            // Check if it's a multi-segment path (e.g., imported call)
+            if rule_path.segments.len() > 1 {
+                // We assume imported/namespaced calls are valid external references.
+                // We cannot validate them locally without more context.
+                // However, we still validate their arguments.
             } else {
-                false
-            };
+                let rule_name_ident = rule_path.get_ident().unwrap();
+                let rule_name_str = rule_name_ident.to_string();
 
-            // Special case: separated and repeated are built-ins we are adding logic for,
-            // but they might not be in B::get_builtins() if B doesn't declare them.
-            // For now, let's assume they are either in builtins or we bypass check for them if generic.
-            // Actually, ADR 004 says they are "Built-in Parametric Rules".
+                // Check if rule_name is in all_defs OR in params (as a grammar parameter)
+                let is_param = params.iter().any(|p| p.name == *rule_name_ident);
 
-            // Note: If 'separated' is not in all_defs, we might error.
-            // The backend should probably export them or we hardcode them here?
-            // "separated" and "repeated" are portable built-ins.
-            let is_portable_builtin =
-                rule_name_ident == "separated" || rule_name_ident == "repeated";
+                let is_portable_builtin =
+                    rule_name_ident == "separated" || rule_name_ident == "repeated";
 
-            if !all_defs.contains(&rule_name_str) && !is_param && !is_portable_builtin {
-                // If it's a qualified path, maybe it refers to something we can't check?
-                // But with mangling, all rules should be local.
-                // So if it's not in all_defs, it's an error.
-                return Err(syn::Error::new(
-                    rule_path.span(),
-                    format!("Undefined rule: '{}'", rule_name_str),
-                ));
+                if !all_defs.contains(&rule_name_str) && !is_param && !is_portable_builtin {
+                    return Err(syn::Error::new(
+                        rule_path.span(),
+                        format!("Undefined rule: '{}'", rule_name_str),
+                    ));
+                }
             }
 
             for arg in args {
@@ -282,37 +279,38 @@ fn validate_args_recursive(
             ModelPattern::RuleCall {
                 rule_path, args, ..
             } => {
-                let rule_name_str = rule_path.segments.last().unwrap().ident.to_string();
+                if let Some(ident) = rule_path.get_ident() {
+                    let rule_name_str = ident.to_string();
 
-                // Allow named args for specific built-ins or generic checks?
-                // For user-defined rules, we currently only support positional args.
-                // If we see Named args for user rule, it's an error unless we implement named params for user rules.
+                    if let Some(target_rule) = rule_map.get(&rule_name_str) {
+                         // Check if any args are named
+                        for arg in args {
+                            if let Argument::Named(n, _) = arg {
+                                return Err(syn::Error::new(
+                                    n.span(),
+                                    "Named arguments are not supported for user-defined rules yet.",
+                                ));
+                            }
+                        }
 
-                if let Some(target_rule) = rule_map.get(&rule_name_str) {
-                    // Check if any args are named
-                    for arg in args {
-                        if let Argument::Named(n, _) = arg {
+                        if target_rule.params.len() != args.len() {
                             return Err(syn::Error::new(
-                                n.span(),
-                                "Named arguments are not supported for user-defined rules yet.",
+                                rule_path.span(),
+                                format!(
+                                    "Rule '{}' expects {} argument(s), but got {}.",
+                                    rule_name_str,
+                                    target_rule.params.len(),
+                                    args.len()
+                                ),
                             ));
                         }
                     }
-
-                    if target_rule.params.len() != args.len() {
-                        return Err(syn::Error::new(
-                            rule_path.span(),
-                            format!(
-                                "Rule '{}' expects {} argument(s), but got {}.",
-                                rule_name_str,
-                                target_rule.params.len(),
-                                args.len()
-                            ),
-                        ));
-                    }
                 } else {
-                    // It might be a builtin. We allow arguments for builtins.
+                     // Namespaced call (e.g. math::expr)
+                     // We can't check arguments for remote rules easily without parsing them.
+                     // But we should recursively check argument patterns.
                 }
+
                 // Recursively check arguments (they are patterns)
                 for arg in args {
                     match arg {

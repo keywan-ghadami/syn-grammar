@@ -1,11 +1,12 @@
 use super::pattern;
+use super::CodegenContext;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use syn::Result;
 use syn_grammar_model::{analysis, model::*};
 
-pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<TokenStream> {
+pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     let name = &rule.name;
     let fn_name = format_ident!("parse_{}", name);
     let impl_name = format_ident!("parse_{}_impl", name);
@@ -14,8 +15,6 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let generics = &rule.generics; // Include where clause if present
 
     // Filter attributes for the implementation function
-    // Structural & Lint attributes must be on both.
-    // API & Doc attributes should only be on the wrapper.
     let impl_attrs: Vec<&syn::Attribute> = attrs
         .iter()
         .filter(|a| {
@@ -70,7 +69,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let where_clause = &generics.where_clause;
 
     let body = if recursive_refs.is_empty() {
-        generate_variants_internal(&rule.variants, true, custom_keywords)?
+        generate_variants_internal(&rule.variants, true, ctx)?
     } else {
         if base_refs.is_empty() {
             return Err(syn::Error::new(
@@ -82,8 +81,8 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
         let base_owned: Vec<RuleVariant> = base_refs.into_iter().cloned().collect();
         let recursive_owned: Vec<RuleVariant> = recursive_refs.into_iter().cloned().collect();
 
-        let base_logic = generate_variants_internal(&base_owned, true, custom_keywords)?;
-        let loop_logic = generate_recursive_loop_body(&recursive_owned, custom_keywords)?;
+        let base_logic = generate_variants_internal(&base_owned, true, ctx)?;
+        let loop_logic = generate_recursive_loop_body(&recursive_owned, ctx)?;
 
         quote! {
             let mut lhs = {
@@ -132,7 +131,7 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
 
 fn generate_recursive_loop_body(
     variants: &[RuleVariant],
-    kws: &HashSet<String>,
+    ctx: &CodegenContext,
 ) -> Result<TokenStream> {
     let arms = variants.iter().map(|variant| {
         let tail_pattern = &variant.pattern[1..];
@@ -148,10 +147,10 @@ fn generate_recursive_loop_body(
             quote! {}
         };
 
-        let logic = pattern::generate_sequence(tail_pattern, &variant.action, kws)?;
+        let logic = pattern::generate_sequence(tail_pattern, &variant.action, ctx)?;
 
         let peek_token_obj = tail_pattern.first()
-            .and_then(|f| analysis::get_simple_peek(f, kws).ok().flatten());
+            .and_then(|f| analysis::get_simple_peek(f, ctx.custom_keywords).ok().flatten());
 
         match peek_token_obj {
             Some(token_code) => {
@@ -197,7 +196,7 @@ fn generate_recursive_loop_body(
 pub fn generate_variants_internal(
     variants: &[RuleVariant],
     is_top_level: bool,
-    _custom_keywords: &HashSet<String>,
+    ctx: &CodegenContext,
 ) -> Result<TokenStream> {
     if variants.is_empty() {
         return Ok(quote! { Err(input.error("No variants defined")) });
@@ -236,10 +235,7 @@ pub fn generate_variants_internal(
              let failure_rec = if let Some(l) = label_str {
                  quote! {
                      if !ctx.is_best_error_deep() {
-                         // DEBUG: eprintln!("DEBUG: Pushing failure: {}", #l);
                          _shallow_failures.push(#l);
-                     } else {
-                         // DEBUG: eprintln!("DEBUG: Skipping failure push due to deep error");
                      }
                  }
              } else {
@@ -252,7 +248,7 @@ pub fn generate_variants_internal(
 
             let peek_token_obj = if !is_nullable {
                 first_pat.and_then(|f| {
-                    analysis::get_simple_peek(f, _custom_keywords)
+                    analysis::get_simple_peek(f, ctx.custom_keywords)
                         .ok()
                         .flatten()
                 })
@@ -280,8 +276,8 @@ pub fn generate_variants_internal(
                 let post_cut = cut.post_cut;
 
                 let pre_bindings = analysis::collect_bindings(pre_cut);
-                let pre_logic = pattern::generate_sequence_steps(pre_cut, _custom_keywords)?;
-                let post_logic = pattern::generate_sequence_steps(post_cut, _custom_keywords)?;
+                let pre_logic = pattern::generate_sequence_steps(pre_cut, ctx)?;
+                let post_logic = pattern::generate_sequence_steps(post_cut, ctx)?;
                 let action = &variant.action;
 
                 let logic_block = if is_unique {
@@ -338,7 +334,7 @@ pub fn generate_variants_internal(
                 let logic = pattern::generate_sequence(
                     &variant.pattern,
                     &variant.action,
-                    _custom_keywords,
+                    ctx,
                 )?;
 
                 if is_unique {
@@ -390,33 +386,23 @@ pub fn generate_variants_internal(
     };
 
     Ok(quote! {
-        // DEBUG: eprintln!("DEBUG: Starting generate_variants_internal. is_top_level: {}", #is_top_level);
         let mut _shallow_failures = Vec::<&str>::new();
         #(#arms)*
 
-        // DEBUG: eprintln!("DEBUG: Checking errors. is_deep: {}", ctx.is_best_error_deep());
-
         if ctx.is_best_error_deep() {
-            // DEBUG: eprintln!("DEBUG: is_deep is TRUE");
             if let Some(best_err) = ctx.take_best_error() {
-                // DEBUG: eprintln!("DEBUG: Returning deep best_err: {}", best_err);
                 return Err(best_err);
             }
         }
-
-        // DEBUG: eprintln!("DEBUG: Final shallow failures: {:?}", _shallow_failures);
 
         if !_shallow_failures.is_empty() {
              _shallow_failures.sort();
              _shallow_failures.dedup();
              let msg = format!("expected one of: {}", _shallow_failures.join(", "));
-             // DEBUG: eprintln!("DEBUG: Returning gathered failures: {}", msg);
              Err(input.error(msg))
         } else if let Some(best_err) = ctx.take_best_error() {
-            // DEBUG: eprintln!("DEBUG: returning best error fallback: {}", best_err);
             Err(best_err)
         } else {
-            // DEBUG: eprintln!("DEBUG: no best error, no shallow failures. Msg: {}", #error_msg);
             Err(input.error(#error_msg))
         }
     })
