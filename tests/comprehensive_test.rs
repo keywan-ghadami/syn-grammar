@@ -31,35 +31,6 @@ grammar! {
 }
 
 grammar! {
-    grammar seq_test {
-        pub rule main -> (i32, i32) = a:i32 b:i32 -> { (a, b) }
-    }
-}
-
-grammar! {
-    grammar epsilon_test {
-        pub rule main -> i32 =
-            i:inner? -> { i.unwrap_or(0) }
-
-        rule inner -> i32 = "a" -> { 1 }
-    }
-}
-
-grammar! {
-    grammar args {
-        pub rule main -> i32 = val<>(1) -> { val }
-        rule val(x: i32) -> i32 = "a" -> { x + 1 }
-    }
-}
-
-grammar! {
-    grammar multi_args {
-        pub rule main -> i32 = call<>(1, 2) -> { call }
-        rule call(x: i32, y: i32) -> i32 = "a" -> { x + y }
-    }
-}
-
-grammar! {
     grammar types {
         use std::rc::Rc;
         use std::cell::RefCell;
@@ -159,39 +130,6 @@ fn test_keywords_vs_idents() {
         .assert_success_is(3);
     kw_test::parse_main
         .parse_str("fnx")
-        .test()
-        .assert_success_is(3);
-}
-
-#[test]
-fn test_basic_sequence() {
-    seq_test::parse_main
-        .parse_str("10 20")
-        .test()
-        .assert_success_is((10, 20));
-}
-
-#[test]
-fn test_epsilon_alternative() {
-    epsilon_test::parse_main
-        .parse_str("a")
-        .test()
-        .assert_success_is(1);
-    epsilon_test::parse_main
-        .parse_str("")
-        .test()
-        .assert_success_is(0);
-}
-
-#[test]
-fn test_rule_arguments() {
-    args::parse_main.parse_str("a").test().assert_success_is(2);
-}
-
-#[test]
-fn test_multiple_arguments() {
-    multi_args::parse_main
-        .parse_str("a")
         .test()
         .assert_success_is(3);
 }

@@ -6,7 +6,7 @@ use syn_grammar::testing::Testable;
 
 grammar! {
     grammar list_test1 {
-        pub rule main -> Vec<String> = items:separated<>(string, ",") -> {
+        pub rule main -> Vec<String> = items:separated<_>(string, ",") -> {
             items.into_iter().map(|s| s.value).collect()
         }
     }
@@ -15,12 +15,12 @@ grammar! {
 grammar! {
     grammar list_test2 {
         pub rule main -> Vec<String>
-            = items:separated<>(string, ",", trailing=true) -> {
+            = items:separated<_>(string, ",", trailing=true) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
 
         pub rule strict -> Vec<String>
-            = items:separated<>(string, ",") -> {
+            = items:separated<_>(string, ",") -> {
                 items.into_iter().map(|s| s.value).collect()
             }
     }
@@ -29,7 +29,7 @@ grammar! {
 grammar! {
     grammar list_test3 {
         pub rule min_two -> Vec<String>
-            = items:separated<>(string, ",", min=2) -> {
+            = items:separated<_>(string, ",", min=2) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
     }
@@ -38,7 +38,7 @@ grammar! {
 grammar! {
     grammar list_test4 {
         pub rule repeated_rule -> Vec<String>
-            = items:repeated<>(string) -> {
+            = items:repeated<_>(string) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
     }
@@ -47,7 +47,7 @@ grammar! {
 grammar! {
     grammar list_test5 {
         pub rule repeated_min -> Vec<String>
-            = items:repeated<>(string, min=2) -> {
+            = items:repeated<_>(string, min=2) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
     }
