@@ -9,7 +9,24 @@ pub mod types;
 pub struct GrammarDefinition {
     pub name: Ident,
     pub rules: Vec<Rule>,
+    pub extern_rules: Vec<ExternRule>,
+    pub imports: Vec<ImportedGrammar>,
     pub uses: Vec<syn::ItemUse>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternRule {
+    pub name: Ident,
+    pub generics: syn::Generics,
+    pub params: Vec<RuleParameter>,
+    pub return_type: syn::Type,
+    pub attrs: Vec<syn::Attribute>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportedGrammar {
+    pub path: syn::Path,
+    pub alias: Ident,
 }
 
 #[derive(Debug, Clone)]
@@ -110,6 +127,8 @@ impl From<parser::GrammarDefinition> for GrammarDefinition {
     fn from(p: parser::GrammarDefinition) -> Self {
         let mut uses = p.uses;
         if let Some(inherits) = p.inherits {
+            // Deprecation warning could be emitted here if we had a way to report it
+            // For now, we just map it to a use super::*; for compatibility
             let name = inherits.name;
             let item_use: syn::ItemUse = syn::parse_quote!(use super::#name::*;);
             uses.insert(0, item_use);
@@ -117,7 +136,30 @@ impl From<parser::GrammarDefinition> for GrammarDefinition {
         GrammarDefinition {
             name: p.name,
             rules: p.rules.into_iter().map(Into::into).collect(),
+            extern_rules: p.extern_rules.into_iter().map(Into::into).collect(),
+            imports: p.imports.into_iter().map(Into::into).collect(),
             uses,
+        }
+    }
+}
+
+impl From<parser::ExternRule> for ExternRule {
+    fn from(p: parser::ExternRule) -> Self {
+        ExternRule {
+            name: p.name,
+            generics: p.generics,
+            params: p.params.into_iter().map(Into::into).collect(),
+            return_type: p.return_type,
+            attrs: p.attrs,
+        }
+    }
+}
+
+impl From<parser::ImportedGrammar> for ImportedGrammar {
+    fn from(p: parser::ImportedGrammar) -> Self {
+        ImportedGrammar {
+            path: p.path,
+            alias: p.alias,
         }
     }
 }

@@ -11,7 +11,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 ## Features
 
 - **Inline Grammars**: Define your grammar directly in your Rust code using the `grammar!` macro.
-- **Namespaced Grammar Composition**: Safely compose grammars from multiple files using a hygienic `include` syntax, preventing name collisions.
+- **Black-Box Grammar Composition**: Safely compose grammars across modules and crates using `import` and `extern` interfaces.
 - **EBNF Syntax**: Familiar syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`), and explicit grouping `(...)`.
 - **Unambiguous Delimiter Matching**: Clear syntax with `paren(...)`, `[...]`, and `{...}` to match literal delimiters in the input.
 - **Type-Safe Actions**: Directly map parsing rules to Rust types and AST nodes using action blocks (`-> { ... }`).
@@ -22,8 +22,8 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
 - **Rule Arguments**: Pass context between rules using a clear, generic-style `rule<...>(...)` syntax.
 - **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
-- **100% Static Validation**: All checks, including for left-recursion and shadowing, are performed at compile time across all included files.
-- **Perfect Spans**: Error messages point to the exact line and file where a syntax error occurred, even in included files.
+- **100% Static Validation**: All checks, including for left-recursion and shadowing, are performed at compile time within each grammar block.
+- **Perfect Spans**: Error messages point to the exact line and file where a syntax error occurred.
 - **Testing Utilities**: Fluent API for testing your parsers with pretty-printed error reporting.
 
 ## Installation
@@ -39,7 +39,7 @@ Add `syn-grammar` and `syn` to your `Cargo.toml`. `syn` is required at runtime b
 
 ```toml
 [dependencies]
-syn-grammar = "0.7.0"
+syn-grammar = "0.8.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -56,7 +56,7 @@ If you are writing a **procedural macro** to parse input **at compile time**, yo
 **Steps:**
 
 1. Create a separate `proc-macro` crate.
-2. Add `syn-grammar`, `syn`, and `quote` to **that** crate\'s `Cargo.toml`.
+2. Add `syn-grammar`, `syn`, and `quote` to **that** crate's `Cargo.toml`.
 3. Define your grammar and macro there.
 4. Depend on that crate from your main project.
 
@@ -70,7 +70,7 @@ Since `syn-grammar` is built on top of `syn`, it uses the **Rust Tokenizer**. Th
 - **Limitations**: You cannot parse languages that require a custom lexer, such as:
     - **Whitespace-sensitive languages** (e.g., Python, YAML) — `syn` skips whitespace automatically.
     - **Binary formats**.
-    - **Arbitrary text** that doesn\'t form valid Rust tokens (e.g., unquoted strings with special characters like `@` or `$` in positions Rust doesn\'t allow).
+    - **Arbitrary text** that doesn't form valid Rust tokens (e.g., unquoted strings with special characters like `@` or `$` in positions Rust doesn't allow).
 
 ## Quick Start
 
@@ -113,50 +113,48 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 - These functions take a `syn::parse::ParseStream` and return a `syn::Result<T>`.
 - All necessary imports and helper functions to make the parser work, including `use super::*;` for convenience.
 
-## Composing Grammars with `include`
+## Composing Grammars
 
-`syn-grammar` allows you to split your grammar across multiple files and compose them safely using a namespaced `include` system. This is the modern, recommended way to manage large grammars.
+`syn-grammar` allows you to split your grammar across multiple files and compose them safely using a "Black-Box" approach. This respects standard Rust module visibility and improves compile times.
 
-### Example
+### 1. Importing Grammars
 
-Let's say we have a base grammar for numbers.
+You can import an entire grammar defined elsewhere. Rules from the imported grammar can be accessed via an alias.
 
 ```rust
-// in file: base.rs
-use syn_grammar::grammar;
-
+// in file: math.rs
 grammar! {
-    // This defines the `Base` parser module AND
-    // the `Base_rules` macro for inclusion.
-    grammar Base {
-        pub rule num -> i32 = i:i32 -> { i }
+    grammar Math {
+        pub rule expr -> i32 = ...
     }
 }
-```
 
-Now, we can include and use it in our main grammar.
-
-```rust
 // in file: main.rs
-use syn_grammar::grammar;
-
-// Make the `Base_rules` macro available.
-#[macro_use]
-mod base;
-
 grammar! {
-    // Include the rules from `Base` under the namespace `b`.
-    include Base_rules as b;
+    import crate::math::Math as math;
 
-    grammar Derived {
-        rule main -> i32 =
-            "add" a:b::num b:b::num -> { a + b }
+    grammar MyLang {
+        pub rule statement -> i32 = 
+            "calc" e:math::expr -> { e }
     }
 }
 ```
 
-### Deprecated Syntax
-The old colon-based inheritance (`grammar Derived : Base`) is now deprecated and will be removed in a future version. Please migrate to the `include` syntax.
+### 2. External Rules
+
+You can bind a grammar rule directly to any Rust function that follows the `fn(ParseStream) -> Result<T>` signature.
+
+```rust
+grammar! {
+    grammar MyGrammar {
+        // Declares that `custom_parser` is a function in scope
+        extern rule custom_parser -> String;
+
+        pub rule main -> String = 
+            "prefix" s:custom_parser -> { s }
+    }
+}
+```
 
 ## Detailed Syntax Guide
 
@@ -659,7 +657,7 @@ rule main
 
 ### Backtracking
 
-By default, `syn-grammar` uses `syn`\'s speculative parsing (`fork`) to try alternatives.
+By default, `syn-grammar` uses `syn`'s speculative parsing (`fork`) to try alternatives.
 1. It checks if the next token matches the start of an alternative (using `peek`).
 2. If ambiguous, it attempts to parse the alternative.
 3. If it fails, it backtracks and tries the next one.
