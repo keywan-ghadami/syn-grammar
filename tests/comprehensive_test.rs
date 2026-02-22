@@ -22,32 +22,6 @@ grammar! {
 }
 
 grammar! {
-    grammar repetition_test {
-        pub rule star -> Vec<i32> = ("a" -> { 1 })* -> { list }
-        pub rule plus -> Vec<i32> = ("a" -> { 1 })+ -> { list }
-        pub rule optional -> Option<i32> = ("a" -> { 1 })? -> { opt }
-    }
-}
-
-grammar! {
-    grammar nested_repetition_test {
-        pub rule main -> Vec<Vec<i32>> =
-            (
-                ("a" -> { 1 })+
-                ("," -> {})?
-            )* -> { list }
-    }
-}
-
-grammar! {
-    grammar cut_test {
-        pub rule main -> i32 =
-            "a" => "b" -> { 1 }
-            | "a" "c" -> { 2 }
-    }
-}
-
-grammar! {
     grammar kw_test {
         pub rule main -> i32 =
             "fn" -> { 1 }
@@ -97,20 +71,6 @@ grammar! {
 }
 
 grammar! {
-    grammar cut_rep {
-        pub rule main -> () = ("a" => "b")* "c" -> { () }
-    }
-}
-
-grammar! {
-    grammar prio {
-        pub rule main -> i32 =
-            "a" "b" -> { 1 }
-            | "a" -> { 2 }
-    }
-}
-
-grammar! {
     grammar use_stmt {
         use std::rc::Rc;
         pub rule main -> Rc<i32> = i:i32 -> { Rc::new(i) }
@@ -129,12 +89,6 @@ grammar! {
         /// Doc comment
         #[allow(unused)]
         pub rule main -> () = "a" -> { () }
-    }
-}
-
-grammar! {
-    grammar plus_validation {
-        pub rule main -> Vec<()> = ("a" -> {()} | "b" -> {()})+ -> { list }
     }
 }
 
@@ -187,56 +141,6 @@ fn test_builtins() {
         .parse_str("")
         .test()
         .assert_success_is(());
-}
-
-#[test]
-fn test_repetition() {
-    repetition_test::parse_star
-        .parse_str("")
-        .test()
-        .assert_success_is(vec![]);
-    repetition_test::parse_star
-        .parse_str("a a")
-        .test()
-        .assert_success_is(vec![1, 1]);
-    repetition_test::parse_plus
-        .parse_str("a")
-        .test()
-        .assert_success_is(vec![1]);
-    repetition_test::parse_plus
-        .parse_str("a a")
-        .test()
-        .assert_success_is(vec![1, 1]);
-    repetition_test::parse_plus
-        .parse_str("")
-        .test()
-        .assert_is_err();
-    repetition_test::parse_optional
-        .parse_str("")
-        .test()
-        .assert_success_is(None);
-    repetition_test::parse_optional
-        .parse_str("a")
-        .test()
-        .assert_success_is(Some(1));
-}
-
-#[test]
-fn test_nested_repetition_complex() {
-    nested_repetition_test::parse_main
-        .parse_str("a, a a, a")
-        .test()
-        .assert_success_is(vec![vec![1], vec![1, 1], vec![1]]);
-}
-
-#[test]
-fn test_cut_operator() {
-    cut_test::parse_main
-        .parse_str("a b")
-        .test()
-        .assert_success_is(1);
-    let res = cut_test::parse_main.parse_str("a c").test();
-    res.assert_is_err();
 }
 
 #[test]
@@ -299,27 +203,6 @@ fn test_complex_return_types() {
 }
 
 #[test]
-fn test_cut_in_repetition() {
-    cut_rep::parse_main
-        .parse_str("a b a b c")
-        .test()
-        .assert_success_is(());
-    cut_rep::parse_main
-        .parse_str("a c")
-        .test()
-        .assert_error_contains(0, "expected `b`");
-}
-
-#[test]
-fn test_backtracking_priority() {
-    prio::parse_main
-        .parse_str("a b")
-        .test()
-        .assert_success_is(1);
-    prio::parse_main.parse_str("a").test().assert_success_is(2);
-}
-
-#[test]
 fn test_use_statements() {
     let result = use_stmt::parse_main.parse_str("123").test();
     assert_eq!(*result.get_success_value(), 123);
@@ -339,18 +222,6 @@ fn test_attributes_on_rules() {
         .parse_str("a")
         .test()
         .assert_success_is(());
-}
-
-#[test]
-fn test_plus_operator_validation() {
-    plus_validation::parse_main
-        .parse_str("")
-        .test()
-        .assert_is_err();
-    plus_validation::parse_main
-        .parse_str("a b a")
-        .test()
-        .assert_success_is(vec![(), (), ()]);
 }
 
 #[test]

@@ -224,6 +224,23 @@ impl<T: Debug, E: Display + Debug + 'static> TestResult<T, E> {
             );
         }
     }
+
+    // --- Deprecated Aliases ---
+
+    #[deprecated(note = "this method should not be used, if you see this warning this indicates corruption of the test by ai hallucinations")]
+    pub fn assert_is_err(self) -> E {
+        self.assert_failure()
+    }
+
+    #[deprecated(note = "this method should not be used, if you see this warning this indicates corruption of the test by ai hallucinations")]
+    pub fn get_success_value(self) -> T {
+        self.assert_success()
+    }
+
+    #[deprecated(note = "this method should not be used, if you see this warning this indicates corruption of the test by ai hallucinations")]
+    pub fn assert_error_contains(self, _code: usize, expected_msg_part: &str) {
+        self.assert_failure_contains(expected_msg_part)
+    }
 }
 
 pub trait Testable<T, E> {
