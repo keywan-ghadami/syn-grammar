@@ -29,3 +29,13 @@ When encountering test failures where the grammar structure seems overly complex
 1. Check if the test was recently refactored to avoid a core feature (like numbers).
 2. Prefer restoring the original, simpler test case (e.g., `i32` binding) rather than patching the workaround.
 3. If a feature (like number parsing) is truly broken, fix the feature, don't change the test to avoid it.
+
+## Syntactic Disambiguation for Generic Rules (2026-02-22)
+
+### ADR 003 Update: The `<_>` Marker
+ADR 003 has been updated to require an explicit `<_>` (or concrete types) for rule invocations that take arguments. This was necessary to resolve an LL(1) parsing ambiguity in the `syn` macro environment.
+
+### Potential Impact
+- **Solves:** Parsing conflicts between rule calls and EBNF groups, and ensures compatibility with `syn`'s native path parsing.
+- **Introduces Issues:** This is a breaking change. The previously used `rule<>(..)` syntax is no longer supported as `syn` fails to parse empty angle brackets as a valid path. All existing grammars using `rule<>(..)` will fail and must be updated to `rule<_>(..)` or `rule<Type>(..)` to comply with the new standard.
+- **Scope:** Expect widespread build failures in tests and modules that rely on the old empty-bracket generic syntax.

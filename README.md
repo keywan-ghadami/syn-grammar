@@ -202,15 +202,15 @@ grammar! {
 
 ### Rule Arguments and Generic Calls
 
-Rule calls with arguments use a syntax similar to Rust's generic function calls. The presence of angle brackets (`<...>`) unambiguously signals a parameterized call.
+Rule calls with arguments use a syntax similar to Rust's generic function calls. To avoid parsing ambiguities in the macro environment, an explicit `<_>` (for inferred types) or `<Type>` is required before the arguments.
 
 ```rust
 use syn_grammar::grammar;
 grammar! {
     grammar Args {
         rule main -> i32 =
-            // Call `value` with argument 10. Empty brackets `<>` are required.
-            "start" v:value<>(10) -> { v }
+            // Call `value` with argument 10. `<_>` is required for disambiguation.
+            "start" v:value<_>(10) -> { v }
 
         rule value(offset: i32) -> i32 =
             i:i32 -> { i + offset }
@@ -233,8 +233,8 @@ grammar! {
             items:item* -> { items }
 
         pub rule integers -> Vec<i32> =
-            // Reuse `list` with the `i32` rule.
-            l:list<>(i32) -> { l }
+            // Reuse `list` with the `i32` rule. `<_>` is required.
+            l:list<_>(i32) -> { l }
     }
 }
 ```
@@ -248,7 +248,7 @@ use syn_grammar::grammar;
 grammar! {
     grammar Map {
         rule map<K: Hash + Eq, V>(k, v) -> HashMap<K, V> =
-            entries:entry<>(k, v)* -> { entries.into_iter().collect() }
+            entries:entry<_>(k, v)* -> { entries.into_iter().collect() }
 
         rule entry<K, V>(k, v) -> (K, V) =
             key:k ":" val:v -> { (key, val) }
@@ -462,11 +462,11 @@ grammar! {
     grammar Lists {
         // [ 1, 2, 3 ]
         rule array -> Vec<i32> = 
-            [ items:separated<>(i32, ",") ] -> { items }
+            [ items:separated<_>(i32, ",") ] -> { items }
 
         // { key value key value }
         rule map -> Vec<(String, i32)> = 
-            { entries:repeated<>(entry) } -> { entries }
+            { entries:repeated<_>(entry) } -> { entries }
             
         rule entry -> (String, i32) = k:ident v:i32 -> { (k.to_string(), v) }
     }
