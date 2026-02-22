@@ -40,20 +40,24 @@ pub fn generate_rule(rule: &Rule, custom_keywords: &HashSet<String>) -> Result<T
     let params: Vec<_> = rule
         .params
         .iter()
-        .filter_map(|p| p.ty.as_ref().map(|t| {
-             let name = &p.name;
-             quote! { , #name : #t }
-        }))
+        .filter_map(|p| {
+            p.ty.as_ref().map(|t| {
+                let name = &p.name;
+                quote! { , #name : #t }
+            })
+        })
         .collect();
 
     // Params for the impl call (forwarding arguments)
     let param_names: Vec<_> = rule
         .params
         .iter()
-        .filter_map(|p| p.ty.as_ref().map(|_| {
-             let name = &p.name;
-             quote! { , #name }
-        }))
+        .filter_map(|p| {
+            p.ty.as_ref().map(|_| {
+                let name = &p.name;
+                quote! { , #name }
+            })
+        })
         .collect();
 
     let is_public = rule.is_pub || name == "main";

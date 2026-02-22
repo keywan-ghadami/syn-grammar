@@ -49,7 +49,10 @@ pub enum ModelPattern {
         generics: Vec<syn::Type>,
         args: Vec<Argument>,
     },
-    Group(Vec<(Vec<ModelPattern>, Option<TokenStream>, Option<String>)>, proc_macro2::Span),
+    Group(
+        Vec<(Vec<ModelPattern>, Option<TokenStream>, Option<String>)>,
+        proc_macro2::Span,
+    ),
     Bracketed(Vec<ModelPattern>, proc_macro2::Span),
     Braced(Vec<ModelPattern>, proc_macro2::Span),
     Parenthesized(Vec<ModelPattern>, proc_macro2::Span),
@@ -177,19 +180,33 @@ impl From<parser::Pattern> for ModelPattern {
                 token.span.join(), // Paren has .span: DelimSpan which has .join() -> Span
             ),
             parser::Pattern::Bracketed(seq, token) => {
-                ModelPattern::Bracketed(seq.into_iter().map(Into::into).collect(), token.span.join()) // Bracket has .span: DelimSpan
+                ModelPattern::Bracketed(
+                    seq.into_iter().map(Into::into).collect(),
+                    token.span.join(),
+                ) // Bracket has .span: DelimSpan
             }
             parser::Pattern::Braced(seq, token) => {
-                ModelPattern::Braced(seq.into_iter().map(Into::into).collect(), token.span.join()) // Brace has .span: DelimSpan
+                ModelPattern::Braced(seq.into_iter().map(Into::into).collect(), token.span.join())
+                // Brace has .span: DelimSpan
             }
             parser::Pattern::Parenthesized(seq, _, token) => {
-                ModelPattern::Parenthesized(seq.into_iter().map(Into::into).collect(), token.span.join()) // Paren has .span: DelimSpan
+                ModelPattern::Parenthesized(
+                    seq.into_iter().map(Into::into).collect(),
+                    token.span.join(),
+                ) // Paren has .span: DelimSpan
             }
-            parser::Pattern::Optional(p, token) => ModelPattern::Optional(Box::new((*p).into()), token.span), // Question has .span (field)
-            parser::Pattern::Repeat(p, token) => ModelPattern::Repeat(Box::new((*p).into()), token.span), // Star has .span (field)
-            parser::Pattern::Plus(p, token) => ModelPattern::Plus(Box::new((*p).into()), token.span), // Plus has .span (field)
+            parser::Pattern::Optional(p, token) => {
+                ModelPattern::Optional(Box::new((*p).into()), token.span)
+            } // Question has .span (field)
+            parser::Pattern::Repeat(p, token) => {
+                ModelPattern::Repeat(Box::new((*p).into()), token.span)
+            } // Star has .span (field)
+            parser::Pattern::Plus(p, token) => {
+                ModelPattern::Plus(Box::new((*p).into()), token.span)
+            } // Plus has .span (field)
             parser::Pattern::SpanBinding(p, id, token) => {
-                ModelPattern::SpanBinding(Box::new((*p).into()), id, token.span) // At has .span (field)
+                ModelPattern::SpanBinding(Box::new((*p).into()), id, token.span)
+                // At has .span (field)
             }
             parser::Pattern::Recover {
                 binding,
@@ -202,8 +219,12 @@ impl From<parser::Pattern> for ModelPattern {
                 sync: Box::new((*sync).into()),
                 span: kw_token.span(), // Custom Keyword has .span()
             },
-            parser::Pattern::Peek(p, token) => ModelPattern::Peek(Box::new((*p).into()), token.span()), // Custom Keyword has .span()
-            parser::Pattern::Not(p, token) => ModelPattern::Not(Box::new((*p).into()), token.span()), // Custom Keyword has .span()
+            parser::Pattern::Peek(p, token) => {
+                ModelPattern::Peek(Box::new((*p).into()), token.span())
+            } // Custom Keyword has .span()
+            parser::Pattern::Not(p, token) => {
+                ModelPattern::Not(Box::new((*p).into()), token.span())
+            } // Custom Keyword has .span()
             parser::Pattern::Until {
                 binding,
                 pattern,

@@ -2,71 +2,76 @@ use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
-pub mod basemod {
+// 1. Calc Grammar
+pub mod calc_mod {
     use syn_grammar::grammar;
     grammar! {
-        grammar base {
-            pub rule digit -> i32 = "a" -> { 0 }
+        grammar Calc {
+            pub rule num -> i32 = i:i32 -> { i }
         }
     }
 }
 
-pub mod derived {
-    use crate::base_rules;
+// 2. Units Grammar
+pub mod units_mod {
     use syn_grammar::grammar;
     grammar! {
-        include base_rules as b;
-        grammar derived {
-            pub rule main -> i32 = d:b::digit -> { d }
+        grammar Units {
+            pub rule weight -> i32 =
+                n:i32 "kg" -> { n * 1000000 }
+              | n:i32 "g"  -> { n * 1000 }
+              | n:i32 "mg" -> { n }
+        }
+    }
+}
+
+// 3. GrammCalc Grammar
+pub mod gramm_calc_mod {
+    use syn_grammar::grammar;
+    // We don't need imports if we use full paths in include
+    
+    grammar! {
+        include crate::calc_mod::Calc_rules as c;
+        include crate::units_mod::Units_rules as u;
+
+        grammar GrammCalc {
+            pub rule expr -> i32 =
+                l:expr "+" r:term -> { l + r }
+              | t:term -> { t }
+
+            rule term -> i32 =
+                w:u::weight -> { w }
+              | n:c::num -> { n }
+        }
+    }
+}
+
+// 4. Rechner Grammar
+pub mod rechner_mod {
+    use syn_grammar::grammar;
+    // include crate::gramm_calc_mod::GrammCalc_rules as gc;
+    
+    grammar! {
+        include crate::gramm_calc_mod::GrammCalc_rules as gc;
+        grammar Rechner {
+            pub rule main -> i32 =
+                "rechne" paren(e:gc::expr) -> { e }
         }
     }
 }
 
 #[test]
-fn test_composition_basic() {
-    derived::derived::parse_main
-        .parse_str("a")
+fn test_composition_complex() {
+    rechner_mod::Rechner::parse_main
+        .parse_str("rechne ( 2 g + 13kg )")
         .test()
-        .assert_success_is(0);
-}
-
-pub mod g1 {
-    use syn_grammar::grammar;
-    grammar! {
-        grammar G1 {
-            pub rule value -> i32 = "a" -> { 1 }
-        }
-    }
-}
-
-pub mod g2 {
-    use syn_grammar::grammar;
-    grammar! {
-        grammar G2 {
-            pub rule value -> i32 = "b" -> { 2 }
-        }
-    }
-}
-
-mod combined {
-    use crate::G1_rules;
-    use crate::G2_rules;
-    use syn_grammar::grammar;
-    grammar! {
-        include G1_rules as g1;
-        include G2_rules as g2;
-
-        grammar Combined {
-            pub rule main -> (i32, i32) =
-                v1:g1::value v2:g2::value -> { (v1, v2) }
-        }
-    }
+        .assert_success_is(13002000);
 }
 
 #[test]
-fn test_composition_mangling() {
-    combined::Combined::parse_main
-        .parse_str("a b")
+fn test_composition_mixed() {
+    rechner_mod::Rechner::parse_main
+        .parse_str("rechne ( 500mg + 1 g )")
         .test()
-        .assert_success_is((1, 2));
+        .assert_success_is(1500);
 }

@@ -16,7 +16,7 @@ fn test_repetition() {
         .parse_str("")
         .test()
         .assert_success_is(vec![]);
-    
+
     repetition_test::parse_star
         .parse_str("1 2")
         .test()

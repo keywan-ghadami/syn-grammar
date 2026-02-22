@@ -34,6 +34,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     let rules = &def.rules;
     let rules_tokens = quote! { #(#rules)* };
 
+    // 1. Build the chain for the grammar definition (the code that runs here)
     let mut current_chain = quote! {
         #core_alias! { #def }
     };
@@ -46,19 +47,81 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         };
     }
 
-    quote! {
-        #[macro_export]
-        macro_rules! #rules_macro_name {
-            ($alias:ident, { $next:ident! { $($inner:tt)* } } $($rest:tt)*) => {
+    // Helper to generate the expansion body
+    // we need a closure or function because we generate it twice
+    let generate_expansion = |acc_tokens: proc_macro2::TokenStream| {
+        if file.includes.is_empty() {
+            quote! {
                 $next! {
-                    ruleset {
-                        #rules_tokens
-                    } as $alias;
+                    @accum (
+                        #acc_tokens
+                        ruleset {
+                            #rules_tokens
+                        } as $alias;
+                    )
                     $($inner)*
                     $($rest)*
                 }
+            }
+        } else {
+            let first = &file.includes[0];
+            let rest = &file.includes[1..];
+            
+            let mut inner_chain = quote! {
+                $next! { 
+                    $($inner)* 
+                    $($rest)* 
+                }
+            };
+
+            for include in rest.iter().rev() {
+                 let m = &include.macro_name;
+                 let a = &include.alias;
+                 inner_chain = quote! {
+                     #m! { #a, { #inner_chain } }
+                 };
+            }
+
+            let first_macro = &first.macro_name;
+            let first_alias = &first.alias;
+
+            quote! {
+                #first_macro! {
+                    @accum (
+                        #acc_tokens
+                        ruleset {
+                            #rules_tokens
+                        } as $alias;
+                    )
+                    #first_alias, 
+                    { 
+                        #inner_chain 
+                    }
+                }
+            }
+        }
+    };
+
+    let expansion_accum = generate_expansion(quote! { $($acc)* });
+    let expansion_entry = generate_expansion(quote! {});
+
+    quote! {
+        // Define the macro locally
+        macro_rules! #rules_macro_name {
+            // Recursive branch: receives accumulated rules in @accum
+            (@accum ($($acc:tt)*) $alias:ident, { $next:ident! { $($inner:tt)* } } $($rest:tt)*) => {
+                #expansion_accum
+            };
+
+            // Entry branch: called without @accum, initializes it
+            ($alias:ident, { $next:ident! { $($inner:tt)* } } $($rest:tt)*) => {
+                #expansion_entry
             };
         }
+        
+        // Export the macro so it can be used outside this module but within the crate
+        #[allow(unused_imports)]
+        pub(crate) use #rules_macro_name;
 
         #[allow(unused_imports)]
         use syn_grammar::grammar_core as #core_alias;

@@ -100,6 +100,21 @@ impl Parse for GrammarDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut included_rules = Vec::<RuleSet>::new();
 
+        // Check for accumulated rules passed via @accum (...)
+        if input.peek(Token![@]) {
+            let _at: Token![@] = input.parse()?;
+            let ident: Ident = input.parse()?;
+            if ident == "accum" {
+                let content;
+                syn::parenthesized!(content in input);
+                while content.peek(kw::ruleset) {
+                    included_rules.push(content.parse()?);
+                }
+            } else {
+                return Err(syn::Error::new(ident.span(), "Expected 'accum'"));
+            }
+        }
+
         while input.peek(kw::ruleset) {
             included_rules.push(input.parse()?);
         }
@@ -188,6 +203,57 @@ fn mangle_rule_definition(rule: &mut Rule, alias: &Ident) {
     }
 }
 
+fn is_builtin(name: &str) -> bool {
+    matches!(
+        name,
+        "ident"
+            | "string"
+            | "char"
+            | "bool"
+            | "i8"
+            | "i16"
+            | "i32"
+            | "i64"
+            | "i128"
+            | "isize"
+            | "u8"
+            | "u16"
+            | "u32"
+            | "u64"
+            | "u128"
+            | "usize"
+            | "f32"
+            | "f64"
+            | "hex_literal"
+            | "oct_literal"
+            | "bin_literal"
+            | "spanned_char"
+            | "spanned_bool"
+            | "spanned_i8"
+            | "spanned_i16"
+            | "spanned_i32"
+            | "spanned_i64"
+            | "spanned_i128"
+            | "spanned_isize"
+            | "spanned_u8"
+            | "spanned_u16"
+            | "spanned_u32"
+            | "spanned_u64"
+            | "spanned_u128"
+            | "spanned_usize"
+            | "spanned_f32"
+            | "spanned_f64"
+            | "rust_type"
+            | "rust_block"
+            | "lit_str"
+            | "lit_int"
+            | "lit_char"
+            | "lit_bool"
+            | "lit_float"
+            | "outer_attrs"
+    )
+}
+
 /// Mangles rule calls *within* an included ruleset. This turns a simple call like `a`
 /// into a namespaced one like `b::a` so that it can be correctly resolved later.
 fn mangle_internal_call_site(pattern: &mut Pattern, alias: &Ident) {
@@ -199,8 +265,10 @@ fn mangle_internal_call_site(pattern: &mut Pattern, alias: &Ident) {
                 let segment = &mut rule_path.segments[0];
                 if segment.arguments.is_none() {
                     let old_ident = segment.ident.clone();
-                    let new_path: Path = syn::parse_quote!(#alias::#old_ident);
-                    *rule_path = new_path;
+                    if !is_builtin(&old_ident.to_string()) {
+                        let new_path: Path = syn::parse_quote!(#alias::#old_ident);
+                        *rule_path = new_path;
+                    }
                 }
             }
 
