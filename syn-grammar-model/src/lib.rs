@@ -19,7 +19,7 @@ pub mod model;
 pub mod parser;
 pub mod validator;
 
-pub use model::{Backend, BuiltIn};
+pub use model::backend::{Backend, BuiltIn};
 pub use proc_macro2::Span;
 
 /// Reusable pipeline: Parses, transforms, and validates the grammar.

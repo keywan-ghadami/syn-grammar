@@ -1,5 +1,6 @@
 //! Semantic validation for the grammar model.
 
+use crate::model::backend::{Backend, BuiltIn};
 use crate::model::*;
 use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;
@@ -25,7 +26,7 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
         .chain(builtin_names.iter().cloned())
         .collect();
 
-    let should_validate_rule_calls = grammar.inherits.is_none();
+    let should_validate_rule_calls = grammar.uses.is_empty(); // Changed from checking inherits.is_none() because 'inherits' is gone? No, `uses` is Vec. If uses is not empty, we assume user includes other grammars.
 
     if should_validate_rule_calls {
         for rule in &grammar.rules {
@@ -93,7 +94,7 @@ fn validate_rule(rule: &Rule, all_defs: &HashSet<String>) -> syn::Result<()> {
 fn validate_pattern_sequence(
     patterns: &[ModelPattern],
     all_defs: &HashSet<String>,
-    params: &[(syn::Ident, Option<syn::Type>)],
+    params: &[(RuleParameter)],
 ) -> syn::Result<()> {
     for pattern in patterns {
         validate_pattern(pattern, all_defs, params)?;
@@ -104,7 +105,7 @@ fn validate_pattern_sequence(
 fn validate_pattern(
     pattern: &ModelPattern,
     all_defs: &HashSet<String>,
-    params: &[(syn::Ident, Option<syn::Type>)],
+    params: &[(RuleParameter)],
 ) -> syn::Result<()> {
     match pattern {
         ModelPattern::RuleCall {
@@ -115,7 +116,7 @@ fn validate_pattern(
 
             // Check if rule_name is in all_defs OR in params (as a grammar parameter)
             let is_param = if let Some(ident) = rule_path.get_ident() {
-                params.iter().any(|(p_name, _)| p_name == ident)
+                params.iter().any(|p| p.name == *ident)
             } else {
                 false
             };
@@ -160,7 +161,7 @@ fn validate_pattern(
             validate_pattern(inner, all_defs, params)?;
         }
         ModelPattern::Group(variants, _) => {
-            for (seq, _) in variants {
+            for (seq, _, _) in variants {
                 validate_pattern_sequence(seq, all_defs, params)?;
             }
         }
@@ -208,7 +209,7 @@ fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
             }
         }
         ModelPattern::Group(variants, _) => {
-            for (seq, _) in variants {
+            for (seq, _, _) in variants {
                 for p in seq {
                     validate_no_bindings(p)?;
                 }
@@ -332,7 +333,7 @@ fn validate_args_recursive(
                 validate_args_recursive(std::slice::from_ref(inner), rule_map)?;
             }
             ModelPattern::Group(variants, _) => {
-                for (seq, _) in variants {
+                for (seq, _, _) in variants {
                     validate_args_recursive(seq, rule_map)?;
                 }
             }

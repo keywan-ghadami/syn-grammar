@@ -32,7 +32,7 @@ impl Monomorphizer {
 
         for rule in rules {
             let has_generics = !rule.generics.params.is_empty();
-            let has_untyped_params = rule.params.iter().any(|(_, ty)| ty.is_none());
+            let has_untyped_params = rule.params.iter().any(|p| p.ty.is_none());
             let is_generic = has_generics || has_untyped_params;
 
             if is_generic {
@@ -89,7 +89,7 @@ impl Monomorphizer {
                 }
             }
             ModelPattern::Group(alts, _) => {
-                for (seq, _) in alts {
+                for (seq, _, _) in alts {
                     for p in seq {
                         self.expand_pattern(p);
                     }
@@ -147,9 +147,9 @@ impl Monomorphizer {
         self.instantiations.insert(key, new_name.clone());
 
         let mut grammar_params = Vec::new();
-        for (name, ty) in &template.params {
-            if ty.is_none() {
-                grammar_params.push(name.clone());
+        for p in &template.params {
+            if p.ty.is_none() {
+                grammar_params.push(p.name.clone());
             }
         }
 
@@ -164,7 +164,7 @@ impl Monomorphizer {
         let old_generics = new_rule.generics.clone();
         new_rule.generics.params.clear();
 
-        new_rule.params.retain(|(_, ty)| ty.is_some());
+        new_rule.params.retain(|p| p.ty.is_some());
 
         let substituter = ParamSubstituter {
             param_map: &param_map,
@@ -294,7 +294,7 @@ impl<'a> ParamSubstituter<'a> {
                 }
             }
             ModelPattern::Group(alts, _) => {
-                for (seq, _) in alts {
+                for (seq, _, _) in alts {
                     for p in seq {
                         self.visit_pattern(p);
                     }

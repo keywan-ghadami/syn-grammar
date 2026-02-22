@@ -18,10 +18,6 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
         quote! { pub mod kw { #(#defs)* } }
     });
 
-    let inheritance = grammar.inherits.as_ref().map(|parent| {
-        quote! { use super::#parent::*; }
-    });
-
     let uses = &grammar.uses;
 
     // Remove defined_rule_names collection as it's no longer needed for builtin logic
@@ -61,7 +57,6 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             use syn_grammar::builtins::*;
 
             #kw_defs
-            #inheritance
 
             #(#uses)*
 

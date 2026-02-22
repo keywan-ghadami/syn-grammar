@@ -1,0 +1,16 @@
+--- a/syn-grammar-model/src/model/mod.rs
++++ b/syn-grammar-model/src/model/mod.rs
+@@ -145,11 +145,11 @@
+             },
+             parser::Pattern::Group(alts, _) => Pattern::Group(
+                 alts.into_iter()
+-                    .map(|(seq, label)| {
++                    .map(|(seq, action, label)| {
+                         (
+                             seq.into_iter().map(IdentityMorphism::pattern).collect(),
+-                            label,
++                            action,
++                            label,
+                         )
+                     })
+                     .collect(),

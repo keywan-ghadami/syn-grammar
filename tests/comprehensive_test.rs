@@ -58,7 +58,7 @@ grammar! {
 
 grammar! {
     grammar seq_test {
-        pub rule main -> (i32, i32) = a:("a" -> {1}) b:("b" -> {2}) -> { (a, b) }
+        pub rule main -> (i32, i32) = a:i32 b:i32 -> { (a, b) }
     }
 }
 
@@ -139,9 +139,9 @@ grammar! {
 }
 
 grammar! {
-    grammar rust_stuff {
-        pub rule ty -> String = "i32" -> { "i32".to_string() }
-        pub rule block -> i32 = "{" "}" -> { 1 }
+    grammar rust_features {
+        pub rule type_parser -> syn::Type = t:rust_type -> { t }
+        pub rule block_parser -> syn::Block = b:rust_block -> { b }
     }
 }
 
@@ -262,9 +262,9 @@ fn test_keywords_vs_idents() {
 #[test]
 fn test_basic_sequence() {
     seq_test::parse_main
-        .parse_str("a b")
+        .parse_str("10 20")
         .test()
-        .assert_success_is((1, 2));
+        .assert_success_is((10, 20));
 }
 
 #[test]
@@ -355,14 +355,15 @@ fn test_plus_operator_validation() {
 
 #[test]
 fn test_rust_types_and_blocks() {
-    rust_stuff::parse_ty
-        .parse_str("i32")
+    rust_features::parse_type_parser
+        .parse_str("Vec<i32>")
         .test()
-        .assert_success_is("i32".to_string());
-    rust_stuff::parse_block
-        .parse_str("{ }")
+        .assert_success();
+
+    rust_features::parse_block_parser
+        .parse_str("{ let x = 1; }")
         .test()
-        .assert_success_is(1);
+        .assert_success();
 }
 
 #[test]

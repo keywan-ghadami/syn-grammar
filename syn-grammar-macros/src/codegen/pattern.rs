@@ -699,9 +699,11 @@ fn generate_pattern_step(pattern: &ModelPattern, kws: &HashSet<String>) -> Resul
 
             let temp_variants = alts
                 .iter()
-                .map(|(pat_seq, label)| {
+                .map(|(pat_seq, action, label)| {
                     let bindings = analysis::collect_bindings(pat_seq);
-                    let action_expr = if bindings.is_empty() {
+                    let action_expr = if let Some(a) = action {
+                        quote!({ #a })
+                    } else if bindings.is_empty() {
                         quote!(())
                     } else {
                         quote!(( #(#bindings),* ))
