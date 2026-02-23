@@ -30,7 +30,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     });
 
     let uses = &grammar.uses;
-    
+
     // Generate imports inside the module
     let imports = grammar.imports.iter().map(|imp| {
         let path = &imp.path;

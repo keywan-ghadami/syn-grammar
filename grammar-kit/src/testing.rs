@@ -156,26 +156,34 @@ impl<T: Debug, E: Display + Debug + 'static> TestResult<T, E> {
     }
 
     // 6. Asserts failure AND checks if the message contains a specific text.
-    pub fn assert_failure_contains(self, expected_msg_part: &str) {
+    pub fn assert_failure_contains(self, expected_msg_part: &str) -> Self {
         let ctx = self.format_context();
         let source = self.source.clone();
 
-        // This will print "Asserting failure. Error: ..."
-        let err = self.assert_failure();
-        let actual_msg = err.to_string();
+        match &self.inner {
+            Ok(val) => {
+                panic!(
+                    "\n🔴 TEST FAILED (Expected Failure, but got Success):{}\nParsed Value: {:?}\n",
+                    ctx, val
+                );
+            }
+            Err(err) => {
+                let actual_msg = err.to_string();
+                println!(
+                    "ℹ️  Checking error message contains {:?}.\n   Actual message: {:?}",
+                    expected_msg_part, actual_msg
+                );
 
-        println!(
-            "ℹ️  Checking error message contains {:?}.\n   Actual message: {:?}",
-            expected_msg_part, actual_msg
-        );
-
-        if !actual_msg.contains(expected_msg_part) {
-            let formatted = format_error_impl(&err, source.as_deref());
-            panic!(
-                "\n🔴 TEST FAILED (Error Message Mismatch):{}\nExpected part: {:?}\nActual msg:    {:?}\nError Debug:   {:?}\nFormatted:   \n{}\n", 
-                ctx, expected_msg_part, actual_msg, err, formatted
-            );
+                if !actual_msg.contains(expected_msg_part) {
+                    let formatted = format_error_impl(err, source.as_deref());
+                    panic!(
+                        "\n🔴 TEST FAILED (Error Message Mismatch):{}\nExpected part: {:?}\nActual msg:    {:?}\nError Debug:   {:?}\nFormatted:   \n{}\n", 
+                        ctx, expected_msg_part, actual_msg, err, formatted
+                    );
+                }
+            }
         }
+        self
     }
 
     // 7. Asserts success AND checks if the string representation contains a specific substring.
@@ -203,26 +211,34 @@ impl<T: Debug, E: Display + Debug + 'static> TestResult<T, E> {
     }
 
     // 8. Asserts failure AND checks if the message DOES NOT contain a specific text.
-    pub fn assert_failure_not_contains(self, unexpected_part: &str) {
+    pub fn assert_failure_not_contains(self, unexpected_part: &str) -> Self {
         let ctx = self.format_context();
         let source = self.source.clone();
 
-        // This will print "Asserting failure. Error: ..."
-        let err = self.assert_failure();
-        let actual_msg = err.to_string();
+        match &self.inner {
+            Ok(val) => {
+                panic!(
+                    "\n🔴 TEST FAILED (Expected Failure, but got Success):{}\nParsed Value: {:?}\n",
+                    ctx, val
+                );
+            }
+            Err(err) => {
+                let actual_msg = err.to_string();
+                println!(
+                    "ℹ️  Checking error message NOT contains {:?}.\n   Actual message: {:?}",
+                    unexpected_part, actual_msg
+                );
 
-        println!(
-            "ℹ️  Checking error message NOT contains {:?}.\n   Actual message: {:?}",
-            unexpected_part, actual_msg
-        );
-
-        if actual_msg.contains(unexpected_part) {
-            let formatted = format_error_impl(&err, source.as_deref());
-            panic!(
-                "\n🔴 TEST FAILED (Unexpected Error Message Content):{}\nUnexpected part: {:?}\nActual msg:      {:?}\nError Debug:     {:?}\nFormatted:\n{}\n", 
-                ctx, unexpected_part, actual_msg, err, formatted
-            );
+                if actual_msg.contains(unexpected_part) {
+                    let formatted = format_error_impl(err, source.as_deref());
+                    panic!(
+                        "\n🔴 TEST FAILED (Unexpected Error Message Content):{}\nUnexpected part: {:?}\nActual msg:      {:?}\nError Debug:     {:?}\nFormatted:\n{}\n", 
+                        ctx, unexpected_part, actual_msg, err, formatted
+                    );
+                }
+            }
         }
+        self
     }
 
     // --- Deprecated Aliases ---
@@ -245,7 +261,7 @@ impl<T: Debug, E: Display + Debug + 'static> TestResult<T, E> {
         note = "this method should not be used, if you see this warning this indicates corruption of the test by ai hallucinations"
     )]
     pub fn assert_error_contains(self, _code: usize, expected_msg_part: &str) {
-        self.assert_failure_contains(expected_msg_part)
+        self.assert_failure_contains(expected_msg_part);
     }
 }
 

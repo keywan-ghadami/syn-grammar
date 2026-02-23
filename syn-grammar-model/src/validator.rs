@@ -1,6 +1,6 @@
 //! Semantic validation for the grammar model.
 
-use crate::model::backend::{Backend, BuiltIn};
+use crate::model::backend::Backend;
 use crate::model::*;
 use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;
@@ -99,7 +99,7 @@ fn validate_rule(rule: &Rule, all_defs: &HashSet<String>) -> syn::Result<()> {
 fn validate_pattern_sequence(
     patterns: &[ModelPattern],
     all_defs: &HashSet<String>,
-    params: &[(RuleParameter)],
+    params: &[RuleParameter],
 ) -> syn::Result<()> {
     for pattern in patterns {
         validate_pattern(pattern, all_defs, params)?;
@@ -110,7 +110,7 @@ fn validate_pattern_sequence(
 fn validate_pattern(
     pattern: &ModelPattern,
     all_defs: &HashSet<String>,
-    params: &[(RuleParameter)],
+    params: &[RuleParameter],
 ) -> syn::Result<()> {
     match pattern {
         ModelPattern::RuleCall {
@@ -283,7 +283,7 @@ fn validate_args_recursive(
                     let rule_name_str = ident.to_string();
 
                     if let Some(target_rule) = rule_map.get(&rule_name_str) {
-                         // Check if any args are named
+                        // Check if any args are named
                         for arg in args {
                             if let Argument::Named(n, _) = arg {
                                 return Err(syn::Error::new(
@@ -306,9 +306,9 @@ fn validate_args_recursive(
                         }
                     }
                 } else {
-                     // Namespaced call (e.g. math::expr)
-                     // We can't check arguments for remote rules easily without parsing them.
-                     // But we should recursively check argument patterns.
+                    // Namespaced call (e.g. math::expr)
+                    // We can't check arguments for remote rules easily without parsing them.
+                    // But we should recursively check argument patterns.
                 }
 
                 // Recursively check arguments (they are patterns)

@@ -1,0 +1,21 @@
+use syn_grammar::grammar;
+use syn_grammar::testing::Testable;
+
+// FIXME: This test currently fails in the 'syn' backend because it does not support
+// numeric literals as direct tokens. Other backends like 'winnow' may support this.
+// A workaround should be implemented in the syn backend.
+grammar! {
+    grammar digit_test_literal {
+        pub rule main -> () = l:letter+ d:digit+ -> { () }
+        rule letter -> () = ("a" | "b" | "c") -> { () }
+        rule digit -> () = ("0" | "1" | "2") -> { () }
+    }
+}
+
+#[test]
+fn test_digit_literals() {
+    digit_test_literal::parse_main
+        .parse_str("a b 1")
+        .test()
+        .assert_success();
+}

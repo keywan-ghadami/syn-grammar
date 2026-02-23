@@ -125,16 +125,23 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
                 #body
             })();
 
-            if let Err(e) = &res {
-                // If the error is fatal, it won't be recorded by 'attempt' upstream.
-                // We record it here to ensure it's enriched with the current rule name.
-                if ctx.check_fatal() {
-                    ctx.record_error(e.clone(), _start_span);
-                }
+            if let Err(ref e) = res {
+                // Record the error BEFORE exiting the rule so we capture the current rule name.
+                ctx.record_error(e.clone(), _start_span);
             }
 
             ctx.exit_rule();
-            res
+
+            match res {
+                Ok(val) => Ok(val),
+                Err(e) => {
+                    if let Some(best) = ctx.take_best_error() {
+                        Err(best)
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
         }
     })
 }

@@ -1,6 +1,6 @@
 // Moved from macros/src/parser.rs
-use proc_macro2::{Delimiter, TokenStream};
-use quote::{format_ident, quote, ToTokens, TokenStreamExt};
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::discouraged::Speculative;
 use syn::parse::{Parse, ParseStream};
 use syn::{token, Attribute, Generics, Ident, ItemUse, Lit, Path, Result, Token, Type};

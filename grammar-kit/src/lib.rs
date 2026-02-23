@@ -137,8 +137,14 @@ impl ParseContext {
 
         // Enrich error with rule name if available
         let err = if let Some(rule_name) = self.rule_stack.last() {
-            let msg = format!("in rule `{}`: {}", rule_name, err);
-            syn::Error::new(err.span(), msg)
+            let prefix = format!("in rule `{}`", rule_name);
+            // Avoid redundant enrichment if the error already has this rule name at the front.
+            if !err.to_string().starts_with(&prefix) {
+                let msg = format!("{}: {}", prefix, err);
+                syn::Error::new(err.span(), msg)
+            } else {
+                err
+            }
         } else {
             err
         };
@@ -169,28 +175,27 @@ impl ParseContext {
 
                 // If priorities are equal, use depth logic.
                 if new_error_state.priority == existing.priority {
-                    if !existing.is_deep {
-                        // Existing is shallow. Always update (Deep beats Shallow, Last Shallow wins).
+                    let new_start = new_error_state.err.span().start();
+                    let old_start = existing.err.span().start();
+
+                    let is_deeper = new_start.line > old_start.line
+                        || (new_start.line == old_start.line
+                            && new_start.column > old_start.column);
+
+                    if is_deeper {
                         #[cfg(feature = "trace")]
-                        eprintln!("[TRACE] Overwriting shallow error: {}", new_error_state.err);
+                        eprintln!(
+                            "[TRACE] Overwriting deep error with deeper error: {}",
+                            new_error_state.err
+                        );
                         self.best_error = Some(new_error_state);
-                    } else if new_error_state.is_deep {
-                        // Both are deep. Prefer the one that is logically "further" in the input.
-                        let new_start = new_error_state.err.span().start();
-                        let old_start = existing.err.span().start();
-
-                        let is_deeper = new_start.line > old_start.line
-                            || (new_start.line == old_start.line
-                                && new_start.column > old_start.column);
-
-                        if is_deeper {
-                            #[cfg(feature = "trace")]
-                            eprintln!(
-                                "[TRACE] Overwriting deep error with deeper error: {}",
-                                new_error_state.err
-                            );
-                            self.best_error = Some(new_error_state);
+                    } else if new_start == old_start {
+                        // Same depth. Prefer the one with MORE context (longer message).
+                        if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
+                             self.best_error = Some(new_error_state);
                         }
+                    } else if !existing.is_deep && new_error_state.is_deep {
+                         self.best_error = Some(new_error_state);
                     }
                 }
             }
@@ -493,6 +498,12 @@ mod tests {
 
         let final_err = ctx.take_best_error().unwrap();
         assert_eq!(final_err.to_string(), "in rule `inner`: fail");
+
+        // Simulate outer rule recording it too
+        ctx.exit_rule(); // inner popped
+        ctx.record_error(final_err, Span::call_site());
+        let final_err2 = ctx.take_best_error().unwrap();
+        assert_eq!(final_err2.to_string(), "in rule `outer`: in rule `inner`: fail");
     }
 
     #[test]
