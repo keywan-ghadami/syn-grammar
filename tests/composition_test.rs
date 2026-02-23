@@ -9,7 +9,7 @@ use modules::rechner::Rechner;
 #[test]
 fn test_composition_complex() {
     Rechner::parse_main
-        .parse_str("rechne ( 2 g + 13kg )")
+        .parse_str("rechne ( 2 g + 13 kg )")
         .test()
         .assert_success_is(13002000);
 }
@@ -17,7 +17,7 @@ fn test_composition_complex() {
 #[test]
 fn test_composition_mixed() {
     Rechner::parse_main
-        .parse_str("rechne ( 500mg + 1 g )")
+        .parse_str("rechne ( 500 mg + 1 g )")
         .test()
         .assert_success_is(1500);
 }

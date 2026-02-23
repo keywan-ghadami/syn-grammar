@@ -137,7 +137,7 @@ impl ParseContext {
 
         // Enrich error with rule name if available
         let err = if let Some(rule_name) = self.rule_stack.last() {
-            let msg = format!("Error in rule '{}': {}", rule_name, err);
+            let msg = format!("in rule `{}`: {}", rule_name, err);
             syn::Error::new(err.span(), msg)
         } else {
             err
@@ -478,7 +478,7 @@ mod tests {
         let final_err = ctx.take_best_error().unwrap();
         assert_eq!(
             final_err.to_string(),
-            "Error in rule 'test_rule': expected something"
+            "in rule `test_rule`: expected something"
         );
     }
 
@@ -492,7 +492,7 @@ mod tests {
         ctx.record_error(err, Span::call_site());
 
         let final_err = ctx.take_best_error().unwrap();
-        assert_eq!(final_err.to_string(), "Error in rule 'inner': fail");
+        assert_eq!(final_err.to_string(), "in rule `inner`: fail");
     }
 
     #[test]
@@ -521,6 +521,6 @@ mod tests {
         let _ = parser.parse_str("");
 
         let err = ctx.take_best_error().expect("Error should be recorded");
-        assert_eq!(err.to_string(), "Error in rule 'outer': parse failed");
+        assert_eq!(err.to_string(), "in rule `outer`: parse failed");
     }
 }

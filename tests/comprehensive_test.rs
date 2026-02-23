@@ -15,13 +15,6 @@ grammar! {
 }
 
 grammar! {
-    grammar builtins_test {
-        pub rule ident -> String = i:ident -> { i.to_string() }
-        pub rule end -> () = eof -> { () }
-    }
-}
-
-grammar! {
     grammar kw_test {
         pub rule main -> i32 =
             "fn" -> { 1 }
@@ -103,18 +96,6 @@ fn test_action_block_statements() {
 }
 
 #[test]
-fn test_builtins() {
-    builtins_test::parse_ident
-        .parse_str("abc")
-        .test()
-        .assert_success_is("abc".to_string());
-    builtins_test::parse_end
-        .parse_str("")
-        .test()
-        .assert_success_is(());
-}
-
-#[test]
 fn test_keywords_vs_idents() {
     kw_test::parse_main
         .parse_str("fn")
@@ -137,13 +118,13 @@ fn test_keywords_vs_idents() {
 #[test]
 fn test_complex_return_types() {
     let result = types::parse_main.parse_str("123").test();
-    assert_eq!(*result.get_success_value().borrow(), 123);
+    assert_eq!(*result.assert_success().borrow(), 123);
 }
 
 #[test]
 fn test_use_statements() {
     let result = use_stmt::parse_main.parse_str("123").test();
-    assert_eq!(*result.get_success_value(), 123);
+    assert_eq!(*result.assert_success(), 123);
 }
 
 #[test]

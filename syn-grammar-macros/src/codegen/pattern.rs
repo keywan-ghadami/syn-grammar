@@ -169,7 +169,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 }
 
                 let container_ty = if let Some(ty) = generics.first() {
-                    quote!(#ty)
+                    match ty {
+                        syn::Type::Infer(_) => quote!(Vec),
+                        _ => quote!(#ty),
+                    }
                 } else {
                     quote!(Vec)
                 };
@@ -207,7 +210,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 let rule_parser = generate_pattern_step(&rule_arg_with_binding, ctx)?;
                 let sep_parser = generate_pattern_step(sep_arg, ctx)?;
-                let sep_peek = analysis::get_simple_peek(sep_arg, ctx.custom_keywords).ok().flatten();
+                let sep_peek = analysis::get_simple_peek(sep_arg, ctx.custom_keywords)
+                    .ok()
+                    .flatten();
 
                 let push_stmt = if item_binding.len() == 1 {
                     let b = &item_binding[0];
@@ -321,7 +326,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 }
 
                 let container_ty = if let Some(ty) = generics.first() {
-                    quote!(#ty)
+                    match ty {
+                        syn::Type::Infer(_) => quote!(Vec),
+                        _ => quote!(#ty),
+                    }
                 } else {
                     quote!(Vec)
                 };
@@ -473,8 +481,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     }
                     // Defer to built-in rules for high-level primitives like "ident", "integer", "float"
                     _ => {
-                        let func_call = generate_rule_call_expr(rule_path, args, ctx);
-                        quote! { #func_call }
+                        let impl_name = format_ident!("parse_{}_impl", rule_name_ident.unwrap());
+                        quote! { syn_grammar::builtins::#impl_name(&mut input, ctx)? }
                     }
                 };
 
@@ -522,7 +530,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let inner_logic = generate_pattern_step(inner, ctx)?;
 
                 // Only use peek optimization if it's safe and unambiguous
-                let peek_opt = analysis::get_simple_peek(inner, ctx.custom_keywords).ok().flatten();
+                let peek_opt = analysis::get_simple_peek(inner, ctx.custom_keywords)
+                    .ok()
+                    .flatten();
 
                 if let Some(peek) = peek_opt {
                     Ok(quote! {
@@ -587,7 +597,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     .collect();
 
                 let inner_logic = generate_pattern_step(inner, ctx)?;
-                let peek_opt = analysis::get_simple_peek(inner, ctx.custom_keywords).ok().flatten();
+                let peek_opt = analysis::get_simple_peek(inner, ctx.custom_keywords)
+                    .ok()
+                    .flatten();
 
                 if let Some(peek) = peek_opt {
                     Ok(quote! {
@@ -637,7 +649,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
         ModelPattern::Optional(inner, _) => {
             let inner_logic = generate_pattern_step(inner, ctx)?;
-            let peek_opt = analysis::get_simple_peek(inner, ctx.custom_keywords).ok().flatten();
+            let peek_opt = analysis::get_simple_peek(inner, ctx.custom_keywords)
+                .ok()
+                .flatten();
             let is_nullable = analysis::is_nullable(inner);
 
             let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
@@ -873,12 +887,13 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             };
 
             let inner_logic = generate_pattern_step(&effective_body, ctx)?;
-            let sync_peek = analysis::get_simple_peek(sync, ctx.custom_keywords)?.ok_or_else(|| {
-                syn::Error::new(
-                    sync.span(),
-                    "Sync pattern in recover(...) must have a simple start token.",
-                )
-            })?;
+            let sync_peek =
+                analysis::get_simple_peek(sync, ctx.custom_keywords)?.ok_or_else(|| {
+                    syn::Error::new(
+                        sync.span(),
+                        "Sync pattern in recover(...) must have a simple start token.",
+                    )
+                })?;
 
             let bindings = analysis::collect_bindings(std::slice::from_ref(&effective_body));
             let _ = span;
@@ -995,7 +1010,11 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
     }
 }
 
-fn generate_rule_call_expr(rule_path: &syn::Path, args: &[Argument], ctx: &CodegenContext) -> TokenStream {
+fn generate_rule_call_expr(
+    rule_path: &syn::Path,
+    args: &[Argument],
+    ctx: &CodegenContext,
+) -> TokenStream {
     let arg_exprs: Vec<TokenStream> = args
         .iter()
         .map(|arg| match arg {
@@ -1014,7 +1033,7 @@ fn generate_rule_call_expr(rule_path: &syn::Path, args: &[Argument], ctx: &Codeg
 
     // 1. External Call (Imports or Namespaced paths)
     // If it has > 1 segment, or if it has 1 segment that matches an external rule or import alias (though alias matching might be implicit by path resolution).
-    
+
     // Check if it's an extern rule (single ident)
     if let Some(ident) = rule_path.get_ident() {
         if ctx.grammar.extern_rules.iter().any(|er| er.name == *ident) {
@@ -1025,7 +1044,7 @@ fn generate_rule_call_expr(rule_path: &syn::Path, args: &[Argument], ctx: &Codeg
                 return quote!(#ident(input, #(#arg_exprs),*)?);
             }
         }
-        
+
         // Check if it's a local rule (single ident)
         if ctx.grammar.rules.iter().any(|r| r.name == *ident) {
             // Local rule: call parse_{name}_impl with ctx
@@ -1036,20 +1055,24 @@ fn generate_rule_call_expr(rule_path: &syn::Path, args: &[Argument], ctx: &Codeg
                 return quote!(#impl_name(&mut input, ctx, #(#arg_exprs),*)?);
             }
         }
-        
+
         // Fallback: Treat as external function call (e.g. builtin or user-imported function)
         // Assume standard signature: func(input)
         if arg_exprs.is_empty() {
-             return quote!(#ident(input)?);
+            return quote!(#rule_path(input)?);
         } else {
-             return quote!(#ident(input, #(#arg_exprs),*)?);
+            return quote!(#rule_path(input, #(#arg_exprs),*)?);
         }
     } else {
         // Multi-segment path
         // Apply parse_ prefix ONLY if first segment is a known import alias
-        
+
         let first_seg = &rule_path.segments.first().unwrap().ident;
-        let is_import_alias = ctx.grammar.imports.iter().any(|imp| imp.alias == *first_seg);
+        let is_import_alias = ctx
+            .grammar
+            .imports
+            .iter()
+            .any(|imp| imp.alias == *first_seg);
 
         if is_import_alias {
             let mut new_path = rule_path.clone();
@@ -1057,7 +1080,7 @@ fn generate_rule_call_expr(rule_path: &syn::Path, args: &[Argument], ctx: &Codeg
             let last_ident = last_seg.ident.clone();
             let new_ident = format_ident!("parse_{}", last_ident);
             last_seg.ident = new_ident;
-            
+
             if arg_exprs.is_empty() {
                 quote!(#new_path(input)?)
             } else {
@@ -1065,7 +1088,7 @@ fn generate_rule_call_expr(rule_path: &syn::Path, args: &[Argument], ctx: &Codeg
             }
         } else {
             // Standard call
-             if arg_exprs.is_empty() {
+            if arg_exprs.is_empty() {
                 quote!(#rule_path(input)?)
             } else {
                 quote!(#rule_path(input, #(#arg_exprs),*)?)

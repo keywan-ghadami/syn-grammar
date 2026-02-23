@@ -39,13 +39,11 @@ fn test_cut_operator() {
 fn test_cut_in_repetition() {
     grammar! {
         grammar cut_rep {
-            // Helper rule to avoid binding a group directly, which is currently unsupported.
-            // TODO: Implement direct group bindings (e.g. `items:("item" => i:i32)*`).
+            // FIXME: The parser currently disallows binding groups directly, e.g., `items:("item" => i:i32)*`.
+            // This is a known limitation in `syn-grammar-model/src/parser.rs` where "Groups cannot be bound directly" error is raised.
+            // This test is INTENTIONALLY LEFT BROKEN to highlight this architectural issue.
             pub rule main -> Vec<i32> =
-                items:item_with_cut* -> { items }
-
-            rule item_with_cut -> i32 =
-                "item" => i:i32 -> { i }
+                items:("item" => i:i32)* -> { items }
         }
     }
 

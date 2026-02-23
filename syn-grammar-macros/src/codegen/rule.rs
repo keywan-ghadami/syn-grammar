@@ -120,9 +120,19 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         #(#impl_attrs)*
         pub fn #impl_name(mut input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> #where_clause {
             ctx.enter_rule(stringify!(#name));
+            let _start_span = input.span();
             let res = (|| -> syn::Result<#ret_type> {
                 #body
             })();
+
+            if let Err(e) = &res {
+                // If the error is fatal, it won't be recorded by 'attempt' upstream.
+                // We record it here to ensure it's enriched with the current rule name.
+                if ctx.check_fatal() {
+                    ctx.record_error(e.clone(), _start_span);
+                }
+            }
+
             ctx.exit_rule();
             res
         }
