@@ -1,6 +1,6 @@
 //! Semantic validation for the grammar model.
 
-use crate::model::backend::{Backend, BuiltIn};
+use crate::model::backend::Backend;
 use crate::model::*;
 use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;
@@ -356,6 +356,7 @@ fn validate_args_recursive(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::backend::BuiltIn;
     use quote::quote;
 
     struct TestBackend;
