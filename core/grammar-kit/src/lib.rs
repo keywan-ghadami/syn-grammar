@@ -227,9 +227,9 @@ impl ParseContext {
 
                 // 4. Context specificity
                 // Prefer deeper rule stack or one with label
-                if new_error_state.rule_stack.len() > existing.rule_stack.len() {
-                    self.best_error = Some(new_error_state);
-                } else if new_error_state.label.is_some() && existing.label.is_none() {
+                if new_error_state.rule_stack.len() > existing.rule_stack.len()
+                    || (new_error_state.label.is_some() && existing.label.is_none())
+                {
                     self.best_error = Some(new_error_state);
                 } else if new_error_state.rule_stack.len() == existing.rule_stack.len() {
                     // Tie-breaker: longer message length (more info)
