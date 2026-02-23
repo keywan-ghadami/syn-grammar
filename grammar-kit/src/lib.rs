@@ -57,11 +57,14 @@ impl ScopeStack {
 }
 
 #[cfg(all(feature = "rt", feature = "syn"))]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct ErrorState {
     err: syn::Error,
-    is_deep: bool,
+    rule_stack: Vec<String>,
+    start_span: Span,
     priority: u8,
+    is_fatal: bool,
+    label: Option<String>,
 }
 
 /// Holds the state for backtracking and error reporting.
@@ -77,6 +80,7 @@ pub struct ParseContext {
     #[cfg(feature = "syn")]
     pub last_span: Option<Span>,
     fail_triggered: bool,
+    suppress_label: bool,
 }
 
 #[cfg(feature = "rt")]
@@ -91,6 +95,7 @@ impl ParseContext {
             #[cfg(feature = "syn")]
             last_span: None,
             fail_triggered: false,
+            suppress_label: false,
         }
     }
 
@@ -104,6 +109,10 @@ impl ParseContext {
 
     pub fn trigger_fail(&mut self) {
         self.fail_triggered = true;
+    }
+    
+    pub fn suppress_label(&mut self) {
+        self.suppress_label = true;
     }
 
     pub fn enter_rule(&mut self, name: &str) {
@@ -120,83 +129,85 @@ impl ParseContext {
         }
     }
 
-    /// Records an error if it is "deeper" than the current best error.
+    /// Records an error if it is "better" than the current best error.
     #[cfg(feature = "syn")]
-    pub fn record_error(&mut self, err: syn::Error, start_span: Span) {
-        // Heuristic: Compare the error location to the start of the attempt.
-        let is_deep = err.span().start() != start_span.start();
-
-        let priority = if self.fail_triggered { 1 } else { 0 };
+    pub fn record_error(&mut self, err: syn::Error, _attempt_span: Span, label: Option<String>, mut priority: u8) {
+        // If fail was triggered, bump priority to at least 2
+        if self.fail_triggered {
+            priority = std::cmp::max(priority, 2);
+        }
         self.fail_triggered = false; // Reset after consuming
 
         #[cfg(feature = "trace")]
         eprintln!(
-            "[TRACE] record_error: '{}', is_deep: {}, priority: {}",
-            err, is_deep, priority
+            "[TRACE] record_error: '{}', priority: {}, label: {:?}",
+            err, priority, label
         );
 
-        // Enrich error with rule name if available
-        let err = if let Some(rule_name) = self.rule_stack.last() {
-            let prefix = format!("in rule `{}`", rule_name);
-            // Avoid redundant enrichment if the error already has this rule name at the front.
-            if !err.to_string().starts_with(&prefix) {
-                let msg = format!("{}: {}", prefix, err);
-                syn::Error::new(err.span(), msg)
-            } else {
-                err
-            }
-        } else {
-            err
-        };
+        // We use the error's actual location for comparison
+        let error_span = err.span();
 
         let new_error_state = ErrorState {
             err,
-            is_deep,
+            rule_stack: self.rule_stack.clone(),
+            start_span: error_span,
             priority,
+            is_fatal: self.is_fatal,
+            label,
         };
 
         match &mut self.best_error {
             None => {
-                #[cfg(feature = "trace")]
-                eprintln!("[TRACE] New best error (was None): {}", new_error_state.err);
                 self.best_error = Some(new_error_state);
             }
             Some(existing) => {
-                // Higher priority always wins.
-                if new_error_state.priority > existing.priority {
-                    #[cfg(feature = "trace")]
-                    eprintln!(
-                        "[TRACE] Overwriting due to higher priority: {}",
-                        new_error_state.err
-                    );
+                // 1. Fatality: If the new error is fatal, it wins immediately.
+                if new_error_state.is_fatal && !existing.is_fatal {
                     self.best_error = Some(new_error_state);
                     return;
                 }
+                if existing.is_fatal && !new_error_state.is_fatal {
+                    return;
+                }
 
-                // If priorities are equal, use depth logic.
-                if new_error_state.priority == existing.priority {
-                    let new_start = new_error_state.err.span().start();
-                    let old_start = existing.err.span().start();
+                // 2. Location (Progress)
+                let new_start = new_error_state.start_span.start();
+                let old_start = existing.start_span.start();
 
-                    let is_deeper = new_start.line > old_start.line
-                        || (new_start.line == old_start.line
-                            && new_start.column > old_start.column);
+                let is_deeper = new_start.line > old_start.line
+                    || (new_start.line == old_start.line
+                        && new_start.column > old_start.column);
+                
+                let is_shallower = old_start.line > new_start.line
+                    || (old_start.line == new_start.line
+                        && old_start.column > new_start.column);
 
-                    if is_deeper {
-                        #[cfg(feature = "trace")]
-                        eprintln!(
-                            "[TRACE] Overwriting deep error with deeper error: {}",
-                            new_error_state.err
-                        );
+                if is_deeper {
+                    self.best_error = Some(new_error_state);
+                    return;
+                } else if is_shallower {
+                    return;
+                }
+
+                // 3. Priority
+                if new_error_state.priority > existing.priority {
+                    self.best_error = Some(new_error_state);
+                    return;
+                } else if existing.priority > new_error_state.priority {
+                    return;
+                }
+
+                // 4. Context specificity
+                // Prefer deeper rule stack or one with label
+                if new_error_state.rule_stack.len() > existing.rule_stack.len() {
+                    self.best_error = Some(new_error_state);
+                } else if new_error_state.label.is_some() && existing.label.is_none() {
+                    self.best_error = Some(new_error_state);
+                } else if new_error_state.rule_stack.len() == existing.rule_stack.len() {
+                    // Tie-breaker: longer message length (more info)
+                     if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
                         self.best_error = Some(new_error_state);
-                    } else if new_start == old_start {
-                        // Same depth. Prefer the one with MORE context (longer message).
-                        if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
-                             self.best_error = Some(new_error_state);
-                        }
-                    } else if !existing.is_deep && new_error_state.is_deep {
-                         self.best_error = Some(new_error_state);
-                    }
+                     }
                 }
             }
         }
@@ -204,22 +215,59 @@ impl ParseContext {
 
     #[cfg(feature = "syn")]
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
-        let err = self.best_error.take().map(|s| s.err);
-        #[cfg(feature = "trace")]
-        if let Some(e) = &err {
-            eprintln!("[TRACE] take_best_error: {}", e);
-        } else {
-            eprintln!("[TRACE] take_best_error: None");
+        let best = self.best_error.take()?;
+        
+        let mut msg = best.err.to_string();
+
+        // Apply label if present
+        if let Some(label) = &best.label {
+            msg = format!("expected {}", label);
         }
-        err
+
+        // Apply rule stack
+        if !best.rule_stack.is_empty() {
+            // Check for recursion or simplify
+            // For now, standard "in rule X" chain
+            for rule in best.rule_stack.iter().rev() {
+                 let prefix = format!("in rule `{}`: ", rule);
+                 if !msg.starts_with(&prefix) {
+                     msg = format!("{}{}", prefix, msg);
+                 }
+            }
+        }
+        
+        Some(syn::Error::new(best.start_span, msg))
+    }
+
+    /// Determines if the current best error is "significant enough" to stop
+    /// aggregating shallow alternative errors.
+    #[cfg(feature = "syn")]
+    pub fn stop_aggregation(&self, current_span: Span) -> bool {
+        if let Some(e) = &self.best_error {
+            // 1. Fatal errors always stop aggregation
+            if e.is_fatal { return true; }
+
+            // 2. Explicit failures (priority > 1) stop aggregation.
+            // Priority 1 (labeled shallow error) is considered insignificant for aggregation.
+            if e.priority > 1 { return true; }
+
+            // 3. Deep errors (progress made beyond current start) stop aggregation.
+            let e_start = e.start_span.start();
+            let c_start = current_span.start();
+
+            if e_start.line > c_start.line
+                || (e_start.line == c_start.line && e_start.column > c_start.column)
+            {
+                return true;
+            }
+        }
+        false
     }
 
     #[cfg(feature = "syn")]
     pub fn is_best_error_deep(&self) -> bool {
-        let is_deep = self.best_error.as_ref().map(|e| e.is_deep).unwrap_or(false);
-        #[cfg(feature = "trace")]
-        eprintln!("[TRACE] is_best_error_deep: {}", is_deep);
-        is_deep
+        // Compatibility: check if priority > 0 (fail or label)
+        self.best_error.as_ref().map(|e| e.priority > 0).unwrap_or(false)
     }
 
     // --- Span Tracking ---
@@ -284,6 +332,16 @@ pub fn attempt<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> R
 where
     F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
 {
+    // Regular attempt without label
+    attempt_labeled(input, ctx, None, parser)
+}
+
+#[cfg(all(feature = "rt", feature = "syn"))]
+#[inline]
+pub fn attempt_labeled<T, F>(input: ParseStream, ctx: &mut ParseContext, label: Option<&str>, parser: F) -> Result<Option<T>>
+where
+    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
+{
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
 
@@ -318,8 +376,24 @@ where
                 Err(e)
             } else {
                 ctx.set_fatal(was_fatal);
+
+                let suppress = ctx.suppress_label;
+                ctx.suppress_label = false; // Reset
+                
+                // Determine label and priority logic
+                // Rule: If error is at the start (no progress), we use the label and priority 1.
+                // If error is deep (progress), we ignore label (pass None) and priority 0.
+                
+                let is_at_start = e.span().start() == start_span.start();
+                
+                let (final_label, priority) = if is_at_start && !suppress {
+                    (label.map(|s| s.to_string()), if label.is_some() { 1 } else { 0 })
+                } else {
+                    (None, 0)
+                };
+
                 // Record error BEFORE restoring state to capture inner rule context
-                ctx.record_error(e, start_span);
+                ctx.record_error(e, start_span, final_label, priority);
 
                 // Restore state
                 ctx.scopes = scopes_snapshot;
@@ -429,7 +503,8 @@ where
         }
         Err(e) => {
             // Record error BEFORE restoring state
-            ctx.record_error(e, start_span);
+            // Recovery attempts don't have labels (usually), so defaults are fine.
+            ctx.record_error(e, start_span, None, 0);
 
             // Restore state
             ctx.scopes = scopes_snapshot;
@@ -478,7 +553,7 @@ mod tests {
         ctx.enter_rule("test_rule");
 
         let err = syn::Error::new(Span::call_site(), "expected something");
-        ctx.record_error(err, Span::call_site());
+        ctx.record_error(err, Span::call_site(), None, 0);
 
         let final_err = ctx.take_best_error().unwrap();
         assert_eq!(
@@ -494,15 +569,20 @@ mod tests {
         ctx.enter_rule("inner");
 
         let err = syn::Error::new(Span::call_site(), "fail");
-        ctx.record_error(err, Span::call_site());
+        ctx.record_error(err, Span::call_site(), None, 0);
 
         let final_err = ctx.take_best_error().unwrap();
-        assert_eq!(final_err.to_string(), "in rule `inner`: fail");
+        assert_eq!(final_err.to_string(), "in rule `outer`: in rule `inner`: fail");
 
         // Simulate outer rule recording it too
         ctx.exit_rule(); // inner popped
-        ctx.record_error(final_err, Span::call_site());
+        
+        // record the ALREADY FORMATTED error
+        ctx.record_error(final_err, Span::call_site(), None, 0);
+        
         let final_err2 = ctx.take_best_error().unwrap();
+        
+        // With prefix checking, it should stay the same
         assert_eq!(final_err2.to_string(), "in rule `outer`: in rule `inner`: fail");
     }
 
@@ -515,9 +595,6 @@ mod tests {
         let parser = |input: ParseStream| {
             ctx.enter_rule("outer");
 
-            // We simulate an attempt that fails.
-            // attempt returns Result<Option<T>>.
-            // If the closure returns Err, attempt records it and returns Ok(None) (if not fatal).
             let _: Option<()> = attempt(input, &mut ctx, |_input, _ctx| {
                 Err(syn::Error::new(Span::call_site(), "parse failed"))
             })?;
@@ -526,9 +603,6 @@ mod tests {
             Ok(())
         };
 
-        // We parse an empty string. The attempt fails immediately.
-        // The outer parser returns Ok(()).
-        // But we check ctx.best_error.
         let _ = parser.parse_str("");
 
         let err = ctx.take_best_error().expect("Error should be recorded");

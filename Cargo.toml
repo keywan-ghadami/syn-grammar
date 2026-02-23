@@ -24,7 +24,7 @@ exclude = [
 [dependencies]
 syn-grammar-macros = { path = "./syn-grammar-macros", version = "0.9.0" }
 syn-grammar-model = { path = "./syn-grammar-model", version = "0.9.0" }
-grammar-kit = { path = "./grammar-kit", version = "0.9.0", features = ["syn"] }
+grammar-kit = { path = "./grammar-kit", version = "0.9.0", features = ["syn", "trace"] }
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 proc-macro2 = "1.0"
 quote = "1.0"

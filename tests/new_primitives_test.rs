@@ -46,15 +46,15 @@ fn test_numeric_primitives() {
         .test()
         .assert_success_is(123);
     inner::num_test::parse_hex
-        .parse_str("ff")
+        .parse_str("0xff")
         .test()
         .assert_success_is(255);
     inner::num_test::parse_oct
-        .parse_str("77")
+        .parse_str("0o77")
         .test()
         .assert_success_is(63);
     inner::num_test::parse_bin
-        .parse_str("11")
+        .parse_str("0b11")
         .test()
         .assert_success_is(3);
 }

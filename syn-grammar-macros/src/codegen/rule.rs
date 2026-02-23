@@ -127,7 +127,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
             if let Err(ref e) = res {
                 // Record the error BEFORE exiting the rule so we capture the current rule name.
-                ctx.record_error(e.clone(), _start_span);
+                ctx.record_error(e.clone(), _start_span, None, 0);
             }
 
             ctx.exit_rule();
@@ -135,11 +135,9 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
             match res {
                 Ok(val) => Ok(val),
                 Err(e) => {
-                    if let Some(best) = ctx.take_best_error() {
-                        Err(best)
-                    } else {
-                        Err(e)
-                    }
+                    // For internal calls, we just propagate the error.
+                    // The top-level caller handles take_best_error.
+                    Err(e)
                 }
             }
         }
@@ -168,14 +166,20 @@ fn generate_recursive_loop_body(
 
         let peek_token_obj = tail_pattern.first()
             .and_then(|f| analysis::get_simple_peek(f, ctx.custom_keywords).ok().flatten());
+        
+        let label_lit = if let Some(l) = &variant.label {
+            quote!(Some(#l))
+        } else {
+            quote!(None)
+        };
 
         match peek_token_obj {
             Some(token_code) => {
                 Ok(quote! {
                     if input.peek(#token_code) {
                         let _start_cursor = input.cursor();
-                        // Pass ctx to attempt
-                        if let Some(new_val) = rt::attempt(input, ctx, |mut input, ctx| {
+                        // Pass ctx to attempt_labeled
+                        if let Some(new_val) = rt::attempt_labeled(input, ctx, #label_lit, |mut input, ctx| {
                             #bind_stmt
                             #logic
                         })? {
@@ -191,8 +195,8 @@ fn generate_recursive_loop_body(
             None => {
                 Ok(quote! {
                     let _start_cursor = input.cursor();
-                    // Pass ctx to attempt
-                    if let Some(new_val) = rt::attempt(input, ctx, |mut input, ctx| {
+                    // Pass ctx to attempt_labeled
+                    if let Some(new_val) = rt::attempt_labeled(input, ctx, #label_lit, |mut input, ctx| {
                         #bind_stmt
                         #logic
                     })? {
@@ -249,9 +253,15 @@ pub fn generate_variants_internal(
                  None
              };
 
-             let failure_rec = if let Some(l) = label_str {
+             let label_lit = if let Some(l) = &label_str {
+                 quote!(Some(#l))
+             } else {
+                 quote!(None)
+             };
+
+            let failure_rec = if let Some(l) = label_str {
                  quote! {
-                     if !ctx.is_best_error_deep() {
+                     if !ctx.stop_aggregation(input.span()) {
                          _shallow_failures.push(#l);
                      }
                  }
@@ -297,27 +307,45 @@ pub fn generate_variants_internal(
                 let post_logic = pattern::generate_sequence_steps(post_cut, ctx)?;
                 let action = &variant.action;
 
+                // For cut, we use attempt_labeled for the pre-part.
                 let logic_block = if is_unique {
-                    quote! {
+                     quote! {
                         {
-                            let mut run = || -> syn::Result<_> {
+                            // Unique + Cut.
+                            let pre_res = rt::attempt_labeled(input, ctx, #label_lit, |mut input, ctx| {
                                 #pre_logic
-                                #post_logic
-                                Ok({ #action })
-                            };
-                            match run() {
-                                Ok(v) => return Ok(v),
-                                Err(e) => {
-                                    ctx.set_fatal(true); // Use ctx
-                                    return Err(e);
+                                Ok(( #(#pre_bindings),* ))
+                            })?;
+                            
+                            match pre_res {
+                                Some(( #(#pre_bindings),* )) => {
+                                    // Pre succeeded. Now run Post.
+                                    let mut post_run = || -> syn::Result<_> {
+                                        #post_logic
+                                        Ok({ #action })
+                                    };
+                                    match post_run() {
+                                        Ok(v) => return Ok(v),
+                                        Err(e) => {
+                                            ctx.set_fatal(true);
+                                            return Err(e);
+                                        }
+                                    }
+                                }
+                                None => {
+                                    // Pre failed.
+                                    // Since is_unique, this is FATAL.
+                                    ctx.set_fatal(true);
+                                    let err = ctx.take_best_error().unwrap_or_else(|| input.error("parse failed"));
+                                    return Err(err);
                                 }
                             }
                         }
                     }
                 } else {
                     quote! {
-                        // Pass ctx to attempt
-                        let pre_result = rt::attempt(input, ctx, |mut input, ctx| {
+                        // Pass ctx to attempt_labeled
+                        let pre_result = rt::attempt_labeled(input, ctx, #label_lit, |mut input, ctx| {
                             #pre_logic
                             Ok(( #(#pre_bindings),* ))
                         })?;
@@ -330,7 +358,7 @@ pub fn generate_variants_internal(
                             match post_run() {
                                 Ok(v) => return Ok(v),
                                 Err(e) => {
-                                    ctx.set_fatal(true); // Use ctx
+                                    ctx.set_fatal(true);
                                     return Err(e);
                                 }
                             }
@@ -358,14 +386,14 @@ pub fn generate_variants_internal(
                     let token_code = peek_token_obj.as_ref().unwrap();
                      quote! {
                         if input.peek(#token_code) {
-                            let mut run = || -> syn::Result<_> {
+                            match rt::attempt_labeled(input, ctx, #label_lit, |mut input, ctx| {
                                 #logic
-                            };
-                            match run() {
-                                Ok(v) => return Ok(v),
-                                Err(e) => {
-                                    ctx.set_fatal(true); // Use ctx
-                                    return Err(e);
+                            })? {
+                                Some(v) => return Ok(v),
+                                None => {
+                                    ctx.set_fatal(true);
+                                    let err = ctx.take_best_error().unwrap_or_else(|| input.error("parse failed"));
+                                    return Err(err);
                                 }
                             }
                         }
@@ -373,16 +401,16 @@ pub fn generate_variants_internal(
                 } else if let Some(token_code) = peek_token_obj {
                      quote! {
                         if input.peek(#token_code) {
-                            // Pass ctx to attempt
-                            if let Some(res) = rt::attempt(input, ctx, |mut input, ctx| { #logic })? {
+                            // Pass ctx to attempt_labeled
+                            if let Some(res) = rt::attempt_labeled(input, ctx, #label_lit, |mut input, ctx| { #logic })? {
                                 return Ok(res);
                             }
                         }
                     }
                 } else {
                      quote! {
-                        // Pass ctx to attempt
-                        if let Some(res) = rt::attempt(input, ctx, |mut input, ctx| { #logic })? {
+                        // Pass ctx to attempt_labeled
+                        if let Some(res) = rt::attempt_labeled(input, ctx, #label_lit, |mut input, ctx| { #logic })? {
                             return Ok(res);
                         }
                     }
@@ -406,7 +434,7 @@ pub fn generate_variants_internal(
         let mut _shallow_failures = Vec::<&str>::new();
         #(#arms)*
 
-        if ctx.is_best_error_deep() {
+        if ctx.stop_aggregation(input.span()) {
             if let Some(best_err) = ctx.take_best_error() {
                 return Err(best_err);
             }
@@ -416,6 +444,10 @@ pub fn generate_variants_internal(
              _shallow_failures.sort();
              _shallow_failures.dedup();
              let msg = format!("expected one of: {}", _shallow_failures.join(", "));
+             
+             // Clear best error to ensure this aggregated error wins
+             let _ = ctx.take_best_error();
+             
              Err(input.error(msg))
         } else if let Some(best_err) = ctx.take_best_error() {
             Err(best_err)
