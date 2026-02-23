@@ -1,5 +1,4 @@
 use syn::parse::Parser;
-use syn_grammar::grammar;
 
 pub mod single_mod {
     use syn_grammar::grammar;

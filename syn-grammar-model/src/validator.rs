@@ -1,6 +1,6 @@
 //! Semantic validation for the grammar model.
 
-use crate::model::backend::Backend;
+use crate::model::backend::{Backend, BuiltIn};
 use crate::model::*;
 use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;

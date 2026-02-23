@@ -2,7 +2,7 @@ use super::pattern;
 use super::CodegenContext;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use syn::Result;
 use syn_grammar_model::{analysis, model::*};
 

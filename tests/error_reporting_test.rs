@@ -38,6 +38,25 @@ grammar! {
     }
 }
 
+grammar! {
+    grammar enterprise_errors {
+        pub rule root -> () = expr -> { () }
+
+        rule expr -> ()
+            = term "+" expr # "Addition" -> { () }
+            | term # "Expression" -> { () }
+
+        rule term -> ()
+            = factor "*" term # "Multiplication" -> { () }
+            | factor # "Term" -> { () }
+
+        rule factor -> ()
+            = "(" expr ")" # "Parenthesized Expression" -> { () }
+            | "id" # "Identifier" -> { () }
+            | fail("missing factor") -> { () }
+    }
+}
+
 #[test]
 fn test_deepest_error_wins() {
     err_test_1::parse_main
@@ -72,4 +91,48 @@ fn test_rule_name_in_error_message() {
         .assert_failure_contains("in rule `inner_rule`")
         .assert_failure_contains("expected `b`")
         ;
+}
+
+#[test]
+fn test_deep_error_with_label_and_fail() {
+    // Attempting "id + (" which should fail because "(" is not followed by a valid expr
+    // The error should ideally point to the missing expr after "(", but also mention "Parenthesized Expression"
+    // or at least be at the right depth.
+    let err = enterprise_errors::parse_root
+        .parse_str("id + (")
+        .test()
+        .assert_failure();
+    
+    println!("Actual Error: {}", err);
+    
+    // We want the error to be specific.
+    // In our current (old) system, it might say "unexpected end of input" or "expected factor"
+    // In the new system, we want it to reflect the most specific failure at the deepest point.
+}
+
+#[test]
+fn test_label_priority() {
+    // "id + id id" -> fails at the second "id"
+    // It could be an Addition where expr failed to match another term.
+    let err = enterprise_errors::parse_root
+        .parse_str("id + id id")
+        .test()
+        .assert_failure();
+
+    println!("Actual Error: {}", err);
+}
+
+#[test]
+fn test_fail_built_in_enterprise() {
+    // This should trigger the `fail` in `factor` if other things don't match.
+    // "id + -" -> "id" is a term, "+" is matched, then it expects an expr.
+    // expr starts with term, term starts with factor.
+    // factor tries "(" (fail), "id" (fail), then hits `fail("missing factor")`.
+    let err = enterprise_errors::parse_root
+        .parse_str("id + -")
+        .test()
+        .assert_failure();
+
+    println!("Actual Error: {}", err);
+    assert!(err.to_string().contains("missing factor"));
 }

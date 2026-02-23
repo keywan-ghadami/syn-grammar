@@ -2,7 +2,6 @@ use crate::backend::SynBackend;
 use crate::codegen::CodegenContext;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use std::collections::HashSet;
 use syn::spanned::Spanned;
 use syn::{Lit, Result};
 use syn_grammar_model::{analysis, model::*, Backend};

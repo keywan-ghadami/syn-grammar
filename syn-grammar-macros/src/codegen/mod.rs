@@ -49,6 +49,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let rules_str = rules_stream.to_string();
 
     Ok(quote! {
+        #[allow(non_snake_case)]
         pub mod #grammar_name {
             #![allow(unused_imports, unused_variables, dead_code, unused_braces, unused_parens)]
             #![allow(clippy::all)]
