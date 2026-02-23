@@ -63,6 +63,15 @@ grammar! {
     }
 }
 
+grammar! {
+    grammar list_test_custom_error {
+        pub rule main -> Vec<String>
+            = items:separated<_>(string, ",", error="custom error message") -> {
+                items.into_iter().map(|s| s.value).collect()
+            }
+    }
+}
+
 #[test]
 fn test_separated_basic() {
     list_test1::parse_main
@@ -139,4 +148,12 @@ fn test_explicit_container() {
         .parse_str(r#""a", "b""#)
         .test()
         .assert_success_is(vec!["a".to_string(), "b".to_string()]);
+}
+
+#[test]
+fn test_separated_custom_error() {
+    list_test_custom_error::parse_main
+        .parse_str(r#""a", "b","#) // Trailing comma -> Error
+        .test()
+        .assert_failure_contains("custom error message");
 }

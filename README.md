@@ -121,7 +121,8 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 
 You can import an entire grammar defined elsewhere. Rules from the imported grammar can be accessed via an alias.
 
-```rust
+```rust,ignore
+# use syn_grammar::grammar;
 // in file: math.rs
 grammar! {
     grammar Math {
@@ -144,7 +145,8 @@ grammar! {
 
 You can bind a grammar rule directly to any Rust function that follows the `fn(ParseStream) -> Result<T>` signature.
 
-```rust
+```rust,ignore
+# use syn_grammar::grammar;
 grammar! {
     grammar MyGrammar {
         // Declares that `custom_parser` is a function in scope
@@ -167,13 +169,12 @@ Use standard parentheses `( ... )` **exclusively** to group patterns for operato
 
 ```rust
 use syn_grammar::grammar;
-# use syn_grammar::Identifier;
 grammar! {
     grammar G {
-        // Correctly parses `run app` or `build app`
-        // The `()` are for logical grouping only.
-        rule command -> (Identifier, Identifier) =
-            (verb:("run" | "build")) "app" -> { (verb, t.0) }
+        // Correctly parses "a c" or "b c"
+        // The `()` are for logical grouping of the alternatives.
+        rule command -> () =
+            ("a" | "b") "c" -> { () }
     }
 }
 ```
@@ -187,7 +188,7 @@ To match literal delimiters that appear in the source code, you **must** use the
 
 The `paren` keyword is necessary to avoid ambiguity with precedence grouping.
 
-```rust
+```rust,ignore
 use syn_grammar::grammar;
 grammar! {
     grammar D {
@@ -501,8 +502,8 @@ grammar! {
     grammar Until {
         // Consumes everything until a semicolon is found.
         // The semicolon remains in the input stream.
-        rule stmt -> String = 
-            body:until(";") ";" -> { body.to_string() }
+        rule body -> String = 
+            content:until(";") ";" -> { content.to_string() }
     }
 }
 ```

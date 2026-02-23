@@ -110,13 +110,13 @@ impl ParseContext {
     pub fn trigger_fail(&mut self) {
         self.fail_triggered = true;
     }
-    
+
     pub fn suppress_label(&mut self) {
         self.suppress_label = true;
     }
 
     /// **High-Level Abstraction**
-    /// Marks the current parse path as definitive. Any subsequent errors 
+    /// Marks the current parse path as definitive. Any subsequent errors
     /// will be treated as fatal, preventing backtracking to other alternatives.
     /// Used by the Cut operator (`=>`).
     pub fn commit(&mut self) {
@@ -132,10 +132,10 @@ impl ParseContext {
     pub fn raise_failure<T>(&mut self, msg: impl std::fmt::Display, span: Span) -> Result<T> {
         // Trigger high priority handling
         self.fail_triggered = true;
-        
+
         // Don't auto-label this error (e.g. don't say "expected identifier" if we explicitly say "number too big")
         self.suppress_label = true;
-        
+
         Err(syn::Error::new(span, msg))
     }
 
@@ -155,7 +155,13 @@ impl ParseContext {
 
     /// Records an error if it is "better" than the current best error.
     #[cfg(feature = "syn")]
-    pub fn record_error(&mut self, err: syn::Error, _attempt_span: Span, label: Option<String>, mut priority: u8) {
+    pub fn record_error(
+        &mut self,
+        err: syn::Error,
+        _attempt_span: Span,
+        label: Option<String>,
+        mut priority: u8,
+    ) {
         // If fail was triggered, bump priority to at least 2
         if self.fail_triggered {
             priority = std::cmp::max(priority, 2);
@@ -199,12 +205,10 @@ impl ParseContext {
                 let old_start = existing.start_span.start();
 
                 let is_deeper = new_start.line > old_start.line
-                    || (new_start.line == old_start.line
-                        && new_start.column > old_start.column);
-                
+                    || (new_start.line == old_start.line && new_start.column > old_start.column);
+
                 let is_shallower = old_start.line > new_start.line
-                    || (old_start.line == new_start.line
-                        && old_start.column > new_start.column);
+                    || (old_start.line == new_start.line && old_start.column > new_start.column);
 
                 if is_deeper {
                     self.best_error = Some(new_error_state);
@@ -229,9 +233,9 @@ impl ParseContext {
                     self.best_error = Some(new_error_state);
                 } else if new_error_state.rule_stack.len() == existing.rule_stack.len() {
                     // Tie-breaker: longer message length (more info)
-                     if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
+                    if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
                         self.best_error = Some(new_error_state);
-                     }
+                    }
                 }
             }
         }
@@ -240,26 +244,38 @@ impl ParseContext {
     #[cfg(feature = "syn")]
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
         let best = self.best_error.take()?;
-        
+
         let mut msg = best.err.to_string();
 
         // Apply label if present
         if let Some(label) = &best.label {
-            msg = format!("expected {}", label);
+            // If the message is generic (e.g. from an empty Result), use the label.
+            // If the message is already specific (e.g. "expected one of..."), keep it.
+            // Heuristic: If it starts with "expected", we assume it's already formatted.
+            // But sometimes the label IS what we want.
+            // For now, simple override if not already containing "expected".
+            if !msg.contains("expected") {
+                msg = format!("expected {}", label);
+            }
         }
 
         // Apply rule stack
         if !best.rule_stack.is_empty() {
-            // Check for recursion or simplify
-            // For now, standard "in rule X" chain
+            // Apply prefixes in reverse order (stack order)
+            // But be careful not to double-apply if the error message already has them.
             for rule in best.rule_stack.iter().rev() {
-                 let prefix = format!("in rule `{}`: ", rule);
-                 if !msg.starts_with(&prefix) {
-                     msg = format!("{}{}", prefix, msg);
-                 }
+                let prefix = format!("in rule `{}`: ", rule);
+
+                // Robust check: Does the message start with this prefix?
+                // Or does it start with "in rule `X`: " where X is something else?
+                // We want to prepend ONLY if it's missing.
+
+                if !msg.starts_with(&prefix) {
+                    msg = format!("{}{}", prefix, msg);
+                }
             }
         }
-        
+
         Some(syn::Error::new(best.start_span, msg))
     }
 
@@ -269,11 +285,15 @@ impl ParseContext {
     pub fn stop_aggregation(&self, current_span: Span) -> bool {
         if let Some(e) = &self.best_error {
             // 1. Fatal errors always stop aggregation
-            if e.is_fatal { return true; }
+            if e.is_fatal {
+                return true;
+            }
 
             // 2. Explicit failures (priority > 1) stop aggregation.
             // Priority 1 (labeled shallow error) is considered insignificant for aggregation.
-            if e.priority > 1 { return true; }
+            if e.priority > 1 {
+                return true;
+            }
 
             // 3. Deep errors (progress made beyond current start) stop aggregation.
             let e_start = e.start_span.start();
@@ -291,7 +311,10 @@ impl ParseContext {
     #[cfg(feature = "syn")]
     pub fn is_best_error_deep(&self) -> bool {
         // Compatibility: check if priority > 0 (fail or label)
-        self.best_error.as_ref().map(|e| e.priority > 0).unwrap_or(false)
+        self.best_error
+            .as_ref()
+            .map(|e| e.priority > 0)
+            .unwrap_or(false)
     }
 
     // --- Span Tracking ---
@@ -362,7 +385,12 @@ where
 
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
-pub fn attempt_labeled<T, F>(input: ParseStream, ctx: &mut ParseContext, label: Option<&str>, parser: F) -> Result<Option<T>>
+pub fn attempt_labeled<T, F>(
+    input: ParseStream,
+    ctx: &mut ParseContext,
+    label: Option<&str>,
+    parser: F,
+) -> Result<Option<T>>
 where
     F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
 {
@@ -403,20 +431,32 @@ where
 
                 let suppress = ctx.suppress_label;
                 ctx.suppress_label = false; // Reset
-                
+
                 // Determine label and priority logic
                 // Rule: If error is at the start (no progress), we use the label and priority 1.
                 // If error is deep (progress), we ignore label (pass None) and priority 0.
-                
+
                 let is_at_start = e.span().start() == start_span.start();
-                
+
                 let (final_label, priority) = if is_at_start && !suppress {
-                    (label.map(|s| s.to_string()), if label.is_some() { 1 } else { 0 })
+                    (
+                        label.map(|s| s.to_string()),
+                        if label.is_some() { 1 } else { 0 },
+                    )
                 } else {
                     (None, 0)
                 };
 
                 // Record error BEFORE restoring state to capture inner rule context
+                // Note: We use the existing rule_stack (which might be deep) if we haven't popped yet.
+                // But attempt() caller usually hasn't popped.
+                // Wait, attempt() restores stack AFTER parser() returns.
+                // So ctx.rule_stack is still the stack *inside* the attempt.
+                // Actually, parser() should have exited its rules.
+
+                // If the parser popped its rules, ctx.rule_stack is back to what it was when attempt started.
+                // So we are recording with the outer stack!
+
                 ctx.record_error(e, start_span, final_label, priority);
 
                 // Restore state
@@ -550,6 +590,7 @@ pub fn parse_separated<T, P, S>(
     mut sep_parser: S,
     min: usize,
     trailing: bool,
+    error_msg: Option<&str>,
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
@@ -576,11 +617,12 @@ where
             // If we are here, we either:
             // 1. Just started (first=true) and failed to parse first item -> Empty list?
             // 2. Had a separator (first=false) but failed to parse item -> Trailing? or Error?
-            
+
             if !first {
                 if !trailing {
                     // We had a separator but no item, and trailing is NOT allowed.
-                    return ctx.raise_failure("expected item after separator", input.span());
+                    let msg = error_msg.unwrap_or("expected item after separator");
+                    return ctx.raise_failure(msg, input.span());
                 }
                 // Trailing allowed, so it's okay.
                 break;
@@ -592,7 +634,7 @@ where
     }
 
     if items.len() < min {
-         return ctx.raise_failure(format!("expected at least {} items", min), input.span());
+        return ctx.raise_failure(format!("expected at least {} items", min), input.span());
     }
 
     Ok(items)
@@ -615,7 +657,7 @@ where
     }
 
     if items.len() < min {
-         return ctx.raise_failure(format!("expected at least {} items", min), input.span());
+        return ctx.raise_failure(format!("expected at least {} items", min), input.span());
     }
 
     Ok(items)
@@ -677,18 +719,24 @@ mod tests {
         ctx.record_error(err, Span::call_site(), None, 0);
 
         let final_err = ctx.take_best_error().unwrap();
-        assert_eq!(final_err.to_string(), "in rule `outer`: in rule `inner`: fail");
+        assert_eq!(
+            final_err.to_string(),
+            "in rule `outer`: in rule `inner`: fail"
+        );
 
         // Simulate outer rule recording it too
         ctx.exit_rule(); // inner popped
-        
+
         // record the ALREADY FORMATTED error
         ctx.record_error(final_err, Span::call_site(), None, 0);
-        
+
         let final_err2 = ctx.take_best_error().unwrap();
-        
+
         // With prefix checking, it should stay the same
-        assert_eq!(final_err2.to_string(), "in rule `outer`: in rule `inner`: fail");
+        assert_eq!(
+            final_err2.to_string(),
+            "in rule `outer`: in rule `inner`: fail"
+        );
     }
 
     #[test]
@@ -718,20 +766,20 @@ mod tests {
     fn test_raise_failure() {
         let mut ctx = ParseContext::new();
         let span = Span::call_site();
-        
+
         // Record a normal error first
         ctx.record_error(syn::Error::new(span, "normal error"), span, None, 0);
-        
+
         // Now raise a failure
         let res: Result<()> = ctx.raise_failure("critical failure", span);
-        
+
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), "critical failure");
-        
+
         // Best error should be cleared (or nullified) so raise_failure return value is used.
         // Actually raise_failure returns Err directly.
         // But if we record it?
-        
+
         // The pattern for `fail` is: return Err from parser immediately.
         // The attempt() wrapper catches it.
         // If it's caught, record_error is called.

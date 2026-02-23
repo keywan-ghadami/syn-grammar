@@ -86,7 +86,7 @@ fn test_nested_cut_propagation() {
         .parse_str("start inner fail")
         .test()
         .assert_failure_contains("expected `end`");
-        
+
     // "start fail" -> Error "expected `inner`"
     // Outer cut commits to outer_cut. inner_cut fails at "inner".
     nested_cut::parse_main
@@ -112,24 +112,24 @@ fn test_fail_vs_deep_error() {
     // 1. Fatality wins.
     // 2. Depth wins.
     // 3. Priority wins.
-    
-    // "a b d" -> 
+
+    // "a b d" ->
     // Branch 1 error at index 2 ("d"). Depth = 2.
     // Branch 2 error at index 1 ("b"). Depth = 1.
     // So "expected c" should win because it made more progress.
-    
+
     priority_interaction::parse_main
         .parse_str("a b d")
         .test()
         .assert_failure_contains("expected `c`");
-        
+
     // "a d" ->
     // Branch 1 error at index 1 ("d"). Depth = 1. (expected "b")
     // Branch 2 error at index 1 ("d"). Depth = 1. (hard fail)
     // Both fail at same position.
     // "hard fail" has priority 2. "expected b" has priority 0.
     // So "hard fail" should win.
-    
+
     priority_interaction::parse_main
         .parse_str("a d")
         .test()

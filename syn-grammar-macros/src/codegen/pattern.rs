@@ -134,6 +134,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 let mut min = 0usize;
                 let mut trailing = false;
+                let mut custom_error: Option<String> = None;
 
                 // Parse optional args
                 for arg in &args[2..] {
@@ -152,6 +153,13 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                                 } = val
                                 {
                                     trailing = b.value;
+                                }
+                            } else if id == "error" || id == "err" {
+                                if let ModelPattern::Lit {
+                                    lit: Lit::Str(s), ..
+                                } = val
+                                {
+                                    custom_error = Some(s.value());
                                 }
                             }
                         }
@@ -209,80 +217,48 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 let rule_parser = generate_pattern_step(&rule_arg_with_binding, ctx)?;
                 let sep_parser = generate_pattern_step(sep_arg, ctx)?;
-                let sep_peek = analysis::get_simple_peek(sep_arg, ctx.custom_keywords)
-                    .ok()
-                    .flatten();
 
-                let push_stmt = if item_binding.len() == 1 {
+                let item_return_expr = if item_binding.len() == 1 {
                     let b = &item_binding[0];
-                    quote! { _items.push(#b); }
+                    quote! { #b }
                 } else if item_binding.is_empty() {
-                    quote! { _items.push(()); }
+                    quote! { () }
                 } else {
                     let b = &item_binding;
-                    quote! { _items.push((#(#b),*)); }
+                    quote! { (#(#b),*) }
                 };
 
-                let sep_logic = if let Some(peek) = sep_peek {
-                    quote! {
-                        if input.peek(#peek) {
-                            #sep_parser
-                            true
-                        } else {
-                            false
-                        }
-                    }
+                let error_msg_expr = if let Some(msg) = custom_error {
+                    quote!(Some(#msg))
                 } else {
-                    quote! {
-                        if rt::attempt(input, ctx, |mut input, ctx| { #sep_parser Ok(()) })?.is_some() {
-                            true
-                        } else {
-                            false
-                        }
-                    }
+                    quote!(None)
                 };
 
-                let refined_loop = quote! {
-                    let mut _items = #container_ty::new();
-                    let mut _first = true;
-                    loop {
-                        if !_first {
-                            // Expect separator
-                            if !{#sep_logic} {
-                                break;
-                            }
-                        }
-
-                        // Attempt parse item
-                        let _checkpoint = input.cursor();
-                        let _item_res = rt::attempt(input, ctx, |mut input, ctx| {
+                let refined_logic = quote! {
+                    let _items_vec = rt::parse_separated::<_, _, _>(
+                        input,
+                        ctx,
+                        |mut input, ctx| {
                              #rule_parser
-                             Ok( (#(#item_binding),*) )
-                        })?;
-
-                        if let Some(val) = _item_res {
-                            let (#(#item_binding),*) = val;
-                            #push_stmt
-                            _first = false;
-                        } else {
-                            if !_first && !#trailing {
-                                // Clear best error because we want to report specific error
-                                ctx.raise_failure::<()>("expected item after separator", input.span())?;
-                            }
-                            break;
-                        }
-                    }
-                    if _items.len() < (#min as usize) {
-                        // Clear best error because we want to report logic error
-                        ctx.raise_failure::<()>(concat!("expected at least ", #min, " items"), input.span())?;
-                    }
+                             Ok(#item_return_expr)
+                        },
+                        |mut input, ctx| {
+                             #sep_parser
+                             Ok(())
+                        },
+                        #min,
+                        #trailing,
+                        #error_msg_expr
+                    )?;
+                    // Convert to container type if needed (currently always Vec, but could be adapted)
+                    let mut _items = #container_ty::from_iter(_items_vec);
                     _items
                 };
 
                 if let Some(bind) = binding {
-                    Ok(quote! { let #bind = { #refined_loop }; })
+                    Ok(quote! { let #bind = { #refined_logic }; })
                 } else {
-                    Ok(quote! { let _ = { #refined_loop }; })
+                    Ok(quote! { let _ = { #refined_logic }; })
                 }
             } else if rule_path.is_ident("repeated") {
                 // repeated(rule, min=0)
@@ -364,29 +340,27 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 let rule_parser = generate_pattern_step(&rule_arg_with_binding, ctx)?;
 
-                let push_stmt = if item_binding.len() == 1 {
+                let item_return_expr = if item_binding.len() == 1 {
                     let b = &item_binding[0];
-                    quote! { _items.push(#b); }
+                    quote! { #b }
                 } else if item_binding.is_empty() {
-                    quote! { _items.push(()); }
+                    quote! { () }
                 } else {
                     let b = &item_binding;
-                    quote! { _items.push((#(#b),*)); }
+                    quote! { (#(#b),*) }
                 };
 
                 let loop_logic = quote! {
-                    let mut _items = #container_ty::new();
-                    while let Some(val) = rt::attempt(input, ctx, |mut input, ctx| {
-                        #rule_parser
-                        Ok( (#(#item_binding),*) )
-                    })? {
-                        let (#(#item_binding),*) = val;
-                        #push_stmt
-                    }
-                     if _items.len() < (#min as usize) {
-                        // Clear best error
-                        ctx.raise_failure::<()>(concat!("expected at least ", #min, " items"), input.span())?;
-                    }
+                    let _items_vec = rt::parse_repeated::<_, _>(
+                        input,
+                        ctx,
+                        |mut input, ctx| {
+                             #rule_parser
+                             Ok(#item_return_expr)
+                        },
+                        #min
+                    )?;
+                    let mut _items = #container_ty::from_iter(_items_vec);
                     _items
                 };
 

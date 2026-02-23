@@ -39,9 +39,9 @@ fn test_default_labels() {
         .parse_str("x")
         .test()
         .assert_failure();
-    // We expect "expected one of: a, b" or similar.
+    // We expect "expected one of: `a`, `b`" or similar.
     println!("Error: {}", err);
-    assert!(err.to_string().contains("expected one of: a, b"));
+    assert!(err.to_string().contains("expected one of: `a`, `b`"));
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn test_explicit_labels() {
     println!("Error: {}", err);
     assert!(err
         .to_string()
-        .contains("expected one of: Letter A, Letter B"));
+        .contains("expected one of: `Letter A`, `Letter B`"));
 }
 
 #[test]
@@ -76,5 +76,5 @@ fn test_group_labels() {
         .test()
         .assert_failure();
     println!("Error: {}", err);
-    assert!(err.to_string().contains("expected one of: A, B"));
+    assert!(err.to_string().contains("expected one of: `A`, `B`"));
 }

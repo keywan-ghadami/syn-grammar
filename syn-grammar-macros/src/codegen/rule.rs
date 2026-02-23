@@ -239,18 +239,21 @@ pub fn generate_variants_internal(
             // Label determination
             let label_str = if let Some(l) = &variant.label {
                  Some(l.clone())
-             } else if variant.pattern.len() == 1 {
-                 if let ModelPattern::RuleCall { rule_path, .. } = &variant.pattern[0] {
-                     if rule_path.segments.len() == 1 {
-                        Some(rule_path.get_ident().unwrap().to_string())
-                     } else {
-                        None
-                     }
-                 } else {
-                     None
-                 }
              } else {
-                 None
+                // Try to derive a label from the first token if possible
+                if variant.pattern.len() == 1 {
+                     if let ModelPattern::RuleCall { rule_path, .. } = &variant.pattern[0] {
+                         if rule_path.segments.len() == 1 {
+                            Some(rule_path.get_ident().unwrap().to_string())
+                         } else {
+                            analysis::get_peek_token_string(&variant.pattern)
+                         }
+                     } else {
+                         analysis::get_peek_token_string(&variant.pattern)
+                     }
+                } else {
+                    analysis::get_peek_token_string(&variant.pattern)
+                }
              };
 
              let label_lit = if let Some(l) = &label_str {
@@ -443,11 +446,20 @@ pub fn generate_variants_internal(
         if !_shallow_failures.is_empty() {
              _shallow_failures.sort();
              _shallow_failures.dedup();
-             let msg = format!("expected one of: {}", _shallow_failures.join(", "));
-             
+
+             let msg = if _shallow_failures.len() == 1 {
+                 format!("expected `{}`", _shallow_failures[0])
+             } else {
+                 let joined = _shallow_failures.iter()
+                    .map(|s| format!("`{}`", s))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                 format!("expected one of: {}", joined)
+             };
+
              // Clear best error to ensure this aggregated error wins
              let _ = ctx.take_best_error();
-             
+
              Err(input.error(msg))
         } else if let Some(best_err) = ctx.take_best_error() {
             Err(best_err)
