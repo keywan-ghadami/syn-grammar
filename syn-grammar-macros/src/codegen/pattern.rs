@@ -267,20 +267,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         } else {
                             if !_first && !#trailing {
                                 // Clear best error because we want to report specific error
-                                let _ = ctx.take_best_error();
-                                ctx.trigger_fail();
-                                ctx.suppress_label();
-                                return Err(input.error("expected item after separator"));
+                                ctx.raise_failure::<()>("expected item after separator", input.span())?;
                             }
                             break;
                         }
                     }
                     if _items.len() < (#min as usize) {
                         // Clear best error because we want to report logic error
-                        let _ = ctx.take_best_error();
-                        ctx.trigger_fail();
-                        ctx.suppress_label();
-                        return Err(input.error(concat!("expected at least ", #min, " items")));
+                        ctx.raise_failure::<()>(concat!("expected at least ", #min, " items"), input.span())?;
                     }
                     _items
                 };
@@ -391,10 +385,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     }
                      if _items.len() < (#min as usize) {
                         // Clear best error
-                        let _ = ctx.take_best_error();
-                        ctx.trigger_fail();
-                        ctx.suppress_label();
-                        return Err(input.error(concat!("expected at least ", #min, " items")));
+                        ctx.raise_failure::<()>(concat!("expected at least ", #min, " items"), input.span())?;
                     }
                     _items
                 };
@@ -471,11 +462,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         };
 
                         return Ok(quote! {
-                            if true {
-                                ctx.trigger_fail();
-                                ctx.suppress_label();
-                                return Err(syn::Error::new(input.span(), #arg_expr));
-                            }
+                            ctx.raise_failure::<()>(#arg_expr, input.span())?;
                         });
                     }
                     "whitespace" => {

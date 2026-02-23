@@ -327,7 +327,7 @@ pub fn generate_variants_internal(
                                     match post_run() {
                                         Ok(v) => return Ok(v),
                                         Err(e) => {
-                                            ctx.set_fatal(true);
+                                            ctx.commit();
                                             return Err(e);
                                         }
                                     }
@@ -335,7 +335,7 @@ pub fn generate_variants_internal(
                                 None => {
                                     // Pre failed.
                                     // Since is_unique, this is FATAL.
-                                    ctx.set_fatal(true);
+                                    ctx.commit();
                                     let err = ctx.take_best_error().unwrap_or_else(|| input.error("parse failed"));
                                     return Err(err);
                                 }
@@ -358,7 +358,7 @@ pub fn generate_variants_internal(
                             match post_run() {
                                 Ok(v) => return Ok(v),
                                 Err(e) => {
-                                    ctx.set_fatal(true);
+                                    ctx.commit();
                                     return Err(e);
                                 }
                             }
@@ -391,7 +391,7 @@ pub fn generate_variants_internal(
                             })? {
                                 Some(v) => return Ok(v),
                                 None => {
-                                    ctx.set_fatal(true);
+                                    ctx.commit();
                                     let err = ctx.take_best_error().unwrap_or_else(|| input.error("parse failed"));
                                     return Err(err);
                                 }

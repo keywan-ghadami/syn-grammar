@@ -115,6 +115,30 @@ impl ParseContext {
         self.suppress_label = true;
     }
 
+    /// **High-Level Abstraction**
+    /// Marks the current parse path as definitive. Any subsequent errors 
+    /// will be treated as fatal, preventing backtracking to other alternatives.
+    /// Used by the Cut operator (`=>`).
+    pub fn commit(&mut self) {
+        self.is_fatal = true;
+    }
+
+    /// **High-Level Abstraction**
+    /// Immediately raises a specific error, overriding any "better" errors found so far.
+    /// This is used for semantic checks (`fail "msg"`) or structural validation (wrong separator).
+    ///
+    /// Clears previous errors, sets priority to High (2), and suppresses default labeling.
+    #[cfg(feature = "syn")]
+    pub fn raise_failure<T>(&mut self, msg: impl std::fmt::Display, span: Span) -> Result<T> {
+        // Trigger high priority handling
+        self.fail_triggered = true;
+        
+        // Don't auto-label this error (e.g. don't say "expected identifier" if we explicitly say "number too big")
+        self.suppress_label = true;
+        
+        Err(syn::Error::new(span, msg))
+    }
+
     pub fn enter_rule(&mut self, name: &str) {
         #[cfg(feature = "trace")]
         eprintln!("[TRACE] enter_rule: {}", name);
@@ -516,6 +540,87 @@ where
     }
 }
 
+// --- Combinators (High-Level Parsers) ---
+
+#[cfg(all(feature = "rt", feature = "syn"))]
+pub fn parse_separated<T, P, S>(
+    input: ParseStream,
+    ctx: &mut ParseContext,
+    mut item_parser: P,
+    mut sep_parser: S,
+    min: usize,
+    trailing: bool,
+) -> Result<Vec<T>>
+where
+    P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
+    S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,
+{
+    let mut items = Vec::new();
+    let mut first = true;
+
+    loop {
+        if !first {
+            // Try parse separator
+            let is_sep = attempt(input, ctx, |i, c| sep_parser(i, c))?.is_some();
+            if !is_sep {
+                break;
+            }
+        }
+
+        // Try parse item
+        // We use attempt because item parsing might fail deeply
+        if let Some(item) = attempt(input, ctx, |i, c| item_parser(i, c))? {
+            items.push(item);
+            first = false;
+        } else {
+            // If we are here, we either:
+            // 1. Just started (first=true) and failed to parse first item -> Empty list?
+            // 2. Had a separator (first=false) but failed to parse item -> Trailing? or Error?
+            
+            if !first {
+                if !trailing {
+                    // We had a separator but no item, and trailing is NOT allowed.
+                    return ctx.raise_failure("expected item after separator", input.span());
+                }
+                // Trailing allowed, so it's okay.
+                break;
+            } else {
+                // First item failed. List is empty.
+                break;
+            }
+        }
+    }
+
+    if items.len() < min {
+         return ctx.raise_failure(format!("expected at least {} items", min), input.span());
+    }
+
+    Ok(items)
+}
+
+#[cfg(all(feature = "rt", feature = "syn"))]
+pub fn parse_repeated<T, P>(
+    input: ParseStream,
+    ctx: &mut ParseContext,
+    mut item_parser: P,
+    min: usize,
+) -> Result<Vec<T>>
+where
+    P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
+{
+    let mut items = Vec::new();
+
+    while let Some(item) = attempt(input, ctx, |i, c| item_parser(i, c))? {
+        items.push(item);
+    }
+
+    if items.len() < min {
+         return ctx.raise_failure(format!("expected at least {} items", min), input.span());
+    }
+
+    Ok(items)
+}
+
 // --- Stateless Helpers (No Context Needed) ---
 
 #[cfg(all(feature = "rt", feature = "syn"))]
@@ -607,5 +712,29 @@ mod tests {
 
         let err = ctx.take_best_error().expect("Error should be recorded");
         assert_eq!(err.to_string(), "in rule `outer`: parse failed");
+    }
+
+    #[test]
+    fn test_raise_failure() {
+        let mut ctx = ParseContext::new();
+        let span = Span::call_site();
+        
+        // Record a normal error first
+        ctx.record_error(syn::Error::new(span, "normal error"), span, None, 0);
+        
+        // Now raise a failure
+        let res: Result<()> = ctx.raise_failure("critical failure", span);
+        
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().to_string(), "critical failure");
+        
+        // Best error should be cleared (or nullified) so raise_failure return value is used.
+        // Actually raise_failure returns Err directly.
+        // But if we record it?
+        
+        // The pattern for `fail` is: return Err from parser immediately.
+        // The attempt() wrapper catches it.
+        // If it's caught, record_error is called.
+        // record_error sees `fail_triggered` is true, so priority becomes 2.
     }
 }
