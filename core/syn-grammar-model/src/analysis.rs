@@ -25,8 +25,8 @@ pub struct CutAnalysis<'a> {
 pub fn find_cut<'a>(patterns: &'a [ModelPattern]) -> Option<CutAnalysis<'a>> {
     let idx = patterns
         .iter()
-        .position(|p| matches!(p, ModelPattern::Cut(_)))?;
-    Some(CutAnalysis {
+        .position(|p| matches!(p, ModelPattern::Cut(_)));
+    idx.map(|idx| CutAnalysis {
         pre_cut: &patterns[0..idx],
         post_cut: &patterns[idx + 1..],
     })
@@ -351,6 +351,7 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Peek(_, _) => true,
         ModelPattern::Not(_, _) => true,
         ModelPattern::Until { .. } => true,
+        ModelPattern::Fail { .. } => false,
     }
 }
 
@@ -448,6 +449,7 @@ fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<
         ModelPattern::Bracketed(_, _)
         | ModelPattern::Braced(_, _)
         | ModelPattern::Parenthesized(_, _) => false,
+        ModelPattern::Fail { .. } => false,
     }
 }
 
@@ -565,7 +567,8 @@ fn collect_nullable_deps(
             ModelPattern::Lit { .. }
             | ModelPattern::Bracketed(..)
             | ModelPattern::Braced(..)
-            | ModelPattern::Parenthesized(..) => {
+            | ModelPattern::Parenthesized(..)
+            | ModelPattern::Fail { .. } => {
                 return;
             }
             ModelPattern::Cut(_) => {}
@@ -848,6 +851,10 @@ fn collect_first_from_sequence(
                     acc,
                 );
             }
+            ModelPattern::Fail { .. } => {
+                // Fail does not contribute tokens to FIRST set and stops execution.
+                return;
+            }
             _ => {}
         }
     }
@@ -948,6 +955,14 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
         ) => pattern_structure_eq(b1, b2) && pattern_structure_eq(s1, s2),
         (ModelPattern::Until { pattern: p1, .. }, ModelPattern::Until { pattern: p2, .. }) => {
             pattern_structure_eq(p1, p2)
+        }
+        (ModelPattern::Fail { message: m1, .. }, ModelPattern::Fail { message: m2, .. }) => {
+            // Compare error messages roughly (optional equality)
+            match (m1, m2) {
+                (Some(Lit::Str(s1)), Some(Lit::Str(s2))) => s1.value() == s2.value(),
+                (None, None) => true,
+                _ => false,
+            }
         }
         _ => false,
     }

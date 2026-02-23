@@ -39,6 +39,7 @@ pub mod kw {
     syn::custom_keyword!(not);
     syn::custom_keyword!(until);
     syn::custom_keyword!(import);
+    syn::custom_keyword!(fail);
 }
 
 fn parse_path_no_args(input: ParseStream) -> Result<Path> {
@@ -459,6 +460,9 @@ impl ToTokens for Argument {
     }
 }
 
+/// A sequence of patterns with an optional action and label.
+pub type GroupAlternative = (Vec<Pattern>, Option<TokenStream>, Option<String>);
+
 #[derive(Debug, Clone)]
 pub enum Pattern {
     Cut(Token![=>]),
@@ -472,10 +476,7 @@ pub enum Pattern {
         generics: Vec<Type>,
         args: Vec<Argument>,
     },
-    Group(
-        Vec<(Vec<Pattern>, Option<TokenStream>, Option<String>)>,
-        token::Paren,
-    ),
+    Group(Vec<GroupAlternative>, token::Paren),
     Bracketed(Vec<Pattern>, token::Bracket),
     Braced(Vec<Pattern>, token::Brace),
     Parenthesized(Vec<Pattern>, kw::paren, token::Paren),
@@ -495,6 +496,10 @@ pub enum Pattern {
         binding: Option<Ident>,
         pattern: Box<Pattern>,
         kw_token: kw::until,
+    },
+    Fail {
+        message: Option<Lit>,
+        kw_token: kw::fail,
     },
 }
 
@@ -669,6 +674,14 @@ impl ToTokens for Pattern {
                     pattern.to_tokens(t);
                 });
             }
+            Pattern::Fail { message, kw_token } => {
+                kw_token.to_tokens(tokens);
+                if let Some(m) = message {
+                    token::Paren::default().surround(tokens, |t| {
+                        m.to_tokens(t);
+                    });
+                }
+            }
         }
     }
 }
@@ -824,6 +837,23 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
             pattern: Box::new(pattern),
             kw_token,
         })
+    } else if input.peek(kw::fail) {
+        if binding.is_some() {
+            return Err(input.error("Fail cannot be bound."));
+        }
+        let kw_token = input.parse::<kw::fail>()?;
+        let message = if input.peek(token::Paren) {
+            let content;
+            syn::parenthesized!(content in input);
+            if content.is_empty() {
+                None
+            } else {
+                Some(content.parse()?)
+            }
+        } else {
+            None
+        };
+        Ok(Pattern::Fail { message, kw_token })
     } else {
         let fork = input.fork();
         if let Ok(ident) = fork.call(rt::parse_ident) {
@@ -861,7 +891,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
             (Vec::new(), false)
         };
 
-        let args = if has_generics || input.peek(token::Paren) {
+        let args = if has_generics {
             parse_args(input)?
         } else {
             Vec::new()
@@ -899,9 +929,7 @@ fn parse_pattern_list(input: ParseStream) -> Result<Vec<Pattern>> {
     Ok(list)
 }
 
-fn parse_group_content(
-    input: ParseStream,
-) -> Result<Vec<(Vec<Pattern>, Option<TokenStream>, Option<String>)>> {
+fn parse_group_content(input: ParseStream) -> Result<Vec<GroupAlternative>> {
     let mut alts = Vec::new();
     loop {
         let mut seq = Vec::new();

@@ -175,6 +175,7 @@ fn validate_pattern(
             validate_pattern(pattern, all_defs, params)?;
             validate_no_bindings(pattern)?;
         }
+        ModelPattern::Fail { .. } => {}
         _ => {}
     }
     Ok(())
@@ -249,6 +250,7 @@ fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
             validate_no_bindings(sync)?;
         }
         ModelPattern::Cut(_) => {}
+        ModelPattern::Fail { .. } => {}
     }
     Ok(())
 }
@@ -412,7 +414,7 @@ mod tests {
     fn test_rule_args_mismatch() {
         let input = quote! {
             grammar test {
-                rule main -> () = sub!(1) -> { () }
+                rule main -> () = sub<_>(1) -> { () }
                 rule sub -> () = "hello" -> { () }
             }
         };

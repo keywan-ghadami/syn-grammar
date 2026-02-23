@@ -422,23 +422,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                         });
                     }
-                    "fail" => {
-                        let arg_expr = if let Some(arg) = args.first() {
-                            match arg {
-                                Argument::Positional(ModelPattern::Lit {
-                                    lit: syn::Lit::Str(s),
-                                    ..
-                                }) => s.value(),
-                                _ => "Explicit failure".to_string(),
-                            }
-                        } else {
-                            "Explicit failure".to_string()
-                        };
-
-                        return Ok(quote! {
-                            ctx.raise_failure::<()>(#arg_expr, input.span())?;
-                        });
-                    }
+                    // "fail" removed here - handled by ModelPattern::Fail
                     "whitespace" => {
                         return Ok(quote! {
                             if !ctx.check_whitespace(input.span()) {
@@ -974,6 +958,18 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 Ok(quote! { let _ = { #loop_body }; })
             }
         }
+
+        ModelPattern::Fail { message, .. } => {
+            let arg_expr = if let Some(Lit::Str(s)) = message {
+                s.value()
+            } else {
+                "Explicit failure".to_string()
+            };
+
+            Ok(quote! {
+                ctx.raise_failure::<()>(#arg_expr, input.span())?;
+            })
+        }
     }
 }
 
@@ -1006,29 +1002,26 @@ fn generate_rule_call_expr(
         if ctx.grammar.extern_rules.iter().any(|er| er.name == *ident) {
             // Extern rule: call exactly as named, no ctx
             if arg_exprs.is_empty() {
-                return quote!(#ident(input)?);
+                quote!(#rule_path(input)?)
             } else {
-                return quote!(#ident(input, #(#arg_exprs),*)?);
+                quote!(#rule_path(input, #(#arg_exprs),*)?)
             }
-        }
-
-        // Check if it's a local rule (single ident)
-        if ctx.grammar.rules.iter().any(|r| r.name == *ident) {
+        } else if ctx.grammar.rules.iter().any(|r| r.name == *ident) {
             // Local rule: call parse_{name}_impl with ctx
             let impl_name = format_ident!("parse_{}_impl", ident);
             if arg_exprs.is_empty() {
-                return quote!(#impl_name(&mut input, ctx)?);
+                quote!(#impl_name(&mut input, ctx)?)
             } else {
-                return quote!(#impl_name(&mut input, ctx, #(#arg_exprs),*)?);
+                quote!(#impl_name(&mut input, ctx, #(#arg_exprs),*)?)
             }
-        }
-
-        // Fallback: Treat as external function call (e.g. builtin or user-imported function)
-        // Assume standard signature: func(input)
-        if arg_exprs.is_empty() {
-            return quote!(#rule_path(input)?);
         } else {
-            return quote!(#rule_path(input, #(#arg_exprs),*)?);
+            // Fallback: Treat as external function call (e.g. builtin or user-imported function)
+            // Assume standard signature: func(input)
+            if arg_exprs.is_empty() {
+                quote!(#rule_path(input)?)
+            } else {
+                quote!(#rule_path(input, #(#arg_exprs),*)?)
+            }
         }
     } else {
         // Multi-segment path
