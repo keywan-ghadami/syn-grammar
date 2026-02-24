@@ -166,7 +166,7 @@ fn generate_recursive_loop_body(
 
         let peek_token_obj = tail_pattern.first()
             .and_then(|f| analysis::get_simple_peek(f, ctx.custom_keywords).ok().flatten());
-        
+
         let label_lit = if let Some(l) = &variant.label {
             quote!(Some(#l))
         } else {
@@ -319,7 +319,7 @@ pub fn generate_variants_internal(
                                 #pre_logic
                                 Ok(( #(#pre_bindings),* ))
                             })?;
-                            
+
                             match pre_res {
                                 Some(( #(#pre_bindings),* )) => {
                                     // Pre succeeded. Now run Post.

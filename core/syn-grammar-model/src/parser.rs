@@ -1,7 +1,6 @@
 // Moved from macros/src/parser.rs
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens, TokenStreamExt};
-use syn::parse::discouraged::Speculative;
 use syn::parse::{Parse, ParseStream};
 use syn::{token, Attribute, Generics, Ident, ItemUse, Lit, Path, Result, Token, Type};
 
@@ -686,62 +685,6 @@ impl ToTokens for Pattern {
     }
 }
 
-fn token_alias_to_literal(s: &str) -> Option<&'static str> {
-    match s {
-        "PLUS" => Some("+"),
-        "MINUS" => Some("-"),
-        "STAR" => Some("*"),
-        "SLASH" => Some("/"),
-        "PERCENT" => Some("%"),
-        "CARET" => Some("^"),
-        "BANG" => Some("!"),
-        "AMP" => Some("&"),
-        "PIPE" => Some("|"),
-        "AND" => Some("&&"),
-        "OR" => Some("||"),
-        "SHL" => Some("<<"),
-        "SHR" => Some(">>"),
-        "PLUS_EQ" => Some("+="),
-        "MINUS_EQ" => Some("-="),
-        "STAR_EQ" => Some("*="),
-        "SLASH_EQ" => Some("/="),
-        "PERCENT_EQ" => Some("%="),
-        "CARET_EQ" => Some("^="),
-        "AMP_EQ" => Some("&="),
-        "PIPE_EQ" => Some("|="),
-        "SHL_EQ" => Some("<<="),
-        "SHR_EQ" => Some(">>="),
-        "EQ" => Some("=="),
-        "NE" => Some("!="),
-        "GT" => Some(">"),
-        "LT" => Some("<"),
-        "GE" => Some(">="),
-        "LE" => Some("<="),
-        "AT" => Some("@"),
-        "UNDERSCORE" => Some("_"),
-        "DOT" => Some("."),
-        "DOT_DOT" => Some(".."),
-        "DOT_DOT_DOT" => Some("..."),
-        "DOT_DOT_EQ" => Some("..="),
-        "COMMA" => Some(","),
-        "SEMI" => Some(";"),
-        "COLON" => Some(":"),
-        "COLON_COLON" => Some("::"),
-        "R_ARROW" => Some("->"),
-        "FAT_ARROW" => Some("=>"),
-        "HASH" => Some("#"),
-        "DOLLAR" => Some("$"),
-        "QUESTION" => Some("?"),
-        "L_PAREN" => Some("("),
-        "R_PAREN" => Some(")"),
-        "L_BRACKET" => Some("["),
-        "R_BRACKET" => Some("]"),
-        "L_BRACE" => Some("{"),
-        "R_BRACE" => Some("}"),
-        _ => None,
-    }
-}
-
 fn parse_atom(input: ParseStream) -> Result<Pattern> {
     // 1. Check for binding
     let binding = rt::attempt(input, |input| {
@@ -855,18 +798,6 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         };
         Ok(Pattern::Fail { message, kw_token })
     } else {
-        let fork = input.fork();
-        if let Ok(ident) = fork.call(rt::parse_ident) {
-            let s = ident.to_string();
-            if let Some(s_lit) = token_alias_to_literal(&s) {
-                input.advance_to(&fork);
-                return Ok(Pattern::Lit {
-                    binding,
-                    lit: syn::Lit::Str(syn::LitStr::new(s_lit, ident.span())),
-                });
-            }
-        }
-
         let rule_path = parse_path_no_args(input)?;
 
         let (generics, has_generics) = if input.peek(Token![<]) {
