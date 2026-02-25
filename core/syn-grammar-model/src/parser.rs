@@ -699,6 +699,18 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         }
         let token = input.parse::<Token![=>]>()?;
         Ok(Pattern::Cut(token))
+    } else if input.peek(Token![!]) {
+        return Err(input.error(
+            "The '!' operator is not supported. Use 'not(pattern)' for negative lookahead.",
+        ));
+    } else if input.peek(Token![&]) {
+        return Err(input.error(
+            "The '&' operator is not supported. Use 'peek(pattern)' for positive lookahead.",
+        ));
+    } else if input.peek(Token![~]) {
+        return Err(
+            input.error("The '~' operator is not supported. Use the '=>' cut operator instead")
+        );
     } else if input.peek(Lit) {
         let lit: Lit = input.parse()?;
         let lit = match lit {

@@ -300,8 +300,10 @@ These represent high-level, conceptually portable primitives that other backends
 | `ident` | A Rust identifier | `syn_grammar::Identifier` |
 | `string` | A string literal's content | `syn_grammar::StringLiteral` |
 | `alpha` | An alphabetic identifier | `syn::Ident` |
-| `digit` | A numeric identifier | `syn::Ident` |
+| `digit` | A numeric literal (0-9) | `syn::LitInt` |
+| `alphanumeric` | An alphanumeric identifier | `syn::Ident` |
 | `whitespace` | Ensures token separation | `()` |
+| `eof` | Ensures the end of input | `()` |
 | `outer_attrs` | Parses `#[...]` attributes | `Vec<syn::Attribute>` |
 
 **Numeric Types (Consistent Naming)**
@@ -432,6 +434,21 @@ grammar! {
 }
 ```
 
+#### Epsilon (Empty) Alternative
+An "epsilon" alternative matches the empty string (consuming no input) and always succeeds. This is useful for making parts of a rule optional while providing a default value or action.
+
+```rust
+use syn_grammar::grammar;
+grammar! {
+    grammar Epsilon {
+        // Matches an integer or nothing (returns None)
+        pub rule main -> Option<i32> =
+            i:i32 -> { Some(i) }
+          | -> { None } 
+    }
+}
+```
+
 #### Repetitions (`*`, `+`, `?`)
 - `pattern*`: Match zero or more times. Returns a `Vec`.
 - `pattern+`: Match one or more times. Returns a `Vec`.
@@ -506,6 +523,45 @@ grammar! {
             content:until(";") ";" -> { content.to_string() }
     }
 }
+```
+
+#### End of Input (`eof`)
+Ensure that the parser has reached the end of the input stream.
+
+```rust
+use syn_grammar::grammar;
+grammar! {
+    grammar Main {
+        // Matches "a" and then ensures there is no more input.
+        pub rule start -> () = "a" eof -> { () }
+    }
+}
+```
+
+#### Explicit Failure (`fail`)
+Explicitly cause a parsing failure with a custom error message.
+When combined with the **Cut Operator** (`=>`), this pattern allows you to reject specific inputs and prevent backtracking.
+
+```rust
+use syn_grammar::grammar;
+grammar! {
+    grammar Validation {
+        // Matches "foo", but fails hard if it is followed by "bar".
+        // The `=>` ensures that if "bar" matches, we commit to this branch 
+        // and trigger the failure immediately, instead of backtracking to the epsilon alternative.
+        pub rule check -> () = 
+            "foo" 
+            (
+                "bar" => fail("foo cannot be followed by bar")
+              | -> { () }
+            )
+            ident*
+            -> { () }
+    }
+}
+
+// Validation::parse_check.parse_str("foo baz") // succeeds
+// Validation::parse_check.parse_str("foo bar") // fails: "foo cannot be followed by bar"
 ```
 
 #### Error Recovery (`recover`)
@@ -667,7 +723,7 @@ This allows for flexible grammars but can impact performance if overused. Use th
 
 ## Building Custom Backends
 
-If you are a library author who wants to create a parser generator using `syn-grammar`'s syntax (e.g. `winnow-grammar` or `chumsky-grammar`), you can use `syn-grammar-model` as a reusable frontend.
+If you are a library author who wants to create a parser generator using `syn-grammar's syntax (e.g. `winnow-grammar` or `chumsky-grammar`), you can use `syn-grammar-model` as a reusable frontend.
 
 See [EXTENDING.md](EXTENDING.md) for a guide on how to build custom backends.
 

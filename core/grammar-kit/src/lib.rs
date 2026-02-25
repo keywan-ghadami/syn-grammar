@@ -776,6 +776,9 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), "critical failure");
 
+        // Assert that it is NOT fatal by default (reverted behavior)
+        assert!(!ctx.check_fatal());
+
         // Best error should be cleared (or nullified) so raise_failure return value is used.
         // Actually raise_failure returns Err directly.
         // But if we record it?

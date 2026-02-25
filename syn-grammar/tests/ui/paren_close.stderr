@@ -1,0 +1,5 @@
+error: Literal delimiter ) is not supported. Use 'paren(...)' to match parenthesized content, or '(...)' for grouping.
+ --> tests/ui/paren_close.rs:5:27
+  |
+5 |         rule main -> () = ")" -> { () }
+  |                           ^^^

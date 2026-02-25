@@ -1,0 +1,5 @@
+error: The '~' operator is not supported. Use the '=>' cut operator instead
+ --> tests/ui/tilde_operator.rs:5:27
+  |
+5 |         rule main -> () = ~ "a" -> { () }
+  |                           ^

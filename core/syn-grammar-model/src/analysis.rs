@@ -178,14 +178,35 @@ pub fn resolve_token_types(
         return Ok(vec![parse_quote!(kw::#ident)]);
     }
 
-    if matches!(s.as_str(), "(" | ")" | "[" | "]" | "{" | "}") {
-        return Err(syn::Error::new(
-            lit.span(),
-            format!(
-                "Invalid direct token literal: '{}'. Use `(...)`, `[...]` or `{{...}}` syntax to match delimiters.",
-                s
-            ),
-        ));
+    match s.as_str() {
+        "(" | ")" | "()" => {
+            return Err(syn::Error::new(
+                lit.span(),
+                format!(
+                    "Literal delimiter {} is not supported. Use 'paren(...)' to match parenthesized content, or '(...)' for grouping.",
+                    s
+                ),
+            ));
+        }
+        "[" | "]" | "[]" => {
+            return Err(syn::Error::new(
+                lit.span(),
+                format!(
+                    "Literal delimiter {} is not supported. Use '[...]' syntax to match bracketed content.",
+                    s
+                ),
+            ));
+        }
+        "{" | "}" | "{}" => {
+            return Err(syn::Error::new(
+                lit.span(),
+                format!(
+                    "Literal delimiter {} is not supported. Use '{{...}}' syntax to match braced content.",
+                    s
+                ),
+            ));
+        }
+        _ => {}
     }
 
     if s == "true" || s == "false" {
