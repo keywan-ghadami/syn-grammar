@@ -183,7 +183,7 @@ pub fn resolve_token_types(
             return Err(syn::Error::new(
                 lit.span(),
                 format!(
-                    "Literal delimiter {} is not supported. Use 'paren(...)' to match parenthesized content, or '(...)' for grouping.",
+                    "Literal delimiter \"{}\" is not supported. Use paren(...) to match parenthesized content, or (...) for grouping.",
                     s
                 ),
             ));
@@ -192,7 +192,7 @@ pub fn resolve_token_types(
             return Err(syn::Error::new(
                 lit.span(),
                 format!(
-                    "Literal delimiter {} is not supported. Use '[...]' syntax to match bracketed content.",
+                    "Literal delimiter \"{}\" is not supported. Use [...] syntax to match bracketed content.",
                     s
                 ),
             ));
@@ -201,7 +201,7 @@ pub fn resolve_token_types(
             return Err(syn::Error::new(
                 lit.span(),
                 format!(
-                    "Literal delimiter {} is not supported. Use '{{...}}' syntax to match braced content.",
+                    "Literal delimiter \"{}\" is not supported. Use {{...}} syntax to match braced content.",
                     s
                 ),
             ));

@@ -1,4 +1,4 @@
-error: Literal delimiter [ is not supported. Use '[...]' syntax to match bracketed content.
+error: Literal delimiter "[" is not supported. Use [...] syntax to match bracketed content.
  --> tests/ui/bracket_open.rs:5:27
   |
 5 |         rule main -> () = "[" -> { () }
