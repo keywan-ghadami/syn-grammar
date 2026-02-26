@@ -117,13 +117,14 @@ fn validate_pattern(
             rule_path, args, ..
         } => {
             // Check if it's a multi-segment path (e.g., imported call)
-            if rule_path.segments.len() > 1 {
-                // We assume imported/namespaced calls are valid external references.
-                // We cannot validate them locally without more context.
-                // However, we still validate their arguments.
-            } else {
-                let rule_name_ident = rule_path.get_ident().unwrap();
-                let rule_name_str = rule_name_ident.to_string();
+            let rule_name_opt = rule_path.get_ident().map(|ident| ident.to_string());
+
+            if let Some(rule_name_str) = rule_name_opt {
+                let rule_name_ident = if let Some(ident) = rule_path.get_ident() {
+                    ident
+                } else {
+                    &rule_path.segments[1].ident
+                };
 
                 // Check if rule_name is in all_defs OR in params (as a grammar parameter)
                 let is_param = params.iter().any(|p| p.name == *rule_name_ident);
@@ -137,6 +138,8 @@ fn validate_pattern(
                         format!("Undefined rule: '{}'", rule_name_str),
                     ));
                 }
+            } else {
+                // Imported/namespaced calls are assumed valid external references.
             }
 
             for arg in args {
@@ -281,21 +284,26 @@ fn validate_args_recursive(
             ModelPattern::RuleCall {
                 rule_path, args, ..
             } => {
-                if let Some(ident) = rule_path.get_ident() {
-                    let rule_name_str = ident.to_string();
+                let rule_name_opt = rule_path.get_ident().map(|ident| ident.to_string());
 
+                if let Some(rule_name_str) = rule_name_opt {
                     if let Some(target_rule) = rule_map.get(&rule_name_str) {
-                        // Check if any args are named
-                        for arg in args {
-                            if let Argument::Named(n, _) = arg {
-                                return Err(syn::Error::new(
-                                    n.span(),
-                                    "Named arguments are not supported for user-defined rules yet.",
-                                ));
-                            }
-                        }
+                        // Removed named argument check to allow named args.
 
                         if target_rule.params.len() != args.len() {
+                            // Check if user likely forgot arguments
+                            if args.is_empty() && !target_rule.params.is_empty() {
+                                return Err(syn::Error::new(
+                                    rule_path.span(),
+                                    format!(
+                                        "Rule '{}' expects {} argument(s). To pass arguments, use named arguments like '{}(arg=value)'.",
+                                        rule_name_str,
+                                        target_rule.params.len(),
+                                        rule_name_str
+                                    ),
+                                ));
+                            }
+
                             return Err(syn::Error::new(
                                 rule_path.span(),
                                 format!(
@@ -307,10 +315,6 @@ fn validate_args_recursive(
                             ));
                         }
                     }
-                } else {
-                    // Namespaced call (e.g. math::expr)
-                    // We can't check arguments for remote rules easily without parsing them.
-                    // But we should recursively check argument patterns.
                 }
 
                 // Recursively check arguments (they are patterns)
@@ -414,7 +418,7 @@ mod tests {
     fn test_rule_args_mismatch() {
         let input = quote! {
             grammar test {
-                rule main -> () = sub<_>(1) -> { () }
+                rule main -> () = sub(arg=1) -> { () }
                 rule sub -> () = "hello" -> { () }
             }
         };

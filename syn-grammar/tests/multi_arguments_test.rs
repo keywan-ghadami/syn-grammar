@@ -6,14 +6,13 @@ use syn_grammar::testing::Testable;
 fn test_multiple_arguments() {
     grammar! {
         grammar multi_args {
-            pub rule main -> i32 = "calc" v:calc<_>(2, 3) -> { v }
+            pub rule main -> i32 = "calc" v:calc(mult=2, base=3) -> { v }
             rule calc(mult: i32, base: i32) -> i32 = i:i32 -> { base + (i * mult) }
         }
     }
 
-    // 10 * 2 + 3 = 23
     multi_args::parse_main
-        .parse_str("calc 10")
+        .parse_str("calc 5")
         .test()
-        .assert_success_is(23);
+        .assert_success_is(13); // 3 + (5 * 2) = 13
 }

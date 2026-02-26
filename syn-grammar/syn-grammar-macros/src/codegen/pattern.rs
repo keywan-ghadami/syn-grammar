@@ -444,7 +444,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 };
                 Ok(result)
             } else {
-                let func_call = generate_rule_call_expr(rule_path, args, ctx);
+                let func_call = generate_rule_call_expr(rule_path, args, ctx)?;
                 Ok(if let Some(bind) = binding {
                     quote! { let #bind = #func_call; }
                 } else {
@@ -977,22 +977,27 @@ fn generate_rule_call_expr(
     rule_path: &syn::Path,
     args: &[Argument],
     ctx: &CodegenContext,
-) -> TokenStream {
-    let arg_exprs: Vec<TokenStream> = args
-        .iter()
-        .map(|arg| match arg {
+) -> Result<TokenStream> {
+    let mut arg_exprs: Vec<TokenStream> = Vec::new();
+
+    for arg in args {
+        match arg {
             Argument::Positional(p) | Argument::Named(_, p) => match p {
-                ModelPattern::Lit { lit, .. } => quote!(#lit),
+                ModelPattern::Lit { lit, .. } => arg_exprs.push(quote!(#lit)),
                 ModelPattern::RuleCall {
                     rule_path, args, ..
                 } if args.is_empty() && rule_path.get_ident().is_some() => {
                     let ident = rule_path.get_ident().unwrap();
-                    quote!(#ident)
+                    arg_exprs.push(quote!(#ident));
                 }
-                _ => quote!(compile_error!("Complex pattern used as runtime argument")),
+                _ => {
+                    return Ok(quote!(compile_error!(
+                        "Complex pattern used as runtime argument"
+                    )));
+                }
             },
-        })
-        .collect();
+        }
+    }
 
     // 1. External Call (Imports or Namespaced paths)
     // If it has > 1 segment, or if it has 1 segment that matches an external rule or import alias (though alias matching might be implicit by path resolution).
@@ -1002,25 +1007,25 @@ fn generate_rule_call_expr(
         if ctx.grammar.extern_rules.iter().any(|er| er.name == *ident) {
             // Extern rule: call exactly as named, no ctx
             if arg_exprs.is_empty() {
-                quote!(#rule_path(input)?)
+                Ok(quote!(#rule_path(input)?))
             } else {
-                quote!(#rule_path(input, #(#arg_exprs),*)?)
+                Ok(quote!(#rule_path(input, #(#arg_exprs),*)?))
             }
         } else if ctx.grammar.rules.iter().any(|r| r.name == *ident) {
             // Local rule: call parse_{name}_impl with ctx
             let impl_name = format_ident!("parse_{}_impl", ident);
             if arg_exprs.is_empty() {
-                quote!(#impl_name(&mut input, ctx)?)
+                Ok(quote!(#impl_name(&mut input, ctx)?))
             } else {
-                quote!(#impl_name(&mut input, ctx, #(#arg_exprs),*)?)
+                Ok(quote!(#impl_name(&mut input, ctx, #(#arg_exprs),*)?))
             }
         } else {
             // Fallback: Treat as external function call (e.g. builtin or user-imported function)
             // Assume standard signature: func(input)
             if arg_exprs.is_empty() {
-                quote!(#rule_path(input)?)
+                Ok(quote!(#rule_path(input)?))
             } else {
-                quote!(#rule_path(input, #(#arg_exprs),*)?)
+                Ok(quote!(#rule_path(input, #(#arg_exprs),*)?))
             }
         }
     } else {
@@ -1042,16 +1047,16 @@ fn generate_rule_call_expr(
             last_seg.ident = new_ident;
 
             if arg_exprs.is_empty() {
-                quote!(#new_path(input)?)
+                Ok(quote!(#new_path(input)?))
             } else {
-                quote!(#new_path(input, #(#arg_exprs),*)?)
+                Ok(quote!(#new_path(input, #(#arg_exprs),*)?))
             }
         } else {
             // Standard call
             if arg_exprs.is_empty() {
-                quote!(#rule_path(input)?)
+                Ok(quote!(#rule_path(input)?))
             } else {
-                quote!(#rule_path(input, #(#arg_exprs),*)?)
+                Ok(quote!(#rule_path(input, #(#arg_exprs),*)?))
             }
         }
     }

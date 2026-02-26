@@ -20,7 +20,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 - **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
-- **Rule Arguments**: Pass context between rules using a clear, generic-style `rule<...>(...)` syntax.
+- **Rule Arguments**: Pass context between rules using a clear, generic-style `self::rule(...)` syntax.
 - **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
 - **100% Static Validation**: All checks, including for left-recursion and shadowing, are performed at compile time within each grammar block.
 - **Perfect Spans**: Error messages point to the exact line and file where a syntax error occurred.
@@ -201,15 +201,15 @@ grammar! {
 
 ### Rule Arguments and Generic Calls
 
-Rule calls with arguments use a syntax similar to Rust's generic function calls. To avoid parsing ambiguities in the macro environment, an explicit `<_>` (for inferred types) or `<Type>` is required before the arguments.
+Rule calls with arguments use named arguments (kwargs) to distinguish them from EBNF grouping `(...)`. Unless you use template rules or built-ins, you have to use named arguments.
 
 ```rust
 use syn_grammar::grammar;
 grammar! {
     grammar Args {
         rule main -> i32 =
-            // Call `value` with argument 10. `<_>` is required for disambiguation.
-            "start" v:value<_>(10) -> { v }
+            // Call `value` with argument 10 using named argument syntax.
+            "start" v:value(offset = 10) -> { v }
 
         rule value(offset: i32) -> i32 =
             i:i32 -> { i + offset }
@@ -232,8 +232,9 @@ grammar! {
             items:item* -> { items }
 
         pub rule integers -> Vec<i32> =
-            // Reuse `list` with the `i32` rule. `<_>` is required.
-            l:list<_>(i32) -> { l }
+            // Reuse `list` with the `i32` rule.
+            // <...> can be inferred or explicit.
+            l:list(item=i32) -> { l }
     }
 }
 ```
@@ -247,7 +248,7 @@ use syn_grammar::grammar;
 grammar! {
     grammar Map {
         rule map<K: Hash + Eq, V>(k, v) -> HashMap<K, V> =
-            entries:entry<_>(k, v)* -> { entries.into_iter().collect() }
+            entries:entry(k=k, v=v)* -> { entries.into_iter().collect() }
 
         rule entry<K, V>(k, v) -> (K, V) =
             key:k ":" val:v -> { (key, val) }
@@ -467,8 +468,8 @@ grammar! {
 #### Parametric List Rules (`separated`, `repeated`)
 For parsing lists of items, use the built-in `separated` and `repeated` rules. These are more efficient and readable than manual recursion.
 
-- `separated<...>(rule, separator, min=0, trailing=false)`: Parses items separated by a delimiter.
-- `repeated<...>(rule, min=0)`: Parses items without a delimiter.
+- `separated(rule, separator, min=0, trailing=false)`: Parses items separated by a delimiter.
+- `repeated(rule, min=0)`: Parses items without a delimiter.
 
 You can specify the container type using generics (default is `Vec`).
 
@@ -478,11 +479,11 @@ grammar! {
     grammar Lists {
         // [ 1, 2, 3 ]
         rule array -> Vec<i32> = 
-            [ items:separated<_>(i32, ",") ] -> { items }
+            [ items:separated(i32, ",") ] -> { items }
 
         // { key value key value }
         rule map -> Vec<(String, i32)> = 
-            { entries:repeated<_>(entry) } -> { entries }
+            { entries:repeated(entry) } -> { entries }
             
         rule entry -> (String, i32) = k:ident v:i32 -> { (k.to_string(), v) }
     }

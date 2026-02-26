@@ -71,7 +71,10 @@ impl Monomorphizer {
     fn expand_pattern(&mut self, pattern: &mut ModelPattern) {
         match pattern {
             ModelPattern::RuleCall {
-                rule_path, args, ..
+                rule_path,
+                args,
+                generics,
+                ..
             } => {
                 for arg in args.iter_mut() {
                     match arg {
@@ -83,9 +86,10 @@ impl Monomorphizer {
 
                 let flattened_name = flatten_path(rule_path);
                 if let Some(template) = self.templates.get(&flattened_name).cloned() {
-                    let new_name = self.instantiate(&template, args);
+                    let new_name = self.instantiate(&template, args, generics);
                     *rule_path = Path::from(new_name);
                     args.clear();
+                    generics.clear();
                 }
             }
             ModelPattern::Group(alts, _) => {
@@ -118,8 +122,8 @@ impl Monomorphizer {
         }
     }
 
-    fn instantiate(&mut self, template: &Rule, args: &[Argument]) -> Ident {
-        // Extract ModelPatterns from Arguments (ignoring names for instantiation key)
+    fn instantiate(&mut self, template: &Rule, args: &[Argument], generics: &[Type]) -> Ident {
+        // Extract ModelPatterns from Arguments
         let model_patterns: Vec<&ModelPattern> = args
             .iter()
             .map(|a| match a {
@@ -128,19 +132,28 @@ impl Monomorphizer {
             })
             .collect();
 
+        // Include generics in the key/hash for instantiation
         let args_repr = model_patterns
             .iter()
             .map(|a| format!("{:?}", a))
             .collect::<Vec<_>>()
             .join(",");
-        let key = (template.name.clone(), args_repr.clone());
+
+        let generics_repr = generics
+            .iter()
+            .map(|t| quote::quote!(#t).to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let unique_key = format!("{}<{}>({})", template.name, generics_repr, args_repr);
+        let key = (template.name.clone(), unique_key.clone());
 
         if let Some(name) = self.instantiations.get(&key) {
             return name.clone();
         }
 
         let mut hasher = DefaultHasher::new();
-        args_repr.hash(&mut hasher);
+        unique_key.hash(&mut hasher);
         let hash = hasher.finish();
         let new_name = format_ident!("{}_{:x}", template.name, hash);
 
@@ -181,11 +194,18 @@ impl Monomorphizer {
             .map(|tp| tp.ident.clone())
             .collect();
 
-        if generic_params.len() <= args.len() {
+        // Map provided generics to template generic params
+        if generic_params.len() <= generics.len() {
             for (i, gp) in generic_params.iter().enumerate() {
-                let arg = model_patterns[i];
-                if let Some(ty) = self.infer_type(arg) {
-                    type_map.insert(gp.clone(), ty);
+                type_map.insert(gp.clone(), generics[i].clone());
+            }
+        } else {
+            // Try to infer from args if explicit generics are missing
+            if generic_params.len() <= model_patterns.len() {
+                for (i, gp) in generic_params.iter().enumerate() {
+                    if let Some(ty) = self.infer_type(model_patterns[i]) {
+                        type_map.insert(gp.clone(), ty);
+                    }
                 }
             }
         }
@@ -198,6 +218,13 @@ impl Monomorphizer {
 
         if let Some(where_clause) = &mut new_rule.generics.where_clause {
             type_substituter.visit_where_clause_mut(where_clause);
+        }
+
+        // Substitute types in patterns (generics in rule calls)
+        for variant in &mut new_rule.variants {
+            for pattern in &mut variant.pattern {
+                substitute_types_in_pattern(pattern, &mut type_substituter);
+            }
         }
 
         for variant in &mut new_rule.variants {
@@ -227,13 +254,61 @@ impl Monomorphizer {
 }
 
 fn flatten_path(path: &Path) -> Ident {
-    let s = path
-        .segments
+    let segments: Vec<_> = path.segments.iter().collect();
+
+    let s = segments
         .iter()
         .map(|s| s.ident.to_string())
         .collect::<Vec<_>>()
         .join("__");
     Ident::new(&s, path.span())
+}
+
+fn substitute_types_in_pattern(pattern: &mut ModelPattern, substituter: &mut TypeSubstituter) {
+    match pattern {
+        ModelPattern::RuleCall { generics, args, .. } => {
+            for ty in generics {
+                substituter.visit_type_mut(ty);
+            }
+            for arg in args {
+                match arg {
+                    Argument::Positional(p) | Argument::Named(_, p) => {
+                        substitute_types_in_pattern(p, substituter);
+                    }
+                }
+            }
+        }
+        ModelPattern::Group(alts, _) => {
+            for (seq, _, _) in alts {
+                for p in seq {
+                    substitute_types_in_pattern(p, substituter);
+                }
+            }
+        }
+        ModelPattern::Bracketed(p, _)
+        | ModelPattern::Braced(p, _)
+        | ModelPattern::Parenthesized(p, _) => {
+            for sub in p {
+                substitute_types_in_pattern(sub, substituter);
+            }
+        }
+        ModelPattern::Optional(p, _)
+        | ModelPattern::Repeat(p, _)
+        | ModelPattern::Plus(p, _)
+        | ModelPattern::SpanBinding(p, _, _)
+        | ModelPattern::Peek(p, _)
+        | ModelPattern::Not(p, _) => {
+            substitute_types_in_pattern(p, substituter);
+        }
+        ModelPattern::Recover { body, sync, .. } => {
+            substitute_types_in_pattern(body, substituter);
+            substitute_types_in_pattern(sync, substituter);
+        }
+        ModelPattern::Until { pattern, .. } => {
+            substitute_types_in_pattern(pattern, substituter);
+        }
+        _ => {}
+    }
 }
 
 struct ParamSubstituter<'a> {
@@ -331,8 +406,9 @@ struct TypeSubstituter<'a> {
 impl<'a> VisitMut for TypeSubstituter<'a> {
     fn visit_type_mut(&mut self, i: &mut Type) {
         if let Type::Path(tp) = i {
-            if tp.qself.is_none() && tp.path.segments.len() == 1 {
-                let ident = &tp.path.segments[0].ident;
+            let segments: Vec<_> = tp.path.segments.iter().collect();
+            if tp.qself.is_none() && segments.len() == 1 {
+                let ident = &segments[0].ident;
                 if let Some(replacement) = self.type_map.get(ident) {
                     *i = replacement.clone();
                     return;

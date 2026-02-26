@@ -68,9 +68,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     // Add where clause from generics
     let where_clause = &generics.where_clause;
 
-    let body = if recursive_refs.is_empty() {
-        generate_variants_internal(&rule.variants, true, ctx)?
-    } else {
+    let body = if !recursive_refs.is_empty() {
         if base_refs.is_empty() {
             return Err(syn::Error::new(
                 name.span(),
@@ -97,6 +95,8 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
             }
             Ok(lhs)
         }
+    } else {
+        generate_variants_internal(&rule.variants, true, ctx)?
     };
 
     Ok(quote! {
@@ -421,7 +421,9 @@ pub fn generate_variants_internal(
             };
 
             Ok(quote! {
-                #logic
+                {
+                    #logic
+                }
                 #failure_rec
             })
         })

@@ -376,6 +376,7 @@ impl RuleVariant {
                 && !input.peek(Token![->])
                 && !input.peek(Token![|])
                 && !input.peek(Token![#])
+                && !input.peek(kw::rule)
             {
                 pattern.push(input.parse()?);
             }
@@ -809,7 +810,7 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
     } else {
         let rule_path = parse_path_no_args(input)?;
 
-        let (generics, has_generics) = if input.peek(Token![<]) {
+        let generics = if input.peek(Token![<]) {
             let _ = input.parse::<Token![<]>()?;
             let mut types = Vec::new();
             if !input.peek(Token![>]) {
@@ -826,13 +827,46 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
                 }
             }
             let _gt_token = input.parse::<Token![>]>()?;
-            (types, true)
+            types
         } else {
-            (Vec::new(), false)
+            Vec::new()
         };
 
-        let args = if has_generics {
-            parse_args(input)?
+        let args = if !generics.is_empty() {
+            if input.peek(token::Paren) {
+                parse_args(input)?
+            } else {
+                Vec::new()
+            }
+        } else if input.peek(token::Paren) {
+            // Simplified Disambiguation logic:
+            // 1. `name = value` -> Always allowed (Arguments).
+            // 2. Built-in rules -> Always allowed (Arguments).
+            // 3. Positional args for user rules -> DISALLOWED (defaults to empty args -> Group).
+
+            let fork = input.fork();
+            let content;
+            syn::parenthesized!(content in fork);
+            let has_named_arg = content.peek(Ident) && content.peek2(Token![=]);
+
+            let is_simple_ident =
+                rule_path.segments.len() == 1 && rule_path.leading_colon.is_none();
+            let ident_str = if is_simple_ident {
+                rule_path.segments[0].ident.to_string()
+            } else {
+                String::new()
+            };
+            let is_builtin =
+                is_simple_ident && (ident_str == "separated" || ident_str == "repeated");
+
+            // Note: `is_scoped` (e.g. `foo::bar(...)`) is NO LONGER a heuristic for args.
+            // Explicitly: only built-ins or named args or templates allowed.
+
+            if has_named_arg || is_builtin {
+                parse_args(input)?
+            } else {
+                Vec::new()
+            }
         } else {
             Vec::new()
         };
