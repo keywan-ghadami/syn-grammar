@@ -12,16 +12,15 @@ All notable changes to this project will be documented in this file.
     - `separated(rule, sep, min=0, trailing=false)`: Parses a list of items separated by a delimiter.
     - `repeated(rule, min=0)`: Parses a list of items without a separator.
     - Supports custom container types via generics (e.g., `separated<HashSet>(...)`), defaulting to `Vec`.
-- **Named Arguments**: Added support for named arguments in rule calls (e.g., `rule(arg, key=value)`), used by the new list rules.
+- **Named Arguments**: Added support for named arguments in rule calls (e.g., `rule(key=value)`), used by the new list rules.
 - **Generic Arguments in Rules**: Added support for generic type arguments in rule calls (e.g., `rule<T>(...)`), enabling the container specification for list rules.
 - **Until**: Added support for the `until` pattern (e.g., `body:until(";")`), which consumes tokens until a terminator pattern is found. The terminator is not consumed. This is useful for parsing unstructured content or content with a known delimiter.
 
 ### Fixed
 - **Built-in Rule Arguments**: Fixed an issue where the validator incorrectly forbade arguments for built-in rules. This allows backend-specific built-ins (or future portable built-ins) to accept arguments as needed.
-- **Gap Detection (ADR 005)**: Resolved parsing ambiguity between rule calls with arguments and rule calls followed by a group. The parser is now whitespace-sensitive in this context: `Rule(Arg)` parses as a call with arguments, while `Rule (Group)` (with space) parses as a call followed by a grouped pattern.
 
 ### Breaking Changes
-- **Removed `<_>` Disambiguation**: Removed the `<_>` hack for rule arguments and generic calls. Instead, rule calls with arguments now require a path prefix like `self::rule(arg)` to disambiguate them from EBNF groupings. Built-ins like `fail`, `peek`, `not` as well as `separated` and `repeated` are unaffected and can be used without a prefix.
+- **Removed `<_>` Disambiguation**: Removed the `<_>` hack for rule arguments and generic calls. Instead, rule calls with arguments now require named arguments (e.g., `rule(name=arg)`) or template parameters to disambiguate them from EBNF groupings. Built-ins like `fail`, `peek`, `not` as well as `separated` and `repeated` are unaffected and can be used without named arguments.
 
 ## [0.8.0]
 

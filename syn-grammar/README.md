@@ -526,6 +526,24 @@ grammar! {
 }
 ```
 
+#### Count (`count`)
+The `count(pattern)` built-in allows you to count the number of times a pattern (typically a repetition) matches. It returns a `usize`. Bindings inside the `count` pattern are ignored.
+
+```rust
+use syn_grammar::grammar;
+grammar! {
+    grammar Count {
+        // Counts how many times "a" appeared.
+        pub rule a_count -> usize =
+            c:count("a"*) -> { c }
+
+        // Works with more complex patterns too.
+        pub rule complex_count -> usize =
+            c:count(("d" "e")+) -> { c }
+    }
+}
+```
+
 #### End of Input (`eof`)
 Ensure that the parser has reached the end of the input stream.
 
