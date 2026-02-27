@@ -20,7 +20,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 - **Automatic Left Recursion**: Write natural expression grammars (e.g., `expr = expr + term`) without worrying about infinite recursion.
 - **Cut Operator**: Control backtracking explicitly for better error messages and performance.
 - **Lookahead**: Use `peek(...)` and `not(...)` for positive and negative lookahead assertions.
-- **Rule Arguments**: Pass context between rules using a clear, generic-style `self::rule(...)` syntax.
+- **Rule Arguments**: Pass context between rules using named arguments or template parameters.
 - **Generic Rules**: Create reusable higher-order rules (like `list<T>(item)`) that are monomorphized at compile time.
 - **100% Static Validation**: All checks, including for left-recursion and shadowing, are performed at compile time within each grammar block.
 - **Perfect Spans**: Error messages point to the exact line and file where a syntax error occurred.
@@ -288,7 +288,7 @@ grammar! {
 ```
 
 #### Built-in Parsers
-`syn-grammar` provides a rich set of built-in parsers. They are divided into two categories:
+`syn-grammar` provides a rich set of built-ins. They are divided into two categories:
 
 **1. Portable Built-ins**
 
