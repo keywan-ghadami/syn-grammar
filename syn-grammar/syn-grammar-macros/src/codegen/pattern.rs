@@ -959,6 +959,153 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             }
         }
 
+        ModelPattern::Count {
+            binding,
+            pattern: inner,
+            ..
+        } => {
+            // Note: bindings inside count are ignored as they are local to the loop/execution
+            // and we return usize.
+            // However, we must ensure we don't try to bind them in the outer scope.
+            // Since we updated collect_bindings to return empty for Count, the outer scope won't expect them.
+            // But generate_pattern_step(inner) WILL generate `let x = ...`.
+            // So we must wrap inner_logic in a block where those bindings are allowed to drop.
+
+            let count_logic = if let ModelPattern::Repeat(rep_inner, _) = &**inner {
+                let inner_logic = generate_pattern_step(rep_inner, ctx)?;
+                let peek_opt = analysis::get_simple_peek(rep_inner, ctx.custom_keywords)
+                    .ok()
+                    .flatten();
+
+                let loop_body = if let Some(peek) = peek_opt {
+                    quote! {
+                        while input.peek(#peek) {
+                            {
+                                #inner_logic
+                            }
+                            _count += 1;
+                        }
+                    }
+                } else {
+                    let inner_bindings =
+                        analysis::collect_bindings(std::slice::from_ref(rep_inner));
+                    let return_tuple = if inner_bindings.is_empty() {
+                        quote!(())
+                    } else {
+                        quote!(( #(#inner_bindings),* ))
+                    };
+
+                    quote! {
+                       while let Some(_) = rt::attempt(input, ctx, |mut input, ctx| {
+                           #inner_logic
+                           Ok(#return_tuple)
+                       })? {
+                           _count += 1;
+                       }
+                    }
+                };
+
+                quote! {
+                    let mut _count: usize = 0;
+                    #loop_body
+                    _count
+                }
+            } else if let ModelPattern::Plus(plus_inner, _) = &**inner {
+                let inner_logic = generate_pattern_step(plus_inner, ctx)?;
+                let peek_opt = analysis::get_simple_peek(plus_inner, ctx.custom_keywords)
+                    .ok()
+                    .flatten();
+
+                let loop_body = if let Some(peek) = peek_opt {
+                    quote! {
+                        {
+                            #inner_logic
+                        }
+                        _count += 1;
+                        while input.peek(#peek) {
+                            {
+                                #inner_logic
+                            }
+                            _count += 1;
+                        }
+                    }
+                } else {
+                    let inner_bindings =
+                        analysis::collect_bindings(std::slice::from_ref(plus_inner));
+                    let return_tuple = if inner_bindings.is_empty() {
+                        quote!(())
+                    } else {
+                        quote!(( #(#inner_bindings),* ))
+                    };
+
+                    quote! {
+                       {
+                           #inner_logic
+                       }
+                       _count += 1;
+                       while let Some(_) = rt::attempt(input, ctx, |mut input, ctx| {
+                           #inner_logic
+                           Ok(#return_tuple)
+                       })? {
+                           _count += 1;
+                       }
+                    }
+                };
+
+                quote! {
+                    let mut _count: usize = 0;
+                    #loop_body
+                    _count
+                }
+            } else if let ModelPattern::Optional(opt_inner, _) = &**inner {
+                // For optional, we check if it matches.
+                let inner_logic = generate_pattern_step(opt_inner, ctx)?;
+                let peek_opt = analysis::get_simple_peek(opt_inner, ctx.custom_keywords)
+                    .ok()
+                    .flatten();
+                let is_nullable = analysis::is_nullable(opt_inner);
+
+                // If we have peek and it's not nullable, we can use peek.
+                if let (Some(peek), false) = (peek_opt, is_nullable) {
+                    quote! {
+                        if input.peek(#peek) {
+                            {
+                                // Pass ctx to attempt just to be safe and consume tokens
+                                let _ = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?;
+                            }
+                            1usize
+                        } else {
+                            0usize
+                        }
+                    }
+                } else {
+                    // Generic attempt
+                    quote! {
+                        if let Some(_) = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })? {
+                            1usize
+                        } else {
+                            0usize
+                        }
+                    }
+                }
+            } else {
+                // Fallback: run the pattern. If success, return 1.
+                let inner_logic = generate_pattern_step(inner, ctx)?;
+                quote! {
+                    {
+                        #inner_logic
+                        1usize
+                    }
+                }
+            };
+
+            if let Some(bind) = binding {
+                Ok(quote! { let #bind = { #count_logic }; })
+            } else {
+                Ok(quote! { let _ = { #count_logic }; })
+            }
+        }
+
         ModelPattern::Fail { message, .. } => {
             let arg_expr = if let Some(Lit::Str(s)) = message {
                 s.value()

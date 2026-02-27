@@ -157,6 +157,9 @@ fn validate_pattern(
         | ModelPattern::Peek(inner, _) => {
             validate_pattern(inner, all_defs, params)?;
         }
+        ModelPattern::Count { pattern: inner, .. } => {
+            validate_pattern(inner, all_defs, params)?;
+        }
         ModelPattern::Not(inner, _) => {
             validate_pattern(inner, all_defs, params)?;
         }
@@ -252,6 +255,9 @@ fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
             validate_no_bindings(body)?;
             validate_no_bindings(sync)?;
         }
+        ModelPattern::Count { .. } => {
+            // Count hides bindings, so it's safe in until
+        }
         ModelPattern::Cut(_) => {}
         ModelPattern::Fail { .. } => {}
     }
@@ -331,6 +337,9 @@ fn validate_args_recursive(
             | ModelPattern::Optional(inner, _)
             | ModelPattern::SpanBinding(inner, _, _)
             | ModelPattern::Peek(inner, _) => {
+                validate_args_recursive(std::slice::from_ref(inner), rule_map)?;
+            }
+            ModelPattern::Count { pattern: inner, .. } => {
                 validate_args_recursive(std::slice::from_ref(inner), rule_map)?;
             }
             ModelPattern::Not(inner, _) => {

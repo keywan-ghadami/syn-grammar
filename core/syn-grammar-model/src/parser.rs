@@ -39,6 +39,7 @@ pub mod kw {
     syn::custom_keyword!(until);
     syn::custom_keyword!(import);
     syn::custom_keyword!(fail);
+    syn::custom_keyword!(count);
 }
 
 fn parse_path_no_args(input: ParseStream) -> Result<Path> {
@@ -497,6 +498,11 @@ pub enum Pattern {
         pattern: Box<Pattern>,
         kw_token: kw::until,
     },
+    Count {
+        binding: Option<Ident>,
+        pattern: Box<Pattern>,
+        kw_token: kw::count,
+    },
     Fail {
         message: Option<Lit>,
         kw_token: kw::fail,
@@ -674,6 +680,18 @@ impl ToTokens for Pattern {
                     pattern.to_tokens(t);
                 });
             }
+            Pattern::Count {
+                binding, pattern, ..
+            } => {
+                if let Some(b) = binding {
+                    b.to_tokens(tokens);
+                    token::Colon::default().to_tokens(tokens);
+                }
+                kw::count::default().to_tokens(tokens);
+                token::Paren::default().surround(tokens, |t| {
+                    pattern.to_tokens(t);
+                });
+            }
             Pattern::Fail { message, kw_token } => {
                 kw_token.to_tokens(tokens);
                 if let Some(m) = message {
@@ -788,6 +806,16 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         Ok(Pattern::Until {
             binding,
             pattern: Box::new(pattern),
+            kw_token,
+        })
+    } else if input.peek(kw::count) {
+        let kw_token = input.parse::<kw::count>()?;
+        let content;
+        syn::parenthesized!(content in input);
+        let inner = content.parse()?;
+        Ok(Pattern::Count {
+            binding,
+            pattern: Box::new(inner),
             kw_token,
         })
     } else if input.peek(kw::fail) {

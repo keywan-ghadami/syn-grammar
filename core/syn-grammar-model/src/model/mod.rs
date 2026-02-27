@@ -90,6 +90,11 @@ pub enum ModelPattern {
         pattern: Box<ModelPattern>,
         span: proc_macro2::Span,
     },
+    Count {
+        binding: Option<Ident>,
+        pattern: Box<ModelPattern>,
+        span: proc_macro2::Span,
+    },
     Fail {
         message: Option<syn::Lit>,
         span: proc_macro2::Span,
@@ -117,6 +122,7 @@ impl ModelPattern {
             ModelPattern::Peek(_, s) => *s,
             ModelPattern::Not(_, s) => *s,
             ModelPattern::Until { span, .. } => *span,
+            ModelPattern::Count { span, .. } => *span,
             ModelPattern::Fail { span, .. } => *span,
         }
     }
@@ -280,6 +286,15 @@ impl From<parser::Pattern> for ModelPattern {
                 binding,
                 pattern: Box::new((*pattern).into()),
                 span: kw_token.span(), // Custom Keyword has .span()
+            },
+            parser::Pattern::Count {
+                binding,
+                pattern,
+                kw_token,
+            } => ModelPattern::Count {
+                binding,
+                pattern: Box::new((*pattern).into()),
+                span: kw_token.span(),
             },
             parser::Pattern::Fail { message, kw_token } => ModelPattern::Fail {
                 message,

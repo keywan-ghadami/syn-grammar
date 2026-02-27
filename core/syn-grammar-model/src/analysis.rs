@@ -105,6 +105,9 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
             ModelPattern::Until { pattern, .. } => {
                 collect_from_patterns(std::slice::from_ref(pattern), kws);
             }
+            ModelPattern::Count { pattern, .. } => {
+                collect_from_patterns(std::slice::from_ref(pattern), kws);
+            }
             _ => {}
         }
     }
@@ -159,6 +162,11 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
                     bindings.push(b.clone());
                 }
                 bindings.extend(collect_bindings(std::slice::from_ref(pattern)));
+            }
+            ModelPattern::Count {
+                binding: Some(b), ..
+            } => {
+                bindings.push(b.clone());
             }
             _ => {}
         }
@@ -316,6 +324,7 @@ pub fn get_simple_peek(
         ModelPattern::Peek(inner, _) => get_simple_peek(inner, kws),
         ModelPattern::Not(_, _) => Ok(None),
         ModelPattern::Until { .. } => Ok(None),
+        ModelPattern::Count { pattern, .. } => get_simple_peek(pattern, kws),
         _ => Ok(None),
     }
 }
@@ -351,6 +360,9 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         Some(ModelPattern::Peek(inner, _)) => get_peek_token_string(std::slice::from_ref(&**inner)),
         Some(ModelPattern::Not(_, _)) => None,
         Some(ModelPattern::Until { .. }) => None,
+        Some(ModelPattern::Count { pattern, .. }) => {
+            get_peek_token_string(std::slice::from_ref(&**pattern))
+        }
         _ => None,
     }
 }
@@ -373,6 +385,7 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Not(_, _) => true,
         ModelPattern::Until { .. } => true,
         ModelPattern::Fail { .. } => false,
+        ModelPattern::Count { pattern, .. } => is_nullable(pattern),
     }
 }
 
@@ -468,9 +481,10 @@ fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<
             is_pattern_nullable_precise(inner, nullable_rules)
         }
         ModelPattern::Bracketed(_, _)
-        | ModelPattern::Braced(_, _)
-        | ModelPattern::Parenthesized(_, _) => false,
+        | ModelPattern::Braced(..)
+        | ModelPattern::Parenthesized(..) => false,
         ModelPattern::Fail { .. } => false,
+        ModelPattern::Count { pattern, .. } => is_pattern_nullable_precise(pattern, nullable_rules),
     }
 }
 
@@ -585,6 +599,12 @@ fn collect_nullable_deps(
             ModelPattern::Until { pattern, .. } => {
                 collect_nullable_deps(std::slice::from_ref(pattern), nullable_rules, deps);
             }
+            ModelPattern::Count { pattern, .. } => {
+                collect_nullable_deps(std::slice::from_ref(pattern), nullable_rules, deps);
+                if !is_pattern_nullable_precise(pattern, nullable_rules) {
+                    return;
+                }
+            }
             ModelPattern::Lit { .. }
             | ModelPattern::Bracketed(..)
             | ModelPattern::Braced(..)
@@ -669,7 +689,8 @@ fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F)
             | ModelPattern::SpanBinding(inner, _, _)
             | ModelPattern::Peek(inner, _)
             | ModelPattern::Not(inner, _)
-            | ModelPattern::Until { pattern: inner, .. } => {
+            | ModelPattern::Until { pattern: inner, .. }
+            | ModelPattern::Count { pattern: inner, .. } => {
                 collect_called_rules(std::slice::from_ref(inner), cb);
             }
             ModelPattern::Recover { body, sync, .. } => {
@@ -872,6 +893,17 @@ fn collect_first_from_sequence(
                     acc,
                 );
             }
+            ModelPattern::Count { pattern, .. } => {
+                collect_first_from_sequence(
+                    std::slice::from_ref(pattern),
+                    first_sets,
+                    nullable_rules,
+                    acc,
+                );
+                if !is_pattern_nullable_precise(pattern, nullable_rules) {
+                    return;
+                }
+            }
             ModelPattern::Fail { .. } => {
                 // Fail does not contribute tokens to FIRST set and stops execution.
                 return;
@@ -965,6 +997,9 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
         | (ModelPattern::Peek(inner1, _), ModelPattern::Peek(inner2, _))
         | (ModelPattern::Not(inner1, _), ModelPattern::Not(inner2, _)) => {
             pattern_structure_eq(inner1, inner2)
+        }
+        (ModelPattern::Count { pattern: p1, .. }, ModelPattern::Count { pattern: p2, .. }) => {
+            pattern_structure_eq(p1, p2)
         }
         (
             ModelPattern::Recover {
