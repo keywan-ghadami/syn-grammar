@@ -288,6 +288,47 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
     }
 }
 
+// Special assertions for float types
+impl<E: Display + Debug> TestResult<f64, E> {
+    pub fn assert_success_approx(self, expected: f64) -> f64 {
+        let ctx = self.format_context();
+        let val = self.assert_success();
+
+        println!(
+            "ℹ️  Checking approximate equality.\n   Expected: {:?}\n   Actual:   {:?}",
+            expected, val
+        );
+
+        if (val - expected).abs() > f64::EPSILON {
+            panic!(
+                "\n🔴 TEST FAILED (Approximate Value Mismatch):{}\nExpected: {:?}\nGot:      {:?}\nDiff:     {:?}\n",
+                ctx, expected, val, (val - expected).abs()
+            );
+        }
+        val
+    }
+}
+
+impl<E: Display + Debug> TestResult<f32, E> {
+    pub fn assert_success_approx(self, expected: f32) -> f32 {
+        let ctx = self.format_context();
+        let val = self.assert_success();
+
+        println!(
+            "ℹ️  Checking approximate equality.\n   Expected: {:?}\n   Actual:   {:?}",
+            expected, val
+        );
+
+        if (val - expected).abs() > f32::EPSILON {
+            panic!(
+                "\n🔴 TEST FAILED (Approximate Value Mismatch):{}\nExpected: {:?}\nGot:      {:?}\nDiff:     {:?}\n",
+                ctx, expected, val, (val - expected).abs()
+            );
+        }
+        val
+    }
+}
+
 pub trait Testable<T, E> {
     fn test(self) -> TestResult<T, E>;
 }

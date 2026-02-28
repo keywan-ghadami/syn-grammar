@@ -71,7 +71,8 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
         let mut unused: Vec<_> = analysis.unused_rules.iter().collect();
         unused.sort();
         for rule_name in unused {
-            if !rule_name.starts_with('_') {
+            // Ignore internal names like _* and special rule "ws" (implicit whitespace)
+            if !rule_name.starts_with('_') && rule_name != "ws" {
                 eprintln!("warning: Unused rule: '{}'", rule_name);
             }
         }
