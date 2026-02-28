@@ -660,7 +660,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 })
             }
         }
-        ModelPattern::Group(alts, _) => {
+        ModelPattern::Group { binding, alts, .. } => {
             use super::rule::generate_variants_internal;
 
             let temp_variants = alts
@@ -675,15 +675,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         quote!(( #(#bindings),* ))
                     };
                     RuleVariant {
-                        pattern: pat_seq.clone(),
-                        label: label.clone(), // Pass label
+                        pattern: pat_seq.clone(), // Use clone() as it's Vec<ModelPattern>
+                        label: label.clone(),
                         action: quote!({ #action_expr }),
                     }
                 })
                 .collect::<Vec<_>>();
 
             let variant_logic = generate_variants_internal(&temp_variants, false, ctx)?;
-            let group_bindings = analysis::collect_bindings(std::slice::from_ref(pattern));
 
             let wrapped_logic = quote! {
                 (|| -> syn::Result<_> {
@@ -691,13 +690,20 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 })()
             };
 
-            if group_bindings.is_empty() {
-                Ok(quote! { { #wrapped_logic }?; })
-            } else {
-                let tuple_pat = quote!(( #(#group_bindings),* ));
+            if let Some(bind) = binding {
                 Ok(quote! {
-                    let #tuple_pat = { #wrapped_logic }?;
+                    let #bind = { #wrapped_logic }?;
                 })
+            } else {
+                let group_bindings = analysis::collect_bindings(std::slice::from_ref(pattern));
+                if group_bindings.is_empty() {
+                    Ok(quote! { { #wrapped_logic }?; })
+                } else {
+                    let tuple_pat = quote!(( #(#group_bindings),* ));
+                    Ok(quote! {
+                        let #tuple_pat = { #wrapped_logic }?;
+                    })
+                }
             }
         }
 

@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - **Named Arguments**: Added support for named arguments in rule calls (e.g., `rule(key=value)`), used by the new list rules.
 - **Generic Arguments in Rules**: Added support for generic type arguments in rule calls (e.g., `rule<T>(...)`), enabling the container specification for list rules.
 - **Until**: Added support for the `until` pattern (e.g., `body:until(";")`), which consumes tokens until a terminator pattern is found. The terminator is not consumed. This is useful for parsing unstructured content or content with a known delimiter.
+- **Group Bindings**: Added support for binding a group of patterns to a variable (e.g. `var:("a" | "b")`). This captures the result of the group (which matches the inner pattern).
 
 ### Fixed
 - **Built-in Rule Arguments**: Fixed an issue where the validator incorrectly forbade arguments for built-in rules. This allows backend-specific built-ins (or future portable built-ins) to accept arguments as needed.

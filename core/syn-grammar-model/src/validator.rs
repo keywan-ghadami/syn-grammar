@@ -163,8 +163,8 @@ fn validate_pattern(
         ModelPattern::Not(inner, _) => {
             validate_pattern(inner, all_defs, params)?;
         }
-        ModelPattern::Group(variants, _) => {
-            for (seq, _, _) in variants {
+        ModelPattern::Group { alts, .. } => {
+            for (seq, _, _) in alts {
                 validate_pattern_sequence(seq, all_defs, params)?;
             }
         }
@@ -212,8 +212,8 @@ fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
                 }
             }
         }
-        ModelPattern::Group(variants, _) => {
-            for (seq, _, _) in variants {
+        ModelPattern::Group { alts, .. } => {
+            for (seq, _, _) in alts {
                 for p in seq {
                     validate_no_bindings(p)?;
                 }
@@ -345,8 +345,8 @@ fn validate_args_recursive(
             ModelPattern::Not(inner, _) => {
                 validate_args_recursive(std::slice::from_ref(inner), rule_map)?;
             }
-            ModelPattern::Group(variants, _) => {
-                for (seq, _, _) in variants {
+            ModelPattern::Group { alts, .. } => {
+                for (seq, _, _) in alts {
                     validate_args_recursive(seq, rule_map)?;
                 }
             }

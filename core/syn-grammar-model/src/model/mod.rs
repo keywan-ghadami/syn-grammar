@@ -66,10 +66,11 @@ pub enum ModelPattern {
         generics: Vec<syn::Type>,
         args: Vec<Argument>,
     },
-    Group(
-        Vec<(Vec<ModelPattern>, Option<TokenStream>, Option<String>)>,
-        proc_macro2::Span,
-    ),
+    Group {
+        binding: Option<Ident>,
+        alts: Vec<(Vec<ModelPattern>, Option<TokenStream>, Option<String>)>,
+        span: proc_macro2::Span,
+    },
     Bracketed(Vec<ModelPattern>, proc_macro2::Span),
     Braced(Vec<ModelPattern>, proc_macro2::Span),
     Parenthesized(Vec<ModelPattern>, proc_macro2::Span),
@@ -110,7 +111,7 @@ impl ModelPattern {
                 use syn::spanned::Spanned;
                 rule_path.span()
             }
-            ModelPattern::Group(_, s) => *s,
+            ModelPattern::Group { span, .. } => *span,
             ModelPattern::Bracketed(_, s) => *s,
             ModelPattern::Braced(_, s) => *s,
             ModelPattern::Parenthesized(_, s) => *s,
@@ -224,29 +225,53 @@ impl From<parser::Pattern> for ModelPattern {
                 generics,
                 args: args.into_iter().map(Into::into).collect(),
             },
-            parser::Pattern::Group(alts, token) => ModelPattern::Group(
-                alts.into_iter()
+            parser::Pattern::Group {
+                binding,
+                alts,
+                token,
+            } => ModelPattern::Group {
+                binding,
+                alts: alts
+                    .into_iter()
                     .map(|(seq, action, label)| {
                         (seq.into_iter().map(Into::into).collect(), action, label)
                     })
                     .collect(),
-                token.span.join(), // Paren has .span: DelimSpan which has .join() -> Span
-            ),
-            parser::Pattern::Bracketed(seq, token) => {
+                span: token.span.join(), // Paren has .span: DelimSpan which has .join() -> Span
+            },
+            parser::Pattern::Bracketed {
+                binding: _,
+                patterns,
+                token,
+            } => {
+                // Ignoring binding for Bracketed as not supported in ModelPattern yet
                 ModelPattern::Bracketed(
-                    seq.into_iter().map(Into::into).collect(),
+                    patterns.into_iter().map(Into::into).collect(),
                     token.span.join(),
-                ) // Bracket has .span: DelimSpan
+                )
             }
-            parser::Pattern::Braced(seq, token) => {
-                ModelPattern::Braced(seq.into_iter().map(Into::into).collect(), token.span.join())
-                // Brace has .span: DelimSpan
+            parser::Pattern::Braced {
+                binding: _,
+                patterns,
+                token,
+            } => {
+                // Ignoring binding for Braced as not supported in ModelPattern yet
+                ModelPattern::Braced(
+                    patterns.into_iter().map(Into::into).collect(),
+                    token.span.join(),
+                )
             }
-            parser::Pattern::Parenthesized(seq, _, token) => {
+            parser::Pattern::Parenthesized {
+                binding: _,
+                patterns,
+                kw_token: _,
+                token,
+            } => {
+                // Ignoring binding for Parenthesized as not supported in ModelPattern yet
                 ModelPattern::Parenthesized(
-                    seq.into_iter().map(Into::into).collect(),
+                    patterns.into_iter().map(Into::into).collect(),
                     token.span.join(),
-                ) // Paren has .span: DelimSpan
+                )
             }
             parser::Pattern::Optional(p, token) => {
                 ModelPattern::Optional(Box::new((*p).into()), token.span)

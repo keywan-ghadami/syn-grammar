@@ -477,10 +477,27 @@ pub enum Pattern {
         generics: Vec<Type>,
         args: Vec<Argument>,
     },
-    Group(Vec<GroupAlternative>, token::Paren),
-    Bracketed(Vec<Pattern>, token::Bracket),
-    Braced(Vec<Pattern>, token::Brace),
-    Parenthesized(Vec<Pattern>, kw::paren, token::Paren),
+    Group {
+        binding: Option<Ident>,
+        alts: Vec<GroupAlternative>,
+        token: token::Paren,
+    },
+    Bracketed {
+        binding: Option<Ident>,
+        patterns: Vec<Pattern>,
+        token: token::Bracket,
+    },
+    Braced {
+        binding: Option<Ident>,
+        patterns: Vec<Pattern>,
+        token: token::Brace,
+    },
+    Parenthesized {
+        binding: Option<Ident>,
+        patterns: Vec<Pattern>,
+        kw_token: kw::paren,
+        token: token::Paren,
+    },
     Optional(Box<Pattern>, Token![?]),
     Repeat(Box<Pattern>, Token![*]),
     Plus(Box<Pattern>, Token![+]),
@@ -580,7 +597,11 @@ impl ToTokens for Pattern {
                     });
                 }
             }
-            Pattern::Group(alts, _) => {
+            Pattern::Group { binding, alts, .. } => {
+                if let Some(b) = binding {
+                    b.to_tokens(tokens);
+                    token::Colon::default().to_tokens(tokens);
+                }
                 token::Paren::default().surround(tokens, |t| {
                     for (i, (seq, action, label)) in alts.iter().enumerate() {
                         if i > 0 {
@@ -600,24 +621,42 @@ impl ToTokens for Pattern {
                     }
                 });
             }
-            Pattern::Bracketed(seq, _) => {
+            Pattern::Bracketed {
+                binding, patterns, ..
+            } => {
+                if let Some(b) = binding {
+                    b.to_tokens(tokens);
+                    token::Colon::default().to_tokens(tokens);
+                }
                 token::Bracket::default().surround(tokens, |t| {
-                    for p in seq {
+                    for p in patterns {
                         p.to_tokens(t);
                     }
                 });
             }
-            Pattern::Braced(seq, _) => {
+            Pattern::Braced {
+                binding, patterns, ..
+            } => {
+                if let Some(b) = binding {
+                    b.to_tokens(tokens);
+                    token::Colon::default().to_tokens(tokens);
+                }
                 token::Brace::default().surround(tokens, |t| {
-                    for p in seq {
+                    for p in patterns {
                         p.to_tokens(t);
                     }
                 });
             }
-            Pattern::Parenthesized(seq, _, _) => {
+            Pattern::Parenthesized {
+                binding, patterns, ..
+            } => {
+                if let Some(b) = binding {
+                    b.to_tokens(tokens);
+                    token::Colon::default().to_tokens(tokens);
+                }
                 kw::paren::default().to_tokens(tokens);
                 token::Paren::default().surround(tokens, |t| {
-                    for p in seq {
+                    for p in patterns {
                         p.to_tokens(t);
                     }
                 });
@@ -735,38 +774,39 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         };
         Ok(Pattern::Lit { binding, lit })
     } else if input.peek(token::Bracket) {
-        if binding.is_some() {
-            return Err(input.error("Bracketed groups cannot be bound directly."));
-        }
         let content;
         let token = syn::bracketed!(content in input);
-        Ok(Pattern::Bracketed(parse_pattern_list(&content)?, token))
+        Ok(Pattern::Bracketed {
+            binding,
+            patterns: parse_pattern_list(&content)?,
+            token,
+        })
     } else if input.peek(token::Brace) {
-        if binding.is_some() {
-            return Err(input.error("Braced groups cannot be bound directly."));
-        }
         let content;
         let token = syn::braced!(content in input);
-        Ok(Pattern::Braced(parse_pattern_list(&content)?, token))
+        Ok(Pattern::Braced {
+            binding,
+            patterns: parse_pattern_list(&content)?,
+            token,
+        })
     } else if input.peek(kw::paren) {
-        if binding.is_some() {
-            return Err(input.error("Parenthesized groups cannot be bound directly."));
-        }
         let kw = input.parse::<kw::paren>()?;
         let content;
         let token = syn::parenthesized!(content in input);
-        Ok(Pattern::Parenthesized(
-            parse_pattern_list(&content)?,
-            kw,
+        Ok(Pattern::Parenthesized {
+            binding,
+            patterns: parse_pattern_list(&content)?,
+            kw_token: kw,
             token,
-        ))
+        })
     } else if input.peek(token::Paren) {
-        if binding.is_some() {
-            return Err(input.error("Groups cannot be bound directly."));
-        }
         let content;
         let token = syn::parenthesized!(content in input);
-        Ok(Pattern::Group(parse_group_content(&content)?, token))
+        Ok(Pattern::Group {
+            binding,
+            alts: parse_group_content(&content)?,
+            token,
+        })
     } else if input.peek(kw::recover) {
         let kw_token = input.parse::<kw::recover>()?;
         let content;

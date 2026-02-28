@@ -83,7 +83,7 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
                     }
                 }
             }
-            ModelPattern::Group(alts, _) => alts
+            ModelPattern::Group { alts, .. } => alts
                 .iter()
                 .for_each(|(alt, _, _)| collect_from_patterns(alt, kws)),
             ModelPattern::Bracketed(s, _)
@@ -147,9 +147,13 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
             ModelPattern::Peek(inner, _) => {
                 bindings.extend(collect_bindings(std::slice::from_ref(inner)));
             }
-            ModelPattern::Group(alts, _) => {
-                for (alt, _, _) in alts {
-                    bindings.extend(collect_bindings(alt));
+            ModelPattern::Group { binding, alts, .. } => {
+                if let Some(b) = binding {
+                    bindings.push(b.clone());
+                } else {
+                    for (alt, _, _) in alts {
+                        bindings.extend(collect_bindings(alt));
+                    }
                 }
             }
             ModelPattern::Not(_, _) => {
@@ -310,7 +314,7 @@ pub fn get_simple_peek(
         | ModelPattern::Plus(inner, _) => get_simple_peek(inner, kws),
         ModelPattern::SpanBinding(inner, _, _) => get_simple_peek(inner, kws),
         ModelPattern::Recover { body, .. } => get_simple_peek(body, kws),
-        ModelPattern::Group(alts, _) => {
+        ModelPattern::Group { alts, .. } => {
             if alts.len() == 1 {
                 if let Some(first) = alts[0].0.first() {
                     get_simple_peek(first, kws)
@@ -350,7 +354,7 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         Some(ModelPattern::Recover { body, .. }) => {
             get_peek_token_string(std::slice::from_ref(&**body))
         }
-        Some(ModelPattern::Group(alts, _)) => {
+        Some(ModelPattern::Group { alts, .. }) => {
             if alts.len() == 1 {
                 get_peek_token_string(&alts[0].0)
             } else {
@@ -372,7 +376,9 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Cut(_) => true,
         ModelPattern::Lit { .. } => false,
         ModelPattern::RuleCall { .. } => true,
-        ModelPattern::Group(alts, _) => alts.iter().any(|(seq, _, _)| seq.iter().all(is_nullable)),
+        ModelPattern::Group { alts, .. } => {
+            alts.iter().any(|(seq, _, _)| seq.iter().all(is_nullable))
+        }
         ModelPattern::Bracketed(_, _)
         | ModelPattern::Braced(_, _)
         | ModelPattern::Parenthesized(_, _) => false,
@@ -467,7 +473,7 @@ fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<
             // Ideally we should resolve paths, but here we assume local names match.
             nullable_rules.contains(&name)
         }
-        ModelPattern::Group(alts, _) => alts
+        ModelPattern::Group { alts, .. } => alts
             .iter()
             .any(|(seq, _, _)| is_sequence_nullable(seq, nullable_rules)),
         ModelPattern::Optional(_, _)
@@ -562,7 +568,7 @@ fn collect_nullable_deps(
                     return;
                 }
             }
-            ModelPattern::Group(alts, _) => {
+            ModelPattern::Group { alts, .. } => {
                 let mut group_nullable = false;
                 for (alt, _, _) in alts {
                     collect_nullable_deps(alt, nullable_rules, deps);
@@ -678,7 +684,7 @@ fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F)
                     }
                 }
             }
-            ModelPattern::Group(alts, _) => {
+            ModelPattern::Group { alts, .. } => {
                 for (alt, _, _) in alts {
                     collect_called_rules(alt, cb);
                 }
@@ -816,7 +822,7 @@ fn collect_first_from_sequence(
                     return;
                 }
             }
-            ModelPattern::Group(alts, _) => {
+            ModelPattern::Group { alts, .. } => {
                 let mut group_nullable = false;
                 for (alt, _, _) in alts {
                     collect_first_from_sequence(alt, first_sets, nullable_rules, acc);
@@ -978,7 +984,7 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
                 ..
             },
         ) => r1 == r2 && arguments_structure_eq(a1, a2),
-        (ModelPattern::Group(g1, _), ModelPattern::Group(g2, _)) => {
+        (ModelPattern::Group { alts: g1, .. }, ModelPattern::Group { alts: g2, .. }) => {
             if g1.len() != g2.len() {
                 return false;
             }

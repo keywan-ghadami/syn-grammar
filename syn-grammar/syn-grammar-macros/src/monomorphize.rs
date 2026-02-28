@@ -92,7 +92,7 @@ impl Monomorphizer {
                     generics.clear();
                 }
             }
-            ModelPattern::Group(alts, _) => {
+            ModelPattern::Group { alts, .. } => {
                 for (seq, _, _) in alts {
                     for p in seq {
                         self.expand_pattern(p);
@@ -278,7 +278,7 @@ fn substitute_types_in_pattern(pattern: &mut ModelPattern, substituter: &mut Typ
                 }
             }
         }
-        ModelPattern::Group(alts, _) => {
+        ModelPattern::Group { alts, .. } => {
             for (seq, _, _) in alts {
                 for p in seq {
                     substitute_types_in_pattern(p, substituter);
@@ -368,7 +368,7 @@ impl<'a> ParamSubstituter<'a> {
                     }
                 }
             }
-            ModelPattern::Group(alts, _) => {
+            ModelPattern::Group { alts, .. } => {
                 for (seq, _, _) in alts {
                     for p in seq {
                         self.visit_pattern(p);
