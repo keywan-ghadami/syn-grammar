@@ -4,5 +4,7 @@ members = [
     "syn-grammar/syn-grammar-macros",
     "core/syn-grammar-model",
     "core/grammar-kit",
+    "winnow-grammar",
+    "winnow-grammar/winnow-grammar-macros",
 ]
 resolver = "2"
