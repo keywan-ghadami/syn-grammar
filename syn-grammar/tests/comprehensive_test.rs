@@ -1,6 +1,5 @@
-use syn::parse::Parser;
 use syn_grammar::grammar;
-use syn_grammar::testing::Testable;
+use syn_grammar::SynTestExt;
 
 // Top level grammars
 
@@ -90,92 +89,67 @@ grammar! {
 #[test]
 fn test_action_block_statements() {
     action_block_test::parse_main
-        .parse_str("a")
-        .test()
+        .parse_test("a")
         .assert_success_is(3);
 }
 
 #[test]
 fn test_keywords_vs_idents() {
+    kw_test::parse_main.parse_test("fn").assert_success_is(1);
     kw_test::parse_main
-        .parse_str("fn")
-        .test()
-        .assert_success_is(1);
-    kw_test::parse_main
-        .parse_str("struct")
-        .test()
+        .parse_test("struct")
         .assert_success_is(2);
-    kw_test::parse_main
-        .parse_str("a")
-        .test()
-        .assert_success_is(3);
-    kw_test::parse_main
-        .parse_str("fnx")
-        .test()
-        .assert_success_is(3);
+    kw_test::parse_main.parse_test("a").assert_success_is(3);
+    kw_test::parse_main.parse_test("fnx").assert_success_is(3);
 }
 
 #[test]
 fn test_complex_return_types() {
-    let result = types::parse_main.parse_str("123").test();
+    let result = types::parse_main.parse_test("123");
     assert_eq!(*result.assert_success().borrow(), 123);
 }
 
 #[test]
 fn test_use_statements() {
-    let result = use_stmt::parse_main.parse_str("123").test();
+    let result = use_stmt::parse_main.parse_test("123");
     assert_eq!(*result.assert_success(), 123);
 }
 
 #[test]
 fn test_multi_token_literals() {
     multi_token::parse_main
-        .parse_str("?.")
-        .test()
+        .parse_test("?.")
         .assert_success_is(());
 }
 
 #[test]
 fn test_attributes_on_rules() {
-    attributes::parse_main
-        .parse_str("a")
-        .test()
-        .assert_success_is(());
+    attributes::parse_main.parse_test("a").assert_success_is(());
 }
 
 #[test]
 fn test_rust_types_and_blocks() {
     rust_features::parse_type_parser
-        .parse_str("Vec<i32>")
-        .test()
+        .parse_test("Vec<i32>")
         .assert_success();
 
     rust_features::parse_block_parser
-        .parse_str("{ let x = 1; }")
-        .test()
+        .parse_test("{ let x = 1; }")
         .assert_success();
 }
 
 #[test]
 fn test_fail_builtin_first() {
+    fail_test_1::parse_main.parse_test("1").assert_success_is(1);
     fail_test_1::parse_main
-        .parse_str("1")
-        .test()
-        .assert_success_is(1);
-    fail_test_1::parse_main
-        .parse_str("DEBUG 1")
-        .test()
+        .parse_test("DEBUG 1")
         .assert_success_is(1);
 }
 
 #[test]
 fn test_fail_builtin_last() {
+    fail_test_2::parse_main.parse_test("1").assert_success_is(1);
     fail_test_2::parse_main
-        .parse_str("1")
-        .test()
-        .assert_success_is(1);
-    fail_test_2::parse_main
-        .parse_str("1 DEBUG")
-        .test()
+        .parse_test("1 DEBUG")
         .assert_success_is(1);
 }

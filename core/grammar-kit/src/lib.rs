@@ -13,6 +13,9 @@ use syn::Result;
 #[cfg(feature = "testing")]
 pub mod testing;
 
+pub mod macros;
+pub mod test_macros;
+
 /// Generic symbol table that tracks variable definitions in nested scopes.
 #[derive(Clone, Default)]
 pub struct ScopeStack {

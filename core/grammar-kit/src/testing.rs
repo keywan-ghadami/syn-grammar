@@ -11,10 +11,10 @@ type ErrorFormatter<E> = Box<dyn Fn(&E, Option<&str>) -> String>;
 // A wrapper around Result to write fluent tests.
 // Keeps ownership of the result to allow chaining assertions.
 pub struct TestResult<T, E> {
-    inner: Result<T, E>,
-    context: Option<String>,
-    source: Option<String>,
-    formatter: Option<ErrorFormatter<E>>,
+    pub inner: Result<T, E>,
+    pub context: Option<String>,
+    pub source: Option<String>,
+    pub formatter: Option<ErrorFormatter<E>>,
 }
 
 impl<T: Debug, E: Display + Debug> TestResult<T, E> {
@@ -48,14 +48,14 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
         self
     }
 
-    fn format_context(&self) -> String {
+    pub fn format_context(&self) -> String {
         self.context
             .as_ref()
             .map(|c| format!("\nContext:  {}", c))
             .unwrap_or_default()
     }
 
-    fn format_err(&self, err: &E) -> String {
+    pub fn format_err(&self, err: &E) -> String {
         if let Some(formatter) = &self.formatter {
             formatter(err, self.source.as_deref())
         } else {
