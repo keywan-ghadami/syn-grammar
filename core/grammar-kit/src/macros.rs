@@ -9,7 +9,7 @@
 /// use grammar_kit::test_both_backends;
 ///
 /// test_both_backends! {
-///     grammar {
+///     grammar MyGrammar {
 ///         pub rule main -> i32 = "a" -> { 1 }
 ///     }
 ///     test(parse_main) {
