@@ -1,0 +1,155 @@
+# Grammar Syntax Reference
+
+This document serves as the reference for the **Grammar Definition Language** shared by all backends (`syn-grammar`, `winnow-grammar`).
+
+## Defining Grammars
+
+Grammars are defined using the `grammar!` macro. A grammar block contains a set of rules.
+
+```rust
+grammar! {
+    grammar MyGrammar {
+        rule start -> () = "hello" -> { () }
+    }
+}
+```
+
+## Rules
+
+A rule consists of a name, a return type, a pattern, and an action block.
+
+```text
+rule name -> ReturnType = pattern -> { action_code }
+```
+
+- **`name`**: The name of the rule.
+- **`ReturnType`**: The Rust type returned by the rule.
+- **`pattern`**: The grammar pattern to match.
+- **`action_code`**: A Rust block that constructs the return value.
+
+## Syntax Guide
+
+### Sequences & Bindings
+Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
+
+```rust
+rule assignment -> (String, i32) = 
+    name:ident "=" val:i32 -> { (name, val) }
+```
+
+### Alternatives
+Match one of several alternatives using `|`. The first one that matches wins.
+
+```rust
+rule choice -> bool = 
+    "yes" -> { true }
+  | "no"  -> { false }
+```
+
+### Repetitions
+- `pattern*`: Match zero or more times. Returns a `Vec`.
+- `pattern+`: Match one or more times. Returns a `Vec`.
+- `pattern?`: Match zero or one time. Returns an `Option`.
+
+```rust
+rule list -> Vec<i32> = elements:i32* -> { elements }
+```
+
+### Delimiters
+To match literal delimiters (parentheses, brackets, braces) in the input, use the specific delimiter syntax. This avoids ambiguity with grouping parentheses.
+
+- `paren(pattern)`: Matches `( pattern )`.
+- `[ pattern ]`: Matches `[ pattern ]`.
+- `{ pattern }`: Matches `{ pattern }`.
+
+```rust
+rule tuple -> (i32, i32) = 
+    paren(a:i32 "," b:i32) -> { (a, b) }
+```
+
+Use standard parentheses `(...)` **only** for logical grouping of patterns (e.g., inside an alternative).
+
+```rust
+rule group -> () = ("a" | "b") "c" -> { () }
+```
+
+### Literals
+Match specific tokens or text using string literals.
+
+```rust
+rule kw -> () = "fn" "name" -> { () }
+```
+
+### Built-in Primitives
+The following primitives are "portable" and expected to be available in all backends, though their exact return types may vary slightly (e.g., `String` vs `syn::Ident`).
+
+| Parser | Description |
+|---|---|
+| `ident` | An identifier (e.g., variable name). |
+| `string` | A string literal. |
+| `u32` | Unsigned 32-bit integer. |
+| `i32` | Signed 32-bit integer. |
+| `bool` | Boolean (`true` or `false`). |
+| `alpha` | Alphabetic characters. |
+| `digit` | Numeric digits. |
+| `whitespace` | Explicit whitespace matching. |
+| `eof` | End of input. |
+
+*Note: Backends may provide additional specialized built-ins.*
+
+## Operators
+
+### Cut Operator (`=>`)
+The cut operator commits to the current alternative. If the pattern *before* the `=>` matches, the parser will **not** backtrack to other alternatives if the pattern *after* the `=>` fails.
+
+```rust
+rule stmt -> Stmt =
+    "let" => name:ident "=" e:expr -> { Stmt::Let(name, e) }
+  | e:expr -> { Stmt::Expr(e) }
+```
+
+### Lookahead (`peek`, `not`)
+- `peek(pattern)`: Succeeds if `pattern` matches, but does not consume input.
+- `not(pattern)`: Succeeds if `pattern` does *not* match.
+
+```rust
+rule check -> () = "a" peek("b") -> { () }
+```
+
+### Special (`until`, `count`, `eof`, `fail`, `recover`)
+
+- **`until(terminator)`**: Consumes tokens until `terminator` is matched. The terminator is not consumed.
+- **`count(pattern)`**: Returns the number of times `pattern` matched (as `usize`).
+- **`eof`**: Succeeds only at the end of the input.
+- **`fail("message")`**: Explicitly fails with a custom error message.
+- **`recover(rule, sync)`**: If `rule` fails, skips input until `sync` token is found.
+
+## Advanced Features
+
+### Rule Arguments
+Rules can accept arguments to pass context or configuration.
+
+```rust
+rule main -> i32 = "start" v:value(offset=10) -> { v }
+rule value(offset: i32) -> i32 = i:i32 -> { i + offset }
+```
+
+### Generic Rules
+Define reusable rules with generic types and parser parameters.
+
+```rust
+rule list<T>(item) -> Vec<T> = items:item* -> { items }
+rule integers -> Vec<i32> = l:list(item=i32) -> { l }
+```
+
+### Left Recursion
+Direct left recursion is automatically detected and compiled into an iterative loop, making expression parsing natural.
+
+```rust
+rule expr -> i32 = 
+    l:expr "+" r:term -> { l + r }
+  | t:term            -> { t }
+```
+
+### Shadowing Detection
+The compiler checks for unreachable alternatives (e.g., if a prefix shadows a longer rule) and emits warnings or errors.
