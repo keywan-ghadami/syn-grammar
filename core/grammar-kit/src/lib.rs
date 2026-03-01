@@ -84,6 +84,7 @@ pub struct ParseContext {
     pub last_span: Option<Span>,
     fail_triggered: bool,
     suppress_label: bool,
+    mode_stack: Vec<bool>, // true = lexical, false = spaced
 }
 
 #[cfg(feature = "rt")]
@@ -99,6 +100,7 @@ impl ParseContext {
             last_span: None,
             fail_triggered: false,
             suppress_label: false,
+            mode_stack: Vec::new(),
         }
     }
 
@@ -320,11 +322,35 @@ impl ParseContext {
             .unwrap_or(false)
     }
 
-    // --- Span Tracking ---
+    // --- Span Tracking & Lexical Mode ---
+
+    pub fn enter_lexical(&mut self) {
+        self.mode_stack.push(true);
+    }
+
+    pub fn enter_spaced(&mut self) {
+        self.mode_stack.push(false);
+    }
+
+    pub fn exit_mode(&mut self) {
+        self.mode_stack.pop();
+    }
+
+    pub fn is_lexical(&self) -> bool {
+        *self.mode_stack.last().unwrap_or(&false)
+    }
 
     #[cfg(feature = "syn")]
-    pub fn record_span(&mut self, span: Span) {
+    pub fn record_span(&mut self, span: Span) -> Result<()> {
+        if self.is_lexical() {
+            if let Some(last) = self.last_span {
+                if last.end() != span.start() {
+                    return Err(syn::Error::new(span, "expected no whitespace"));
+                }
+            }
+        }
         self.last_span = Some(span);
+        Ok(())
     }
 
     #[cfg(feature = "syn")]
@@ -404,6 +430,7 @@ where
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
+    let mode_stack_snapshot = ctx.mode_stack.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -418,6 +445,8 @@ where
             input.advance_to(&fork);
             ctx.set_fatal(was_fatal);
             // We KEEP the last_span updated by the successful attempt
+            // We RESTORE mode stack because modes are scoped to structure, not state
+            ctx.mode_stack = mode_stack_snapshot;
             Ok(Some(val))
         }
         Err(e) => {
@@ -426,6 +455,7 @@ where
                 ctx.scopes = scopes_snapshot;
                 ctx.rule_stack = rule_stack_snapshot;
                 ctx.last_span = last_span_snapshot;
+                ctx.mode_stack = mode_stack_snapshot;
 
                 ctx.set_fatal(true);
                 Err(e)
@@ -466,6 +496,7 @@ where
                 ctx.scopes = scopes_snapshot;
                 ctx.rule_stack = rule_stack_snapshot;
                 ctx.last_span = last_span_snapshot;
+                ctx.mode_stack = mode_stack_snapshot;
 
                 Ok(None)
             }
@@ -487,6 +518,7 @@ where
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
+    let mode_stack_snapshot = ctx.mode_stack.clone();
 
     let res = parser(&fork, ctx);
 
@@ -494,6 +526,7 @@ where
     ctx.scopes = scopes_snapshot;
     ctx.rule_stack = rule_stack_snapshot;
     ctx.last_span = last_span_snapshot;
+    ctx.mode_stack = mode_stack_snapshot;
 
     res
 }
@@ -514,6 +547,7 @@ where
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
+    let mode_stack_snapshot = ctx.mode_stack.clone();
 
     // Disable fatal errors for the check to allow backtracking/failure
     let was_fatal = ctx.check_fatal();
@@ -528,6 +562,7 @@ where
     ctx.scopes = scopes_snapshot;
     ctx.rule_stack = rule_stack_snapshot;
     ctx.last_span = last_span_snapshot;
+    ctx.mode_stack = mode_stack_snapshot;
 
     match res {
         Ok(_) => Err(syn::Error::new(input.span(), "unexpected match")),
@@ -553,6 +588,7 @@ where
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
+    let mode_stack_snapshot = ctx.mode_stack.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -566,6 +602,8 @@ where
         Ok(val) => {
             input.advance_to(&fork);
             // Keep last_span
+            // Restore mode stack
+            ctx.mode_stack = mode_stack_snapshot;
             Ok(Some(val))
         }
         Err(e) => {
@@ -577,6 +615,7 @@ where
             ctx.scopes = scopes_snapshot;
             ctx.rule_stack = rule_stack_snapshot;
             ctx.last_span = last_span_snapshot;
+            ctx.mode_stack = mode_stack_snapshot;
 
             Ok(None)
         }

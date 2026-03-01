@@ -108,6 +108,9 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
             ModelPattern::Count { pattern, .. } => {
                 collect_from_patterns(std::slice::from_ref(pattern), kws);
             }
+            ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
+                collect_from_patterns(std::slice::from_ref(pattern), kws);
+            }
             _ => {}
         }
     }
@@ -171,6 +174,9 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
                 binding: Some(b), ..
             } => {
                 bindings.push(b.clone());
+            }
+            ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
+                bindings.extend(collect_bindings(std::slice::from_ref(pattern)));
             }
             _ => {}
         }
@@ -305,6 +311,9 @@ pub fn get_simple_peek(
                 Ok(None)
             }
         }
+        ModelPattern::Lit {
+            lit: Lit::Char(_), ..
+        } => Ok(Some(quote!(syn::LitChar))),
         ModelPattern::Lit { .. } => Ok(None),
         ModelPattern::Bracketed(_, _) => Ok(Some(quote!(syn::token::Bracket))),
         ModelPattern::Braced(_, _) => Ok(Some(quote!(syn::token::Brace))),
@@ -329,6 +338,9 @@ pub fn get_simple_peek(
         ModelPattern::Not(_, _) => Ok(None),
         ModelPattern::Until { .. } => Ok(None),
         ModelPattern::Count { pattern, .. } => get_simple_peek(pattern, kws),
+        ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
+            get_simple_peek(pattern, kws)
+        }
         _ => Ok(None),
     }
 }
@@ -339,6 +351,9 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         Some(ModelPattern::Lit {
             lit: Lit::Str(l), ..
         }) => Some(l.value()),
+        Some(ModelPattern::Lit {
+            lit: Lit::Char(l), ..
+        }) => Some(l.value().to_string()),
         Some(ModelPattern::Lit { .. }) => None,
         Some(ModelPattern::Bracketed(_, _)) => Some("Bracket".to_string()),
         Some(ModelPattern::Braced(_, _)) => Some("Brace".to_string()),
@@ -367,6 +382,10 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
         Some(ModelPattern::Count { pattern, .. }) => {
             get_peek_token_string(std::slice::from_ref(&**pattern))
         }
+        Some(ModelPattern::LexicalScope(pattern, _))
+        | Some(ModelPattern::SpacedScope(pattern, _)) => {
+            get_peek_token_string(std::slice::from_ref(&**pattern))
+        }
         _ => None,
     }
 }
@@ -392,6 +411,8 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
         ModelPattern::Until { .. } => true,
         ModelPattern::Fail { .. } => false,
         ModelPattern::Count { pattern, .. } => is_nullable(pattern),
+        ModelPattern::LexicalScope(pattern, _) => is_nullable(pattern),
+        ModelPattern::SpacedScope(pattern, _) => is_nullable(pattern),
     }
 }
 
@@ -491,6 +512,9 @@ fn is_pattern_nullable_precise(pattern: &ModelPattern, nullable_rules: &HashSet<
         | ModelPattern::Parenthesized(..) => false,
         ModelPattern::Fail { .. } => false,
         ModelPattern::Count { pattern, .. } => is_pattern_nullable_precise(pattern, nullable_rules),
+        ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
+            is_pattern_nullable_precise(pattern, nullable_rules)
+        }
     }
 }
 
@@ -611,6 +635,12 @@ fn collect_nullable_deps(
                     return;
                 }
             }
+            ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
+                collect_nullable_deps(std::slice::from_ref(pattern), nullable_rules, deps);
+                if !is_pattern_nullable_precise(pattern, nullable_rules) {
+                    return;
+                }
+            }
             ModelPattern::Lit { .. }
             | ModelPattern::Bracketed(..)
             | ModelPattern::Braced(..)
@@ -696,7 +726,9 @@ fn collect_called_rules<F: FnMut(String)>(patterns: &[ModelPattern], cb: &mut F)
             | ModelPattern::Peek(inner, _)
             | ModelPattern::Not(inner, _)
             | ModelPattern::Until { pattern: inner, .. }
-            | ModelPattern::Count { pattern: inner, .. } => {
+            | ModelPattern::Count { pattern: inner, .. }
+            | ModelPattern::LexicalScope(inner, _)
+            | ModelPattern::SpacedScope(inner, _) => {
                 collect_called_rules(std::slice::from_ref(inner), cb);
             }
             ModelPattern::Recover { body, sync, .. } => {
@@ -807,6 +839,12 @@ fn collect_first_from_sequence(
                 acc.insert(format!("\"{}\"", s.value()));
                 return;
             }
+            ModelPattern::Lit {
+                lit: Lit::Char(c), ..
+            } => {
+                acc.insert(format!("'{}'", c.value()));
+                return;
+            }
             ModelPattern::Lit { .. } => {
                 acc.insert("LIT".to_string());
                 return;
@@ -900,6 +938,17 @@ fn collect_first_from_sequence(
                 );
             }
             ModelPattern::Count { pattern, .. } => {
+                collect_first_from_sequence(
+                    std::slice::from_ref(pattern),
+                    first_sets,
+                    nullable_rules,
+                    acc,
+                );
+                if !is_pattern_nullable_precise(pattern, nullable_rules) {
+                    return;
+                }
+            }
+            ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
                 collect_first_from_sequence(
                     std::slice::from_ref(pattern),
                     first_sets,
@@ -1016,6 +1065,12 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
             },
         ) => pattern_structure_eq(b1, b2) && pattern_structure_eq(s1, s2),
         (ModelPattern::Until { pattern: p1, .. }, ModelPattern::Until { pattern: p2, .. }) => {
+            pattern_structure_eq(p1, p2)
+        }
+        (ModelPattern::LexicalScope(p1, _), ModelPattern::LexicalScope(p2, _)) => {
+            pattern_structure_eq(p1, p2)
+        }
+        (ModelPattern::SpacedScope(p1, _), ModelPattern::SpacedScope(p2, _)) => {
             pattern_structure_eq(p1, p2)
         }
         (ModelPattern::Fail { message: m1, .. }, ModelPattern::Fail { message: m2, .. }) => {

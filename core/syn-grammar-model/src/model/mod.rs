@@ -37,6 +37,7 @@ pub struct Rule {
     pub return_type: syn::Type,
     pub variants: Vec<RuleVariant>,
     pub is_pub: bool,
+    pub is_lexical: bool,
     pub attrs: Vec<syn::Attribute>,
 }
 
@@ -96,6 +97,8 @@ pub enum ModelPattern {
         pattern: Box<ModelPattern>,
         span: proc_macro2::Span,
     },
+    LexicalScope(Box<ModelPattern>, proc_macro2::Span),
+    SpacedScope(Box<ModelPattern>, proc_macro2::Span),
     Fail {
         message: Option<syn::Lit>,
         span: proc_macro2::Span,
@@ -124,6 +127,8 @@ impl ModelPattern {
             ModelPattern::Not(_, s) => *s,
             ModelPattern::Until { span, .. } => *span,
             ModelPattern::Count { span, .. } => *span,
+            ModelPattern::LexicalScope(_, s) => *s,
+            ModelPattern::SpacedScope(_, s) => *s,
             ModelPattern::Fail { span, .. } => *span,
         }
     }
@@ -178,6 +183,12 @@ impl From<parser::ImportedGrammar> for ImportedGrammar {
 
 impl From<parser::Rule> for Rule {
     fn from(p: parser::Rule) -> Self {
+        let is_lexical = p
+            .name
+            .to_string()
+            .chars()
+            .next()
+            .is_some_and(char::is_uppercase);
         Rule {
             name: p.name,
             generics: p.generics,
@@ -185,6 +196,7 @@ impl From<parser::Rule> for Rule {
             return_type: p.return_type,
             variants: p.variants.into_iter().map(Into::into).collect(),
             is_pub: p.is_pub.is_some(),
+            is_lexical,
             attrs: p.attrs,
         }
     }
@@ -321,6 +333,12 @@ impl From<parser::Pattern> for ModelPattern {
                 pattern: Box::new((*pattern).into()),
                 span: kw_token.span(),
             },
+            parser::Pattern::LexicalScope(pattern, kw_token) => {
+                ModelPattern::LexicalScope(Box::new((*pattern).into()), kw_token.span())
+            }
+            parser::Pattern::SpacedScope(pattern, kw_token) => {
+                ModelPattern::SpacedScope(Box::new((*pattern).into()), kw_token.span())
+            }
             parser::Pattern::Fail { message, kw_token } => ModelPattern::Fail {
                 message,
                 span: kw_token.span(),

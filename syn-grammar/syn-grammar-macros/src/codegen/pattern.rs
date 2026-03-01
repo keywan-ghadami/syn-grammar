@@ -38,12 +38,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         if let Some(bind) = binding {
                             quote! {
                                 let #bind = input.parse::<#ty>()?;
-                                ctx.record_span(syn::spanned::Spanned::span(&#bind));
+                                ctx.record_span(syn::spanned::Spanned::span(&#bind))?;
                             }
                         } else {
                             quote! {
                                 let _t = input.parse::<#ty>()?;
-                                ctx.record_span(syn::spanned::Spanned::span(&_t));
+                                ctx.record_span(syn::spanned::Spanned::span(&_t))?;
                             }
                         }
                     });
@@ -63,7 +63,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         // Record span for the last token
                         if i == token_types.len() - 1 {
                             steps.push(quote! {
-                                ctx.record_span(syn::spanned::Spanned::span(&#var));
+                                ctx.record_span(syn::spanned::Spanned::span(&#var))?;
                             });
                         }
 
@@ -376,42 +376,42 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     "alpha" => quote! {
                         {
                             let t = rt::token_filter::alpha(input)?;
-                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            ctx.record_span(syn::spanned::Spanned::span(&t))?;
                             t
                         }
                     },
                     "digit" => quote! {
                         {
                             let t = rt::token_filter::digit(input)?;
-                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            ctx.record_span(syn::spanned::Spanned::span(&t))?;
                             t
                         }
                     },
                     "alphanumeric" => quote! {
                         {
                             let t = rt::token_filter::alphanumeric(input)?;
-                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            ctx.record_span(syn::spanned::Spanned::span(&t))?;
                             t
                         }
                     },
                     "hex_digit" => quote! {
                         {
                             let t = rt::token_filter::hex_digit(input)?;
-                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            ctx.record_span(syn::spanned::Spanned::span(&t))?;
                             t
                         }
                     },
                     "oct_digit" => quote! {
                         {
                             let t = rt::token_filter::oct_digit(input)?;
-                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            ctx.record_span(syn::spanned::Spanned::span(&t))?;
                             t
                         }
                     },
                     "any_byte" => quote! {
                         {
                             let t = input.parse::<syn::LitByte>()?;
-                            ctx.record_span(syn::spanned::Spanned::span(&t));
+                            ctx.record_span(syn::spanned::Spanned::span(&t))?;
                             t
                         }
                     },
@@ -748,6 +748,31 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     };
                 })
             }
+        }
+
+        ModelPattern::LexicalScope(inner, _) => {
+            let inner_logic = generate_pattern_step(inner, ctx)?;
+            Ok(quote! {
+                ctx.enter_lexical();
+                let _res = (|| -> syn::Result<_> {
+                    #inner_logic
+                    Ok(())
+                })();
+                ctx.exit_mode();
+                _res?;
+            })
+        }
+        ModelPattern::SpacedScope(inner, _) => {
+            let inner_logic = generate_pattern_step(inner, ctx)?;
+            Ok(quote! {
+                ctx.enter_spaced();
+                let _res = (|| -> syn::Result<_> {
+                    #inner_logic
+                    Ok(())
+                })();
+                ctx.exit_mode();
+                _res?;
+            })
         }
 
         ModelPattern::SpanBinding(inner, span_var, _) => {

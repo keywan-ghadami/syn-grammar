@@ -68,6 +68,19 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     // Add where clause from generics
     let where_clause = &generics.where_clause;
 
+    // Check if lexical
+    let lexical_block_start = if rule.is_lexical {
+        quote! { ctx.enter_lexical(); }
+    } else {
+        quote! {}
+    };
+
+    let lexical_block_end = if rule.is_lexical {
+        quote! { ctx.exit_mode(); }
+    } else {
+        quote! {}
+    };
+
     let body = if !recursive_refs.is_empty() {
         if base_refs.is_empty() {
             return Err(syn::Error::new(
@@ -120,10 +133,12 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         #(#impl_attrs)*
         pub fn #impl_name(mut input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> #where_clause {
             ctx.enter_rule(stringify!(#name));
+            #lexical_block_start
             let _start_span = input.span();
             let res = (|| -> syn::Result<#ret_type> {
                 #body
             })();
+            #lexical_block_end
 
             if let Err(ref e) = res {
                 // Record the error BEFORE exiting the rule so we capture the current rule name.

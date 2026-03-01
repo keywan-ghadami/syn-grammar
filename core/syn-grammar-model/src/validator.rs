@@ -182,6 +182,9 @@ fn validate_pattern(
             validate_pattern(pattern, all_defs, params)?;
             validate_no_bindings(pattern)?;
         }
+        ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
+            validate_pattern(pattern, all_defs, params)?;
+        }
         ModelPattern::Fail { .. } => {}
         _ => {}
     }
@@ -258,6 +261,9 @@ fn validate_no_bindings(pattern: &ModelPattern) -> syn::Result<()> {
         }
         ModelPattern::Count { .. } => {
             // Count hides bindings, so it's safe in until
+        }
+        ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
+            validate_no_bindings(pattern)?;
         }
         ModelPattern::Cut(_) => {}
         ModelPattern::Fail { .. } => {}
@@ -361,6 +367,9 @@ fn validate_args_recursive(
                 validate_args_recursive(std::slice::from_ref(sync), rule_map)?;
             }
             ModelPattern::Until { pattern, .. } => {
+                validate_args_recursive(std::slice::from_ref(pattern), rule_map)?;
+            }
+            ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
                 validate_args_recursive(std::slice::from_ref(pattern), rule_map)?;
             }
             _ => {}

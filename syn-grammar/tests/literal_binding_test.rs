@@ -14,7 +14,7 @@ grammar! {
 grammar! {
     grammar LitBind2 {
         pub rule main -> (char, char) =
-            a:'a' b:'b' -> { ('a', 'b') }
+            a:"a" b:"b" -> { ('a', 'b') }
     }
 }
 
