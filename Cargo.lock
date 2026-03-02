@@ -18,6 +18,7 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 name = "grammar-kit"
 version = "0.9.0"
 dependencies = [
+ "paste",
  "proc-macro2",
  "quote",
  "syn",
@@ -51,6 +52,12 @@ name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "proc-macro2"
@@ -137,6 +144,7 @@ name = "syn-grammar"
 version = "0.9.0"
 dependencies = [
  "grammar-kit",
+ "paste",
  "proc-macro2",
  "quote",
  "syn",
@@ -283,6 +291,7 @@ name = "winnow-grammar"
 version = "0.1.0"
 dependencies = [
  "grammar-kit",
+ "paste",
  "proc-macro2",
  "quote",
  "syn",

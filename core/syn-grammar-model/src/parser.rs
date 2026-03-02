@@ -530,6 +530,20 @@ pub enum Pattern {
     },
 }
 
+impl Pattern {
+    fn wrap_sequence(patterns: Vec<Pattern>) -> Pattern {
+        if patterns.len() == 1 {
+            patterns.into_iter().next().unwrap()
+        } else {
+            Pattern::Group {
+                binding: None,
+                alts: vec![(patterns, None, None)],
+                token: token::Paren::default(),
+            }
+        }
+    }
+}
+
 impl Parse for Pattern {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut pat = parse_atom(input)?;
@@ -875,14 +889,20 @@ fn parse_atom(input: ParseStream) -> Result<Pattern> {
         let kw_token = input.parse::<kw::lex>()?;
         let content;
         syn::parenthesized!(content in input);
-        let inner = content.parse()?;
-        Ok(Pattern::LexicalScope(Box::new(inner), kw_token))
+        let patterns = parse_pattern_list(&content)?;
+        Ok(Pattern::LexicalScope(
+            Box::new(Pattern::wrap_sequence(patterns)),
+            kw_token,
+        ))
     } else if input.peek(kw::spaced) {
         let kw_token = input.parse::<kw::spaced>()?;
         let content;
         syn::parenthesized!(content in input);
-        let inner = content.parse()?;
-        Ok(Pattern::SpacedScope(Box::new(inner), kw_token))
+        let patterns = parse_pattern_list(&content)?;
+        Ok(Pattern::SpacedScope(
+            Box::new(Pattern::wrap_sequence(patterns)),
+            kw_token,
+        ))
     } else if input.peek(kw::fail) {
         if binding.is_some() {
             return Err(input.error("Fail cannot be bound."));

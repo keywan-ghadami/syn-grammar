@@ -27,6 +27,21 @@ rule name -> ReturnType = pattern -> { action_code }
 - **`pattern`**: The grammar pattern to match.
 - **`action_code`**: A Rust block that constructs the return value.
 
+### Lexical vs. Syntactic Rules (Case Sensitivity)
+
+The casing of a rule's name determines its whitespace handling:
+
+- **Syntactic Rules (lowercase)**: Rule names starting with a **lowercase** letter (e.g., `rule expression`) allow implicit whitespace between patterns.
+- **Lexical Rules (UPPERCASE)**: Rule names starting with an **uppercase** letter (e.g., `rule IDENTIFIER`) are **lexical**. They do **not** allow implicit whitespace between patterns.
+
+```rust
+// Syntactic: matches "a + b"
+rule add -> () = "a" "+" "b" -> { () }
+
+// Lexical: matches "ab", but NOT "a b"
+rule AB = "a" "b" -> { () }
+```
+
 ## Syntax Guide
 
 ### Sequences & Bindings
@@ -80,13 +95,20 @@ Match specific tokens or text using string literals.
 rule kw -> () = "fn" "name" -> { () }
 ```
 
+For matching Rust literals as values, use the `lit_*` built-ins:
+- `lit_str`: Matches a string literal.
+- `lit_int`: Matches an integer literal.
+- `lit_char`: Matches a character literal.
+- `lit_bool`: Matches `true` or `false`.
+- `lit_float`: Matches a floating-point literal.
+
 ### Built-in Primitives
 The following primitives are "portable" and expected to be available in all backends, though their exact return types may vary slightly (e.g., `String` vs `syn::Ident`).
 
 | Parser | Description |
 |---|---|
 | `ident` | An identifier (e.g., variable name). |
-| `string` | A string literal. |
+| `string` | A string literal (same as `lit_str`). |
 | `u32` | Unsigned 32-bit integer. |
 | `i32` | Signed 32-bit integer. |
 | `bool` | Boolean (`true` or `false`). |
@@ -114,6 +136,15 @@ rule stmt -> Stmt =
 
 ```rust
 rule check -> () = "a" peek("b") -> { () }
+```
+
+### Lexical Control (`lex`, `spaced`)
+- `lex(pattern)`: Forces a **lexical context** (no implicit whitespace) for the duration of the pattern.
+- `spaced(pattern)`: Forces a **syntactic context** (implicit whitespace allowed) even inside a lexical rule.
+
+```rust
+rule word = lex(alpha+) -> { () }
+rule CAST_OPERATOR = "as" spaced("<" T ">") ;
 ```
 
 ### Special (`until`, `count`, `eof`, `fail`, `recover`)
