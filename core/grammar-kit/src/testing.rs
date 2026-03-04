@@ -91,14 +91,11 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
     pub fn assert_success(self) -> T {
         let ctx = self.format_context();
         match self.inner {
-            Ok(val) => {
-                println!("ℹ️  Asserting success.\n   Actual:   {:?}", val);
-                val
-            }
+            Ok(val) => val,
             Err(ref e) => {
                 let msg = self.format_err(e);
                 panic!(
-                    "\n🔴 TEST FAILED (Expected Success, but got Error):{}\nMessage:  {}\nError Debug: {:?}\n", 
+                    "\n🔴 TEST FAILED (Expected Success, but got Error):{}\n\nError Message:\n{}\n\nError Debug:\n{:?}\n", 
                     ctx, msg, e
                 );
             }
@@ -113,8 +110,6 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
     {
         let ctx = self.format_context();
         let val = self.assert_success();
-
-        println!("ℹ️  Checking equality.\n   Expected: {:?}", expected);
 
         if val != expected {
             panic!(
@@ -131,7 +126,6 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
         F: FnOnce(&T),
     {
         let val = self.assert_success();
-        println!("ℹ️  Asserting success with closure.");
         f(&val);
         val
     }
@@ -142,11 +136,6 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
         let ctx = self.format_context();
         let val = self.assert_success();
         let actual_debug = format!("{:?}", val);
-
-        println!(
-            "ℹ️  Checking debug representation.\n   Expected: {:?}",
-            expected_debug
-        );
 
         if actual_debug != expected_debug {
             panic!(
@@ -165,11 +154,6 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
         let ctx = self.format_context();
         let val = self.assert_success();
         let val_str = val.to_string();
-
-        println!(
-            "ℹ️  Checking success string contains {:?}.\n   Actual string: {:?}",
-            expected_part, val_str
-        );
 
         if !val_str.contains(expected_part) {
             panic!(
@@ -195,10 +179,7 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
                     ctx, val
                 );
             }
-            Err(e) => {
-                println!("ℹ️  Asserting failure.\n   Error:    {:?}", e);
-                e
-            }
+            Err(e) => e,
         }
     }
 
@@ -216,15 +197,11 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
             }
             Err(err) => {
                 let actual_msg = err.to_string();
-                println!(
-                    "ℹ️  Checking error message contains {:?}.\n   Actual message: {:?}",
-                    expected_msg_part, actual_msg
-                );
 
                 if !actual_msg.contains(expected_msg_part) {
                     let formatted = self.format_err(err);
                     panic!(
-                        "\n🔴 TEST FAILED (Error Message Mismatch):{}\nExpected part: {:?}\nActual msg:    {:?}\nError Debug:   {:?}\nFormatted:   \n{}\n", 
+                        "\n🔴 TEST FAILED (Error Message Mismatch):{}\nExpected part: {:?}\nActual msg:    {:?}\n\nError Debug:\n{:?}\n\nFormatted:\n{}\n", 
                         ctx, expected_msg_part, actual_msg, err, formatted
                     );
                 }
@@ -247,15 +224,11 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
             }
             Err(err) => {
                 let actual_msg = err.to_string();
-                println!(
-                    "ℹ️  Checking error message NOT contains {:?}.\n   Actual message: {:?}",
-                    unexpected_part, actual_msg
-                );
 
                 if actual_msg.contains(unexpected_part) {
                     let formatted = self.format_err(err);
                     panic!(
-                        "\n🔴 TEST FAILED (Unexpected Error Message Content):{}\nUnexpected part: {:?}\nActual msg:      {:?}\nError Debug:     {:?}\nFormatted:\n{}\n", 
+                        "\n🔴 TEST FAILED (Unexpected Error Message Content):{}\nUnexpected part: {:?}\nActual msg:      {:?}\n\nError Debug:\n{:?}\n\nFormatted:\n{}\n", 
                         ctx, unexpected_part, actual_msg, err, formatted
                     );
                 }
@@ -294,11 +267,6 @@ impl<E: Display + Debug> TestResult<f64, E> {
         let ctx = self.format_context();
         let val = self.assert_success();
 
-        println!(
-            "ℹ️  Checking approximate equality.\n   Expected: {:?}\n   Actual:   {:?}",
-            expected, val
-        );
-
         if (val - expected).abs() > f64::EPSILON {
             panic!(
                 "\n🔴 TEST FAILED (Approximate Value Mismatch):{}\nExpected: {:?}\nGot:      {:?}\nDiff:     {:?}\n",
@@ -313,11 +281,6 @@ impl<E: Display + Debug> TestResult<f32, E> {
     pub fn assert_success_approx(self, expected: f32) -> f32 {
         let ctx = self.format_context();
         let val = self.assert_success();
-
-        println!(
-            "ℹ️  Checking approximate equality.\n   Expected: {:?}\n   Actual:   {:?}",
-            expected, val
-        );
 
         if (val - expected).abs() > f32::EPSILON {
             panic!(
