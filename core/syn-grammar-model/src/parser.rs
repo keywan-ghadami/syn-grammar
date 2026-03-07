@@ -284,7 +284,9 @@ impl Parse for Rule {
             None
         };
 
-        let _ = input.parse::<kw::rule>()?;
+        if input.peek(kw::rule) {
+            let _ = input.parse::<kw::rule>()?;
+        }
         let name = rt::parse_ident(input)?;
 
         let generics: Generics = input.parse()?;
@@ -304,8 +306,13 @@ impl Parse for Rule {
             Vec::new()
         };
 
-        let _ = input.parse::<Token![->]>()?;
-        let return_type = input.parse::<Type>()?;
+        let return_type = if input.peek(Token![->]) {
+            let _ = input.parse::<Token![->]>()?;
+            input.parse::<Type>()?
+        } else {
+            syn::parse_quote!(())
+        };
+
         let _ = input.parse::<Token![=]>()?;
 
         let variants = RuleVariant::parse_list(input)?;
@@ -374,13 +381,23 @@ impl RuleVariant {
     pub fn parse_list(input: ParseStream) -> Result<Vec<Self>> {
         let mut variants = Vec::new();
         loop {
-            let mut pattern = Vec::new();
+            let mut pattern: Vec<Pattern> = Vec::new();
             while !input.is_empty()
                 && !input.peek(Token![->])
                 && !input.peek(Token![|])
                 && !input.peek(Token![#])
                 && !input.peek(kw::rule)
             {
+                // Lookahead to detect start of next rule:
+                // 1. Ident followed by `=` (e.g. `next_rule = ...`)
+                if input.peek(Ident) && input.peek2(Token![=]) {
+                    break;
+                }
+                // 2. `pub` keyword (e.g. `pub rule ...` or `pub next_rule ...`)
+                if input.peek(Token![pub]) {
+                    break;
+                }
+
                 pattern.push(input.parse()?);
             }
 
@@ -392,11 +409,26 @@ impl RuleVariant {
                 None
             };
 
-            let _ = input.parse::<Token![->]>()?;
+            let action = if input.peek(Token![->]) {
+                let _ = input.parse::<Token![->]>()?;
+                let content;
+                syn::braced!(content in input);
+                content.parse()?
+            } else {
+                let mut bindings = Vec::new();
+                for p in &pattern {
+                    p.collect_bindings(&mut bindings);
+                }
 
-            let content;
-            syn::braced!(content in input);
-            let action = content.parse()?;
+                if bindings.is_empty() {
+                    quote! { () }
+                } else if bindings.len() == 1 {
+                    let b = &bindings[0];
+                    quote! { #b }
+                } else {
+                    quote! { ( #(#bindings),* ) }
+                }
+            };
 
             variants.push(RuleVariant {
                 pattern,
@@ -540,6 +572,151 @@ impl Pattern {
                 alts: vec![(patterns, None, None)],
                 token: token::Paren::default(),
             }
+        }
+    }
+
+    pub fn collect_bindings(&self, acc: &mut Vec<Ident>) {
+        match self {
+            Pattern::Lit { binding, .. } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                }
+            }
+            Pattern::RuleCall { binding, .. } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                }
+            }
+            Pattern::Group { binding, alts, .. } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                } else {
+                    for (pats, action, _) in alts {
+                        if action.is_none() {
+                            for p in pats {
+                                p.collect_bindings(acc);
+                            }
+                        }
+                    }
+                }
+            }
+            Pattern::Bracketed {
+                binding, patterns, ..
+            } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                } else {
+                    for p in patterns {
+                        p.collect_bindings(acc);
+                    }
+                }
+            }
+            Pattern::Braced {
+                binding, patterns, ..
+            } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                } else {
+                    for p in patterns {
+                        p.collect_bindings(acc);
+                    }
+                }
+            }
+            Pattern::Parenthesized {
+                binding, patterns, ..
+            } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                } else {
+                    for p in patterns {
+                        p.collect_bindings(acc);
+                    }
+                }
+            }
+            Pattern::Optional(p, _) => p.collect_bindings(acc),
+            Pattern::Repeat(p, _) => p.collect_bindings(acc),
+            Pattern::Plus(p, _) => p.collect_bindings(acc),
+            Pattern::SpanBinding(p, id, _) => {
+                acc.push(id.clone());
+                p.collect_bindings(acc);
+            }
+            Pattern::Recover { binding, body, .. } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                } else {
+                    body.collect_bindings(acc);
+                }
+            }
+            Pattern::Peek(p, _) => p.collect_bindings(acc),
+            Pattern::Not(p, _) => p.collect_bindings(acc),
+            Pattern::Until {
+                binding, pattern, ..
+            } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                } else {
+                    pattern.collect_bindings(acc);
+                }
+            }
+            Pattern::Count {
+                binding, pattern, ..
+            } => {
+                if let Some(b) = binding {
+                    acc.push(b.clone());
+                } else {
+                    pattern.collect_bindings(acc);
+                }
+            }
+            Pattern::LexicalScope(p, _) => p.collect_bindings(acc),
+            Pattern::SpacedScope(p, _) => p.collect_bindings(acc),
+            Pattern::Fail { .. } => {}
+            Pattern::Cut(_) => {}
+        }
+    }
+
+    pub fn has_binding(&self) -> bool {
+        match self {
+            Pattern::Lit { binding, .. } => binding.is_some(),
+            Pattern::RuleCall { binding, .. } => binding.is_some(),
+            Pattern::Group { binding, alts, .. } => {
+                if binding.is_some() {
+                    return true;
+                }
+                alts.iter().any(|(pats, action, _)| {
+                    action.is_none() && pats.iter().any(|p| p.has_binding())
+                })
+            }
+            Pattern::Bracketed {
+                binding, patterns, ..
+            } => binding.is_some() || patterns.iter().any(|p| p.has_binding()),
+            Pattern::Braced {
+                binding, patterns, ..
+            } => binding.is_some() || patterns.iter().any(|p| p.has_binding()),
+            Pattern::Parenthesized {
+                binding, patterns, ..
+            } => binding.is_some() || patterns.iter().any(|p| p.has_binding()),
+            Pattern::Optional(p, _) => p.has_binding(),
+            Pattern::Repeat(p, _) => p.has_binding(),
+            Pattern::Plus(p, _) => p.has_binding(),
+            Pattern::SpanBinding(..) => true,
+            Pattern::Recover {
+                binding,
+                body,
+                sync,
+                ..
+            } => binding.is_some() || body.has_binding() || sync.has_binding(),
+            Pattern::Peek(p, _) => p.has_binding(),
+            Pattern::Not(p, _) => p.has_binding(),
+            Pattern::Until {
+                binding, pattern, ..
+            } => binding.is_some() || pattern.has_binding(),
+            Pattern::Count {
+                binding, pattern, ..
+            } => binding.is_some() || pattern.has_binding(),
+            Pattern::LexicalScope(p, _) => p.has_binding(),
+            Pattern::SpacedScope(p, _) => p.has_binding(),
+            Pattern::Fail { .. } => false,
+            Pattern::Cut(_) => false,
         }
     }
 }

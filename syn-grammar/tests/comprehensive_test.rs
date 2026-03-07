@@ -5,7 +5,7 @@ use syn_grammar::SynTestExt;
 
 grammar! {
     grammar action_block_test {
-        pub rule main -> i32 = "a" -> {
+        pub main -> i32 = "a" -> {
             let a = 1;
             let b = 2;
             a + b
@@ -15,7 +15,7 @@ grammar! {
 
 grammar! {
     grammar kw_test {
-        pub rule main -> i32 =
+        pub main -> i32 =
             "fn" -> { 1 }
             | "struct" -> { 2 }
             | i:ident -> { 3 }

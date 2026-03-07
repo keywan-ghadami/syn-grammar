@@ -657,6 +657,8 @@ fn find_unused_rules(grammar: &GrammarDefinition) -> HashSet<String> {
     let mut used = HashSet::new();
     let mut queue = VecDeque::new();
 
+    // Roots are:
+    // 1. All `pub` rules
     for rule in &grammar.rules {
         if rule.is_pub {
             used.insert(rule.name.to_string());
@@ -664,6 +666,14 @@ fn find_unused_rules(grammar: &GrammarDefinition) -> HashSet<String> {
         }
     }
 
+    // Special case for "WS" - it's implicitly used by the backend
+    for rule in &grammar.rules {
+        if rule.name == "WS" && used.insert("WS".to_string()) {
+            queue.push_back("WS".to_string());
+        }
+    }
+
+    // 2. If no pub rules (and no WS), the first rule is the root.
     if used.is_empty() && !grammar.rules.is_empty() {
         let first = grammar.rules[0].name.to_string();
         used.insert(first.clone());

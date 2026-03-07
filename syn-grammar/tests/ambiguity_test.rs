@@ -6,8 +6,8 @@ use syn_grammar::testing::Testable;
 fn test_group_vs_args_ambiguity() {
     grammar! {
         grammar test_ambiguity {
-            pub rule main -> String = item ("a") -> { "success".to_string() }
-            rule item -> () = "item" -> { () }
+            pub main -> String = item ("a") -> { "success".to_string() }
+            item = "item"
         }
     }
 

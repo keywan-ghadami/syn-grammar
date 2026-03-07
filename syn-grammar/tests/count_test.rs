@@ -3,13 +3,13 @@ use syn_grammar::grammar; // Import Parser trait
 
 grammar! {
     grammar count_test {
-        pub rule count_stars -> usize = c:count("a"*) -> { c }
-        pub rule count_plus -> usize = c:count("b"+) -> { c }
-        pub rule count_opts -> usize = c:count("c"?) -> { c }
-        pub rule count_group -> usize = c:count(("d" "e")*) -> { c }
+        pub count_stars -> usize = c:count("a"*) -> { c }
+        pub count_plus -> usize = c:count("b"+) -> { c }
+        pub count_opts -> usize = c:count("c"?) -> { c }
+        pub count_group -> usize = c:count(("d" "e")*) -> { c }
 
         // Count with bindings (should be ignored)
-        pub rule count_bindings -> usize = c:count(x:"f"*) -> { c }
+        pub count_bindings -> usize = c:count(x:"f"*) -> { c }
     }
 }
 

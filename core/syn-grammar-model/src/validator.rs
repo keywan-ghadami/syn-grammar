@@ -409,7 +409,7 @@ mod tests {
     fn test_undefined_rule() {
         let input = quote! {
             grammar test {
-                rule main -> () = undefined_rule -> { () }
+                main = undefined_rule
             }
         };
         let model = parse_model(input);
@@ -424,8 +424,8 @@ mod tests {
     fn test_duplicate_rule() {
         let input = quote! {
             grammar test {
-                rule main -> () = "a" -> { () }
-                rule main -> () = "b" -> { () }
+                main = "a"
+                main = "b"
             }
         };
         let model = parse_model(input);
@@ -437,8 +437,8 @@ mod tests {
     fn test_rule_args_mismatch() {
         let input = quote! {
             grammar test {
-                rule main -> () = sub(arg=1) -> { () }
-                rule sub -> () = "hello" -> { () }
+                main = sub(arg=1)
+                sub = "hello"
             }
         };
         let model = parse_model(input);
@@ -457,9 +457,9 @@ mod tests {
     fn test_shadowing_identical() {
         let input = quote! {
             grammar test {
-                rule main -> ()
-                    = "a" -> { () }
-                    | "a" -> { () }
+                main
+                    = "a"
+                    | "a"
             }
         };
         let model = parse_model(input);
@@ -473,9 +473,9 @@ mod tests {
     fn test_shadowing_prefix() {
         let input = quote! {
             grammar test {
-                rule main -> ()
-                    = "a" -> { () }
-                    | "a" "b" -> { () }
+                main
+                    = "a"
+                    | "a" "b"
             }
         };
         let model = parse_model(input);
@@ -489,9 +489,9 @@ mod tests {
     fn test_no_shadowing() {
         let input = quote! {
             grammar test {
-                rule main -> ()
-                    = "a" "b" -> { () }
-                    | "a" -> { () }
+                main
+                    = "a" "b"
+                    | "a"
             }
         };
         let model = parse_model(input);
@@ -502,7 +502,7 @@ mod tests {
     fn test_bug_typed_param() {
         let input = quote! {
             grammar test {
-                rule list<T>(item: Type) -> () = item -> { () }
+                list<T>(item: Type) = item
             }
         };
         let model = parse_model(input);
@@ -514,7 +514,7 @@ mod tests {
     fn test_until_binding_fail() {
         let input = quote! {
             grammar test {
-                rule main -> () = until(x: "a") -> { () }
+                main = until(x: "a")
             }
         };
         let model = parse_model(input);

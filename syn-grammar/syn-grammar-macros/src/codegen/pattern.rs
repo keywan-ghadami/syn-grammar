@@ -671,6 +671,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         quote!({ #a })
                     } else if bindings.is_empty() {
                         quote!(())
+                    } else if bindings.len() == 1 {
+                        let b = &bindings[0];
+                        quote!(#b)
                     } else {
                         quote!(( #(#bindings),* ))
                     };

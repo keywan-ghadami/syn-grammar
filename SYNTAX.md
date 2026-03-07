@@ -7,11 +7,14 @@ This document serves as the reference for the **Grammar Definition Language** sh
 Grammars are defined using the `grammar!` macro. A grammar block contains a set of rules.
 
 ```rust
+# use winnow_grammar::grammar;
+# fn main() {
 grammar! {
     grammar MyGrammar {
-        rule start -> () = "hello" -> { () }
+        start = "hello"
     }
 }
+# }
 ```
 
 ## Rules
@@ -35,11 +38,18 @@ The casing of a rule's name determines its whitespace handling:
 - **Lexical Rules (UPPERCASE)**: Rule names starting with an **uppercase** letter (e.g., `rule IDENTIFIER`) are **lexical**. They do **not** allow implicit whitespace between patterns.
 
 ```rust
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
 // Syntactic: matches "a + b"
-rule add -> () = "a" "+" "b" -> { () }
+ add = "a" "+" "b"
 
 // Lexical: matches "ab", but NOT "a b"
-rule AB = "a" "b" -> { () }
+ AB = "a" "b" 
+#         }
+#     }
+# }
 ```
 
 ## Syntax Guide
@@ -48,17 +58,32 @@ rule AB = "a" "b" -> { () }
 Match a sequence of patterns. Use `name:pattern` to bind the result to a variable available in the action block.
 
 ```rust
-rule assignment -> (String, i32) = 
+# use winnow_grammar::grammar;
+# use winnow_grammar::types::Identifier;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ assignment -> (Identifier, i32) = 
     name:ident "=" val:i32 -> { (name, val) }
+#         }
+#     }
+# }
 ```
 
 ### Alternatives
 Match one of several alternatives using `|`. The first one that matches wins.
 
 ```rust
-rule choice -> bool = 
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ choice -> bool = 
     "yes" -> { true }
   | "no"  -> { false }
+#         }
+#     }
+# }
 ```
 
 ### Repetitions
@@ -67,7 +92,14 @@ rule choice -> bool =
 - `pattern?`: Match zero or one time. Returns an `Option`.
 
 ```rust
-rule list -> Vec<i32> = elements:i32* -> { elements }
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ list -> Vec<i32> = elements:i32* -> { elements }
+#         }
+#     }
+# }
 ```
 
 ### Delimiters
@@ -78,21 +110,43 @@ To match literal delimiters (parentheses, brackets, braces) in the input, use th
 - `{ pattern }`: Matches `{ pattern }`.
 
 ```rust
-rule tuple -> (i32, i32) = 
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ tuple -> (i32, i32) = 
     paren(a:i32 "," b:i32) -> { (a, b) }
+#         }
+
+#     }
+# }
 ```
 
 Use standard parentheses `(...)` **only** for logical grouping of patterns (e.g., inside an alternative).
 
 ```rust
-rule group -> () = ("a" | "b") "c" -> { () }
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ group = ("a" | "b") "c"
+#         }
+#     }
+# }
 ```
 
 ### Literals
 Match specific tokens or text using string literals.
 
 ```rust
-rule kw -> () = "fn" "name" -> { () }
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ kw  = "fn" "name"
+#         }
+#     }
+# }
 ```
 
 For matching Rust literals as values, use the `lit_*` built-ins:
@@ -125,9 +179,26 @@ The following primitives are "portable" and expected to be available in all back
 The cut operator commits to the current alternative. If the pattern *before* the `=>` matches, the parser will **not** backtrack to other alternatives if the pattern *after* the `=>` fails.
 
 ```rust
-rule stmt -> Stmt =
-    "let" => name:ident "=" e:expr -> { Stmt::Let(name, e) }
-  | e:expr -> { Stmt::Expr(e) }
+# use winnow_grammar::grammar;
+# use winnow_grammar::types::Identifier;
+# #[derive(Debug)]
+# pub enum Stmt {
+#     Let(Identifier, Box<Expr>),
+#     Expr(Box<Expr>),
+# }
+# #[derive(Debug)]
+# pub struct Expr;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ stmt -> Stmt =
+    "let" => name:ident "=" e:expr -> { Stmt::Let(name, Box::new(e)) }
+  | e:expr -> { Stmt::Expr(Box::new(e)) }
+
+expr -> Expr = i32 -> { Expr }
+#         }
+#     }
+# }
 ```
 
 ### Lookahead (`peek`, `not`)
@@ -135,7 +206,14 @@ rule stmt -> Stmt =
 - `not(pattern)`: Succeeds if `pattern` does *not* match.
 
 ```rust
-rule check -> () = "a" peek("b") -> { () }
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+check = "a" peek("b")
+#         }
+#     }
+# }
 ```
 
 ### Lexical Control (`lex`, `spaced`)
@@ -143,8 +221,16 @@ rule check -> () = "a" peek("b") -> { () }
 - `spaced(pattern)`: Forces a **syntactic context** (implicit whitespace allowed) even inside a lexical rule.
 
 ```rust
-rule word = lex(alpha+) -> { () }
-rule CAST_OPERATOR = "as" spaced("<" T ">") ;
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ word  = lex(alpha+)
+ CAST_OPERATOR = "as" spaced("<" T ">") 
+rule T  = "bool"
+#         }
+#     }
+# }
 ```
 
 ### Special (`until`, `count`, `eof`, `fail`, `recover`)
@@ -161,25 +247,48 @@ rule CAST_OPERATOR = "as" spaced("<" T ">") ;
 Rules can accept arguments to pass context or configuration.
 
 ```rust
-rule main -> i32 = "start" v:value(offset=10) -> { v }
-rule value(offset: i32) -> i32 = i:i32 -> { i + offset }
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+main -> i32 = "start" v:value(offset=10) -> { v }
+value(offset: i32) -> i32 = i:i32 -> { i + offset }
+#         }
+#     }
+# }
 ```
 
 ### Generic Rules
 Define reusable rules with generic types and parser parameters.
 
 ```rust
-rule list<T>(item) -> Vec<T> = items:item* -> { items }
-rule integers -> Vec<i32> = l:list(item=i32) -> { l }
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+list<T>(item) -> Vec<T> = items:item* -> { items }
+integers -> Vec<i32> = l:list(item=i32) -> { l }
+#         }
+#     }
+# }
 ```
 
 ### Left Recursion
 Direct left recursion is automatically detected and compiled into an iterative loop, making expression parsing natural.
 
 ```rust
-rule expr -> i32 = 
+# use winnow_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ expr -> i32 = 
     l:expr "+" r:term -> { l + r }
   | t:term            -> { t }
+
+term -> i32 = i:i32 -> {i}
+#         }
+#     }
+# }
 ```
 
 ### Shadowing Detection

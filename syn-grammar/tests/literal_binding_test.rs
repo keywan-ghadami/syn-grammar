@@ -5,9 +5,9 @@ use syn_grammar::testing::Testable;
 grammar! {
     grammar LitBind1 {
         // The literal binding `a:"a"` binds `a` to a generated token struct (e.g. `kw::a`).
-        // These tokens don't carry values, so we return hardcoded strings to verify the path.
+        // We implemented Display for these tokens so we can use .to_string() to get the value.
         pub rule main -> (String, String) =
-            a:"a" b:"b" -> { ("a".to_string(), "b".to_string()) }
+            a:"a" b:"b" -> { (a.to_string(), b.to_string()) }
     }
 }
 
@@ -21,7 +21,7 @@ grammar! {
 grammar! {
     grammar LitBind3 {
         pub rule main -> (String, String) =
-            a:r"a" b:r#"b"# -> { ("a".to_string(), "b".to_string()) }
+            a:r"a" b:r#"b"# -> { (a.to_string(), b.to_string()) }
     }
 }
 

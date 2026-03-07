@@ -6,10 +6,10 @@ use syn_grammar::testing::Testable;
 fn test_builtins() {
     grammar! {
         grammar builtins_test {
-            pub rule test_int -> i32 = i:i32 -> { i }
-            pub rule test_str -> String = s:string -> { s.value }
-            pub rule test_ident -> String = i:ident -> { i.to_string() }
-            pub rule test_eof -> () = eof -> { () }
+            pub test_int -> i32 = i:i32 -> { i }
+            pub test_str -> String = s:string -> { s.value }
+            pub test_ident -> String = i:ident -> { i.to_string() }
+            pub test_eof = eof
         }
     }
 

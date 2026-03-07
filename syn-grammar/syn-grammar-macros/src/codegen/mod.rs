@@ -24,7 +24,14 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let kw_defs = (!custom_keywords.is_empty()).then(|| {
         let defs = custom_keywords.iter().map(|k| {
             let ident = format_ident!("{}", k);
-            quote! { syn::custom_keyword!(#ident); }
+            quote! {
+                syn::custom_keyword!(#ident);
+                impl std::fmt::Display for #ident {
+                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        f.write_str(stringify!(#ident))
+                    }
+                }
+            }
         });
         quote! { pub mod kw { #(#defs)* } }
     });

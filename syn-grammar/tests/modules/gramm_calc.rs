@@ -5,11 +5,11 @@ grammar! {
     import crate::modules::units::Units as u;
 
     grammar GrammCalc {
-        pub rule expr -> i32 =
+        pub expr -> i32 =
             l:expr "+" r:term -> { l + r }
           | t:term -> { t }
 
-        rule term -> i32 =
+        term -> i32 =
                 w:u::weight -> { w }
               | n:c::num -> { n }
     }

@@ -3,20 +3,20 @@ use syn_grammar::grammar; // Import Parser trait
 
 grammar! {
     grammar until_test {
-        pub rule main -> (String, String)
+        pub main -> (String, String)
             = body:until(";") ";" -> { (body.to_string(), ";".to_string()) }
 
-        pub rule fn_keyword -> () = "fn" -> { () }
+        pub fn_keyword = "fn"
 
-        pub rule until_keyword -> (String, String)
+        pub until_keyword -> (String, String)
             = body:until(fn_keyword) "fn" -> { (body.to_string(), "fn".to_string()) }
 
-        pub rule nested_until -> String
+        pub nested_until -> String
             = "start" body:until("end") "end" -> { body.to_string() }
 
-        pub rule ab -> String = "a" -> { "a".to_string() } | "b" -> { "b".to_string() }
+        pub ab -> String = "a" -> { "a".to_string() } | "b" -> { "b".to_string() }
 
-        pub rule until_group -> String
+        pub until_group -> String
              = body:until(ab) delim:ab -> { format!("{}{}", body, delim) }
     }
 }
