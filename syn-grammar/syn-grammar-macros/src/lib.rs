@@ -29,7 +29,12 @@ fn grammar_core(input: TokenStream) -> TokenStream {
     m_ast.rules = monomorphizer.process();
 
     match codegen::generate_rust(m_ast) {
-        Ok(stream) => stream.into(),
+        Ok(stream) => {
+            if std::env::var("DEBUG_GRAMMAR").is_ok() {
+                eprintln!("{}", stream);
+            }
+            stream.into()
+        }
         Err(e) => e.to_compile_error().into(),
     }
 }

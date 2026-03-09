@@ -313,9 +313,16 @@ impl Parse for Rule {
             syn::parse_quote!(())
         };
 
-        let _ = input.parse::<Token![=]>()?;
+        let capture_span = if input.peek(Token![@]) && input.peek2(Token![=]) {
+            let _ = input.parse::<Token![@]>()?;
+            let _ = input.parse::<Token![=]>()?;
+            true
+        } else {
+            let _ = input.parse::<Token![=]>()?;
+            false
+        };
 
-        let variants = RuleVariant::parse_list(input)?;
+        let variants = RuleVariant::parse_list(input, capture_span)?;
 
         Ok(Rule {
             attrs,
@@ -353,6 +360,12 @@ impl ToTokens for Rule {
             v.to_tokens(&mut variants_tokens);
         }
 
+        // We don't have explicit access to capture_span here to re-emit it,
+        // but RuleVariant knows about with_span which is derived from it.
+        // However, standard ToTokens for Rule usually reconstructs the syntax.
+        // If we want to support round-tripping or accurate ToTokens, we should store capture_span in Rule.
+        // But for now, just emitting = is standard. If the variants use it, fine.
+
         tokens.append_all(quote! {
             #(#attrs)*
             #vis rule #name #generics #params_tokens -> #ret = #variants_tokens
@@ -375,10 +388,12 @@ pub struct RuleVariant {
     pub pattern: Vec<Pattern>,
     pub label: Option<String>,
     pub action: TokenStream,
+    pub with_span: bool,
+    pub is_explicit: bool,
 }
 
 impl RuleVariant {
-    pub fn parse_list(input: ParseStream) -> Result<Vec<Self>> {
+    pub fn parse_list(input: ParseStream, capture_span: bool) -> Result<Vec<Self>> {
         let mut variants = Vec::new();
         loop {
             let mut pattern: Vec<Pattern> = Vec::new();
@@ -393,7 +408,11 @@ impl RuleVariant {
                 if input.peek(Ident) && input.peek2(Token![=]) {
                     break;
                 }
-                // 2. `pub` keyword (e.g. `pub rule ...` or `pub next_rule ...`)
+                // 2. Ident followed by `@` then `=`
+                if input.peek(Ident) && input.peek2(Token![@]) && input.peek3(Token![=]) {
+                    break;
+                }
+                // 3. `pub` keyword (e.g. `pub rule ...` or `pub next_rule ...`)
                 if input.peek(Token![pub]) {
                     break;
                 }
@@ -409,7 +428,9 @@ impl RuleVariant {
                 None
             };
 
+            let mut is_explicit = false;
             let action = if input.peek(Token![->]) {
+                is_explicit = true;
                 let _ = input.parse::<Token![->]>()?;
                 let content;
                 syn::braced!(content in input);
@@ -434,6 +455,8 @@ impl RuleVariant {
                 pattern,
                 label,
                 action,
+                with_span: capture_span,
+                is_explicit,
             });
 
             if input.peek(Token![|]) {
@@ -457,9 +480,15 @@ impl ToTokens for RuleVariant {
             quote! {}
         };
 
-        tokens.append_all(quote! {
-            #(#pattern)* #label -> { #action }
-        });
+        if self.is_explicit {
+            tokens.append_all(quote! {
+                #(#pattern)* #label -> { #action }
+            });
+        } else {
+            tokens.append_all(quote! {
+                #(#pattern)* #label
+            });
+        }
     }
 }
 

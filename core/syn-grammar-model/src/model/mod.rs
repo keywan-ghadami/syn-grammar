@@ -52,6 +52,8 @@ pub struct RuleVariant {
     pub pattern: Vec<ModelPattern>,
     pub action: TokenStream,
     pub label: Option<String>,
+    pub with_span: bool,
+    pub is_explicit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -217,6 +219,8 @@ impl From<parser::RuleVariant> for RuleVariant {
             pattern: p.pattern.into_iter().map(Into::into).collect(),
             action: p.action,
             label: p.label,
+            with_span: p.with_span,
+            is_explicit: p.is_explicit,
         }
     }
 }

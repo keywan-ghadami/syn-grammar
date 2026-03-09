@@ -681,6 +681,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         pattern: pat_seq.clone(), // Use clone() as it's Vec<ModelPattern>
                         label: label.clone(),
                         action: quote!({ #action_expr }),
+                        with_span: false,
+                        is_explicit: false,
                     }
                 })
                 .collect::<Vec<_>>();

@@ -18,6 +18,7 @@ syn = { version = "2.0", features = ["full", "extra-traits"], optional = true }
 proc-macro2 = { version = "1.0", optional = true, features = ["span-locations"] }
 termcolor = { version = "1.2", optional = true }
 paste = "1.0"
+grammar-kit-macros = { path = "../grammar-kit-macros" }
 
 [dev-dependencies]
 syn = { version = "2.0", features = ["full", "extra-traits"] }

@@ -89,11 +89,21 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 name = "grammar-kit"
 version = "0.9.0"
 dependencies = [
+ "grammar-kit-macros",
  "paste",
  "proc-macro2",
  "quote",
  "syn",
  "termcolor",
+]
+
+[[package]]
+name = "grammar-kit-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

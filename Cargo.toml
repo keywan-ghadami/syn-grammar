@@ -4,6 +4,7 @@ members = [
     "syn-grammar/syn-grammar-macros",
     "core/syn-grammar-model",
     "core/grammar-kit",
+    "core/grammar-kit-macros",
     "winnow-grammar",
     "winnow-grammar/winnow-grammar-macros",
 ]
