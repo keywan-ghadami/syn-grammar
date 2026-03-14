@@ -2,7 +2,50 @@ use crate::model::{Argument, GrammarDefinition, ModelPattern, RuleVariant};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet, VecDeque};
+use syn::visit::{self, Visit};
 use syn::{parse_quote, Lit, Result};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReturnTypeKind {
+    Empty,
+    Primitive,
+    Borrowed,
+}
+
+pub fn determine_return_type_kind(ty: &syn::Type) -> ReturnTypeKind {
+    // 1. Check for borrowed
+    struct LifetimeVisitor {
+        has_lifetime_a: bool,
+    }
+
+    impl<'ast> Visit<'ast> for LifetimeVisitor {
+        fn visit_lifetime(&mut self, i: &'ast syn::Lifetime) {
+            if i.ident == "a" {
+                self.has_lifetime_a = true;
+            }
+            visit::visit_lifetime(self, i);
+        }
+    }
+
+    let mut visitor = LifetimeVisitor {
+        has_lifetime_a: false,
+    };
+    visitor.visit_type(ty);
+
+    if visitor.has_lifetime_a {
+        return ReturnTypeKind::Borrowed;
+    }
+
+    // 2. Check for empty tuple
+    if let syn::Type::Tuple(t) = ty {
+        if t.elems.is_empty() {
+            return ReturnTypeKind::Empty;
+        }
+    }
+
+    // 3. Otherwise primitive/owned
+    ReturnTypeKind::Primitive
+}
 
 /// Collects all custom keywords from the grammar
 pub fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {

@@ -1,4 +1,4 @@
-use crate::parser;
+use crate::{analysis, parser};
 use proc_macro2::{Ident, TokenStream};
 use syn::spanned::Spanned;
 
@@ -35,6 +35,7 @@ pub struct Rule {
     pub generics: syn::Generics,
     pub params: Vec<RuleParameter>,
     pub return_type: syn::Type,
+    pub return_type_kind: analysis::ReturnTypeKind,
     pub variants: Vec<RuleVariant>,
     pub is_pub: bool,
     pub is_lexical: bool,
@@ -191,11 +192,13 @@ impl From<parser::Rule> for Rule {
             .chars()
             .next()
             .is_some_and(char::is_uppercase);
+        let return_type_kind = analysis::determine_return_type_kind(&p.return_type);
         Rule {
             name: p.name,
             generics: p.generics,
             params: p.params.into_iter().map(Into::into).collect(),
             return_type: p.return_type,
+            return_type_kind,
             variants: p.variants.into_iter().map(Into::into).collect(),
             is_pub: p.is_pub.is_some(),
             is_lexical,

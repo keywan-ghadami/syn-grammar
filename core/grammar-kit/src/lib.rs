@@ -14,24 +14,9 @@ use syn::Result;
 pub mod testing;
 
 pub mod macros;
-pub mod test_macros;
 
 pub use grammar_kit_macros::with_span;
 
-/// Interface for bridging parsed data with source span information.
-///
-/// # ⚠️ ARCHITECTURAL WARNING
-///
-/// **Manual implementation of this trait is strongly discouraged.**
-///
-/// This trait is intended to be implemented automatically by the `#[ast_node]` attribute macro.
-/// The macro ensures strict adherence to the architecture's zero-copy semantics and deferred
-/// allocation guarantees.
-///
-/// By manually implementing this trait, you opt out of these safety guarantees and assume full
-/// responsibility for maintaining the integrity of the span mapping and memory model.
-///
-/// **"You break it, you own it."**
 pub trait WithSpan<ParsedData> {
     /// Constructs the node from parsed data and a source span.
     fn with_span(parsed_data: ParsedData, span: std::ops::Range<usize>) -> Self;
