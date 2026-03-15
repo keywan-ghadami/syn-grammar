@@ -1,0 +1,165 @@
+   Compiling winnow-grammar-macros v0.1.0 (/home/user/syn-grammar/winnow-grammar/winnow-grammar-macros)
+   Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
+error[E0277]: `?` couldn't convert the error to `ContextError`
+  --> winnow-grammar/tests/comprehensive.rs:28:1
+   |
+13 | / grammar! {
+14 | |     grammar Comprehensive {
+15 | |         pub rule value -> Value =
+16 | |             i:i32 not(".") not("e") n...
+...  |
+28 | | }
+   | | ^
+   | | |
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, InputError<...>>`
+   |
+   = help: the trait `From<InputError<Stateful<LocatingSlice<&str>, S>>>` is not implemented for `ContextError`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-17768141871138732138.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `ContextError`
+  --> winnow-grammar/tests/comprehensive.rs:28:1
+   |
+13 | / grammar! {
+14 | |     grammar Comprehensive {
+15 | |         pub rule value -> Value =
+16 | |             i:i32 not(".") not("e") n...
+...  |
+28 | | }
+   | | ^
+   | | |
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, InputError<...>>`
+   |
+   = help: the trait `From<InputError<Stateful<LocatingSlice<&str>, S>>>` is not implemented for `ContextError`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-7060313401342421583.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+  --> winnow-grammar/tests/comprehensive.rs:13:1
+   |
+13 | / grammar! {
+14 | |     grammar Comprehensive {
+15 | |         pub rule value -> Value =
+16 | |             i:i32 not(".") not("e") n...
+...  |
+28 | | }
+   | | ^
+   | | |
+   | |_expected `Result<Value, InputError<...>>`, found `Result<Value, ContextError>`
+   |   expected `Result<Value, ...>` because of return type
+   |
+   = note: expected enum `Result<_, InputError<Stateful<LocatingSlice<&'a str>, S>>>`
+              found enum `Result<_, ContextError>`
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-8861595443993087425.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `ContextError`
+  --> winnow-grammar/tests/comprehensive.rs:28:1
+   |
+13 | / grammar! {
+14 | |     grammar Comprehensive {
+15 | |         pub rule value -> Value =
+16 | |             i:i32 not(".") not("e") n...
+...  |
+28 | | }
+   | | ^
+   | | |
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, InputError<...>>`
+   |
+   = help: the trait `From<InputError<Stateful<LocatingSlice<&str>, S>>>` is not implemented for `ContextError`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-13939593741770528915.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+  --> winnow-grammar/tests/comprehensive.rs:13:1
+   |
+13 | / grammar! {
+14 | |     grammar Comprehensive {
+15 | |         pub rule value -> Value =
+16 | |             i:i32 not(".") not("e") n...
+...  |
+28 | | }
+   | | ^
+   | | |
+   | |_expected `Result<Vec<Value>, InputError<...>>`, found `Result<Vec<Value>, ContextError>`
+   |   expected `Result<Vec<Value>, ...>` because of return type
+   |
+   = note: expected enum `Result<_, InputError<Stateful<LocatingSlice<&'a str>, S>>>`
+              found enum `Result<_, ContextError>`
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-10151072096679852753.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `ContextError`
+  --> winnow-grammar/tests/comprehensive.rs:79:1
+   |
+73 | / grammar! {
+74 | |     grammar GenericReturn {
+75 | |         pub rule optional_int -> Opti...
+76 | |             i:i32 -> { Some(i) }
+...  |
+79 | | }
+   | | ^
+   | | |
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, InputError<...>>`
+   |
+   = help: the trait `From<InputError<Stateful<LocatingSlice<&str>, S>>>` is not implemented for `ContextError`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-17768141871138732138.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `ContextError`
+  --> winnow-grammar/tests/comprehensive.rs:79:1
+   |
+73 | / grammar! {
+74 | |     grammar GenericReturn {
+75 | |         pub rule optional_int -> Opti...
+76 | |             i:i32 -> { Some(i) }
+...  |
+79 | | }
+   | | ^
+   | | |
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, InputError<...>>`
+   |
+   = help: the trait `From<InputError<Stateful<LocatingSlice<&str>, S>>>` is not implemented for `ContextError`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-7060313401342421583.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+  --> winnow-grammar/tests/comprehensive.rs:73:1
+   |
+73 | / grammar! {
+74 | |     grammar GenericReturn {
+75 | |         pub rule optional_int -> Opti...
+76 | |             i:i32 -> { Some(i) }
+...  |
+79 | | }
+   | | ^
+   | | |
+   | |_expected `Result<Option<i32>, InputError<...>>`, found `Result<Option<i32>, ContextError>`
+   |   expected `Result<..., ...>` because of return type
+   |
+   = note: expected enum `Result<_, InputError<Stateful<LocatingSlice<&'a str>, S>>>`
+              found enum `Result<_, ContextError>`
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/comprehensive-e159b253547d19d5.long-type-769022040949402581.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `winnow-grammar` (test "comprehensive") due to 9 previous errors
