@@ -1,35 +1,85 @@
    Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
 error[E0782]: expected a type, found a trait
-  --> winnow-grammar/tests/explicit_span_test.rs:17:1
+  --> winnow-grammar/tests/span_injection_test.rs:17:1
    |
 17 | / grammar! {
-18 | |     grammar ExplicitSpanTest {
-19 | |         pub rule custom_node ->...
-20 | |     }
-21 | | }
+18 | |     grammar SpanTest {
+19 | |         // We now need @= to op...
+20 | |         pub rule main -> Spanne...
+21 | |     }
+22 | | }
    | |_^
    |
    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: the method `parse` exists for fn item `fn() -> ... {parse_custom_node::<'_, _>}`, but its trait bounds were not satisfied
-  --> winnow-grammar/tests/explicit_span_test.rs:27:54
+error[E0782]: expected a type, found a trait
+  --> winnow-grammar/tests/span_injection_test.rs:50:1
    |
-27 | ...tom_node.parse(input).unwrap();
-   |             ^^^^^ method cannot be called on `fn() -> ... {parse_custom_node::<'_, _>}` due to unsatisfied trait bounds
+50 | / grammar! {
+51 | |     grammar SpanTupleTest {
+52 | |         // Opt-in with @=
+53 | |         pub rule main -> Spanne...
+54 | |     }
+55 | | }
+   | |_^
    |
-   = note: the following trait bounds were not satisfied:
-           `<fn() -> impl winnow::Parser<Stateful<LocatingSlice<&str>, _>, CustomNode, InputError<Stateful<LocatingSlice<&str>, _>>> {parse_custom_node::<'_, _>} as FnOnce<(&mut _,)>>::Output = Result<_, _>`
-           which is required by `fn() -> impl winnow::Parser<Stateful<LocatingSlice<&str>, _>, CustomNode, InputError<Stateful<LocatingSlice<&str>, _>>> {parse_custom_node::<'_, _>}: winnow::Parser<_, _, _>`
-           `fn() -> impl winnow::Parser<Stateful<LocatingSlice<&str>, _>, CustomNode, InputError<Stateful<LocatingSlice<&str>, _>>> {parse_custom_node::<'_, _>}: FnMut<(&mut _,)>`
-           which is required by `fn() -> impl winnow::Parser<Stateful<LocatingSlice<&str>, _>, CustomNode, InputError<Stateful<LocatingSlice<&str>, _>>> {parse_custom_node::<'_, _>}: winnow::Parser<_, _, _>`
-   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/explicit_span_test-91f63ae45e9e3994.long-type-13615854255211655763.txt'
-   = note: consider using `--verbose` to print the full type name to the console
-help: use parentheses to call this function
-   |
-27 |     let result = ExplicitSpanTest::parse_custom_node().parse(input).unwrap();
-   |                                                     ++
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-Some errors have detailed explanations: E0599, E0782.
-For more information about an error, try `rustc --explain E0599`.
-error: could not compile `winnow-grammar` (test "explicit_span_test") due to 2 previous errors
+For more information about this error, try `rustc --explain E0782`.
+error: could not compile `winnow-grammar` (test "span_injection_test") due to 2 previous errors
 warning: build failed, waiting for other jobs to finish...
+error[E0425]: cannot find type `Output_item` in this scope
+  --> winnow-grammar/tests/generics_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar Generics {
+ 7 | |         list<T>(item) -> Vec<T> =
+ 8 | |             "[" elements:item* ...
+...  |
+13 | | }
+   | |_^ not found in this scope
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> winnow-grammar/tests/generics_test.rs:8:41
+    |
+  5 | / grammar! {
+  6 | |     grammar Generics {
+  7 | |         list<T>(item) -> Vec<T> =
+    | |              - expected type parameter
+  8 | |             "[" elements:item* "]" -> { elements }
+    | |                                         ^^^^^^^^ expected `Vec<T>`, found `Vec<Output_item>`
+...   |
+ 13 | | }
+    | | -
+    | | |
+    | | found type parameter
+    | |_here the type of `elements` is inferred to be `Vec<Output_item>`
+    |   arguments to this enum variant are incorrect
+    |
+    = note: expected struct `Vec<T>`
+               found struct `Vec<Output_item>`
+    = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound
+    = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+help: the type constructed contains `Vec<Output_item>` due to the type of the argument passed
+   --> winnow-grammar/tests/generics_test.rs:5:1
+    |
+  5 | / grammar! {
+  6 | |     grammar Generics {
+  7 | |         list<T>(item) -> Vec<T> =
+  8 | |             "[" elements:item* "]" -> { elements }
+    | |                                         -------- this argument influences the type of `Ok`
+...   |
+ 13 | | }
+    | |_^
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:561:5
+    |
+561 |     Ok(#[stable(feature = "rust1...
+    |     ^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0308, E0425.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `winnow-grammar` (test "generics_test") due to 2 previous errors
