@@ -1,22 +1,81 @@
-   Compiling winnow-grammar-macros v0.1.0 (/home/user/syn-grammar/winnow-grammar/winnow-grammar-macros)
-warning: unused variable: `ret_type`
-   --> winnow-grammar/winnow-grammar-macros/src/codegen/variants.rs:133:9
-    |
-133 |         ret_type: &syn::Type,
-    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ret_type`
-    |
-    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
-warning: `winnow-grammar-macros` (lib) generated 1 warning (run `cargo fix --lib -p winnow-grammar-macros` to apply 1 suggestion)
    Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.32s
-     Running tests/comprehensive.rs (target/debug/deps/comprehensive-e159b253547d19d5)
+error[E0525]: expected a closure that implements the `FnMut` trait, but this closure only implements `FnOnce`
+  --> winnow-grammar/tests/generics_test.rs:6:1
+   |
+ 6 | / grammar! {
+ 7 | |     grammar Generics {
+ 8 | |         // Explicitly type the ...
+ 9 | |         list<T>(item: impl Pars...
+   | |                 ---- closure is `FnOnce` because it moves the variable `item` out of its environment
+...  |
+16 | | }
+   | | ^
+   | | |
+   | | this closure implements `FnOnce`, not `FnMut`
+   | |_the requirement to implement `FnMut` derives from here
+   |   return type was inferred to be `{closure@...}` here
+   |
+   = note: required for `{closure@...}` to implement `Parser<Stateful<..., ...>, ..., ...>`
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/generics_test-0a72d56d3b470c90.long-type-14883443281113363468.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-running 4 tests
-test test_generic_return ... ok
-test test_mixed_values ... ok
-test test_num_formats ... ok
-test test_int64 ... ok
+error[E0271]: expected `{closure@...}` to return `Result<_, ...>`, but it returns `Result<T, ContextError>`
+  --> winnow-grammar/tests/generics_test.rs:6:1
+   |
+ 6 | / grammar! {
+ 7 | |     grammar Generics {
+ 8 | |         // Explicitly type the ...
+ 9 | |         list<T>(item: impl Pars...
+...  |
+16 | | }
+   | | ^
+   | | |
+   | |_this closure
+   |   expected `Result<T, InputError<...>>`, found `Result<T, ContextError>`
+   |
+   = note: expected enum `Result<_, InputError<Stateful<LocatingSlice<&str>, S>>>`
+              found enum `Result<_, ContextError>`
+   = note: required for `{closure@...}` to implement `Parser<Stateful<..., ...>, ..., ...>`
+note: required by a bound in `preceded`
+  --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winnow-0.7.15/src/combinator/sequence.rs:41:16
+   |
+33 | ...fn preceded<Input, Ignored, Output, Error,...
+   |       -------- required by a bound in this function
+...
+41 | ...ParseNext: Parser<Input, Output, Error>,
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `preceded`
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/generics_test-0a72d56d3b470c90.long-type-9470603935150666256.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+error[E0271]: expected `{closure@...}` to return `Result<_, ContextError>`, but it returns `Result<u32, ...>`
+  --> winnow-grammar/tests/generics_test.rs:6:1
+   |
+ 6 | / grammar! {
+ 7 | |     grammar Generics {
+ 8 | |         // Explicitly type the ...
+ 9 | |         list<T>(item: impl Pars...
+...  |
+16 | | }
+   | | ^
+   | | |
+   | |_this closure
+   |   expected `Result<u32, ContextError>`, found `Result<u32, InputError<...>>`
+   |
+   = note: expected enum `Result<_, ContextError>`
+              found enum `Result<_, InputError<Stateful<LocatingSlice<&str>, _>>>`
+   = note: required for `{closure@...}` to implement `Parser<Stateful<..., _>, u32, ...>`
+note: required by a bound in `parse_list_inner`
+  --> winnow-grammar/tests/generics_test.rs:9:28
+   |
+ 9 | ...pl Parser<ParseInput<'a, S>, T, winnow::error::ContextError>) -...
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `parse_list_inner`
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/generics_test-0a72d56d3b470c90.long-type-11239934925384151389.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
+Some errors have detailed explanations: E0271, E0525.
+For more information about an error, try `rustc --explain E0271`.
+error: could not compile `winnow-grammar` (test "generics_test") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
