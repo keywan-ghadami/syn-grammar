@@ -12,7 +12,6 @@ The framework supports multiple backends depending on your parsing needs:
 ## Documentation
 
 - **[Grammar Syntax Reference](SYNTAX.md)**: Detailed guide to the shared grammar definition language (rules, operators, built-ins).
-- **[Extending Guide](EXTENDING.md)**: Guide for library authors on how to build custom backends using `syn-grammar-model`.
 
 ## License
 
