@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use syn::parse::Parser;
 use syn_grammar::grammar;
+use syn_grammar::testing::Testable;
 
 #[test]
 fn test_generic_rule() {
@@ -13,7 +15,10 @@ fn test_generic_rule() {
         }
     }
 
-    // ... test execution ...
+    generic_list::parse_main
+        .parse_str("1 2 3")
+        .test()
+        .assert_success_is(vec![1, 2, 3]);
 }
 
 #[test]
@@ -33,4 +38,12 @@ fn test_generic_inference() {
                 }
         }
     }
+    let mut expected = HashMap::new();
+    expected.insert("a".to_string(), 1);
+    expected.insert("b".to_string(), 2);
+
+    generic_map::parse_main
+        .parse_str(r#""a": 1 "b": 2"#)
+        .test()
+        .assert_success_is(expected);
 }
