@@ -1,6 +1,6 @@
    Compiling winnow-grammar-macros v0.1.0 (/home/user/syn-grammar/winnow-grammar/winnow-grammar-macros)
     Checking winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.04s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.66s
 
 #![feature(prelude_import)]
 #[macro_use]
@@ -59,8 +59,11 @@ pub mod Generics {
                 >(
                         0..,
                         ::winnow::combinator::preceded(
-                            |i: &mut _| WS(i),
-                            (|i: &mut _| ::winnow::Parser::parse_next(&mut item, i)),
+                            |i: &mut ::winnow_grammar::ParseInput<'a, S>| WS(i),
+                            (|i: &mut ::winnow_grammar::ParseInput<'a, S>| ::winnow::Parser::parse_next(
+                                &mut item,
+                                i,
+                            )),
                         ),
                     )
                     .parse_next(input)?;
@@ -111,7 +114,7 @@ pub mod Generics {
             use ::winnow::prelude::*;
             {
                 let _ = WS(input)?;
-                let l = (|i: &mut _| parse_list_inner(
+                let l = (|i: &mut ::winnow_grammar::ParseInput<'a, S>| parse_list_inner(
                     i,
                     ::winnow::ascii::dec_uint::<
                         ::winnow_grammar::ParseInput<'a, S>,
