@@ -1,0 +1,25 @@
+   Compiling winnow-grammar-macros v0.1.0 (/home/user/syn-grammar/winnow-grammar/winnow-grammar-macros)
+   Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
+error[E0525]: expected a closure that implements the `FnMut` trait, but this closure only implements `FnOnce`
+  --> winnow-grammar/tests/generics_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar Generics {
+ 7 | |         list<T>(item: Rule<T>) -> Vec<T> =
+   | |                 ---- closure is `FnOnce` because it moves the variable `item` out of its environment
+ 8 | |             elements:item* -> { elements }
+...  |
+11 | | }
+   | | ^
+   | | |
+   | | this closure implements `FnOnce`, not `FnMut`
+   | |_the requirement to implement `FnMut` derives from here
+   |   return type was inferred to be `{closure@...}` here
+   |
+   = note: required for `{closure@...}` to implement `Parser<Stateful<..., ...>, ..., ...>`
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/generics_test-0eac061d4b1087e6.long-type-3806606884523856870.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0525`.
+error: could not compile `winnow-grammar` (test "generics_test") due to 1 previous error
