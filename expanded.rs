@@ -1,17 +1,6 @@
+   Compiling winnow-grammar-macros v0.1.0 (/home/user/syn-grammar/winnow-grammar/winnow-grammar-macros)
     Checking winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-error[E0425]: cannot find type `Output_item` in this scope
-  --> winnow-grammar/tests/generics_test.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar Generics {
- 7 | |         list<T>(item) -> Vec<T> =
- 8 | |             elements:item* -> {...
-...  |
-11 | | }
-   | |_^ not found in this scope
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-For more information about this error, try `rustc --explain E0425`.
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.04s
 
 #![feature(prelude_import)]
 #[macro_use]
@@ -40,11 +29,11 @@ pub mod Generics {
         ::winnow::ascii::multispace0.parse_next(input).map(|_| ())
     }
     #[allow(dead_code)]
-    fn parse_list_inner<'a, S: std::fmt::Debug + Clone, T, Output_item>(
+    fn parse_list_inner<'a, S: std::fmt::Debug + Clone, T>(
         input: &mut ::winnow_grammar::ParseInput<'a, S>,
         mut item: impl ::winnow::Parser<
             ::winnow_grammar::ParseInput<'a, S>,
-            Output_item,
+            T,
             ::winnow::error::InputError<::winnow_grammar::ParseInput<'a, S>>,
         >,
     ) -> ::winnow::Result<
@@ -70,8 +59,8 @@ pub mod Generics {
                 >(
                         0..,
                         ::winnow::combinator::preceded(
-                            move |i: &mut _| WS(i),
-                            (move |i: &mut _| ::winnow::Parser::parse_next(&mut item, i)),
+                            |i: &mut _| WS(i),
+                            (|i: &mut _| ::winnow::Parser::parse_next(&mut item, i)),
                         ),
                     )
                     .parse_next(input)?;
@@ -84,7 +73,7 @@ pub mod Generics {
     fn parse_list<'a, S: std::fmt::Debug + Clone, T>(
         mut item: impl ::winnow::Parser<
             ::winnow_grammar::ParseInput<'a, S>,
-            Output_item,
+            T,
             ::winnow::error::InputError<::winnow_grammar::ParseInput<'a, S>>,
         >,
     ) -> impl ::winnow::Parser<
@@ -99,7 +88,7 @@ pub mod Generics {
             ::winnow::error::InputError<::winnow_grammar::ParseInput<'a, S>>,
         > {
             let _ = WS(input)?;
-            let result = parse_list_inner(input, item)?;
+            let result = parse_list_inner(input, &mut item)?;
             let _ = WS(input)?;
             ::winnow::combinator::eof.parse_next(input)?;
             Ok(result)
@@ -122,7 +111,7 @@ pub mod Generics {
             use ::winnow::prelude::*;
             {
                 let _ = WS(input)?;
-                let l = (move |i: &mut _| parse_list_inner(
+                let l = (|i: &mut _| parse_list_inner(
                     i,
                     ::winnow::ascii::dec_uint::<
                         ::winnow_grammar::ParseInput<'a, S>,
