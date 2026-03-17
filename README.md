@@ -9,9 +9,8 @@ The framework supports multiple backends depending on your parsing needs:
 - **[`syn-grammar`](syn-grammar/README.md)**: Designed for parsing Rust TokenStreams. Ideal for writing procedural macros, DSLs embedded in Rust, and code generation tools.
 - **[`winnow-grammar`](winnow-grammar/README.md)**: Built on top of `winnow`. Designed for general-purpose parsing of text (`&str`) and binary data (`&[u8]`). Ideal for file formats, protocols, and configuration files.
 
-## Documentation
-
-- **[Grammar Syntax Reference](SYNTAX.md)**: Detailed guide to the shared grammar definition language (rules, operators, built-ins).
+## Documentation 
+- **[Extending Guide](EXTENDING.md)**: Guide for library authors on how to build custom backends using `syn-grammar-model`.
 
 ## License
 
