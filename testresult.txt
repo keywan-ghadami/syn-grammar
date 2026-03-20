@@ -1,32 +1,77 @@
    Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-error[E0308]: mismatched types
-  --> winnow-grammar/tests/args.rs:4:1
+error[E0277]: `?` couldn't convert the error to `ErrMode<_>`
+  --> winnow-grammar/tests/left_recursion.rs:19:1
    |
- 4 | / grammar! {
- 5 | |     grammar Args {
- 6 | |         pub main -> i32 =
- 7 | |             "start" v:...
+10 | / grammar! {
+11 | |     grammar LeftRec {
+12 | |         pub rule expr ...
+13 | |             l:expr "+"...
 ...  |
-12 | | }
+19 | | }
    | | ^
    | | |
-   | |_expected `i32`, found `&mut {integer}`
-   |   arguments to this function are incorrect
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, InputError<...>>`
    |
-note: function defined here
-  --> winnow-grammar/tests/args.rs:4:1
-   |
- 4 | / grammar! {
- 5 | |     grammar Args {
- 6 | |         pub main -> i32 =
- 7 | |             "start" v:value(...
- 8 | |
- 9 | |         value(offset: i32) -...
-   | |               -----------
-...  |
-12 | | }
-   | |_^
+   = help: the trait `From<InputError<Stateful<LocatingSlice<&str>, S>>>` is not implemented for `ErrMode<_>`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/left_recursion-39a370593ef0c9fa.long-type-2277292051903545087.txt'
+   = note: consider using `--verbose` to print the full type name to the console
    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-For more information about this error, try `rustc --explain E0308`.
-error: could not compile `winnow-grammar` (test "args") due to 1 previous error
+error[E0277]: `?` couldn't convert the error to `ErrMode<_>`
+  --> winnow-grammar/tests/left_recursion.rs:19:1
+   |
+10 | / grammar! {
+11 | |     grammar LeftRec {
+12 | |         pub rule expr ...
+13 | |             l:expr "+"...
+...  |
+19 | | }
+   | | ^
+   | | |
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, InputError<...>>`
+   |
+   = help: the trait `From<InputError<Stateful<LocatingSlice<&str>, S>>>` is not implemented for `ErrMode<_>`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/left_recursion-39a370593ef0c9fa.long-type-17454490564825410571.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> winnow-grammar/tests/left_recursion.rs:10:1
+    |
+ 10 | / grammar! {
+ 11 | |     grammar LeftRec {
+ 12 | |         pub rule expr...
+ 13 | |             l:expr "+...
+...   |
+ 19 | | }
+    | | ^
+    | | |
+    | |_expected `InputError<Stateful<..., ...>>`, found `ErrMode<_>`
+    |   arguments to this enum variant are incorrect
+    |
+    = note: expected struct `InputError<Stateful<LocatingSlice<&str>, S>>`
+                 found enum `ErrMode<_>`
+help: the type constructed contains `ErrMode<_>` due to the type of the argument passed
+   --> winnow-grammar/tests/left_recursion.rs:10:1
+    |
+ 10 | / grammar! {
+ 11 | |     grammar LeftRec {
+ 12 | |         pub rule expr...
+ 13 | |             l:expr "+...
+...   |
+ 19 | | }
+    | |_^ this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:566:5
+    |
+566 |     Err(#[stable(featur...
+    |     ^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `winnow-grammar` (test "left_recursion") due to 3 previous errors
