@@ -1,16 +1,22 @@
    Compiling winnow-grammar-macros v0.1.0 (/home/user/syn-grammar/winnow-grammar/winnow-grammar-macros)
    Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-error[E0425]: cannot find type `T` in this scope
- --> winnow-grammar/tests/generics_test.rs:7:39
-  |
-7 |         list<T>(item: Rule<T>) -> Vec<T> =
-  |                                       ^ not found in this scope
+error[E0501]: cannot borrow value as mutable because previous closure requires unique access
+  --> winnow-grammar/tests/generics_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar Generics {
+ 7 | |         list<T>(item: ...
+ 8 | |             elements:i...
+...  |
+11 | | }
+   | | ^
+   | | |
+   | | second borrow occurs here
+   | | closure construction occurs here
+   | |_first borrow occurs due to use of value in closure
+   |   first borrow later used by call
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0425]: cannot find value `elements` in this scope
- --> winnow-grammar/tests/generics_test.rs:8:33
-  |
-8 |             elements:item* -> { elements }
-  |                                 ^^^^^^^^ not found in this scope
-
-For more information about this error, try `rustc --explain E0425`.
-error: could not compile `winnow-grammar` (test "generics_test") due to 2 previous errors
+For more information about this error, try `rustc --explain E0501`.
+error: could not compile `winnow-grammar` (test "generics_test") due to 1 previous error
