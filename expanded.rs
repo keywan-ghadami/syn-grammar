@@ -1,15 +1,6 @@
+   Compiling winnow-grammar-macros v0.1.0 (/home/user/syn-grammar/winnow-grammar/winnow-grammar-macros)
     Checking winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-error[E0425]: cannot find type `T` in this scope
- --> winnow-grammar/tests/generics_test.rs:7:39
-  |
-7 | ...-> Vec<T> =
-  |           ^ not found in this scope
-error[E0425]: cannot find value `elements` in this scope
- --> winnow-grammar/tests/generics_test.rs:8:33
-  |
-8 | ...-> { elements }
-  |         ^^^^^^^^ not found in this scope
-For more information about this error, try `rustc --explain E0425`.
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.89s
 
 #![feature(prelude_import)]
 #[macro_use]
@@ -57,21 +48,21 @@ pub mod Generics {
                 let l = (|
                     i: &mut ::winnow_grammar::ParseInput<'a, S>,
                 | -> ::winnow::Result<
-                    Vec<T>,
+                    Vec<u32>,
                     ::winnow::error::InputError<::winnow_grammar::ParseInput<'a, S>>,
                 > {
                     let mut parser = (|
                         i: &mut ::winnow_grammar::ParseInput<'a, S>,
                     | -> ::winnow::Result<
-                        Vec<T>,
+                        Vec<u32>,
                         ::winnow::error::InputError<::winnow_grammar::ParseInput<'a, S>>,
                     > {
                         {
                             let _ = WS(input)?;
-                            let _: () = ::winnow::combinator::repeat::<
+                            let elements: Vec<_> = ::winnow::combinator::repeat::<
                                 _,
                                 _,
-                                (),
+                                Vec<_>,
                                 _,
                                 _,
                             >(
