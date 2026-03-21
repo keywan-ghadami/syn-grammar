@@ -1,3 +1,6 @@
+    Checking winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+
 #![feature(prelude_import)]
 #[macro_use]
 extern crate std;
