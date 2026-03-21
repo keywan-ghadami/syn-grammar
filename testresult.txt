@@ -1,4 +1,4 @@
-The terminal command failed with:    Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
+    Checking winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
 error[E0782]: expected a type, found a trait
   --> winnow-grammar/tests/explicit_span_test.rs:17:1
    |
@@ -11,6 +11,35 @@ error[E0782]: expected a type, found a trait
    |
    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
+error[E0782]: expected a type, found a trait
+  --> winnow-grammar/tests/span_injection_test.rs:17:1
+   |
+17 | / grammar! {
+18 | |     grammar SpanTest {
+19 | |         // We now need...
+20 | |         pub rule main ...
+21 | |     }
+22 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0782]: expected a type, found a trait
+  --> winnow-grammar/tests/span_injection_test.rs:50:1
+   |
+50 | / grammar! {
+51 | |     grammar SpanTupleT...
+52 | |         // Opt-in with @=
+53 | |         pub rule main ...
+54 | |     }
+55 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0782`.
+error: could not compile `winnow-grammar` (test "span_injection_test") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
 error[E0308]: mismatched types
   --> winnow-grammar/tests/explicit_span_test.rs:27:62
    |
@@ -37,4 +66,3 @@ note: method defined here
 Some errors have detailed explanations: E0308, E0782.
 For more information about an error, try `rustc --explain E0308`.
 error: could not compile `winnow-grammar` (test "explicit_span_test") due to 2 previous errors
-warning: build failed, waiting for other jobs to finish...
