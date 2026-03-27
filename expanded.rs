@@ -101,7 +101,7 @@ pub mod SpanTest {
                 let end = ::winnow::stream::Location::location(input);
                 #[allow(unused_variables)]
                 let _span = start..end;
-                Ok(::grammar_kit::WithSpan::with_span({ n }, _span))
+                Ok(<SpannedInt as ::grammar_kit::WithSpan<_>>::with_span({ n }, _span))
             }
         })
             .context(::winnow::error::StrContext::Label("main"));
@@ -323,7 +323,11 @@ pub mod SpanTupleTest {
                 let end = ::winnow::stream::Location::location(input);
                 #[allow(unused_variables)]
                 let _span = start..end;
-                Ok(::grammar_kit::WithSpan::with_span({ (a, b) }, _span))
+                Ok(
+                    <SpannedTuple as ::grammar_kit::WithSpan<
+                        _,
+                    >>::with_span({ (a, b) }, _span),
+                )
             }
         })
             .context(::winnow::error::StrContext::Label("main"));
