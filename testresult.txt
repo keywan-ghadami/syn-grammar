@@ -1,0 +1,35 @@
+The terminal command failed with:    Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
+error[E0782]: expected a type, found a trait
+  --> winnow-grammar/tests/explicit_span_test.rs:17:1
+   |
+17 | / grammar! {
+18 | |     grammar ExplicitSp...
+19 | |         pub custom_nod...
+20 | |     }
+21 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `unwrap` found for struct `TestResult<T, E>` in the current scope
+  --> winnow-grammar/tests/explicit_span_test.rs:26:74
+   |
+26 | ...put).unwrap();
+   |         ^^^^^^ method not found in `TestResult<..., ...>`
+   |
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/explicit_span_test-33f4d61461308f86.long-type-10247066304316152419.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+help: some of the expressions' fields have a method of the same name
+   |
+26 |     let result = ExplicitSpanTest::parse_custom_node().parse_test(input).context.unwrap();
+   |                                                                          ++++++++
+26 |     let result = ExplicitSpanTest::parse_custom_node().parse_test(input).formatter.unwrap();
+   |                                                                          ++++++++++
+26 |     let result = ExplicitSpanTest::parse_custom_node().parse_test(input).inner.unwrap();
+   |                                                                          ++++++
+26 |     let result = ExplicitSpanTest::parse_custom_node().parse_test(input).source.unwrap();
+   |                                                                          +++++++
+
+Some errors have detailed explanations: E0599, E0782.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `winnow-grammar` (test "explicit_span_test") due to 2 previous errors
