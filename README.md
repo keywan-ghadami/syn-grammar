@@ -1,3 +1,4 @@
+
 # Grammar Ecosystem
 
 The **Grammar** ecosystem is a powerful parser generator framework for Rust. It allows you to define EBNF-like grammars directly inside your Rust code using a macro, which are then compiled into efficient parsers at compile time.
