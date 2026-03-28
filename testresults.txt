@@ -1,0 +1,36 @@
+   Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
+error[E0308]: mismatched types
+   --> winnow-grammar/tests/oct_test.rs:4:1
+    |
+  4 | / grammar! {
+  5 | |     grammar OctParser {
+  6 | |         pub rule test_oct -> S...
+  7 | |             o:oct_digit1 -> { ...
+  8 | |     }
+  9 | | }
+    | | ^
+    | | |
+    | |_expected `Stateful<LocatingSlice<&str>, S>`, found `StrContext`
+    |   arguments to this method are incorrect
+    |
+    = note: expected struct `Stateful<LocatingSlice<&'a str>, S>`
+                 found enum `StrContext`
+help: the return type of this call is `StrContext` due to the type of the argument passed
+   --> winnow-grammar/tests/oct_test.rs:4:1
+    |
+  4 | / grammar! {
+  5 | |     grammar OctParser {
+  6 | |         pub rule test_oct -> S...
+  7 | |             o:oct_digit1 -> { ...
+  8 | |     }
+  9 | | }
+    | |_^ this argument influences the return type of `context`
+note: method defined here
+   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winnow-0.7.15/src/parser.rs:787:8
+    |
+787 |     fn context<C>(self, context:...
+    |        ^^^^^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `winnow-grammar` (test "oct_test") due to 1 previous error
