@@ -1,5 +1,5 @@
     Checking winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.24s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.33s
 
 #![feature(prelude_import)]
 #[macro_use]
@@ -205,7 +205,7 @@ pub const test_explicit_span_injection: test::TestDescAndFn = test::TestDescAndF
 };
 fn test_explicit_span_injection() {
     let input = "  my_ident  ";
-    let result = ExplicitSpanTest::parse_custom_node().parse_test(input).unwrap();
+    let result = ExplicitSpanTest::parse_custom_node().parse_test(input).inner.unwrap();
     match (&result.name, &"my_ident") {
         (left_val, right_val) => {
             if !(*left_val == *right_val) {
