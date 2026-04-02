@@ -10,21 +10,29 @@ type ErrorFormatter<E> = Box<dyn Fn(&E, Option<&str>) -> String>;
 
 // A wrapper around Result to write fluent tests.
 // Keeps ownership of the result to allow chaining assertions.
-pub struct TestResult<T, E> {
+pub struct TestResult<T, E, S = ()> {
     pub inner: Result<T, E>,
+    pub state: Option<S>,
     pub context: Option<String>,
     pub source: Option<String>,
     pub formatter: Option<ErrorFormatter<E>>,
 }
 
-impl<T: Debug, E: Display + Debug> TestResult<T, E> {
+impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
     pub fn new(result: Result<T, E>) -> Self {
         Self {
             inner: result,
+            state: None,
             context: None,
             source: None,
             formatter: None,
         }
+    }
+
+    /// Adds a state object to the test result.
+    pub fn with_state(mut self, state: S) -> Self {
+        self.state = Some(state);
+        self
     }
 
     /// Adds context description to the test result for better failure messages.
@@ -121,12 +129,15 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
     }
 
     /// 3. Asserts success AND checks the value using a closure.
-    pub fn assert_success_with<F>(self, f: F) -> T
+    pub fn assert_success_with<F>(mut self, f: F) -> T
     where
-        F: FnOnce(&T),
+        F: FnOnce(&T, &S),
+        S: Debug,
     {
+        let state = self.state.take();
         let val = self.assert_success();
-        f(&val);
+        let state_ref = state.as_ref().expect("State must be provided to use assert_success_with");
+        f(&val, state_ref);
         val
     }
 
@@ -262,7 +273,7 @@ impl<T: Debug, E: Display + Debug> TestResult<T, E> {
 }
 
 // Special assertions for float types
-impl<E: Display + Debug> TestResult<f64, E> {
+impl<E: Display + Debug, S> TestResult<f64, E, S> {
     pub fn assert_success_approx(self, expected: f64) -> f64 {
         let ctx = self.format_context();
         let val = self.assert_success();
@@ -277,7 +288,7 @@ impl<E: Display + Debug> TestResult<f64, E> {
     }
 }
 
-impl<E: Display + Debug> TestResult<f32, E> {
+impl<E: Display + Debug, S> TestResult<f32, E, S> {
     pub fn assert_success_approx(self, expected: f32) -> f32 {
         let ctx = self.format_context();
         let val = self.assert_success();
