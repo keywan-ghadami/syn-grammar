@@ -22,7 +22,7 @@ grammar! {
 A rule consists of a name, a return type, a pattern, and an action block.
 
 ```text
-rule name -> ReturnType = pattern -> { action_code }
+    name -> ReturnType = pattern -> { action_code }
 ```
 
 - **`name`**: The name of the rule.
