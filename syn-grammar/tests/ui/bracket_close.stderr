@@ -1,5 +1,5 @@
 error: Literal delimiter "]" is not supported. Use [...] syntax to match bracketed content.
- --> tests/ui/bracket_close.rs:5:27
+ --> tests/ui/bracket_close.rs:5:16
   |
-5 |         rule main -> () = "]" -> { () }
-  |                           ^^^
+5 |         main = "]"
+  |                ^^^

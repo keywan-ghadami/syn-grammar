@@ -2,7 +2,7 @@ use syn_grammar::grammar;
 
 grammar! {
     grammar Test {
-        rule main -> () = ~ "a" -> { () }
+        main = ~ "a"
     }
 }
 

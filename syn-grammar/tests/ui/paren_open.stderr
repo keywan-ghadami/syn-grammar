@@ -1,5 +1,5 @@
 error: Literal delimiter "(" is not supported. Use paren(...) to match parenthesized content, or (...) for grouping.
- --> tests/ui/paren_open.rs:5:27
+ --> tests/ui/paren_open.rs:5:16
   |
-5 |         rule main -> () = "(" -> { () }
-  |                           ^^^
+5 |         main = "("
+  |                ^^^

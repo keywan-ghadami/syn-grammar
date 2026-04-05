@@ -1,5 +1,5 @@
 error: The '!' operator is not supported. Use 'not(pattern)' for negative lookahead.
- --> tests/ui/not_operator.rs:5:27
+ --> tests/ui/not_operator.rs:5:16
   |
-5 |         rule main -> () = ! "a" -> { () }
-  |                           ^
+5 |         main = ! "a"
+  |                ^

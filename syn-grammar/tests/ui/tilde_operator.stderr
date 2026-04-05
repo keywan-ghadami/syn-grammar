@@ -1,5 +1,5 @@
 error: The '~' operator is not supported. Use the '=>' cut operator instead
- --> tests/ui/tilde_operator.rs:5:27
+ --> tests/ui/tilde_operator.rs:5:16
   |
-5 |         rule main -> () = ~ "a" -> { () }
-  |                           ^
+5 |         main = ~ "a"
+  |                ^
