@@ -173,6 +173,41 @@ The following primitives are "portable" and expected to be available in all back
 
 *Note: Backends may provide additional specialized built-ins.*
 
+## List Parsing
+
+The grammar provides convenient built-in functions for parsing lists and repetitions.
+
+- **`separated(item, separator)`**: Parses a list of `item`s separated by a `separator`.
+- **`repeated(item)`**: Parses a sequence of `item`s (whitespace-separated in syntactic rules).
+
+Both functions return a `Vec` of the `item`'s result type. They can be customized with the following named arguments:
+
+- `min = <usize>`: The minimum number of items required.
+- `trailing = <bool>`: Whether a trailing separator is allowed (defaults to `false`).
+- `error = <&str>`: A custom error message to display on failure.
+
+```rust
+# use syn_grammar::grammar;
+# use syn_grammar::types::StringLiteral;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+// Matches "a", "b", "c"
+comma_list -> Vec<StringLiteral> = separated(string, ",")
+
+// Matches "a", "b", "c",
+trailing_comma_list -> Vec<StringLiteral> = separated(string, ",", trailing = true)
+
+// Matches at least two items
+min_two_items -> Vec<StringLiteral> = separated(string, ",", min = 2)
+
+// Matches "a" "b" "c"
+space_list -> Vec<StringLiteral> = repeated(string)
+#         }
+#     }
+# }
+```
+
 ## Operators
 
 ### Cut Operator (`=>`)

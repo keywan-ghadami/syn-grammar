@@ -46,6 +46,12 @@ impl ToTokens for Identifier {
     }
 }
 
+impl From<Identifier> for syn::Ident {
+    fn from(ident: Identifier) -> Self {
+        syn::Ident::new(&ident.text, ident.span)
+    }
+}
+
 /// A backend-agnostic representation of a string literal.
 #[derive(Debug, Clone)]
 pub struct StringLiteral {
