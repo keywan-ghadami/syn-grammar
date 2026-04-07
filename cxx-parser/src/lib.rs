@@ -1,7 +1,7 @@
 // CXX Parser Library
 // Contains the AST struct definitions and the grammar for parsing CXX FFI bridges.
 
-use syn::{self, Attribute, Ident, LitStr};
+use syn::{self, Attribute, Ident, LitStr, Macro};
 use syn::parse::{Parse, ParseStream, Result};
 use syn_grammar::grammar;
 
@@ -22,9 +22,9 @@ pub struct ExternBlock {
 
 #[derive(Debug)]
 pub enum CxxItem {
-    Include(LitStr),
     Type(Vec<Attribute>, Ident, syn::Generics),
     Function(Vec<Attribute>, Ident, syn::Generics, Vec<CxxArg>, syn::ReturnType),
+    Macro(Macro),
 }
 
 #[derive(Debug)]
@@ -57,16 +57,16 @@ grammar! {
             }
 
         cxx_item -> CxxItem =
-            "include" "!" paren(file:lit_str) ";" -> {
-                CxxItem::Include(file.into())
+            attrs:outer_attrs "type" name:ident generics:syn::Generics? ";" -> {
+                CxxItem::Type(attrs, name.into(), generics.unwrap_or_default())
             }
-          | attrs:outer_attrs "type" name:ident generics:syn::Generics ";" -> {
-                CxxItem::Type(attrs, name.into(), generics)
-            }
-          | attrs:outer_attrs "fn" name:ident generics:syn::Generics
+          | attrs:outer_attrs "fn" name:ident generics:syn::Generics?
             paren(args:cxx_arg_list?)
             ret:syn::ReturnType ";" -> {
-                CxxItem::Function(attrs, name.into(), generics, args.unwrap_or_default(), ret)
+                CxxItem::Function(attrs, name.into(), generics.unwrap_or_default(), args.unwrap_or_default(), ret)
+            }
+          | mac:syn::Macro ";" -> {
+                CxxItem::Macro(mac)
             }
 
         cxx_arg_list -> Vec<CxxArg> = items:separated(cxx_arg, ",") -> { items }
@@ -126,6 +126,30 @@ mod tests {
         assert!(extern_block.is_unsafe);
         assert_eq!(extern_block.lang.value(), "C++");
         assert_eq!(extern_block.items.len(), 4);
+
+        // Check the `include!` macro
+        match &extern_block.items[0] {
+            CxxItem::Macro(m) => assert_eq!(m.path.get_ident().unwrap().to_string(), "include"),
+            _ => panic!("Expected a macro item at index 0"),
+        }
+
+        // Check the type with generics
+        match &extern_block.items[1] {
+            CxxItem::Type(_, name, generics) => {
+                assert_eq!(name.to_string(), "EventPayload");
+                assert!(!generics.params.is_empty());
+            }
+            _ => panic!("Expected a type item at index 1"),
+        }
+
+        // Check the type without generics
+        match &extern_block.items[2] {
+            CxxItem::Type(_, name, generics) => {
+                assert_eq!(name.to_string(), "DispatchReceipt");
+                assert!(generics.params.is_empty());
+            }
+            _ => panic!("Expected a type item at index 2"),
+        }
 
         let function_item = match &extern_block.items[3] {
             CxxItem::Function(a, n, g, args, r) => Some((a, n, g, args, r)),

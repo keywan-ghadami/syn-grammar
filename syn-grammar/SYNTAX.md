@@ -193,16 +193,16 @@ Both functions return a `Vec` of the `item`'s result type. They can be customize
 #     grammar! {
 #         grammar Test {
 // Matches "a", "b", "c"
-comma_list -> Vec<StringLiteral> = separated(string, ",")
+comma_list -> Vec<StringLiteral> = items:separated(string, ",") -> { items }
 
 // Matches "a", "b", "c",
-trailing_comma_list -> Vec<StringLiteral> = separated(string, ",", trailing = true)
+trailing_comma_list -> Vec<StringLiteral> = items:separated(string, ",", trailing = true) -> { items }
 
 // Matches at least two items
-min_two_items -> Vec<StringLiteral> = separated(string, ",", min = 2)
+min_two_items -> Vec<StringLiteral> = items:separated(string, ",", min = 2) -> { items }
 
 // Matches "a" "b" "c"
-space_list -> Vec<StringLiteral> = repeated(string)
+space_list -> Vec<StringLiteral> = items:repeated(string) -> { items }
 #         }
 #     }
 # }
