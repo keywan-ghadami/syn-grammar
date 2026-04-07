@@ -2,7 +2,8 @@ use crate::rt::ParseContext;
 use proc_macro2::Span;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
-use syn::Result;
+use syn::{Result, Ident};
+use syn::ext::IdentExt;
 use syn_grammar_model::model::types::{Identifier, SpannedValue, StringLiteral};
 
 // A trait that all token streams must implement so that we can have
@@ -499,4 +500,74 @@ pub fn parse_outer_attrs_impl(
         ctx.record_span(last.span())?;
     }
     Ok(attrs)
+}
+
+pub fn parse_any_ident_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<Ident> {
+    let ident = Ident::parse_any(input)?;
+    ctx.record_span(ident.span())?;
+    Ok(ident)
+}
+
+pub fn parse_named_field_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::Field> {
+    let field = syn::Field::parse_named(input)?;
+    ctx.record_span(field.span())?;
+    Ok(field)
+}
+
+
+pub fn parse_unnamed_field_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::Field> {
+    let field = syn::Field::parse_unnamed(input)?;
+    ctx.record_span(field.span())?;
+    Ok(field)
+}
+
+
+pub fn parse_visibility_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::Visibility> {
+    let vis = input.parse::<syn::Visibility>()?;
+    ctx.record_span(vis.span())?;
+    Ok(vis)
+}
+
+
+pub fn parse_generics_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::Generics> {
+    let generics = input.parse::<syn::Generics>()?;
+    ctx.record_span(generics.span())?;
+    Ok(generics)
+}
+
+
+pub fn parse_return_type_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<syn::ReturnType> {
+    let ret = input.parse::<syn::ReturnType>()?;
+    ctx.record_span(ret.span())?;
+    Ok(ret)
+}
+
+
+pub fn parse_statements_impl(
+    input: &mut ParseStream,
+    ctx: &mut ParseContext,
+) -> Result<Vec<syn::Stmt>> {
+    let block = syn::Block::parse_within(input)?;
+    if let Some(last) = block.last() {
+        ctx.record_span(last.span())?;
+    }
+    Ok(block)
 }

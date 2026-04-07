@@ -1,9 +1,7 @@
 // CXX Parser Library
 // Contains the AST struct definitions and the grammar for parsing CXX FFI bridges.
 
-mod parser;
-
-use syn::{self, Attribute, Generics, Ident, LitStr, ReturnType, Type};
+use syn::{self, Attribute, Ident, LitStr};
 use syn::parse::{Parse, ParseStream, Result};
 use syn_grammar::grammar;
 
@@ -25,14 +23,14 @@ pub struct ExternBlock {
 #[derive(Debug)]
 pub enum CxxItem {
     Include(LitStr),
-    Type(Vec<Attribute>, Ident, Generics),
-    Function(Vec<Attribute>, Ident, Generics, Vec<CxxArg>, ReturnType),
+    Type(Vec<Attribute>, Ident, syn::Generics),
+    Function(Vec<Attribute>, Ident, syn::Generics, Vec<CxxArg>, syn::ReturnType),
 }
 
 #[derive(Debug)]
 pub struct CxxArg {
     pub name: Ident,
-    pub ty: Type,
+    pub ty: syn::Type,
 }
 
 // 2. Grammar Definition
@@ -62,19 +60,19 @@ grammar! {
             "include" "!" paren(file:lit_str) ";" -> {
                 CxxItem::Include(file.into())
             }
-          | attrs:outer_attrs "type" name:ident generics:parser::parse_generics ";" -> {
+          | attrs:outer_attrs "type" name:ident generics:syn::Generics ";" -> {
                 CxxItem::Type(attrs, name.into(), generics)
             }
-          | attrs:outer_attrs "fn" name:ident generics:parser::parse_generics
+          | attrs:outer_attrs "fn" name:ident generics:syn::Generics
             paren(args:cxx_arg_list?)
-            ret:parser::parse_return_type ";" -> {
+            ret:syn::ReturnType ";" -> {
                 CxxItem::Function(attrs, name.into(), generics, args.unwrap_or_default(), ret)
             }
 
         cxx_arg_list -> Vec<CxxArg> = items:separated(cxx_arg, ",") -> { items }
 
         cxx_arg -> CxxArg =
-            name:ident ":" ty:rust_type -> {
+            name:any_ident ":" ty:syn::Type -> {
                 CxxArg { name: name.into(), ty }
             }
     }

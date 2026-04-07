@@ -229,6 +229,34 @@ impl Backend for SynBackend {
                 name: "outer_attrs",
                 return_type: "Vec<syn::Attribute>",
             },
+            BuiltIn {
+                name: "any_ident",
+                return_type: "syn::Ident",
+            },
+            BuiltIn {
+                name: "named_field",
+                return_type: "syn::Field",
+            },
+            BuiltIn {
+                name: "unnamed_field",
+                return_type: "syn::Field",
+            },
+            BuiltIn {
+                name: "visibility",
+                return_type: "syn::Visibility",
+            },
+            BuiltIn {
+                name: "generics",
+                return_type: "syn::Generics",
+            },
+            BuiltIn {
+                name: "return_type",
+                return_type: "syn::ReturnType",
+            },
+            BuiltIn {
+                name: "statements",
+                return_type: "Vec<syn::Stmt>",
+            },
         ]
     }
 }

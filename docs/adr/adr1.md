@@ -47,6 +47,13 @@ The responsibility for implementing these primitives lies with the backend. The 
 -   **Idea**: Allow each backend to inject its own proprietary primitives into the grammar.
 -   **Rejected Because**: This leads to "Vendor Leaking" and destroys portability. A grammar written with `winnow_ident` cannot be used with the `syn` backend. The core DSL syntax must remain 100% portable.
 
+**Architect's Note (Post-Decision Amendment):** The "100% portability" goal outlined above has been revised. While it remains a valuable principle for the core set of portable primitives, it is now considered counter-productive when it actively hinders the primary use case of a specific backend.
+
+The `syn` backend's entire purpose is to integrate seamlessly with the `syn` ecosystem. Forcing users to learn an intermediate abstraction (e.g., `syn_type`) when they already know the target type (`syn::Type`) adds needless cognitive overhead.
+
+Therefore, the architectural direction is to **prioritize developer experience for the `syn` backend**. This backend will be enhanced to directly recognize and parse fully-qualified `syn` types (e.g., `ty:syn::Type`). This makes grammars using this feature inherently `syn`-specific, which is now accepted as a deliberate and worthwhile trade-off.
+
+
 ### Alternative C: Force `syn` to Parse Character-by-Character
 
 -   **Idea**: Make the `syn` backend behave exactly like a character-stream parser.

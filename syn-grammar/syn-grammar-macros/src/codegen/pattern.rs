@@ -114,7 +114,21 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let is_builtin =
                 rule_name_ident.is_some_and(|ident| builtins.iter().any(|b| ident == b.name));
 
-            if rule_path.is_ident("separated") {
+            let first_segment = rule_path.segments.iter().next();
+            let is_syn_type = if let Some(seg) = first_segment {
+                seg.ident == "syn"
+            } else {
+                false
+            };
+
+            if is_syn_type {
+                let expr = quote! { input.parse::<#rule_path>()? };
+                if let Some(bind) = binding {
+                    Ok(quote! { let #bind = #expr; })
+                } else {
+                    Ok(quote! { let _ = #expr; })
+                }
+            } else if rule_path.is_ident("separated") {
                 // separated(rule, sep, min=0, trailing=false)
                 if args.len() < 2 {
                     return Err(syn::Error::new(
@@ -715,43 +729,48 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         ModelPattern::Bracketed(s, _)
         | ModelPattern::Braced(s, _)
         | ModelPattern::Parenthesized(s, _) => {
-            let macro_name = match pattern {
-                ModelPattern::Bracketed(_, _) => quote!(bracketed),
-                ModelPattern::Braced(_, _) => quote!(braced),
-                _ => quote!(parenthesized),
+            let delimiter = match pattern {
+                ModelPattern::Bracketed(_, _) => '[',
+                ModelPattern::Braced(_, _) => '{',
+                _ => '(',
             };
 
             let inner_logic = generate_sequence_steps(s, ctx)?;
             let bindings = analysis::collect_bindings(s);
 
-            if bindings.is_empty() {
-                Ok(quote! { {
-                    let content;
-                    let _ = syn::#macro_name!(content in input);
-                    let mut input = &content;
+            let return_expr = if bindings.is_empty() {
+                quote! { () }
+            } else if bindings.len() == 1 {
+                let b = &bindings[0];
+                quote! { #b }
+            } else {
+                let b = &bindings;
+                quote! { (#(#b),*) }
+            };
+
+            let parser_closure = quote! {
+                |mut input, ctx| {
                     #inner_logic
-                }})
+                    Ok(#return_expr)
+                }
+            };
+
+            let call_expr = quote! {
+                rt::parse_delimited(
+                    input,
+                    ctx,
+                    #parser_closure,
+                    #delimiter
+                )?
+            };
+
+            if bindings.is_empty() {
+                Ok(quote! { let _ = #call_expr; })
             } else if bindings.len() == 1 {
                 let bind = &bindings[0];
-                Ok(quote! {
-                    let #bind = {
-                        let content;
-                        let _ = syn::#macro_name!(content in input);
-                        let mut input = &content;
-                        #inner_logic
-                        #bind
-                    };
-                })
+                Ok(quote! { let #bind = #call_expr; })
             } else {
-                Ok(quote! {
-                    let (#(#bindings),*) = {
-                        let content;
-                        let _ = syn::#macro_name!(content in input);
-                        let mut input = &content;
-                        #inner_logic
-                        (#(#bindings),*)
-                    };
-                })
+                Ok(quote! { let (#(#bindings),*) = #call_expr; })
             }
         }
 

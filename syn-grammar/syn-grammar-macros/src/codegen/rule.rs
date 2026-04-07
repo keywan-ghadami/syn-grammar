@@ -351,8 +351,7 @@ pub fn generate_variants_internal(
                                     }
                                 }
                                 None => {
-                                    // Pre failed.
-                                    // Since is_unique, this is FATAL.
+                                    // Pre failed. Since is_unique, this is FATAL.
                                     ctx.commit();
                                     let err = ctx.take_best_error().unwrap_or_else(|| input.error("parse failed"));
                                     return Err(err);
@@ -452,15 +451,17 @@ pub fn generate_variants_internal(
 
     Ok(quote! {
         let mut _shallow_failures = Vec::<&str>::new();
+        let _start_span = input.span();
+
         #(#arms)*
 
-        if ctx.stop_aggregation(input.span()) {
+        if ctx.stop_aggregation(_start_span) {
             if let Some(best_err) = ctx.take_best_error() {
                 return Err(best_err);
             }
         }
 
-        if !_shallow_failures.is_empty() {
+        let mut error_to_return = if !_shallow_failures.is_empty() {
              _shallow_failures.sort();
              _shallow_failures.dedup();
 
@@ -474,14 +475,24 @@ pub fn generate_variants_internal(
                  format!("expected one of: {}", joined)
              };
 
-             // Clear best error to ensure this aggregated error wins
              let _ = ctx.take_best_error();
-
-             Err(input.error(msg))
+             input.error(msg)
         } else if let Some(best_err) = ctx.take_best_error() {
-            Err(best_err)
+            best_err
         } else {
-            Err(input.error(#error_msg))
+            input.error(#error_msg)
+        };
+
+        if !input.is_empty() {
+            if let Ok(tt) = input.fork().parse::<proc_macro2::TokenTree>() {
+                let found = tt.to_string();
+                if !found.trim().is_empty() {
+                    let new_message = format!("{}; found unexpected token `{}`", error_to_return, found);
+                    error_to_return = syn::Error::new(error_to_return.span(), new_message);
+                }
+            }
         }
+
+        Err(error_to_return)
     })
 }

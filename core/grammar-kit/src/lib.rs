@@ -642,41 +642,59 @@ pub fn parse_separated<T, P, S>(
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
-    S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,
-{
+    S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,{
     let mut items = Vec::new();
     let mut first = true;
 
     loop {
+        let loop_start_span = input.span();
+
         if !first {
-            // Try parse separator
-            let is_sep = attempt(input, ctx, |i, c| sep_parser(i, c))?.is_some();
-            if !is_sep {
+            // Try to parse a separator. If it fails, it's the end of the list.
+            if attempt(input, ctx, |i, c| sep_parser(i, c))?.is_none() {
+                // If separator parsing failed with a significant error, we must abort.
+                if ctx.stop_aggregation(loop_start_span) {
+                    // The real error is in the context. Return a dummy error to propagate.
+                    return Err(syn::Error::new(loop_start_span, "significant error while parsing separator"));
+                }
+                // Otherwise, it's just the end of the list.
                 break;
             }
         }
 
         // Try parse item
         // We use attempt because item parsing might fail deeply
-        if let Some(item) = attempt(input, ctx, |i, c| item_parser(i, c))? {
-            items.push(item);
-            first = false;
-        } else {
-            // If we are here, we either:
-            // 1. Just started (first=true) and failed to parse first item -> Empty list?
-            // 2. Had a separator (first=false) but failed to parse item -> Trailing? or Error?
-
-            if !first {
-                if !trailing {
-                    // We had a separator but no item, and trailing is NOT allowed.
-                    let msg = error_msg.unwrap_or("expected item after separator");
-                    return ctx.raise_failure(msg, input.span());
+        match attempt(input, ctx, |i, c| item_parser(i, c))? {
+            Some(item) => {
+                items.push(item);
+                first = false;
+            }
+            None => {
+                // Item parsing failed. Check if it was a significant failure.
+                if ctx.stop_aggregation(loop_start_span) {
+                    // A deep or high-priority error occurred. This is not just a
+                    // "no match" situation. We must propagate the failure.
+                    return Err(syn::Error::new(loop_start_span, "significant error while parsing item"));
                 }
-                // Trailing allowed, so it's okay.
-                break;
-            } else {
-                // First item failed. List is empty.
-                break;
+
+                // If we are here, it means we either:
+                // 1. Just started (first=true) and failed to parse first item -> Empty list.
+                // 2. Had a separator (first=false) but failed to parse item -> Trailing separator? or Error?
+
+                if !first {
+                    // This means we just successfully parsed a separator.
+                    // A separator must be followed by an item unless trailing separators are allowed.
+                    if !trailing {
+                        let msg = error_msg.unwrap_or("expected item after separator");
+                        return ctx.raise_failure(msg, input.span());
+                    }
+                    // A trailing separator is allowed and was found. End of list.
+                    break;
+                } else {
+                    // This means we failed to parse even the first item.
+                    // The list is simply empty.
+                    break;
+                }
             }
         }
     }
@@ -700,9 +718,24 @@ where
 {
     let mut items = Vec::new();
 
-    while let Some(item) = attempt(input, ctx, |i, c| item_parser(i, c))? {
-        items.push(item);
+    loop {
+        let loop_start_span = input.span();
+        match attempt(input, ctx, |i, c| item_parser(i, c))? {
+            Some(item) => {
+                items.push(item);
+            }
+            None => {
+                // Item parsing failed. Check if it was a significant failure.
+                if ctx.stop_aggregation(loop_start_span) {
+                    // A deep or high-priority error occurred. Propagate failure.
+                    return Err(syn::Error::new(loop_start_span, "significant error in repetition"));
+                }
+                // Otherwise, it's just the end of the repetition.
+                break;
+            }
+        }
     }
+
 
     if items.len() < min {
         return ctx.raise_failure(format!("expected at least {} items", min), input.span());
@@ -710,6 +743,83 @@ where
 
     Ok(items)
 }
+
+// --- Delimited Parsing ---
+
+#[cfg(all(feature = "rt", feature = "syn"))]
+pub fn parse_delimited<T, F>(
+    input: ParseStream,
+    ctx: &mut ParseContext,
+    parser: F,
+    delimiter: char,
+) -> Result<T>
+where
+    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
+{
+    let content;
+    let final_span: proc_macro2::Span;
+    match delimiter {
+        '(' => {
+            let paren_token = syn::parenthesized!(content in input);
+            final_span = paren_token.span.join();
+        }
+        '{' => {
+            let brace_token = syn::braced!(content in input);
+            final_span = brace_token.span.join();
+        }
+        '[' => {
+            let bracket_token = syn::bracketed!(content in input);
+            final_span = bracket_token.span.join();
+        }
+        _ => {
+            return Err(syn::Error::new(
+                input.span(),
+                "unsupported delimiter for custom parsing",
+            ));
+        }
+    }
+    ctx.record_span(final_span)?;
+
+    // Run the inner parser on the content stream.
+    let res = parser(&content, ctx);
+
+    // After parsing, check if the content stream is fully consumed.
+    // If not, it's an error because there's trailing garbage.
+    if !content.is_empty() {
+        // There are unconsumed tokens. This is an error condition, even if the
+        // parser returned `Ok`. The parser might have successfully parsed a prefix
+        // of the content, but it should have consumed all of it.
+
+        // We prioritize any high-quality error that the inner parser might have
+        // recorded in the context. This is key to avoiding generic errors from `syn`.
+        if let Some(best_err) = ctx.take_best_error() {
+            return Err(best_err);
+        } else {
+            // If the context has no better error, create a generic but clear one
+            // pointing at the start of the unparsed tokens.
+            return Err(content.error("unexpected token in delimited group"));
+        }
+    }
+
+    // If the content is empty, the parser (whether it succeeded or failed)
+    // has processed the entire stream. We now trust its outcome.
+    match res {
+        Ok(value) => Ok(value),
+        Err(parser_err) => {
+            // The parser failed, but consumed all tokens. This can happen, for
+            // example, if an optional element at the end of the group was not found.
+            // Again, we check the context for a more specific error that might have
+            // been recorded during a failed `attempt`.
+            if let Some(best_err) = ctx.take_best_error() {
+                Err(best_err)
+            } else {
+                // If there's no better error, we return the original error from the parser.
+                Err(parser_err)
+            }
+        }
+    }
+}
+
 
 // --- Stateless Helpers (No Context Needed) ---
 
