@@ -783,16 +783,22 @@ where
     // Run the inner parser on the content stream.
     let res = parser(&content, ctx);
 
-    // If there is trailing garbage, return a generic error.
-    // DO NOT call take_best_error(). If a better error exists in ctx,
-    // the outer attempt's record_error call will automatically prefer it.
-    if !content.is_empty() {
-        return Err(content.error("unexpected token in delimited group"));
+    match res {
+        Ok(val) => {
+            // Bei Erfolg prüfen wir, ob alle Tokens konsumiert wurden.
+            // Wenn nicht, ist das ein echter "unexpected token" Fehler.
+            if !content.is_empty() {
+                Err(content.error("unexpected token in delimited group"))
+            } else {
+                Ok(val)
+            }
+        }
+        Err(e) => {
+            // CRITICAL FIX: Bei einem Fehler geben wir den Fehler direkt weiter.
+            // Nicht konsumierte Tokens sind hier erwartet, da der Parser abgebrochen hat.
+            Err(e)
+        }
     }
-
-    // Return the result directly. 
-    // DO NOT intercept Err to call take_best_error().
-    res
 }
 
 
