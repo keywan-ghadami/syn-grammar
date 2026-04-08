@@ -19,7 +19,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test test_builtins ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 2 tests
@@ -35,12 +35,12 @@ test test_attributes_on_rules ... ok
 test test_complex_return_types ... ok
 test test_fail_builtin_first ... ok
 test test_keywords_vs_idents ... ok
-test test_multi_token_literals ... ok
-test test_rust_types_and_blocks ... ok
 test test_fail_builtin_last ... ok
+test test_multi_token_literals ... ok
 test test_use_statements ... ok
+test test_rust_types_and_blocks ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 6 tests
@@ -51,7 +51,7 @@ test test_count_plus ... ok
 test test_count_plus_fail ... ok
 test test_count_stars ... ok
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 2 tests
@@ -73,17 +73,17 @@ test test_fail_overrides_everything ... ok
 test test_fail_vs_deep_error ... ok
 test test_nested_cut_propagation ... ok
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 7 tests
-test test_deep_error_with_label_and_fail ... ok
 test test_combinator_error_produces_clean_message ... FAILED
-test test_deep_vs_shallow ... FAILED
-test test_deepest_error_wins ... FAILED
+test test_deep_error_with_label_and_fail ... ok
+test test_deep_vs_shallow ... ok
+test test_deepest_error_wins ... ok
 test test_fail_built_in_enterprise ... ok
 test test_label_priority ... ok
-test test_rule_name_in_error_message ... FAILED
+test test_rule_name_in_error_message ... ok
 
 failures:
 
@@ -101,7 +101,7 @@ failures:
 [TRACE] record_error: 'expected `inner`; found unexpected token `b`', priority: 0, label: None
 [TRACE] exit_rule: outer
 
-thread 'test_combinator_error_produces_clean_message' (2551) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_combinator_error_produces_clean_message' (7244) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "in rule `outer`: in rule `inner`: expected 'a'"
@@ -115,78 +115,9 @@ unexpected token
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
----- test_deep_vs_shallow stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: deep
-[TRACE] record_error: 'expected `c`', priority: 0, label: None
-[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
-[TRACE] exit_rule: deep
-[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
-[TRACE] exit_rule: main
-
-thread 'test_deep_vs_shallow' (2553) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
-
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "expected `c`"
-Actual msg:    "in rule `main`: in rule `deep`: propagating fatal unique error"
-
-Error Debug:
-Error("in rule `main`: in rule `deep`: propagating fatal unique error")
-
-Formatted:
-in rule `main`: in rule `deep`: propagating fatal unique error
-
-
----- test_deepest_error_wins stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: deepest_err
-[TRACE] record_error: 'expected `c`', priority: 0, label: None
-[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
-[TRACE] exit_rule: deepest_err
-[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
-[TRACE] exit_rule: main
-
-thread 'test_deepest_error_wins' (2554) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
-
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "expected `c`"
-Actual msg:    "in rule `main`: in rule `deepest_err`: propagating fatal unique error"
-
-Error Debug:
-Error("in rule `main`: in rule `deepest_err`: propagating fatal unique error")
-
-Formatted:
-in rule `main`: in rule `deepest_err`: propagating fatal unique error
-
-
----- test_rule_name_in_error_message stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: inner_rule
-[TRACE] record_error: 'expected `b`', priority: 0, label: None
-[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
-[TRACE] exit_rule: inner_rule
-[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
-[TRACE] exit_rule: main
-
-thread 'test_rule_name_in_error_message' (2557) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
-
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "expected `b`"
-Actual msg:    "in rule `main`: in rule `inner_rule`: propagating fatal unique error"
-
-Error Debug:
-Error("in rule `main`: in rule `inner_rule`: propagating fatal unique error")
-
-Formatted:
-in rule `main`: in rule `inner_rule`: propagating fatal unique error
-
-
 
 failures:
     test_combinator_error_produces_clean_message
-    test_deep_vs_shallow
-    test_deepest_error_wins
-    test_rule_name_in_error_message
 
-test result: FAILED. 3 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
