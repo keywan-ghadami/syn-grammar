@@ -142,7 +142,9 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
             if let Err(ref e) = res {
                 // Record the error BEFORE exiting the rule so we capture the current rule name.
-                ctx.record_error(e.clone(), _start_span, None, 0);
+                if !ctx.check_fatal() {
+                    ctx.record_error(e.clone(), _start_span, None, 0);
+                }
             }
 
             ctx.exit_rule();
