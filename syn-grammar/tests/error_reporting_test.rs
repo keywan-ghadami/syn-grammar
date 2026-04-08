@@ -7,7 +7,7 @@ use syn_grammar::testing::Testable;
 
 grammar! {
     grammar err_test_1 {
-        pub rule main -> () = deepest_err eof -> { () }
+        pub main -> () = deepest_err eof -> { () }
         rule deepest_err -> () = "a" "b" "c" -> { () }
     }
 }
@@ -17,40 +17,40 @@ grammar! {
     // support numeric literals like "0" as tokens.
     // See tests/digits.fixme for the intended test case for other backends.
     grammar numeric_words_test {
-        pub rule main -> () = l:letter+ d:num_word+ eof -> { () }
-        rule letter -> () = ("a" | "b" | "c") -> { () }
-        rule num_word -> () = ("zero" | "one" | "two") -> { () }
+        pub main -> () = l:letter+ d:num_word+ eof -> { () }
+        letter -> () = ("a" | "b" | "c") -> { () }
+        num_word -> () = ("zero" | "one" | "two") -> { () }
     }
 }
 
 grammar! {
     grammar prio_test {
-        pub rule main -> () = (deep | shallow) eof -> { () }
-        rule deep -> () = "a" "b" "c" -> { () }
-        rule shallow -> () = "d" "e" -> { () }
+        pub main -> () = (deep | shallow) eof -> { () }
+        deep -> () = "a" "b" "c" -> { () }
+        shallow -> () = "d" "e" -> { () }
     }
 }
 
 grammar! {
     grammar rule_name_test {
-        pub rule main -> () = a:inner_rule eof -> { () }
-        rule inner_rule -> () = "a" "b" -> { () }
+        pub main -> () = a:inner_rule eof -> { () }
+        inner_rule -> () = "a" "b" -> { () }
     }
 }
 
 grammar! {
     grammar enterprise_errors {
-        pub rule root -> () = expr eof -> { () }
+        pub root -> () = expr eof -> { () }
 
-        rule expr -> ()
+        expr -> ()
             = term "+" expr # "Addition" -> { () }
             | term # "Expression" -> { () }
 
-        rule term -> ()
+        term -> ()
             = factor "*" term # "Multiplication" -> { () }
             | factor # "Term" -> { () }
 
-        rule factor -> ()
+        factor -> ()
             = paren(expr) # "Parenthesized Expression" -> { () }
             | "id" # "Identifier" -> { () }
             | fail("missing factor") -> { () }
@@ -129,4 +129,25 @@ fn test_fail_built_in_enterprise() {
         .assert_failure();
 
     println!("Actual Error: {}", err);
+}
+
+grammar! {
+    grammar combinator_error_test {
+        inner = i:ident -> {
+            if i.to_string() != "a" {
+                return Err(syn::Error::new(i.span(), "expected \'a\'"));
+            }
+            ()
+        }
+
+        pub outer = (inner)* -> { () }
+    }
+}
+
+#[test]
+fn test_combinator_error_produces_clean_message() {
+    combinator_error_test::parse_outer
+        .parse_str("a a b")
+        .test()
+        .assert_failure_contains("in rule `outer`: in rule `inner`: expected \'a\'");
 }

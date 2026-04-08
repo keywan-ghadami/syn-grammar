@@ -281,7 +281,7 @@ impl ParseContext {
                 // Or does it start with "in rule `X`: " where X is something else?
                 // We want to prepend ONLY if it's missing.
 
-                if !msg.starts_with(&prefix) {
+                if !msg.contains(&prefix) { // Correction: contains instead of starts_with
                     msg = format!("{}{}", prefix, msg);
                 }
             }
@@ -718,24 +718,9 @@ where
 {
     let mut items = Vec::new();
 
-    loop {
-        let loop_start_span = input.span();
-        match attempt(input, ctx, |i, c| item_parser(i, c))? {
-            Some(item) => {
-                items.push(item);
-            }
-            None => {
-                // Item parsing failed. Check if it was a significant failure.
-                if ctx.stop_aggregation(loop_start_span) {
-                    // A deep or high-priority error occurred. Propagate failure.
-                    return Err(syn::Error::new(loop_start_span, "significant error in repetition"));
-                }
-                // Otherwise, it's just the end of the repetition.
-                break;
-            }
-        }
+    while let Some(item) = attempt(input, ctx, |i, c| item_parser(i, c))? {
+        items.push(item);
     }
-
 
     if items.len() < min {
         return ctx.raise_failure(format!("expected at least {} items", min), input.span());
@@ -946,4 +931,5 @@ mod tests {
         // If it's caught, record_error is called.
         // record_error sees `fail_triggered` is true, so priority becomes 2.
     }
+
 }

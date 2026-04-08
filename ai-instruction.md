@@ -1,3 +1,8 @@
+## all output im backtivks
+
+UI needs output in 4 backticks e.g.
+
+```` I will run `cargo test` ````
 
 ## experimente
 
@@ -10,6 +15,10 @@ use default_api::write_file to write files
 ## grep 
 
 never grep in root because binary files in subdirectories.
+
+## Error Output
+
+User always want to see the error output.
 
 ## Collaboration with the User
 
