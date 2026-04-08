@@ -353,8 +353,7 @@ pub fn generate_variants_internal(
                                 None => {
                                     // Pre failed. Since is_unique, this is FATAL.
                                     ctx.commit();
-                                    let err = ctx.take_best_error().unwrap_or_else(|| input.error("parse failed"));
-                                    return Err(err);
+                                    return Err(input.error("propagating fatal unique cut error"));
                                 }
                             }
                         }
@@ -409,8 +408,7 @@ pub fn generate_variants_internal(
                                 Some(v) => return Ok(v),
                                 None => {
                                     ctx.commit();
-                                    let err = ctx.take_best_error().unwrap_or_else(|| input.error("parse failed"));
-                                    return Err(err);
+                                    return Err(input.error("propagating fatal unique error"));
                                 }
                             }
                         }
@@ -456,9 +454,11 @@ pub fn generate_variants_internal(
         #(#arms)*
 
         if ctx.stop_aggregation(_start_span) {
-            if let Some(best_err) = ctx.take_best_error() {
-                return Err(best_err);
-            }
+            // CRITICAL FIX: Niemals take_best_error() mitten im Baum aufrufen!
+            // Wir geben einen Platzhalter-Fehler zurück, um das Bubbling (Abbruch) zu erzwingen.
+            // Der tatsächliche High-Priority-Fehler bleibt sicher unangetastet im `ctx` gespeichert 
+            // und wird von `record_error` der übergeordneten Caller priorisiert.
+            return Err(input.error("propagating significant error"));
         }
 
         let mut error_to_return = if !_shallow_failures.is_empty() {
@@ -475,12 +475,11 @@ pub fn generate_variants_internal(
                  format!("expected one of: {}", joined)
              };
 
-             let _ = ctx.take_best_error();
+             // CRITICAL FIX: Auch hier kein take_best_error()!
              input.error(msg)
-        } else if let Some(best_err) = ctx.take_best_error() {
-            best_err
         } else {
-            input.error(#error_msg)
+             // Fallback-Fehler, falls keine flachen Fehler vorliegen
+             input.error(#error_msg)
         };
 
         if !input.is_empty() {

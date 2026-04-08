@@ -1,76 +1,192 @@
 
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
 running 1 test
-test tests::parse_complex_cxx_bridge ... FAILED
+test test_group_vs_args_ambiguity ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_literal_binding_with_action ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_builtins ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test_composition_complex ... ok
+test test_composition_mixed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+test test_action_block_statements ... ok
+test test_attributes_on_rules ... ok
+test test_fail_builtin_first ... ok
+test test_complex_return_types ... ok
+test test_fail_builtin_last ... ok
+test test_multi_token_literals ... ok
+test test_keywords_vs_idents ... ok
+test test_use_statements ... ok
+test test_rust_types_and_blocks ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 6 tests
+test test_count_bindings ... ok
+test test_count_opts ... ok
+test test_count_group ... ok
+test test_count_plus ... ok
+test test_count_plus_fail ... ok
+test test_count_stars ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test_cut_operator ... ok
+test test_cut_in_repetition ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_epsilon_alternative ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test test_cut_prevents_backtracking ... ok
+test test_fail_overrides_everything ... ok
+test test_nested_cut_propagation ... ok
+test test_fail_vs_deep_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test test_combinator_error_produces_clean_message ... FAILED
+test test_deep_error_with_label_and_fail ... ok
+test test_deep_vs_shallow ... FAILED
+test test_fail_built_in_enterprise ... ok
+test test_deepest_error_wins ... FAILED
+test test_label_priority ... ok
+test test_rule_name_in_error_message ... FAILED
 
 failures:
 
----- tests::parse_complex_cxx_bridge stdout ----
-[TRACE] enter_rule: top_level_mod
-[TRACE] enter_rule: extern_block
-[TRACE] enter_rule: cxx_item
-[TRACE] record_error: 'expected `type`', priority: 0, label: None
-[TRACE] record_error: 'expected `fn`', priority: 0, label: None
-[TRACE] Attempting to parse syn type: syn :: Macro at bytes(0..0)
-[TRACE] Successfully parsed syn type: syn :: Macro
-[TRACE] exit_rule: cxx_item
-[TRACE] enter_rule: cxx_item
-[TRACE] Attempting to parse syn type: syn :: Generics at bytes(0..0)
-[TRACE] Successfully parsed syn type: syn :: Generics
-[TRACE] exit_rule: cxx_item
-[TRACE] enter_rule: cxx_item
-[TRACE] Attempting to parse syn type: syn :: Generics at bytes(0..0)
-[TRACE] Successfully parsed syn type: syn :: Generics
-[TRACE] exit_rule: cxx_item
-[TRACE] enter_rule: cxx_item
-[TRACE] record_error: 'expected `type`', priority: 0, label: None
-[TRACE] Attempting to parse syn type: syn :: Generics at bytes(0..0)
-[TRACE] Successfully parsed syn type: syn :: Generics
-[TRACE] enter_rule: cxx_arg_list
-[TRACE] enter_rule: cxx_arg
-[TRACE] Attempting to parse syn type: syn :: Type at bytes(0..0)
-[TRACE] Successfully parsed syn type: syn :: Type
-[TRACE] exit_rule: cxx_arg
-[TRACE] enter_rule: cxx_arg
-[TRACE] Attempting to parse syn type: syn :: Type at bytes(0..0)
-[TRACE] Successfully parsed syn type: syn :: Type
-[TRACE] exit_rule: cxx_arg
-[TRACE] enter_rule: cxx_arg
-[TRACE] Attempting to parse syn type: syn :: Type at bytes(0..0)
-[TRACE] Successfully parsed syn type: syn :: Type
-[TRACE] exit_rule: cxx_arg
-[TRACE] enter_rule: cxx_arg
-[TRACE] record_error: 'unexpected end of input, expected ident', priority: 0, label: None
-[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: in rule `cxx_arg`: unexpected end of input, expected ident', priority: 0, label: None
-[TRACE] exit_rule: cxx_arg
-[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: in rule `cxx_arg`: unexpected end of input, expected ident', priority: 0, label: None
-[TRACE] record_error: 'expected item after separator', priority: 2, label: None
-[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator', priority: 0, label: None
-[TRACE] exit_rule: cxx_arg_list
-[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator', priority: 0, label: None
-[TRACE] record_error: 'unexpected token in delimited group', priority: 0, label: None
-[TRACE] Attempting to parse syn type: syn :: Macro at bytes(0..0)
-[TRACE] FAILED to parse syn type: syn :: Macro. Error: 'expected identifier', Error Span: bytes(0..0)
-[TRACE] Start span was: bytes(0..0)
-[TRACE] No progress. NOT calling trigger_fail()
-[TRACE] record_error: 'expected identifier', priority: 0, label: None
-[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator; found unexpected token `#`', priority: 0, label: None
-[TRACE] exit_rule: cxx_item
-[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator; found unexpected token `#`', priority: 0, label: None
-[TRACE] record_error: 'unexpected token in delimited group', priority: 1, label: Some("unsafe")
-[TRACE] record_error: 'expected `unsafe`; found unexpected token `unsafe`', priority: 0, label: None
-[TRACE] exit_rule: extern_block
-[TRACE] record_error: 'expected `unsafe`; found unexpected token `unsafe`', priority: 0, label: None
-[TRACE] record_error: 'unexpected token in delimited group', priority: 0, label: None
-[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: expected `unsafe`; found unexpected token `unsafe`; found unexpected token `#`', priority: 0, label: None
-[TRACE] exit_rule: top_level_mod
+---- test_combinator_error_produces_clean_message stdout ----
+[TRACE] enter_rule: outer
+[TRACE] enter_rule: inner
+[TRACE] exit_rule: inner
+[TRACE] enter_rule: inner
+[TRACE] exit_rule: inner
+[TRACE] enter_rule: inner
+[TRACE] record_error: 'expected 'a'', priority: 1, label: Some("ident")
+[TRACE] record_error: 'expected `ident`; found unexpected token `b`', priority: 0, label: None
+[TRACE] exit_rule: inner
+[TRACE] record_error: 'expected `ident`; found unexpected token `b`', priority: 1, label: Some("inner")
+[TRACE] record_error: 'expected `inner`; found unexpected token `b`', priority: 0, label: None
+[TRACE] exit_rule: outer
 
-thread 'tests::parse_complex_cxx_bridge' (53416) panicked at cxx-parser/src/lib.rs:118:14:
-Parser failed to process the TokenStream: Error("in rule `top_level_mod`: in rule `extern_block`: expected `unsafe`; found unexpected token `unsafe`; found unexpected token `#`")
+thread 'test_combinator_error_produces_clean_message' (17286) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "in rule `outer`: in rule `inner`: expected 'a'"
+Actual msg:    "unexpected token"
+
+Error Debug:
+Error("unexpected token")
+
+Formatted:
+unexpected token
+
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
+---- test_deep_vs_shallow stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: deep
+[TRACE] record_error: 'expected `c`', priority: 0, label: None
+[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
+[TRACE] exit_rule: deep
+[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
+[TRACE] exit_rule: main
+
+thread 'test_deep_vs_shallow' (17288) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `c`"
+Actual msg:    "in rule `main`: in rule `deep`: propagating fatal unique error"
+
+Error Debug:
+Error("in rule `main`: in rule `deep`: propagating fatal unique error")
+
+Formatted:
+in rule `main`: in rule `deep`: propagating fatal unique error
+
+
+---- test_deepest_error_wins stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: deepest_err
+[TRACE] record_error: 'expected `c`', priority: 0, label: None
+[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
+[TRACE] exit_rule: deepest_err
+[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
+[TRACE] exit_rule: main
+
+thread 'test_deepest_error_wins' (17289) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `c`"
+Actual msg:    "in rule `main`: in rule `deepest_err`: propagating fatal unique error"
+
+Error Debug:
+Error("in rule `main`: in rule `deepest_err`: propagating fatal unique error")
+
+Formatted:
+in rule `main`: in rule `deepest_err`: propagating fatal unique error
+
+
+---- test_rule_name_in_error_message stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: inner_rule
+[TRACE] record_error: 'expected `b`', priority: 0, label: None
+[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
+[TRACE] exit_rule: inner_rule
+[TRACE] record_error: 'propagating fatal unique error', priority: 0, label: None
+[TRACE] exit_rule: main
+
+thread 'test_rule_name_in_error_message' (17292) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `b`"
+Actual msg:    "in rule `main`: in rule `inner_rule`: propagating fatal unique error"
+
+Error Debug:
+Error("in rule `main`: in rule `inner_rule`: propagating fatal unique error")
+
+Formatted:
+in rule `main`: in rule `inner_rule`: propagating fatal unique error
+
+
 
 failures:
-    tests::parse_complex_cxx_bridge
+    test_combinator_error_produces_clean_message
+    test_deep_vs_shallow
+    test_deepest_error_wins
+    test_rule_name_in_error_message
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 3 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
