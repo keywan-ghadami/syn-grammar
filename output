@@ -23,101 +23,69 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 2 tests
-test test_composition_complex ... ok
-test test_composition_mixed ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 9 tests
-test test_action_block_statements ... ok
-test test_attributes_on_rules ... ok
-test test_complex_return_types ... ok
-test test_fail_builtin_first ... ok
-test test_keywords_vs_idents ... ok
-test test_fail_builtin_last ... ok
-test test_multi_token_literals ... ok
-test test_use_statements ... ok
-test test_rust_types_and_blocks ... ok
-
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-
-running 6 tests
-test test_count_bindings ... ok
-test test_count_group ... ok
-test test_count_opts ... ok
-test test_count_plus ... ok
-test test_count_plus_fail ... ok
-test test_count_stars ... ok
-
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-
-running 2 tests
-test test_cut_in_repetition ... ok
-test test_cut_operator ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-test test_epsilon_alternative ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 4 tests
-test test_cut_prevents_backtracking ... ok
-test test_fail_overrides_everything ... ok
-test test_fail_vs_deep_error ... ok
-test test_nested_cut_propagation ... ok
-
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-
-running 7 tests
-test test_combinator_error_produces_clean_message ... FAILED
-test test_deep_error_with_label_and_fail ... ok
-test test_deep_vs_shallow ... ok
-test test_deepest_error_wins ... ok
-test test_fail_built_in_enterprise ... ok
-test test_label_priority ... ok
-test test_rule_name_in_error_message ... ok
+test test_composition_complex ... FAILED
+test test_composition_mixed ... FAILED
 
 failures:
 
----- test_combinator_error_produces_clean_message stdout ----
-[TRACE] enter_rule: outer
-[TRACE] enter_rule: inner
-[TRACE] exit_rule: inner
-[TRACE] enter_rule: inner
-[TRACE] exit_rule: inner
-[TRACE] enter_rule: inner
-[TRACE] record_error: 'expected 'a'', priority: 1, label: Some("ident")
-[TRACE] record_error: 'expected `ident`; found unexpected token `b`', priority: 0, label: None
-[TRACE] exit_rule: inner
-[TRACE] record_error: 'expected `ident`; found unexpected token `b`', priority: 1, label: Some("inner")
-[TRACE] record_error: 'expected `inner`; found unexpected token `b`', priority: 0, label: None
-[TRACE] exit_rule: outer
+---- test_composition_complex stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: expr
+[TRACE] enter_rule: term
+[TRACE] enter_rule: weight
+[TRACE] record_error: 'expected `kg`', priority: 0, label: None
+[TRACE] exit_rule: weight
+[TRACE] record_error: 'in rule `weight`: expected `kg`', priority: 0, label: None
+[TRACE] enter_rule: num
+[TRACE] exit_rule: num
+[TRACE] exit_rule: term
+[TRACE] exit_rule: expr
+[TRACE] record_error: 'in rule `expr`: in rule `term`: in rule `weight`: expected `kg`', priority: 0, label: None
+[TRACE] exit_rule: main
 
-thread 'test_combinator_error_produces_clean_message' (7244) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_composition_complex' (39326) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "in rule `outer`: in rule `inner`: expected 'a'"
-Actual msg:    "unexpected token"
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+in rule `main`: in rule `expr`: in rule `term`: in rule `weight`: expected `kg`
 
 Error Debug:
-Error("unexpected token")
-
-Formatted:
-unexpected token
+Error("in rule `main`: in rule `expr`: in rule `term`: in rule `weight`: expected `kg`")
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
+---- test_composition_mixed stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: expr
+[TRACE] enter_rule: term
+[TRACE] enter_rule: weight
+[TRACE] record_error: 'expected `kg`', priority: 0, label: None
+[TRACE] record_error: 'expected `g`', priority: 0, label: None
+[TRACE] exit_rule: weight
+[TRACE] record_error: 'in rule `weight`: expected `kg`', priority: 0, label: None
+[TRACE] enter_rule: num
+[TRACE] exit_rule: num
+[TRACE] exit_rule: term
+[TRACE] exit_rule: expr
+[TRACE] record_error: 'in rule `expr`: in rule `term`: in rule `weight`: expected `kg`', priority: 0, label: None
+[TRACE] exit_rule: main
+
+thread 'test_composition_mixed' (39327) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+in rule `main`: in rule `expr`: in rule `term`: in rule `weight`: expected `kg`
+
+Error Debug:
+Error("in rule `main`: in rule `expr`: in rule `term`: in rule `weight`: expected `kg`")
+
+
 
 failures:
-    test_combinator_error_produces_clean_message
+    test_composition_complex
+    test_composition_mixed
 
-test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
