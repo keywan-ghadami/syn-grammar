@@ -718,8 +718,22 @@ where
 {
     let mut items = Vec::new();
 
-    while let Some(item) = attempt(input, ctx, |i, c| item_parser(i, c))? {
-        items.push(item);
+    loop {
+        let loop_start_span = input.span();
+        match attempt(input, ctx, |i, c| item_parser(i, c))? {
+            Some(item) => {
+                items.push(item);
+            }
+            None => {
+                // Item parsing failed. Check if it was a significant failure.
+                if ctx.stop_aggregation(loop_start_span) {
+                    // A deep or high-priority error occurred. Propagate failure.
+                    return Err(syn::Error::new(loop_start_span, "significant error in repetition"));
+                }
+                // Otherwise, it's just the end of the repetition.
+                break;
+            }
+        }
     }
 
     if items.len() < min {
@@ -728,6 +742,7 @@ where
 
     Ok(items)
 }
+
 
 // --- Delimited Parsing ---
 
