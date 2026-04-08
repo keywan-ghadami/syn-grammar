@@ -64,7 +64,7 @@ failures:
 [TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: expected `unsafe`; found unexpected token `unsafe`; found unexpected token `#`', priority: 0, label: None
 [TRACE] exit_rule: top_level_mod
 
-thread 'tests::parse_complex_cxx_bridge' (45657) panicked at cxx-parser/src/lib.rs:118:14:
+thread 'tests::parse_complex_cxx_bridge' (53416) panicked at cxx-parser/src/lib.rs:118:14:
 Parser failed to process the TokenStream: Error("in rule `top_level_mod`: in rule `extern_block`: expected `unsafe`; found unexpected token `unsafe`; found unexpected token `#`")
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
