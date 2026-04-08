@@ -118,7 +118,17 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         #vis fn #fn_name(input: ParseStream #(#params)*) -> Result<#ret_type> #where_clause {
             let mut ctx = rt::ParseContext::new();
             match #impl_name(input, &mut ctx #(#param_names)*) {
-                Ok(val) => Ok(val),
+                Ok(val) => {
+                    // CRITICAL FIX: Wenn der Parser erfolgreich abschließt, aber Tokens 
+                    // übrig lässt, extrahieren wir den präzisen Abbruchgrund aus dem Kontext,
+                    // anstatt auf den generischen "unexpected token" Fehler von syn zu warten.
+                    if !input.is_empty() {
+                        if let Some(best) = ctx.take_best_error() {
+                            return Err(best);
+                        }
+                    }
+                    Ok(val)
+                },
                 Err(e) => {
                     if let Some(best) = ctx.take_best_error() {
                         Err(best)
