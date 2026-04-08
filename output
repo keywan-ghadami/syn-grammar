@@ -1,0 +1,76 @@
+
+running 1 test
+test tests::parse_complex_cxx_bridge ... FAILED
+
+failures:
+
+---- tests::parse_complex_cxx_bridge stdout ----
+[TRACE] enter_rule: top_level_mod
+[TRACE] enter_rule: extern_block
+[TRACE] enter_rule: cxx_item
+[TRACE] record_error: 'expected `type`', priority: 0, label: None
+[TRACE] record_error: 'expected `fn`', priority: 0, label: None
+[TRACE] Attempting to parse syn type: syn :: Macro at bytes(0..0)
+[TRACE] Successfully parsed syn type: syn :: Macro
+[TRACE] exit_rule: cxx_item
+[TRACE] enter_rule: cxx_item
+[TRACE] Attempting to parse syn type: syn :: Generics at bytes(0..0)
+[TRACE] Successfully parsed syn type: syn :: Generics
+[TRACE] exit_rule: cxx_item
+[TRACE] enter_rule: cxx_item
+[TRACE] Attempting to parse syn type: syn :: Generics at bytes(0..0)
+[TRACE] Successfully parsed syn type: syn :: Generics
+[TRACE] exit_rule: cxx_item
+[TRACE] enter_rule: cxx_item
+[TRACE] record_error: 'expected `type`', priority: 0, label: None
+[TRACE] Attempting to parse syn type: syn :: Generics at bytes(0..0)
+[TRACE] Successfully parsed syn type: syn :: Generics
+[TRACE] enter_rule: cxx_arg_list
+[TRACE] enter_rule: cxx_arg
+[TRACE] Attempting to parse syn type: syn :: Type at bytes(0..0)
+[TRACE] Successfully parsed syn type: syn :: Type
+[TRACE] exit_rule: cxx_arg
+[TRACE] enter_rule: cxx_arg
+[TRACE] Attempting to parse syn type: syn :: Type at bytes(0..0)
+[TRACE] Successfully parsed syn type: syn :: Type
+[TRACE] exit_rule: cxx_arg
+[TRACE] enter_rule: cxx_arg
+[TRACE] Attempting to parse syn type: syn :: Type at bytes(0..0)
+[TRACE] Successfully parsed syn type: syn :: Type
+[TRACE] exit_rule: cxx_arg
+[TRACE] enter_rule: cxx_arg
+[TRACE] record_error: 'unexpected end of input, expected ident', priority: 0, label: None
+[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: in rule `cxx_arg`: unexpected end of input, expected ident', priority: 0, label: None
+[TRACE] exit_rule: cxx_arg
+[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: in rule `cxx_arg`: unexpected end of input, expected ident', priority: 0, label: None
+[TRACE] record_error: 'expected item after separator', priority: 2, label: None
+[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator', priority: 0, label: None
+[TRACE] exit_rule: cxx_arg_list
+[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator', priority: 0, label: None
+[TRACE] record_error: 'unexpected token in delimited group', priority: 0, label: None
+[TRACE] Attempting to parse syn type: syn :: Macro at bytes(0..0)
+[TRACE] FAILED to parse syn type: syn :: Macro. Error: 'expected identifier', Error Span: bytes(0..0)
+[TRACE] Start span was: bytes(0..0)
+[TRACE] No progress. NOT calling trigger_fail()
+[TRACE] record_error: 'expected identifier', priority: 0, label: None
+[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator; found unexpected token `#`', priority: 0, label: None
+[TRACE] exit_rule: cxx_item
+[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: in rule `cxx_item`: in rule `cxx_arg_list`: expected item after separator; found unexpected token `#`', priority: 0, label: None
+[TRACE] record_error: 'unexpected token in delimited group', priority: 1, label: Some("unsafe")
+[TRACE] record_error: 'expected `unsafe`; found unexpected token `unsafe`', priority: 0, label: None
+[TRACE] exit_rule: extern_block
+[TRACE] record_error: 'expected `unsafe`; found unexpected token `unsafe`', priority: 0, label: None
+[TRACE] record_error: 'unexpected token in delimited group', priority: 0, label: None
+[TRACE] record_error: 'in rule `top_level_mod`: in rule `extern_block`: expected `unsafe`; found unexpected token `unsafe`; found unexpected token `#`', priority: 0, label: None
+[TRACE] exit_rule: top_level_mod
+
+thread 'tests::parse_complex_cxx_bridge' (45657) panicked at cxx-parser/src/lib.rs:118:14:
+Parser failed to process the TokenStream: Error("in rule `top_level_mod`: in rule `extern_block`: expected `unsafe`; found unexpected token `unsafe`; found unexpected token `#`")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::parse_complex_cxx_bridge
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

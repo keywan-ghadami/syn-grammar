@@ -122,7 +122,29 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             };
 
             if is_syn_type {
-                let expr = quote! { input.parse::<#rule_path>()? };
+                let expr = quote! {
+                    {
+                        let start_span = input.span();
+                        eprintln!("[TRACE] Attempting to parse syn type: {} at {:?}", stringify!(#rule_path), start_span);
+                        match input.parse::<#rule_path>() {
+                            Ok(val) => {
+                                eprintln!("[TRACE] Successfully parsed syn type: {}", stringify!(#rule_path));
+                                Ok(val)
+                            },
+                            Err(e) => {
+                                eprintln!("[TRACE] FAILED to parse syn type: {}. Error: '{}', Error Span: {:?}", stringify!(#rule_path), e.to_string(), e.span());
+                                eprintln!("[TRACE] Start span was: {:?}", start_span);
+                                if e.span().start() > start_span.start() {
+                                    eprintln!("[TRACE] Progress was made. Calling trigger_fail()");
+                                    ctx.trigger_fail();
+                                } else {
+                                    eprintln!("[TRACE] No progress. NOT calling trigger_fail()");
+                                }
+                                Err(e)
+                            }
+                        }
+                    }?
+                };
                 if let Some(bind) = binding {
                     Ok(quote! { let #bind = #expr; })
                 } else {

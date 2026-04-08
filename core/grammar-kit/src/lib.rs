@@ -768,41 +768,16 @@ where
     // Run the inner parser on the content stream.
     let res = parser(&content, ctx);
 
-    // After parsing, check if the content stream is fully consumed.
-    // If not, it's an error because there's trailing garbage.
+    // If there is trailing garbage, return a generic error.
+    // DO NOT call take_best_error(). If a better error exists in ctx,
+    // the outer attempt's record_error call will automatically prefer it.
     if !content.is_empty() {
-        // There are unconsumed tokens. This is an error condition, even if the
-        // parser returned `Ok`. The parser might have successfully parsed a prefix
-        // of the content, but it should have consumed all of it.
-
-        // We prioritize any high-quality error that the inner parser might have
-        // recorded in the context. This is key to avoiding generic errors from `syn`.
-        if let Some(best_err) = ctx.take_best_error() {
-            return Err(best_err);
-        } else {
-            // If the context has no better error, create a generic but clear one
-            // pointing at the start of the unparsed tokens.
-            return Err(content.error("unexpected token in delimited group"));
-        }
+        return Err(content.error("unexpected token in delimited group"));
     }
 
-    // If the content is empty, the parser (whether it succeeded or failed)
-    // has processed the entire stream. We now trust its outcome.
-    match res {
-        Ok(value) => Ok(value),
-        Err(parser_err) => {
-            // The parser failed, but consumed all tokens. This can happen, for
-            // example, if an optional element at the end of the group was not found.
-            // Again, we check the context for a more specific error that might have
-            // been recorded during a failed `attempt`.
-            if let Some(best_err) = ctx.take_best_error() {
-                Err(best_err)
-            } else {
-                // If there's no better error, we return the original error from the parser.
-                Err(parser_err)
-            }
-        }
-    }
+    // Return the result directly. 
+    // DO NOT intercept Err to call take_best_error().
+    res
 }
 
 
