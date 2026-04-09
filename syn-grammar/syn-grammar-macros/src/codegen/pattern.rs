@@ -1267,13 +1267,15 @@ fn generate_rule_call_expr(
             let mut new_path = rule_path.clone();
             let last_seg = new_path.segments.last_mut().unwrap();
             let last_ident = last_seg.ident.clone();
-            let new_ident = format_ident!("parse_{}", last_ident);
+            
+            // CRITICAL FIX: Immer die interne _impl Funktion nutzen und den shared 'ctx' übergeben
+            let new_ident = format_ident!("parse_{}_impl", last_ident);
             last_seg.ident = new_ident;
 
             if arg_exprs.is_empty() {
-                Ok(quote!(#new_path(input)?))
+                Ok(quote!(#new_path(&mut input, ctx)?))
             } else {
-                Ok(quote!(#new_path(input, #(#arg_exprs),*)?))
+                Ok(quote!(#new_path(&mut input, ctx, #(#arg_exprs),*)?))
             }
         } else {
             // Standard call
