@@ -61,7 +61,7 @@ grammar! {
                 CxxItem::Type(attrs, name.into(), generics.unwrap_or_default())
             }
           | attrs:outer_attrs "fn" name:ident generics:syn::Generics?
-            paren(args:cxx_arg_list?)
+            paren(args:cxx_arg_list? ","?)
             ret:syn::ReturnType ";" -> {
                 CxxItem::Function(attrs, name.into(), generics.unwrap_or_default(), args.unwrap_or_default(), ret)
             }

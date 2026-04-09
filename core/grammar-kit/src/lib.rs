@@ -1,3 +1,4 @@
+
 #![doc = include_str!("../README.md")]
 
 #[cfg(feature = "syn")]
@@ -173,17 +174,15 @@ impl ParseContext {
         label: Option<String>,
         mut priority: u8,
     ) {
+        // Trace every considered error before any filtering.
+        #[cfg(feature = "trace")]
+        eprintln!("[TRACE] considering_error: '{}' (priority: {}, label: {:?})", err, priority, label);
+
         // If fail was triggered, bump priority to at least 2
         if self.fail_triggered {
             priority = std::cmp::max(priority, 2);
         }
         self.fail_triggered = false; // Reset after consuming
-
-        #[cfg(feature = "trace")]
-        eprintln!(
-            "[TRACE] record_error: '{}', priority: {}, label: {:?}",
-            err, priority, label
-        );
 
         // We use the error's actual location for comparison
         let error_span = err.span();
@@ -199,15 +198,21 @@ impl ParseContext {
 
         match &mut self.best_error {
             None => {
+                #[cfg(feature = "trace")]
+                eprintln!("[TRACE] record_error: New best error (no previous)");
                 self.best_error = Some(new_error_state);
             }
             Some(existing) => {
                 // 1. Fatality: If the new error is fatal, it wins immediately.
                 if new_error_state.is_fatal && !existing.is_fatal {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: New best error (is fatal)");
                     self.best_error = Some(new_error_state);
                     return;
                 }
                 if existing.is_fatal && !new_error_state.is_fatal {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: Rejected (existing is fatal)");
                     return;
                 }
 
@@ -222,17 +227,25 @@ impl ParseContext {
                     || (old_start.line == new_start.line && old_start.column > new_start.column);
 
                 if is_deeper {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: New best error (deeper span)");
                     self.best_error = Some(new_error_state);
                     return;
                 } else if is_shallower {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: Rejected (shallower span)");
                     return;
                 }
 
                 // 3. Priority
                 if new_error_state.priority > existing.priority {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: New best error (higher priority)");
                     self.best_error = Some(new_error_state);
                     return;
                 } else if existing.priority > new_error_state.priority {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: Rejected (lower priority)");
                     return;
                 }
 
@@ -241,12 +254,22 @@ impl ParseContext {
                 if new_error_state.rule_stack.len() > existing.rule_stack.len()
                     || (new_error_state.label.is_some() && existing.label.is_none())
                 {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: New best error (more specific context)");
                     self.best_error = Some(new_error_state);
                 } else if new_error_state.rule_stack.len() == existing.rule_stack.len() {
                     // Tie-breaker: longer message length (more info)
                     if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
+                        #[cfg(feature = "trace")]
+                        eprintln!("[TRACE] record_error: New best error (longer message)");
                         self.best_error = Some(new_error_state);
+                    } else {
+                        #[cfg(feature = "trace")]
+                        eprintln!("[TRACE] record_error: Rejected (shorter message)");
                     }
+                } else {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: Rejected (less specific context)");
                 }
             }
         }
@@ -642,65 +665,46 @@ pub fn parse_separated<T, P, S>(
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
-    S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,{
+    S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,
+{
     let mut items = Vec::new();
-    let mut first = true;
 
-    loop {
-        let loop_start_span = input.span();
-
-        if !first {
-            // Try to parse a separator. If it fails, it's the end of the list.
-            if attempt(input, ctx, |i, c| sep_parser(i, c))?.is_none() {
-                // If separator parsing failed with a significant error, we must abort.
-                if ctx.stop_aggregation(loop_start_span) {
-                    // The real error is in the context. Return a dummy error to propagate.
-                    return Err(syn::Error::new(loop_start_span, "significant error while parsing separator"));
-                }
-                // Otherwise, it's just the end of the list.
-                break;
+    // 1. Initiales Item parsen
+    match attempt(input, ctx, |i, c| item_parser(i, c))? {
+        Some(item) => items.push(item),
+        None => {
+            if min > 0 {
+                let msg = error_msg.unwrap_or("expected item");
+                return ctx.raise_failure(msg, input.span());
             }
-        }
-
-        // Try parse item
-        // We use attempt because item parsing might fail deeply
-        match attempt(input, ctx, |i, c| item_parser(i, c))? {
-            Some(item) => {
-                items.push(item);
-                first = false;
-            }
-            None => {
-                // Item parsing failed. Check if it was a significant failure.
-                if ctx.stop_aggregation(loop_start_span) {
-                    // A deep or high-priority error occurred. This is not just a
-                    // "no match" situation. We must propagate the failure.
-                    return Err(syn::Error::new(loop_start_span, "significant error while parsing item"));
-                }
-
-                // If we are here, it means we either:
-                // 1. Just started (first=true) and failed to parse first item -> Empty list.
-                // 2. Had a separator (first=false) but failed to parse item -> Trailing separator? or Error?
-
-                if !first {
-                    // This means we just successfully parsed a separator.
-                    // A separator must be followed by an item unless trailing separators are allowed.
-                    if !trailing {
-                        let msg = error_msg.unwrap_or("expected item after separator");
-                        return ctx.raise_failure(msg, input.span());
-                    }
-                    // A trailing separator is allowed and was found. End of list.
-                    break;
-                } else {
-                    // This means we failed to parse even the first item.
-                    // The list is simply empty.
-                    break;
-                }
-            }
+            return Ok(items); // Leere Liste
         }
     }
 
+    // 2. Atomares Paar-Parsing [Separator, Item]
+    loop {
+        // attempt arbeitet auf einem Fork. Schlägt sep_parser oder item_parser fehl,
+        // wird der Input nicht vorgerückt (Rollback auf den Zustand vor dem Separator).
+        let next_pair = attempt(input, ctx, |i, c| {
+            sep_parser(i, c)?;
+            item_parser(i, c)
+        })?;
+
+        match next_pair {
+            Some(item) => items.push(item),
+            None => break, // Paar unvollständig oder nicht vorhanden -> Liste beendet
+        }
+    }
+
+    // 3. Optionales Trailing Comma explizit konsumieren, falls in der Grammatik gefordert
+    if trailing {
+        let _ = attempt(input, ctx, |i, c| sep_parser(i, c))?;
+    }
+
+    // 4. Finale Längenprüfung
     if items.len() < min {
-        return ctx.raise_failure(format!("expected at least {} items", min), input.span());
+        let msg = error_msg.unwrap_or("expected more items");
+        return ctx.raise_failure(&format!("{}, found {}", msg, items.len()), input.span());
     }
 
     Ok(items)
