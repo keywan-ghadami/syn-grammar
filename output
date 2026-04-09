@@ -31,22 +31,22 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 9 tests
 test test_attributes_on_rules ... ok
-test test_complex_return_types ... ok
 test test_action_block_statements ... ok
+test test_complex_return_types ... ok
 test test_fail_builtin_first ... ok
-test test_fail_builtin_last ... ok
 test test_keywords_vs_idents ... ok
+test test_fail_builtin_last ... ok
 test test_multi_token_literals ... ok
 test test_rust_types_and_blocks ... ok
 test test_use_statements ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
 
 
 running 6 tests
+test test_count_group ... ok
 test test_count_bindings ... ok
 test test_count_opts ... ok
-test test_count_group ... ok
 test test_count_plus ... ok
 test test_count_plus_fail ... ok
 test test_count_stars ... ok
@@ -58,7 +58,7 @@ running 2 tests
 test test_cut_in_repetition ... ok
 test test_cut_operator ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -68,24 +68,24 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 4 tests
-test test_cut_prevents_backtracking ... ok
 test test_fail_overrides_everything ... ok
+test test_cut_prevents_backtracking ... ok
 test test_fail_vs_deep_error ... ok
 test test_nested_cut_propagation ... ok
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 7 tests
+test test_deep_error_with_label_and_fail ... ok
 test test_combinator_error_produces_clean_message ... ok
 test test_deep_vs_shallow ... ok
-test test_deep_error_with_label_and_fail ... ok
 test test_deepest_error_wins ... ok
 test test_fail_built_in_enterprise ... ok
 test test_label_priority ... ok
 test test_rule_name_in_error_message ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -101,49 +101,123 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 2 tests
-test test_generic_inference ... ok
 test test_generic_rule ... ok
+test test_generic_inference ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 
 running 4 tests
 test test_deep_error_wins ... ok
-test test_default_labels ... FAILED
 test test_explicit_labels ... ok
 test test_group_labels ... ok
+test test_default_labels ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test test_explicit_container ... ok
+test test_repeated ... ok
+test test_repeated_min ... ok
+test test_separated_basic ... ok
+test test_separated_min ... FAILED
+test test_separated_custom_error ... FAILED
+test test_separated_trailing ... FAILED
 
 failures:
 
----- test_default_labels stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: a
-[TRACE] considering_error: 'expected `a`; found unexpected token `x`' (priority: 0, label: None)
+---- test_separated_min stdout ----
+[TRACE] enter_rule: min_two
+[TRACE] enter_rule: item 1 in separated
+[TRACE] exit_rule: item 1 in separated
+[TRACE] considering_error: 'expected `,`' (priority: 0, label: None)
 [TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: a
-[TRACE] considering_error: 'expected `a`; found unexpected token `x`' (priority: 10, label: Some("a"))
+[TRACE] considering_error: 'expected more items, found 1' (priority: 0, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
 [TRACE] record_error: Rejected (lower priority)
-[TRACE] enter_rule: b
-[TRACE] considering_error: 'expected `b`; found unexpected token `x`' (priority: 0, label: None)
-[TRACE] record_error: New best error (longer message)
-[TRACE] exit_rule: b
-[TRACE] considering_error: 'expected `b`; found unexpected token `x`' (priority: 10, label: Some("b"))
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] considering_error: 'expected one of: `a`, `b`; found unexpected token `x`' (priority: 0, label: None)
-[TRACE] record_error: Rejected (less specific context)
-[TRACE] considering_error: 'No matching rule variant found; found unexpected token `x`' (priority: 0, label: None)
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] exit_rule: main
-Error: expected `b`; found unexpected token `x` in rule `b`
-in rule `main`
+[TRACE] exit_rule: min_two
 
-thread 'test_default_labels' (89659) panicked at syn-grammar/tests/labeled_alternatives_test.rs:44:5:
-assertion failed: err.to_string().contains("expected one of: `a`, `b`")
+thread 'test_separated_min' (3459) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected at least 2 items"
+Actual msg:    "expected more items, found 1 in rule `min_two`"
+
+Error Debug:
+Error("expected more items, found 1 in rule `min_two`")
+
+Formatted:
+expected more items, found 1 in rule `min_two`
+
+
+---- test_separated_custom_error stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: item 1 in separated
+[TRACE] exit_rule: item 1 in separated
+[TRACE] enter_rule: item 2 in separated
+[TRACE] exit_rule: item 2 in separated
+[TRACE] enter_rule: item 3 in separated
+[TRACE] exit_rule: item 3 in separated
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: main
+
+thread 'test_separated_custom_error' (3458) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "custom error message"
+Actual msg:    "unexpected end of input, expected string literal in rule `main`"
+
+Error Debug:
+Error("unexpected end of input, expected string literal in rule `main`")
+
+Formatted:
+unexpected end of input, expected string literal in rule `main`
+
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
+---- test_separated_trailing stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: item 1 in separated
+[TRACE] exit_rule: item 1 in separated
+[TRACE] enter_rule: item 2 in separated
+[TRACE] exit_rule: item 2 in separated
+[TRACE] enter_rule: item 3 in separated
+[TRACE] exit_rule: item 3 in separated
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: main
+[TRACE] enter_rule: strict
+[TRACE] enter_rule: item 1 in separated
+[TRACE] exit_rule: item 1 in separated
+[TRACE] enter_rule: item 2 in separated
+[TRACE] exit_rule: item 2 in separated
+[TRACE] enter_rule: item 3 in separated
+[TRACE] exit_rule: item 3 in separated
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: strict
+
+thread 'test_separated_trailing' (3460) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected item after separator"
+Actual msg:    "unexpected end of input, expected string literal in rule `strict`"
+
+Error Debug:
+Error("unexpected end of input, expected string literal in rule `strict`")
+
+Formatted:
+unexpected end of input, expected string literal in rule `strict`
+
+
 
 failures:
-    test_default_labels
+    test_separated_custom_error
+    test_separated_min
+    test_separated_trailing
 
-test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 

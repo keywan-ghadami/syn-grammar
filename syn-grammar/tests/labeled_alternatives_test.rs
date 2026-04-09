@@ -4,77 +4,64 @@ use syn_grammar::testing::Testable;
 
 grammar! {
     grammar default_labels {
-        pub rule main -> () = (a | b) -> { () }
-        rule a -> () = "a" -> { () }
-        rule b -> () = "b" -> { () }
+        pub main = ("a" | "b")
     }
 }
 
 grammar! {
     grammar explicit_labels {
-        pub rule main -> ()
-            = "a" # "Letter A" -> { () }
-            | "b" # "Letter B" -> { () }
+        pub main
+            = "a" # "Letter A"
+            | "b" # "Letter B"
     }
 }
 
 grammar! {
     grammar deep_error {
-        pub rule main -> ()
-            = "a" "b" # "AB" -> { () }
-            | "c" # "C" -> { () }
+        pub main
+            = "a" "b" # "AB"
+            | "c" # "C"
     }
 }
 
 grammar! {
     grammar group_labels {
-        pub rule main -> ()
-            = ("a" # "A" | "b" # "B") -> { () }
+        pub main
+            = ("a" # "A" | "b" # "B")
     }
 }
 
 #[test]
 fn test_default_labels() {
-    let err = default_labels::parse_main
+    default_labels::parse_main
         .parse_str("x")
         .test()
-        .assert_failure();
-    // We expect "expected one of: `a`, `b`" or similar.
-    println!("Error: {}", err);
-    assert!(err.to_string().contains("expected one of: `a`, `b`"));
+        .assert_failure_contains("expected one of: `a`, `b`");
 }
 
 #[test]
 fn test_explicit_labels() {
-    let err = explicit_labels::parse_main
+    explicit_labels::parse_main
         .parse_str("x")
         .test()
-        .assert_failure();
-    println!("Error: {}", err);
-    assert!(err
-        .to_string()
-        .contains("expected one of: `Letter A`, `Letter B`"));
+        .assert_failure_contains("expected one of: `Letter A`, `Letter B`");
 }
 
 #[test]
 fn test_deep_error_wins() {
     // Input "a x" matches first part of AB, fails at "b". This is deep.
     // So error should be "expected 'b'", NOT "expected one of: AB, C".
-    let err = deep_error::parse_main
+    deep_error::parse_main
         .parse_str("a x")
         .test()
-        .assert_failure();
-    println!("Error: {}", err);
-    assert!(err.to_string().contains("expected `b`"));
-    assert!(!err.to_string().contains("expected one of:"));
+        .assert_failure_contains("expected `b`")
+        .assert_failure_not_contains("expected one of:");
 }
 
 #[test]
 fn test_group_labels() {
-    let err = group_labels::parse_main
+    group_labels::parse_main
         .parse_str("x")
         .test()
-        .assert_failure();
-    println!("Error: {}", err);
-    assert!(err.to_string().contains("expected one of: `A`, `B`"));
+        .assert_failure_contains("expected one of: `A`, `B`");
 }
