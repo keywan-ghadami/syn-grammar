@@ -352,7 +352,16 @@ pub fn generate_variants_internal(
                                     // Pre succeeded. Now run Post.
                                     let mut post_run = || -> syn::Result<_> {
                                         #post_logic
-                                        Ok({ #action })
+                                        let _semantic_res = (|| -> syn::Result<_> {
+                                            Ok({ #action })
+                                        })();
+                                        match _semantic_res {
+                                            Ok(_v) => Ok(_v),
+                                            Err(_e) => {
+                                                ctx.set_priority(rt::ParseContext::PRIO_STRUCTURAL);
+                                                Err(_e)
+                                            }
+                                        }
                                     };
                                     match post_run() {
                                         Ok(v) => return Ok(v),
@@ -381,7 +390,16 @@ pub fn generate_variants_internal(
                         if let Some(( #(#pre_bindings),* )) = pre_result {
                             let mut post_run = || -> syn::Result<_> {
                                 #post_logic
-                                Ok({ #action })
+                                let _semantic_res = (|| -> syn::Result<_> {
+                                    Ok({ #action })
+                                        })();
+                                        match _semantic_res {
+                                            Ok(_v) => Ok(_v),
+                                            Err(_e) => {
+                                                ctx.set_priority(rt::ParseContext::PRIO_STRUCTURAL);
+                                                Err(_e)
+                                            }
+                                        }
                             };
                             match post_run() {
                                 Ok(v) => return Ok(v),

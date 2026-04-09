@@ -12,7 +12,23 @@ pub fn generate_sequence(
     ctx: &CodegenContext,
 ) -> Result<TokenStream> {
     let steps = generate_sequence_steps(patterns, ctx)?;
-    Ok(quote! { { #steps Ok({ #action }) } })
+    Ok(quote! {
+        {
+            #steps
+            // CRITICAL FIX: Semantische Action-Blöcke kapseln.
+            // Fängt der Nutzer-Code mit Err(...) ab, stufen wir das zwingend als Strukturfehler ein.
+            let _semantic_res = (|| -> syn::Result<_> {
+                Ok({ #action })
+            })();
+            match _semantic_res {
+                Ok(_v) => Ok(_v),
+                Err(_e) => {
+                    ctx.set_priority(rt::ParseContext::PRIO_STRUCTURAL);
+                    Err(_e)
+                }
+            }
+        }
+    })
 }
 
 pub fn generate_sequence_steps(

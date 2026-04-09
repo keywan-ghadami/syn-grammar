@@ -31,32 +31,32 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 9 tests
 test test_attributes_on_rules ... ok
-test test_action_block_statements ... ok
 test test_complex_return_types ... ok
+test test_action_block_statements ... ok
 test test_fail_builtin_first ... ok
 test test_fail_builtin_last ... ok
 test test_keywords_vs_idents ... ok
 test test_multi_token_literals ... ok
-test test_use_statements ... ok
 test test_rust_types_and_blocks ... ok
+test test_use_statements ... ok
 
 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 6 tests
 test test_count_bindings ... ok
-test test_count_group ... ok
 test test_count_opts ... ok
+test test_count_group ... ok
 test test_count_plus ... ok
-test test_count_stars ... ok
 test test_count_plus_fail ... ok
+test test_count_stars ... ok
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 2 tests
-test test_cut_operator ... ok
 test test_cut_in_repetition ... ok
+test test_cut_operator ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -77,52 +77,73 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 7 tests
-test test_combinator_error_produces_clean_message ... FAILED
-test test_deep_error_with_label_and_fail ... ok
+test test_combinator_error_produces_clean_message ... ok
 test test_deep_vs_shallow ... ok
+test test_deep_error_with_label_and_fail ... ok
 test test_deepest_error_wins ... ok
 test test_fail_built_in_enterprise ... ok
 test test_label_priority ... ok
 test test_rule_name_in_error_message ... ok
 
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_span_propagation_compiles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_fail_builtin ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test_generic_inference ... ok
+test test_generic_rule ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test test_deep_error_wins ... ok
+test test_default_labels ... FAILED
+test test_explicit_labels ... ok
+test test_group_labels ... ok
+
 failures:
 
----- test_combinator_error_produces_clean_message stdout ----
-[TRACE] enter_rule: outer
-[TRACE] enter_rule: inner
-[TRACE] exit_rule: inner
-[TRACE] enter_rule: inner
-[TRACE] exit_rule: inner
-[TRACE] enter_rule: inner
-[TRACE] considering_error: 'expected 'a'' (priority: 10, label: Some("ident"))
+---- test_default_labels stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: a
+[TRACE] considering_error: 'expected `a`; found unexpected token `x`' (priority: 0, label: None)
 [TRACE] record_error: New best error (no previous)
-[TRACE] considering_error: 'expected `ident`; found unexpected token `b`' (priority: 0, label: None)
-[TRACE] record_error: New best error (higher priority)
-[TRACE] exit_rule: inner
-[TRACE] considering_error: 'expected `ident`; found unexpected token `b`' (priority: 10, label: Some("inner"))
+[TRACE] exit_rule: a
+[TRACE] considering_error: 'expected `a`; found unexpected token `x`' (priority: 10, label: Some("a"))
 [TRACE] record_error: Rejected (lower priority)
-[TRACE] considering_error: 'expected `inner`; found unexpected token `b`' (priority: 0, label: None)
+[TRACE] enter_rule: b
+[TRACE] considering_error: 'expected `b`; found unexpected token `x`' (priority: 0, label: None)
+[TRACE] record_error: New best error (longer message)
+[TRACE] exit_rule: b
+[TRACE] considering_error: 'expected `b`; found unexpected token `x`' (priority: 10, label: Some("b"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] considering_error: 'expected one of: `a`, `b`; found unexpected token `x`' (priority: 0, label: None)
 [TRACE] record_error: Rejected (less specific context)
-[TRACE] exit_rule: outer
+[TRACE] considering_error: 'No matching rule variant found; found unexpected token `x`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: main
+Error: expected `b`; found unexpected token `x` in rule `b`
+in rule `main`
 
-thread 'test_combinator_error_produces_clean_message' (23674) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
-
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "expected 'a' in rule `inner`\nin rule `outer`"
-Actual msg:    "expected `ident`; found unexpected token `b` in rule `inner`\nin rule `outer`"
-
-Error Debug:
-Error("expected `ident`; found unexpected token `b` in rule `inner`\nin rule `outer`")
-
-Formatted:
-expected `ident`; found unexpected token `b` in rule `inner`
-in rule `outer`
-
+thread 'test_default_labels' (89659) panicked at syn-grammar/tests/labeled_alternatives_test.rs:44:5:
+assertion failed: err.to_string().contains("expected one of: `a`, `b`")
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 
 failures:
-    test_combinator_error_produces_clean_message
+    test_default_labels
 
-test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
