@@ -24,6 +24,7 @@ pub trait WithSpan<ParsedData> {
 }
 
 /// Generic symbol table that tracks variable definitions in nested scopes.
+/// This is essential for parsing languages with lexical scoping rules.
 #[derive(Clone, Default)]
 pub struct ScopeStack {
     scopes: Vec<HashSet<String>>,
@@ -66,6 +67,9 @@ impl ScopeStack {
     }
 }
 
+/// Represents the state of a single parse error, including its location,
+/// priority, and the context in which it occurred. This is used by `ParseContext`
+/// to track the "best" error encountered so far.
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[derive(Clone, Debug)]
 struct ErrorState {
@@ -77,8 +81,9 @@ struct ErrorState {
     label: Option<String>,
 }
 
-/// Holds the state for backtracking and error reporting.
-/// This must be passed mutably through the parsing chain.
+/// Holds the shared state for a parsing process, enabling advanced error
+/// reporting, backtracking, and context-aware parsing. It is passed mutably
+/// through the parser functions.
 #[cfg(feature = "rt")]
 #[derive(Clone)]
 pub struct ParseContext {
@@ -89,13 +94,25 @@ pub struct ParseContext {
     rule_stack: Vec<String>,
     #[cfg(feature = "syn")]
     pub last_span: Option<Span>,
-    fail_triggered: bool,
+    pub pending_priority: u8,
     suppress_label: bool,
     mode_stack: Vec<bool>, // true = lexical, false = spaced
 }
 
 #[cfg(feature = "rt")]
 impl ParseContext {
+    // --- PRIORITY SYSTEM ---
+    pub const PRIO_NORMAL: u8 = 0;
+    pub const PRIO_LABELED: u8 = 10;
+    pub const PRIO_AGGREGATED: u8 = 20;
+    pub const PRIO_STRUCTURAL: u8 = 50;
+
+    pub fn set_priority(&mut self, prio: u8) {
+        if prio > self.pending_priority {
+            self.pending_priority = prio;
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             is_fatal: false,
@@ -105,7 +122,7 @@ impl ParseContext {
             rule_stack: Vec::new(),
             #[cfg(feature = "syn")]
             last_span: None,
-            fail_triggered: false,
+            pending_priority: Self::PRIO_NORMAL,
             suppress_label: false,
             mode_stack: Vec::new(),
         }
@@ -120,7 +137,7 @@ impl ParseContext {
     }
 
     pub fn trigger_fail(&mut self) {
-        self.fail_triggered = true;
+        self.set_priority(Self::PRIO_STRUCTURAL);
     }
 
     pub fn suppress_label(&mut self) {
@@ -143,7 +160,7 @@ impl ParseContext {
     #[cfg(feature = "syn")]
     pub fn raise_failure<T>(&mut self, msg: impl std::fmt::Display, span: Span) -> Result<T> {
         // Trigger high priority handling
-        self.fail_triggered = true;
+        self.set_priority(Self::PRIO_STRUCTURAL);
 
         // Don't auto-label this error (e.g. don't say "expected identifier" if we explicitly say "number too big")
         self.suppress_label = true;
@@ -166,6 +183,8 @@ impl ParseContext {
     }
 
     /// Records an error if it is "better" than the current best error.
+    /// The "best" error is determined by a set of heuristics, including whether
+    /// the error is fatal, how far it is in the input, and its priority.
     #[cfg(feature = "syn")]
     pub fn record_error(
         &mut self,
@@ -178,11 +197,9 @@ impl ParseContext {
         #[cfg(feature = "trace")]
         eprintln!("[TRACE] considering_error: '{}' (priority: {}, label: {:?})", err, priority, label);
 
-        // If fail was triggered, bump priority to at least 2
-        if self.fail_triggered {
-            priority = std::cmp::max(priority, 2);
-        }
-        self.fail_triggered = false; // Reset after consuming
+        // Eskalierte Priorität aus dem Kontext übernehmen und sofort zurücksetzen
+        priority = std::cmp::max(priority, self.pending_priority);
+        self.pending_priority = Self::PRIO_NORMAL;
 
         // We use the error's actual location for comparison
         let error_span = err.span();
@@ -250,7 +267,6 @@ impl ParseContext {
                 }
 
                 // 4. Context specificity
-                // Prefer deeper rule stack or one with label
                 if new_error_state.rule_stack.len() > existing.rule_stack.len()
                     || (new_error_state.label.is_some() && existing.label.is_none())
                 {
@@ -275,43 +291,56 @@ impl ParseContext {
         }
     }
 
+    /// Consumes the best error, formatting it into a user-friendly `syn::Error`.
+    /// This includes adding rule context and labels.
     #[cfg(feature = "syn")]
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
         let best = self.best_error.take()?;
-
         let mut msg = best.err.to_string();
 
-        // Apply label if present
         if let Some(label) = &best.label {
-            // If the message is generic (e.g. from an empty Result), use the label.
-            // If the message is already specific (e.g. "expected one of..."), keep it.
-            // Heuristic: If it starts with "expected", we assume it's already formatted.
-            // But sometimes the label IS what we want.
-            // For now, simple override if not already containing "expected".
             if !msg.contains("expected") {
                 msg = format!("expected {}", label);
             }
         }
 
-        // Apply rule stack
         if !best.rule_stack.is_empty() {
-            // Apply prefixes in reverse order (stack order)
-            // But be careful not to double-apply if the error message already has them.
-            for rule in best.rule_stack.iter().rev() {
-                let prefix = format!("in rule `{}`: ", rule);
+            let mut stack_iter = best.rule_stack.iter().rev();
+            
+            // 1. Den innersten Fehler-Ort direkt an den Satz anhängen
+            if let Some(innermost) = stack_iter.next() {
+                let is_structural = innermost.contains(" "); // z.B. "item 3 in separated"
+                let suffix = if is_structural {
+                    format!(" in {}", innermost)
+                } else {
+                    format!(" in rule `{}`", innermost)
+                };
+                
+                if !msg.contains(&suffix) {
+                    msg = format!("{}{}", msg, suffix);
+                }
+            }
 
-                // Robust check: Does the message start with this prefix?
-                // Or does it start with "in rule `X`: " where X is something else?
-                // We want to prepend ONLY if it's missing.
-
-                if !msg.contains(&prefix) { // Correction: contains instead of starts_with
-                    msg = format!("{}{}", prefix, msg);
+            // 2. Den restlichen Weg nach draußen (Traceback) in neue Zeilen packen
+            for rule in stack_iter {
+                let is_structural = rule.contains(" ");
+                let suffix = if is_structural {
+                    format!("
+in {}", rule)
+                } else {
+                    format!("
+in rule `{}`", rule)
+                };
+                
+                if !msg.contains(&suffix) {
+                    msg = format!("{}{}", msg, suffix);
                 }
             }
         }
 
         Some(syn::Error::new(best.start_span, msg))
     }
+
 
     /// Determines if the current best error is "significant enough" to stop
     /// aggregating shallow alternative errors.
@@ -325,7 +354,7 @@ impl ParseContext {
 
             // 2. Explicit failures (priority > 1) stop aggregation.
             // Priority 1 (labeled shallow error) is considered insignificant for aggregation.
-            if e.priority > 1 {
+            if e.priority >= Self::PRIO_STRUCTURAL {
                 return true;
             }
 
@@ -352,6 +381,7 @@ impl ParseContext {
     }
 
     // --- Span Tracking & Lexical Mode ---
+
 
     pub fn enter_lexical(&mut self) {
         self.mode_stack.push(true);
@@ -395,6 +425,7 @@ impl ParseContext {
 
     // --- Symbol Table Methods ---
 
+
     pub fn enter_scope(&mut self) {
         self.scopes.enter_scope();
     }
@@ -413,6 +444,7 @@ impl ParseContext {
 
     // --- Inspection Methods ---
 
+
     pub fn scopes(&self) -> &Vec<HashSet<String>> {
         self.scopes.scopes()
     }
@@ -430,7 +462,8 @@ impl Default for ParseContext {
 }
 
 /// Encapsulates a speculative parse attempt.
-/// Requires passing the ParseContext to manage error state.
+/// If the inner parser succeeds, it advances the input stream.
+/// If it fails, it backtracks, restores the parsing context, and records the error.
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn attempt<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<Option<T>>
@@ -441,6 +474,8 @@ where
     attempt_labeled(input, ctx, None, parser)
 }
 
+/// A variant of `attempt` that attaches a descriptive label to errors that
+/// occur at the beginning of the parse attempt. This improves error messages for alternatives.
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn attempt_labeled<T, F>(
@@ -503,10 +538,10 @@ where
                 let (final_label, priority) = if is_at_start && !suppress {
                     (
                         label.map(|s| s.to_string()),
-                        if label.is_some() { 1 } else { 0 },
+                        if label.is_some() { ParseContext::PRIO_LABELED } else { ParseContext::PRIO_NORMAL },
                     )
                 } else {
-                    (None, 0)
+                    (None, ParseContext::PRIO_NORMAL)
                 };
 
                 // Record error BEFORE restoring state to capture inner rule context
@@ -533,8 +568,8 @@ where
     }
 }
 
-/// Executes a parser on a fork, returning the result but NEVER advancing the input.
-/// Restores ParseContext state (scopes, last_span) to what it was before.
+/// Executes a parser on a fork, returning the result but NEVER advancing the input stream.
+/// This is useful for looking ahead in the token stream. State is always restored.
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn peek<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<T>
@@ -561,9 +596,9 @@ where
 }
 
 /// Executes a parser on a fork.
-/// If it SUCCEEDS, returns Err("unexpected match").
-/// If it FAILS, returns Ok(()).
-/// Never advances input. Restores state.
+/// If it SUCCEEDS, returns an `Err`.
+/// If it FAILS, returns `Ok(())`.
+/// This is used for negative lookaheads. The input stream is never advanced.
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn not_check<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<()>
@@ -600,6 +635,8 @@ where
 }
 
 /// Wrapper around attempt used specifically for recovery blocks.
+/// This allows parsing to continue even after an error, which is useful
+/// for providing more comprehensive diagnostics.
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[inline]
 pub fn attempt_recover<T, F>(
@@ -653,6 +690,8 @@ where
 
 // --- Combinators (High-Level Parsers) ---
 
+/// A combinator for parsing a sequence of items separated by a delimiter.
+/// It handles a minimum number of items and optional trailing separators.
 #[cfg(all(feature = "rt", feature = "syn"))]
 pub fn parse_separated<T, P, S>(
     input: ParseStream,
@@ -666,37 +705,47 @@ pub fn parse_separated<T, P, S>(
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
     S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,
+
 {
     let mut items = Vec::new();
 
-    // 1. Initiales Item parsen
-    match attempt(input, ctx, |i, c| item_parser(i, c))? {
+    // 1. Initiales Item parsen (Item 1)
+    ctx.enter_rule("item 1 in separated");
+    let first_res = attempt(input, ctx, |i, c| item_parser(i, c));
+    ctx.exit_rule();
+
+    match first_res? {
         Some(item) => items.push(item),
         None => {
             if min > 0 {
                 let msg = error_msg.unwrap_or("expected item");
                 return ctx.raise_failure(msg, input.span());
             }
-            return Ok(items); // Leere Liste
+            return Ok(items);
         }
     }
 
     // 2. Atomares Paar-Parsing [Separator, Item]
     loop {
-        // attempt arbeitet auf einem Fork. Schlägt sep_parser oder item_parser fehl,
-        // wird der Input nicht vorgerückt (Rollback auf den Zustand vor dem Separator).
+        let next_idx = items.len() + 1;
+        let rule_name = format!("item {} in separated", next_idx);
+
         let next_pair = attempt(input, ctx, |i, c| {
             sep_parser(i, c)?;
-            item_parser(i, c)
+            // Den Index-Kontext erst NACH erfolgreichem Separator auf den Stack legen
+            c.enter_rule(&rule_name);
+            let res = item_parser(i, c);
+            c.exit_rule();
+            res
         })?;
 
         match next_pair {
             Some(item) => items.push(item),
-            None => break, // Paar unvollständig oder nicht vorhanden -> Liste beendet
+            None => break,
         }
     }
 
-    // 3. Optionales Trailing Comma explizit konsumieren, falls in der Grammatik gefordert
+    // 3. Optionales Trailing Comma konsumieren
     if trailing {
         let _ = attempt(input, ctx, |i, c| sep_parser(i, c))?;
     }
@@ -710,6 +759,9 @@ where
     Ok(items)
 }
 
+
+/// A combinator for parsing a repetition of an item.
+/// It continues parsing until the item parser fails and handles a minimum number of items.
 #[cfg(all(feature = "rt", feature = "syn"))]
 pub fn parse_repeated<T, P>(
     input: ParseStream,
@@ -750,6 +802,8 @@ where
 
 // --- Delimited Parsing ---
 
+/// A helper for parsing content enclosed in delimiters like `()`, `{}`, or `[]`.
+/// It ensures that the entire content within the delimiters is consumed by the inner parser.
 #[cfg(all(feature = "rt", feature = "syn"))]
 pub fn parse_delimited<T, F>(
     input: ParseStream,
@@ -848,7 +902,7 @@ mod tests {
         let final_err = ctx.take_best_error().unwrap();
         assert_eq!(
             final_err.to_string(),
-            "in rule `test_rule`: expected something"
+            "expected something in rule `test_rule`"
         );
     }
 
@@ -864,7 +918,8 @@ mod tests {
         let final_err = ctx.take_best_error().unwrap();
         assert_eq!(
             final_err.to_string(),
-            "in rule `outer`: in rule `inner`: fail"
+            "fail in rule `inner`
+in rule `outer`"
         );
 
         // Simulate outer rule recording it too
@@ -878,7 +933,8 @@ mod tests {
         // With prefix checking, it should stay the same
         assert_eq!(
             final_err2.to_string(),
-            "in rule `outer`: in rule `inner`: fail"
+            "fail in rule `inner`
+in rule `outer`"
         );
     }
 
@@ -902,7 +958,7 @@ mod tests {
         let _ = parser.parse_str("");
 
         let err = ctx.take_best_error().expect("Error should be recorded");
-        assert_eq!(err.to_string(), "in rule `outer`: parse failed");
+        assert_eq!(err.to_string(), "parse failed in rule `outer`");
     }
 
     #[test]
@@ -921,10 +977,6 @@ mod tests {
 
         // Assert that it is NOT fatal by default (reverted behavior)
         assert!(!ctx.check_fatal());
-
-        // Best error should be cleared (or nullified) so raise_failure return value is used.
-        // Actually raise_failure returns Err directly.
-        // But if we record it?
 
         // The pattern for `fail` is: return Err from parser immediately.
         // The attempt() wrapper catches it.

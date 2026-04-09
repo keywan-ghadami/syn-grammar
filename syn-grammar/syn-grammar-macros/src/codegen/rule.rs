@@ -488,6 +488,8 @@ pub fn generate_variants_internal(
              };
 
              // CRITICAL FIX: Auch hier kein take_best_error()!
+             // Dem Kontext die saubere Priorität für Aggregation mitteilen
+             ctx.set_priority(rt::ParseContext::PRIO_AGGREGATED);
              input.error(msg)
         } else {
              // Fallback-Fehler, falls keine flachen Fehler vorliegen

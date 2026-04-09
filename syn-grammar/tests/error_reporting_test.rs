@@ -149,5 +149,5 @@ fn test_combinator_error_produces_clean_message() {
     combinator_error_test::parse_outer
         .parse_str("a a b")
         .test()
-        .assert_failure_contains("in rule `outer`: in rule `inner`: expected \'a\'");
+        .assert_failure_contains("expected \'a\' in rule `inner`\nin rule `outer`");
 }
