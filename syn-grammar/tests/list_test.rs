@@ -100,7 +100,7 @@ fn test_separated_trailing() {
     list_test2::parse_strict
         .parse_str(r#""a", "b","#)
         .test()
-        .assert_failure_contains("expected item after separator");
+        .assert_failure_contains("unexpected end of input, expected string literal in item 3 in separated");
 }
 
 #[test]
