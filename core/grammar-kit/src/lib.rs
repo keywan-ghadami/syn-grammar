@@ -718,8 +718,8 @@ where
         Some(item) => items.push(item),
         None => {
             if min > 0 {
-                let msg = error_msg.unwrap_or("expected item");
-                return ctx.raise_failure(msg, input.span());
+                let msg = error_msg.map(|s| s.to_string()).unwrap_or_else(|| format!("expected at least {} items", min));
+                return ctx.raise_failure(&format!("{}, found 0", msg), input.span());
             }
             return Ok(items);
         }
@@ -729,16 +729,16 @@ where
     loop {
         let next_idx = items.len() + 1;
         let rule_name = format!("item {} in separated", next_idx);
-
+        ctx.enter_rule(&rule_name);
         let next_pair = attempt(input, ctx, |i, c| {
             sep_parser(i, c)?;
             // Den Index-Kontext erst NACH erfolgreichem Separator auf den Stack legen
-            c.enter_rule(&rule_name);
+            //c.enter_rule(&rule_name);
             let res = item_parser(i, c);
-            c.exit_rule();
+            //c.exit_rule();
             res
         })?;
-
+        ctx.exit_rule();
         match next_pair {
             Some(item) => items.push(item),
             None => break,
@@ -747,12 +747,14 @@ where
 
     // 3. Optionales Trailing Comma konsumieren
     if trailing {
+        ctx.enter_rule("trailing separator");
         let _ = attempt(input, ctx, |i, c| sep_parser(i, c))?;
+        ctx.exit_rule();
     }
 
     // 4. Finale Längenprüfung
     if items.len() < min {
-        let msg = error_msg.unwrap_or("expected more items");
+        let msg = error_msg.map(|s| s.to_string()).unwrap_or_else(|| format!("expected at least {} items", min));
         return ctx.raise_failure(&format!("{}, found {}", msg, items.len()), input.span());
     }
 
@@ -793,7 +795,7 @@ where
     }
 
     if items.len() < min {
-        return ctx.raise_failure(format!("expected at least {} items", min), input.span());
+        return ctx.raise_failure(format!("expected at least {} items, found {}", min, items.len()), input.span());
     }
 
     Ok(items)

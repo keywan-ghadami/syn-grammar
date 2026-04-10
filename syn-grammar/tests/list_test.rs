@@ -57,7 +57,7 @@ grammar! {
     grammar list_test6 {
         // usage: separated<Vec>(...)
         pub rule explicit_container -> Vec<String>
-            = items:separated<Vec>(string, ",") -> {
+            = items:separated<Vec>(string, ",") "end" -> {
                 items.into_iter().map(|s| s.value).collect()
             }
     }
@@ -108,7 +108,7 @@ fn test_separated_min() {
     list_test3::parse_min_two
         .parse_str(r#""a""#)
         .test()
-        .assert_failure_contains("expected at least 2 items");
+        .assert_failure_contains("expected at least 2 items, found 1");
 
     list_test3::parse_min_two
         .parse_str(r#""a", "b""#)
@@ -134,7 +134,7 @@ fn test_repeated_min() {
     list_test5::parse_repeated_min
         .parse_str(r#""a""#)
         .test()
-        .assert_failure_contains("expected at least 2 items");
+        .assert_failure_contains("expected at least 2 items, found 1");
 
     list_test5::parse_repeated_min
         .parse_str(r#""a" "b""#)
@@ -145,7 +145,7 @@ fn test_repeated_min() {
 #[test]
 fn test_explicit_container() {
     list_test6::parse_explicit_container
-        .parse_str(r#""a", "b""#)
+        .parse_str(r#""a", "b" end"#)
         .test()
         .assert_success_is(vec!["a".to_string(), "b".to_string()]);
 }
@@ -153,7 +153,7 @@ fn test_explicit_container() {
 #[test]
 fn test_separated_custom_error() {
     list_test_custom_error::parse_main
-        .parse_str(r#""a", "b","#) // Trailing comma -> Error
+        .parse_str(r#""a", "b", end"#) // Trailing comma -> Error
         .test()
         .assert_failure_contains("custom error message");
 }
