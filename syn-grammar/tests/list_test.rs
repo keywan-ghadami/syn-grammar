@@ -66,7 +66,7 @@ grammar! {
 grammar! {
     grammar list_test_custom_error {
         pub rule main -> Vec<String>
-            = items:separated(string, ",", error="custom error message") -> {
+            = items:separated(string, ",", item_label="function argument") -> {
                 items.into_iter().map(|s| s.value).collect()
             }
     }
@@ -155,5 +155,5 @@ fn test_separated_custom_error() {
     list_test_custom_error::parse_main
         .parse_str(r#""a", "b", end"#) // Trailing comma -> Error
         .test()
-        .assert_failure_contains("custom error message");
+        .assert_failure_contains("expected string literal in function argument 3 in separated");
 }

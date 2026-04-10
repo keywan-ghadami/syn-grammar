@@ -544,16 +544,6 @@ where
                     (None, ParseContext::PRIO_NORMAL)
                 };
 
-                // Record error BEFORE restoring state to capture inner rule context
-                // Note: We use the existing rule_stack (which might be deep) if we haven't popped yet.
-                // But attempt() caller usually hasn't popped.
-                // Wait, attempt() restores stack AFTER parser() returns.
-                // So ctx.rule_stack is still the stack *inside* the attempt.
-                // Actually, parser() should have exited its rules.
-
-                // If the parser popped its rules, ctx.rule_stack is back to what it was when attempt started.
-                // So we are recording with the outer stack!
-
                 ctx.record_error(e, start_span, final_label, priority);
 
                 // Restore state
@@ -690,8 +680,6 @@ where
 
 // --- Combinators (High-Level Parsers) ---
 
-/// A combinator for parsing a sequence of items separated by a delimiter.
-/// It handles a minimum number of items and optional trailing separators.
 #[cfg(all(feature = "rt", feature = "syn"))]
 pub fn parse_separated<T, P, S>(
     input: ParseStream,
@@ -700,26 +688,29 @@ pub fn parse_separated<T, P, S>(
     mut sep_parser: S,
     min: usize,
     trailing: bool,
-    error_msg: Option<&str>,
+    item_label: Option<&str>,
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
     S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,
-
 {
     let mut items = Vec::new();
+    let label_str = item_label.unwrap_or("item");
 
     // 1. Initiales Item parsen (Item 1)
-    ctx.enter_rule("item 1 in separated");
-    let first_res = attempt(input, ctx, |i, c| item_parser(i, c));
+    let first_rule_name = format!("{} 1 in separated", label_str);
+    ctx.enter_rule(&first_rule_name);
+    let first_res = attempt_labeled(input, ctx, item_label, |i, c| item_parser(i, c));
     ctx.exit_rule();
 
     match first_res? {
         Some(item) => items.push(item),
         None => {
             if min > 0 {
-                let msg = error_msg.map(|s| s.to_string()).unwrap_or_else(|| format!("expected at least {} items", min));
-                return ctx.raise_failure(&format!("{}, found 0", msg), input.span());
+                let msg = item_label
+                    .map(|l| format!("expected {}", l))
+                    .unwrap_or_else(|| format!("expected {}", label_str));
+                return ctx.raise_failure(&msg, input.span());
             }
             return Ok(items);
         }
@@ -728,18 +719,27 @@ where
     // 2. Atomares Paar-Parsing [Separator, Item]
     loop {
         let next_idx = items.len() + 1;
-        let rule_name = format!("item {} in separated", next_idx);
-        ctx.enter_rule(&rule_name);
-        let next_pair = attempt(input, ctx, |i, c| {
+        let rule_name = format!("{} {} in separated", label_str, next_idx);
+
+        let next_item = attempt(input, ctx, |i, c| {
+            c.enter_rule(&rule_name);
             sep_parser(i, c)?;
-            // Den Index-Kontext erst NACH erfolgreichem Separator auf den Stack legen
-            //c.enter_rule(&rule_name);
-            let res = item_parser(i, c);
-            //c.exit_rule();
-            res
+            let item_opt = attempt_labeled(i, c, item_label, |i, c| item_parser(i, c))?;
+
+            match item_opt {
+                Some(item) => {
+                    c.exit_rule();
+                    Ok(item)
+                }
+                None => {
+                    // This error is temporary to fail the outer 'attempt'.
+                    // The 'better' error from 'attempt_labeled' will be preserved.
+                    Err(syn::Error::new(i.span(), ""))
+                }
+            }
         })?;
-        ctx.exit_rule();
-        match next_pair {
+
+        match next_item {
             Some(item) => items.push(item),
             None => break,
         }
@@ -747,15 +747,16 @@ where
 
     // 3. Optionales Trailing Comma konsumieren
     if trailing {
-        ctx.enter_rule("trailing separator");
         let _ = attempt(input, ctx, |i, c| sep_parser(i, c))?;
-        ctx.exit_rule();
     }
 
     // 4. Finale Längenprüfung
     if items.len() < min {
-        let msg = error_msg.map(|s| s.to_string()).unwrap_or_else(|| format!("expected at least {} items", min));
-        return ctx.raise_failure(&format!("{}, found {}", msg, items.len()), input.span());
+        let plural = if min == 1 { "" } else { "s" };
+        return ctx.raise_failure(
+            &format!("expected at least {} {}{}, found {}", min, label_str, plural, items.len()),
+            input.span(),
+        );
     }
 
     Ok(items)
@@ -775,31 +776,33 @@ where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
 {
     let mut items = Vec::new();
-
     loop {
         let loop_start_span = input.span();
-        match attempt(input, ctx, |i, c| item_parser(i, c))? {
+        let item_res = attempt(input, ctx, |i, c| item_parser(i, c))?;
+
+        match item_res {
             Some(item) => {
                 items.push(item);
             }
             None => {
-                // Item parsing failed. Check if it was a significant failure.
+                // If the attempt failed, we need to check if it was a "deep" failure.
+                // If so, we should probably stop and report it instead of just ending the loop.
                 if ctx.stop_aggregation(loop_start_span) {
-                    // A deep or high-priority error occurred. Propagate failure.
-                    return Err(syn::Error::new(loop_start_span, "significant error in repetition"));
+                     return Err(input.error("significant error in repetition"));
                 }
-                // Otherwise, it's just the end of the repetition.
                 break;
             }
         }
     }
 
     if items.len() < min {
-        return ctx.raise_failure(format!("expected at least {} items, found {}", min, items.len()), input.span());
+        let plural = if min == 1 { "" } else { "s" };
+        return ctx.raise_failure(&format!("expected at least {} item{}, found {}", min, plural, items.len()), input.span());
     }
 
     Ok(items)
 }
+
 
 
 // --- Delimited Parsing ---

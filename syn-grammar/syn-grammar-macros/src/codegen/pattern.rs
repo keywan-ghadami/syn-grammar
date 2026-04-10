@@ -186,7 +186,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 let mut min = 0usize;
                 let mut trailing = false;
-                let mut custom_error: Option<String> = None;
+                let mut item_label: Option<String> = None;
 
                 // Parse optional args
                 for arg in &args[2..] {
@@ -206,12 +206,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                                 {
                                     trailing = b.value;
                                 }
-                            } else if id == "error" || id == "err" {
+                            } else if id == "item_label" {
                                 if let ModelPattern::Lit {
                                     lit: Lit::Str(s), ..
                                 } = val
                                 {
-                                    custom_error = Some(s.value());
+                                    item_label = Some(s.value());
                                 }
                             }
                         }
@@ -280,7 +280,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     quote! { (#(#b),*) }
                 };
 
-                let error_msg_expr = if let Some(msg) = custom_error {
+                let error_msg_expr = if let Some(msg) = item_label {
                     quote!(Some(#msg))
                 } else {
                     quote!(None)
