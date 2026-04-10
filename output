@@ -26,37 +26,37 @@ running 2 tests
 test test_composition_complex ... ok
 test test_composition_mixed ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 9 tests
 test test_action_block_statements ... ok
 test test_attributes_on_rules ... ok
 test test_complex_return_types ... ok
-test test_fail_builtin_first ... ok
 test test_fail_builtin_last ... ok
+test test_fail_builtin_first ... ok
 test test_keywords_vs_idents ... ok
-test test_rust_types_and_blocks ... ok
 test test_multi_token_literals ... ok
+test test_rust_types_and_blocks ... ok
 test test_use_statements ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 6 tests
-test test_count_bindings ... ok
 test test_count_group ... ok
 test test_count_opts ... ok
+test test_count_bindings ... ok
 test test_count_plus ... ok
-test test_count_plus_fail ... ok
 test test_count_stars ... ok
+test test_count_plus_fail ... ok
 
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 2 tests
-test test_cut_in_repetition ... ok
 test test_cut_operator ... ok
+test test_cut_in_repetition ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -64,34 +64,34 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test test_epsilon_alternative ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 4 tests
 test test_cut_prevents_backtracking ... ok
-test test_fail_overrides_everything ... ok
 test test_fail_vs_deep_error ... ok
 test test_nested_cut_propagation ... ok
+test test_fail_overrides_everything ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 7 tests
 test test_combinator_error_produces_clean_message ... ok
-test test_deep_vs_shallow ... ok
 test test_deep_error_with_label_and_fail ... ok
 test test_deepest_error_wins ... ok
+test test_deep_vs_shallow ... ok
 test test_fail_built_in_enterprise ... ok
 test test_label_priority ... ok
 test test_rule_name_in_error_message ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
 test test_span_propagation_compiles ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -120,10 +120,10 @@ running 7 tests
 test test_explicit_container ... ok
 test test_repeated ... ok
 test test_repeated_min ... ok
+test test_separated_basic ... ok
 test test_separated_custom_error ... FAILED
 test test_separated_min ... ok
-test test_separated_trailing ... FAILED
-test test_separated_basic ... ok
+test test_separated_trailing ... ok
 
 failures:
 
@@ -139,7 +139,7 @@ failures:
 [TRACE] exit_rule: item 3 in separated
 [TRACE] exit_rule: main
 
-thread 'test_separated_custom_error' (19541) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_separated_custom_error' (20945) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "custom error message"
@@ -154,48 +154,9 @@ in rule `main`
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
----- test_separated_trailing stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: item 1 in separated
-[TRACE] exit_rule: item 1 in separated
-[TRACE] enter_rule: item 2 in separated
-[TRACE] exit_rule: item 2 in separated
-[TRACE] enter_rule: item 3 in separated
-[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: item 3 in separated
-[TRACE] enter_rule: trailing separator
-[TRACE] exit_rule: trailing separator
-[TRACE] exit_rule: main
-[TRACE] enter_rule: strict
-[TRACE] enter_rule: item 1 in separated
-[TRACE] exit_rule: item 1 in separated
-[TRACE] enter_rule: item 2 in separated
-[TRACE] exit_rule: item 2 in separated
-[TRACE] enter_rule: item 3 in separated
-[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: item 3 in separated
-[TRACE] exit_rule: strict
-
-thread 'test_separated_trailing' (19543) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
-
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "unexpected end of input, expected string literal in item 3 in rule separated"
-Actual msg:    "unexpected end of input, expected string literal in item 3 in separated\nin rule `strict`"
-
-Error Debug:
-Error("unexpected end of input, expected string literal in item 3 in separated\nin rule `strict`")
-
-Formatted:
-unexpected end of input, expected string literal in item 3 in separated
-in rule `strict`
-
-
 
 failures:
     test_separated_custom_error
-    test_separated_trailing
 
-test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
