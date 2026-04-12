@@ -291,8 +291,6 @@ impl ParseContext {
         }
     }
 
-    /// Consumes the best error, formatting it into a user-friendly `syn::Error`.
-    /// This includes adding rule context and labels.
     #[cfg(feature = "syn")]
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
         let best = self.best_error.take()?;
@@ -304,34 +302,18 @@ impl ParseContext {
             }
         }
 
-        if !best.rule_stack.is_empty() {
-            let mut stack_iter = best.rule_stack.iter().rev();
-            
-            // 1. Den innersten Fehler-Ort direkt an den Satz anhängen
-            if let Some(innermost) = stack_iter.next() {
-                let is_structural = innermost.contains(" "); // z.B. "item 3 in separated"
-                let suffix = if is_structural {
-                    format!(" in {}", innermost)
-                } else {
-                    format!(" in rule `{}`", innermost)
-                };
-                
-                if !msg.contains(&suffix) {
-                    msg = format!("{}{}", msg, suffix);
-                }
-            }
+        let line = best.start_span.start().line;
+        let col = best.start_span.start().column;
+        
+        if !msg.contains("at column") {
+            msg = format!("{} at column {} (line {})", msg, col, line);
+        }
 
-            // 2. Den restlichen Weg nach draußen (Traceback) in neue Zeilen packen
-            for rule in stack_iter {
-                let is_structural = rule.contains(" ");
-                let suffix = if is_structural {
-                    format!("
-in {}", rule)
-                } else {
-                    format!("
-in rule `{}`", rule)
-                };
-                
+        // Purer, semantischer Traceback ohne "in rule"
+        if !best.rule_stack.is_empty() {
+            for rule in best.rule_stack.iter().rev() {
+                let suffix = format!("
+in {}", rule);
                 if !msg.contains(&suffix) {
                     msg = format!("{}{}", msg, suffix);
                 }
@@ -688,74 +670,57 @@ pub fn parse_separated<T, P, S>(
     mut sep_parser: S,
     min: usize,
     trailing: bool,
-    item_label: Option<&str>,
+    item_name: &str, // CRITICAL: Vom Codegenerator injizierter Kontext-Name
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
     S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,
 {
     let mut items = Vec::new();
-    let label_str = item_label.unwrap_or("item");
 
-    // 1. Initiales Item parsen (Item 1)
-    let first_rule_name = format!("{} 1 in separated", label_str);
-    ctx.enter_rule(&first_rule_name);
-    let first_res = attempt_labeled(input, ctx, item_label, |i, c| item_parser(i, c));
+    // 1. Initiales Item
+    ctx.enter_rule(&format!("{} 1", item_name));
+    let first_res = attempt(input, ctx, |i, c| item_parser(i, c));
     ctx.exit_rule();
 
     match first_res? {
         Some(item) => items.push(item),
         None => {
-            if min > 0 {
-                let msg = item_label
-                    .map(|l| format!("expected {}", l))
-                    .unwrap_or_else(|| format!("expected {}", label_str));
-                return ctx.raise_failure(&msg, input.span());
-            }
+            // Auch wenn min > 0 ist, delegieren wir den Fehler an den Kontext.
+            // Der Traceback kümmert sich um die Details (z.B. EOF).
             return Ok(items);
         }
     }
 
-    // 2. Atomares Paar-Parsing [Separator, Item]
+    // 2. Loop
     loop {
         let next_idx = items.len() + 1;
-        let rule_name = format!("{} {} in separated", label_str, next_idx);
+        let rule_name = format!("{} {}", item_name, next_idx);
 
-        let next_item = attempt(input, ctx, |i, c| {
-            c.enter_rule(&rule_name);
+        let next_pair = attempt(input, ctx, |i, c| {
             sep_parser(i, c)?;
-            let item_opt = attempt_labeled(i, c, item_label, |i, c| item_parser(i, c))?;
-
-            match item_opt {
-                Some(item) => {
-                    c.exit_rule();
-                    Ok(item)
-                }
-                None => {
-                    // This error is temporary to fail the outer 'attempt'.
-                    // The 'better' error from 'attempt_labeled' will be preserved.
-                    Err(syn::Error::new(i.span(), ""))
-                }
-            }
+            c.enter_rule(&rule_name);
+            let res = item_parser(i, c);
+            c.exit_rule();
+            res
         })?;
 
-        match next_item {
+        match next_pair {
             Some(item) => items.push(item),
             None => break,
         }
     }
 
-    // 3. Optionales Trailing Comma konsumieren
+    // 3. Trailing Check
     if trailing {
         let _ = attempt(input, ctx, |i, c| sep_parser(i, c))?;
     }
 
-    // 4. Finale Längenprüfung
+    // 4. Min Check
     if items.len() < min {
-        let plural = if min == 1 { "" } else { "s" };
         return ctx.raise_failure(
-            &format!("expected at least {} {}{}, found {}", min, label_str, plural, items.len()),
-            input.span(),
+            &format!("expected at least {} {}s, found {}", min, item_name, items.len()),
+            input.span()
         );
     }
 
@@ -771,24 +736,28 @@ pub fn parse_repeated<T, P>(
     ctx: &mut ParseContext,
     mut item_parser: P,
     min: usize,
+    item_name: &str, // CRITICAL: Kontext-Name
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
 {
     let mut items = Vec::new();
+
     loop {
         let loop_start_span = input.span();
-        let item_res = attempt(input, ctx, |i, c| item_parser(i, c))?;
+        let next_idx = items.len() + 1;
+        let rule_name = format!("{} {}", item_name, next_idx);
 
-        match item_res {
-            Some(item) => {
-                items.push(item);
-            }
+        ctx.enter_rule(&rule_name);
+        let res = attempt(input, ctx, |i, c| item_parser(i, c));
+        ctx.exit_rule();
+
+        match res? {
+            Some(item) => items.push(item),
             None => {
-                // If the attempt failed, we need to check if it was a "deep" failure.
-                // If so, we should probably stop and report it instead of just ending the loop.
                 if ctx.stop_aggregation(loop_start_span) {
-                     return Err(input.error("significant error in repetition"));
+                    ctx.commit();
+                    return Err(input.error(""));
                 }
                 break;
             }
@@ -796,8 +765,10 @@ where
     }
 
     if items.len() < min {
-        let plural = if min == 1 { "" } else { "s" };
-        return ctx.raise_failure(&format!("expected at least {} item{}, found {}", min, plural, items.len()), input.span());
+        return ctx.raise_failure(
+            &format!("expected at least {} {}s, found {}", min, item_name, items.len()),
+            input.span()
+        );
     }
 
     Ok(items)

@@ -8,6 +8,10 @@ use syn_grammar_model::{analysis, model::*};
 
 pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     let name = &rule.name;
+
+    // 1. Schlangennamen in lesbaren Semantik-String übersetzen
+    let context_name = name.to_string().replace("_", " ");
+
     let fn_name = format_ident!("parse_{}", name);
     let impl_name = format_ident!("parse_{}_impl", name);
     let ret_type = &rule.return_type;
@@ -111,6 +115,8 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     } else {
         generate_variants_internal(&rule.variants, true, ctx)?
     };
+    
+    let rule_logic = body;
 
     Ok(quote! {
         #(#attrs)*
@@ -141,32 +147,23 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
         #[doc(hidden)]
         #(#impl_attrs)*
-        pub fn #impl_name(mut input: ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> Result<#ret_type> #where_clause {
-            ctx.enter_rule(stringify!(#name));
+        pub fn #impl_name(mut input: syn::parse::ParseStream, ctx: &mut rt::ParseContext #(#params)*) -> syn::Result<#ret_type> #where_clause {
+            
+            // 2. Den übersetzten Kontext-String statt des harten Bezeichners übergeben
+            ctx.enter_rule(#context_name); 
+            
             #lexical_block_start
             let _start_span = input.span();
-            let res = (|| -> syn::Result<#ret_type> {
-                #body
+
+            let _res = (|| -> syn::Result<_> {
+                #rule_logic
             })();
+
             #lexical_block_end
-
-            if let Err(ref e) = res {
-                // Record the error BEFORE exiting the rule so we capture the current rule name.
-                if !ctx.check_fatal() {
-                    ctx.record_error(e.clone(), _start_span, None, 0);
-                }
-            }
-
-            ctx.exit_rule();
-
-            match res {
-                Ok(val) => Ok(val),
-                Err(e) => {
-                    // For internal calls, we just propagate the error.
-                    // The top-level caller handles take_best_error.
-                    Err(e)
-                }
-            }
+            
+            ctx.exit_rule(); // Stack bereinigen
+            
+            _res
         }
     })
 }

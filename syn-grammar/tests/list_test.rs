@@ -6,7 +6,7 @@ use syn_grammar::testing::Testable;
 
 grammar! {
     grammar list_test1 {
-        pub rule main -> Vec<String> = items:separated(string, ",") -> {
+        pub main -> Vec<String> = items:separated(string, ",") -> {
             items.into_iter().map(|s| s.value).collect()
         }
     }
@@ -14,12 +14,12 @@ grammar! {
 
 grammar! {
     grammar list_test2 {
-        pub rule main -> Vec<String>
+        pub main -> Vec<String>
             = items:separated(string, ",", trailing=true) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
 
-        pub rule strict -> Vec<String>
+        pub strict -> Vec<String>
             = items:separated(string, ",") -> {
                 items.into_iter().map(|s| s.value).collect()
             }
@@ -28,7 +28,7 @@ grammar! {
 
 grammar! {
     grammar list_test3 {
-        pub rule min_two -> Vec<String>
+        pub min_two -> Vec<String>
             = items:separated(string, ",", min=2) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
@@ -37,7 +37,7 @@ grammar! {
 
 grammar! {
     grammar list_test4 {
-        pub rule repeated_rule -> Vec<String>
+        pub repeated_rule -> Vec<String>
             = items:repeated(string) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
@@ -46,7 +46,7 @@ grammar! {
 
 grammar! {
     grammar list_test5 {
-        pub rule repeated_min -> Vec<String>
+        pub repeated_min -> Vec<String>
             = items:repeated(string, min=2) -> {
                 items.into_iter().map(|s| s.value).collect()
             }
@@ -56,7 +56,7 @@ grammar! {
 grammar! {
     grammar list_test6 {
         // usage: separated<Vec>(...)
-        pub rule explicit_container -> Vec<String>
+        pub explicit_container -> Vec<String>
             = items:separated<Vec>(string, ",") "end" -> {
                 items.into_iter().map(|s| s.value).collect()
             }
@@ -65,7 +65,7 @@ grammar! {
 
 grammar! {
     grammar list_test_custom_error {
-        pub rule main -> Vec<String>
+        pub main -> Vec<String>
             = items:separated(string, ",", item_label="function argument") -> {
                 items.into_iter().map(|s| s.value).collect()
             }
@@ -100,7 +100,8 @@ fn test_separated_trailing() {
     list_test2::parse_strict
         .parse_str(r#""a", "b","#)
         .test()
-        .assert_failure_contains("unexpected end of input, expected string literal in item 3 in separated");
+        .assert_failure_contains("found unexpected token `,`")
+        .assert_failure_contains("in strict");
 }
 
 #[test]
@@ -108,7 +109,7 @@ fn test_separated_min() {
     list_test3::parse_min_two
         .parse_str(r#""a""#)
         .test()
-        .assert_failure_contains("expected at least 2 items, found 1");
+        .assert_failure_contains("expected at least 2 items, found 1 at column");
 
     list_test3::parse_min_two
         .parse_str(r#""a", "b""#)
@@ -134,7 +135,7 @@ fn test_repeated_min() {
     list_test5::parse_repeated_min
         .parse_str(r#""a""#)
         .test()
-        .assert_failure_contains("expected at least 2 items, found 1");
+        .assert_failure_contains("expected at least 2 items, found 1 at column");
 
     list_test5::parse_repeated_min
         .parse_str(r#""a" "b""#)
@@ -155,5 +156,7 @@ fn test_separated_custom_error() {
     list_test_custom_error::parse_main
         .parse_str(r#""a", "b", end"#) // Trailing comma -> Error
         .test()
-        .assert_failure_contains("expected string literal in function argument 3 in separated");
+        .assert_failure_contains("expected function argument at column")
+        .assert_failure_contains("in function argument 3")
+        .assert_failure_contains("in main");
 }
