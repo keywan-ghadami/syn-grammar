@@ -84,5 +84,5 @@ fn test_not_complex() {
     not_complex::parse_main
         .parse_str("bad")
         .test()
-        .assert_failure_contains("unexpected match");
+        .assert_failure_contains("No matching rule variant found; found unexpected token `bad` in rule `main`");
 }
