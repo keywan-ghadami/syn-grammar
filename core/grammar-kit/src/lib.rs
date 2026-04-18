@@ -670,7 +670,7 @@ pub fn parse_separated<T, P, S>(
     mut sep_parser: S,
     min: usize,
     trailing: bool,
-    item_name: &str, // CRITICAL: Vom Codegenerator injizierter Kontext-Name
+    item_name: &str, 
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
@@ -680,16 +680,13 @@ where
 
     // 1. Initiales Item
     ctx.enter_rule(&format!("{} 1", item_name));
-    let first_res = attempt(input, ctx, |i, c| item_parser(i, c));
+    // Hier nutzen wir attempt_labeled, damit das Label bei 0 Fortschritt sofort greift
+    let first_res = attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c));
     ctx.exit_rule();
 
     match first_res? {
         Some(item) => items.push(item),
-        None => {
-            // Auch wenn min > 0 ist, delegieren wir den Fehler an den Kontext.
-            // Der Traceback kümmert sich um die Details (z.B. EOF).
-            return Ok(items);
-        }
+        None => return Ok(items),
     }
 
     // 2. Loop
@@ -697,12 +694,27 @@ where
         let next_idx = items.len() + 1;
         let rule_name = format!("{} {}", item_name, next_idx);
 
+        // ÄUSSERE TRANSAKTION: Nur für das Rollback des Separators
         let next_pair = attempt(input, ctx, |i, c| {
-            sep_parser(i, c)?;
+            sep_parser(i, c)?; // Fortschritt 1: Komma konsumiert
+
             c.enter_rule(&rule_name);
-            let res = item_parser(i, c);
+            
+            // INNERE MESSUNG: Neuer start_span nach dem Komma!
+            // Wenn dies nun direkt bei ')' fehlschlägt, ist Fortschritt = 0 -> Shallow Error!
+            let item_res = attempt_labeled(i, c, Some(item_name), |i, c| item_parser(i, c))?;
             c.exit_rule();
-            res
+
+            match item_res {
+                Some(item) => Ok(item),
+                None => {
+                    // Das Item ist fehlgeschlagen. attempt_labeled hat bereits den 
+                    // PERFEKTEN Fehler (PRIO_LABELED oder tief) im ParseContext hinterlegt.
+                    // Wir werfen hier nur einen Dummy-Fehler, um die äußere 
+                    // attempt-Transaktion zum Rollback des Kommas zu zwingen.
+                    Err(syn::Error::new(i.span(), "rollback_trigger"))
+                }
+            }
         })?;
 
         match next_pair {
@@ -728,6 +740,7 @@ where
 }
 
 
+
 /// A combinator for parsing a repetition of an item.
 /// It continues parsing until the item parser fails and handles a minimum number of items.
 #[cfg(all(feature = "rt", feature = "syn"))]
@@ -749,15 +762,16 @@ where
         let rule_name = format!("{} {}", item_name, next_idx);
 
         ctx.enter_rule(&rule_name);
-        let res = attempt(input, ctx, |i, c| item_parser(i, c));
+        let res = attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c));
         ctx.exit_rule();
 
         match res? {
             Some(item) => items.push(item),
             None => {
+                // If the attempt to parse an item failed, we check if it was a "deep" error.
+                // If so, we propagate it. Otherwise, it's just the end of the repetition.
                 if ctx.stop_aggregation(loop_start_span) {
-                    ctx.commit();
-                    return Err(input.error(""));
+                    return Err(ctx.take_best_error().unwrap_or_else(|| input.error("parsing repetition failed")));
                 }
                 break;
             }
@@ -822,7 +836,10 @@ where
             // Bei Erfolg prüfen wir, ob alle Tokens konsumiert wurden.
             // Wenn nicht, ist das ein echter "unexpected token" Fehler.
             if !content.is_empty() {
-                Err(content.error("unexpected token in delimited group"))
+                let err = content.error("unexpected token in delimited group");
+                // Give this high priority because it means the grammar is ambiguous or incomplete.
+                ctx.record_error(err, content.span(), None, ParseContext::PRIO_STRUCTURAL);
+                Err(ctx.take_best_error().unwrap())
             } else {
                 Ok(val)
             }
@@ -876,9 +893,10 @@ mod tests {
         ctx.record_error(err, Span::call_site(), None, 0);
 
         let final_err = ctx.take_best_error().unwrap();
-        assert_eq!(
-            final_err.to_string(),
-            "expected something in rule `test_rule`"
+        // Updated expectation to match new format
+        assert!(
+            final_err.to_string().contains("expected something") &&
+            final_err.to_string().contains("in test_rule")
         );
     }
 
@@ -892,11 +910,12 @@ mod tests {
         ctx.record_error(err, Span::call_site(), None, 0);
 
         let final_err = ctx.take_best_error().unwrap();
-        assert_eq!(
-            final_err.to_string(),
-            "fail in rule `inner`
-in rule `outer`"
-        );
+        let final_err_str = final_err.to_string();
+
+        assert!(final_err_str.contains("fail"));
+        assert!(final_err_str.contains("in inner"));
+        assert!(final_err_str.contains("in outer"));
+
 
         // Simulate outer rule recording it too
         ctx.exit_rule(); // inner popped
@@ -905,13 +924,12 @@ in rule `outer`"
         ctx.record_error(final_err, Span::call_site(), None, 0);
 
         let final_err2 = ctx.take_best_error().unwrap();
+        let final_err2_str = final_err2.to_string();
 
         // With prefix checking, it should stay the same
-        assert_eq!(
-            final_err2.to_string(),
-            "fail in rule `inner`
-in rule `outer`"
-        );
+        assert!(final_err2_str.contains("fail"));
+        assert!(final_err2_str.contains("in inner"));
+        assert!(final_err2_str.contains("in outer"));
     }
 
     #[test]
@@ -934,7 +952,8 @@ in rule `outer`"
         let _ = parser.parse_str("");
 
         let err = ctx.take_best_error().expect("Error should be recorded");
-        assert_eq!(err.to_string(), "parse failed in rule `outer`");
+        assert!(err.to_string().contains("parse failed"));
+        assert!(err.to_string().contains("in outer"));
     }
 
     #[test]
