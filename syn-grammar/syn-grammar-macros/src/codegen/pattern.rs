@@ -15,8 +15,6 @@ pub fn generate_sequence(
     Ok(quote! {
         {
             #steps
-            // CRITICAL FIX: Semantische Action-Blöcke kapseln.
-            // Fängt der Nutzer-Code mit Err(...) ab, stufen wir das zwingend als Strukturfehler ein.
             let _semantic_res = (|| -> syn::Result<_> {
                 Ok({ #action })
             })();
@@ -76,7 +74,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         });
                         results.push(var.clone());
 
-                        // Record span for the last token
                         if i == token_types.len() - 1 {
                             steps.push(quote! {
                                 ctx.record_span(syn::spanned::Spanned::span(&#var))?;
@@ -167,7 +164,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     Ok(quote! { let _ = #expr; })
                 }
             } else if rule_path.is_ident("separated") {
-                // separated(rule, sep, min=0, trailing=false)
                 if args.len() < 2 {
                     return Err(syn::Error::new(
                         rule_path.span(),
@@ -188,7 +184,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let mut trailing = false;
                 let mut item_label: Option<String> = None;
 
-                // Parse optional args
                 for arg in &args[2..] {
                     match arg {
                         Argument::Named(id, val) => {
@@ -216,7 +211,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                         }
                         Argument::Positional(val) => {
-                            // Assume positional min
                             if let ModelPattern::Lit {
                                 lit: Lit::Int(i), ..
                             } = val
@@ -236,7 +230,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     quote!(Vec)
                 };
 
-                // Inject binding if missing
                 let (rule_arg_with_binding, item_binding) = match rule_arg {
                     ModelPattern::RuleCall {
                         binding: None,
@@ -280,10 +273,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     quote! { (#(#b),*) }
                 };
 
-                let error_msg_expr = if let Some(msg) = item_label {
-                    quote!(Some(#msg))
+                let item_label_expr = if let Some(msg) = item_label {
+                    quote!(#msg)
                 } else {
-                    quote!(None)
+                    quote!("item")
                 };
 
                 let refined_logic = quote! {
@@ -300,9 +293,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         },
                         #min,
                         #trailing,
-                        #error_msg_expr
+                        #item_label_expr
                     )?;
-                    // Convert to container type if needed (currently always Vec, but could be adapted)
                     let mut _items = #container_ty::from_iter(_items_vec);
                     _items
                 };
@@ -313,7 +305,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     Ok(quote! { let _ = { #refined_logic }; })
                 }
             } else if rule_path.is_ident("repeated") {
-                // repeated(rule, min=0)
                 if args.is_empty() {
                     return Err(syn::Error::new(
                         rule_path.span(),
@@ -326,7 +317,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 };
 
                 let mut min = 0usize;
-                // Parse optional args
+                let mut item_label: Option<String> = None;
+
                 for arg in &args[1..] {
                     match arg {
                         Argument::Named(id, val) => {
@@ -336,6 +328,13 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                                 } = val
                                 {
                                     min = i.base10_parse()?;
+                                }
+                            } else if id == "item_label" {
+                                if let ModelPattern::Lit {
+                                    lit: Lit::Str(s), ..
+                                } = val
+                                {
+                                    item_label = Some(s.value());
                                 }
                             }
                         }
@@ -359,7 +358,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     quote!(Vec)
                 };
 
-                // Inject binding if missing
                 let (rule_arg_with_binding, item_binding) = match rule_arg {
                     ModelPattern::RuleCall {
                         binding: None,
@@ -401,6 +399,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     let b = &item_binding;
                     quote! { (#(#b),*) }
                 };
+                
+                let item_label_expr = if let Some(msg) = item_label {
+                    quote!(#msg)
+                } else {
+                    quote!("item")
+                };
 
                 let loop_logic = quote! {
                     let _items_vec = rt::parse_repeated::<_, _>(
@@ -410,7 +414,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                              #rule_parser
                              Ok(#item_return_expr)
                         },
-                        #min
+                        #min,
+                        #item_label_expr
                     )?;
                     let mut _items = #container_ty::from_iter(_items_vec);
                     _items
@@ -423,7 +428,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 }
             } else if is_builtin {
                 let rule_name_str = rule_name_ident.unwrap().to_string();
-                // Generate a token-filtering expression for the primitive.
                 let expr = match rule_name_str.as_str() {
                     "alpha" => quote! {
                         {
@@ -474,7 +478,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                         });
                     }
-                    // "fail" removed here - handled by ModelPattern::Fail
                     "whitespace" => {
                         return Ok(quote! {
                             if !ctx.check_whitespace(input.span()) {
@@ -482,7 +485,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                         });
                     }
-                    // Defer to built-in rules for high-level primitives like "ident", "integer", "float"
                     _ => {
                         let impl_name = format_ident!("parse_{}_impl", rule_name_ident.unwrap());
                         quote! { syn_grammar::builtins::#impl_name(&mut input, ctx)? }
@@ -509,7 +511,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
 
             if !bindings.is_empty() {
-                // Use temporary names for vectors to avoid shadowing by inner bindings
                 let vec_names: Vec<_> = bindings
                     .iter()
                     .map(|b| format_ident!("_vec_{}", b))
@@ -532,7 +533,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 let inner_logic = generate_pattern_step(inner, ctx)?;
 
-                // Only use peek optimization if it's safe and unambiguous
                 let peek_opt = analysis::get_simple_peek(inner, ctx.custom_keywords)
                     .ok()
                     .flatten();
@@ -554,7 +554,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                     Ok(quote! {
                        #(#init_vecs)*
-                       // Pass ctx to attempt
                        while let Some(vals) = rt::attempt(input, ctx, |mut input, ctx| {
                            #inner_logic
                            Ok(#return_tuple)
@@ -568,7 +567,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             } else {
                 let inner_logic = generate_pattern_step(inner, ctx)?;
                 Ok(quote! {
-                    // Pass ctx to attempt
                     while let Some(_) = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })? {}
                 })
             }
@@ -578,7 +576,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let bindings = analysis::collect_bindings(std::slice::from_ref(inner));
 
             if !bindings.is_empty() {
-                // Use temporary names for vectors to avoid shadowing by inner bindings
                 let vec_names: Vec<_> = bindings
                     .iter()
                     .map(|b| format_ident!("_vec_{}", b))
@@ -629,7 +626,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                            #inner_logic
                            #(#push_vecs)*
                        }
-                       // Pass ctx to attempt
                        while let Some(vals) = rt::attempt(input, ctx, |mut input, ctx| {
                            #inner_logic
                            Ok(#return_tuple)
@@ -644,7 +640,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let inner_logic = generate_pattern_step(inner, ctx)?;
                 Ok(quote! {
                     #inner_logic
-                    // Pass ctx to attempt
                     while let Some(_) = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })? {}
                 })
             }
@@ -663,12 +658,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 if bindings.is_empty() {
                     Ok(quote! {
                         if input.peek(#peek) {
-                            // Pass ctx to attempt
                             let _ = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?;
                         }
                     })
                 } else {
-                    // For optional binding, we need to return Option<T>
                     let vars: Vec<_> = bindings.iter().map(|b| quote!(#b)).collect();
                     let some_vars: Vec<_> = bindings.iter().map(|b| quote!(Some(#b))).collect();
                     let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
@@ -691,7 +684,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 }
             } else if bindings.is_empty() {
                 Ok(quote! {
-                    // Pass ctx to attempt
                     let _ = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?;
                 })
             } else {
@@ -730,7 +722,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         quote!(( #(#bindings),* ))
                     };
                     RuleVariant {
-                        pattern: pat_seq.clone(), // Use clone() as it's Vec<ModelPattern>
+                        pattern: pat_seq.clone(),
                         label: label.clone(),
                         action: quote!({ #action_expr }),
                         with_span: false,
@@ -924,7 +916,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         generics: generics.clone(),
                         args: args.clone(),
                     }),
-                    _ => body.clone(), // fallback
+                    _ => body.clone(),
                 }
             } else {
                 body.clone()
@@ -944,7 +936,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
             if bindings.is_empty() {
                 Ok(quote! {
-                    // Pass ctx to attempt_recover
                     if rt::attempt_recover(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?.is_none() {
                         rt::skip_until(input, |i| i.peek(#sync_peek))?;
                     }
@@ -1057,13 +1048,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             pattern: inner,
             ..
         } => {
-            // Note: bindings inside count are ignored as they are local to the loop/execution
-            // and we return usize.
-            // However, we must ensure we don't try to bind them in the outer scope.
-            // Since we updated collect_bindings to return empty for Count, the outer scope won't expect them.
-            // But generate_pattern_step(inner) WILL generate `let x = ...`.
-            // So we must wrap inner_logic in a block where those bindings are allowed to drop.
-
             let count_logic = if let ModelPattern::Repeat(rep_inner, _) = &**inner {
                 let inner_logic = generate_pattern_step(rep_inner, ctx)?;
                 let peek_opt = analysis::get_simple_peek(rep_inner, ctx.custom_keywords)
@@ -1151,19 +1135,16 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     _count
                 }
             } else if let ModelPattern::Optional(opt_inner, _) = &**inner {
-                // For optional, we check if it matches.
                 let inner_logic = generate_pattern_step(opt_inner, ctx)?;
                 let peek_opt = analysis::get_simple_peek(opt_inner, ctx.custom_keywords)
                     .ok()
                     .flatten();
                 let is_nullable = analysis::is_nullable(opt_inner);
 
-                // If we have peek and it's not nullable, we can use peek.
                 if let (Some(peek), false) = (peek_opt, is_nullable) {
                     quote! {
                         if input.peek(#peek) {
                             {
-                                // Pass ctx to attempt just to be safe and consume tokens
                                 let _ = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })?;
                             }
                             1usize
@@ -1172,7 +1153,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         }
                     }
                 } else {
-                    // Generic attempt
                     quote! {
                         if let Some(_) = rt::attempt(input, ctx, |mut input, ctx| { #inner_logic Ok(()) })? {
                             1usize
@@ -1182,7 +1162,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     }
                 }
             } else {
-                // Fallback: run the pattern. If success, return 1.
                 let inner_logic = generate_pattern_step(inner, ctx)?;
                 quote! {
                     {
@@ -1239,20 +1218,14 @@ fn generate_rule_call_expr(
         }
     }
 
-    // 1. External Call (Imports or Namespaced paths)
-    // If it has > 1 segment, or if it has 1 segment that matches an external rule or import alias (though alias matching might be implicit by path resolution).
-
-    // Check if it's an extern rule (single ident)
     if let Some(ident) = rule_path.get_ident() {
         if ctx.grammar.extern_rules.iter().any(|er| er.name == *ident) {
-            // Extern rule: call exactly as named, no ctx
             if arg_exprs.is_empty() {
                 Ok(quote!(#rule_path(input)?))
             } else {
                 Ok(quote!(#rule_path(input, #(#arg_exprs),*)?))
             }
         } else if ctx.grammar.rules.iter().any(|r| r.name == *ident) {
-            // Local rule: call parse_{name}_impl with ctx
             let impl_name = format_ident!("parse_{}_impl", ident);
             if arg_exprs.is_empty() {
                 Ok(quote!(#impl_name(&mut input, ctx)?))
@@ -1260,8 +1233,6 @@ fn generate_rule_call_expr(
                 Ok(quote!(#impl_name(&mut input, ctx, #(#arg_exprs),*)?))
             }
         } else {
-            // Fallback: Treat as external function call (e.g. builtin or user-imported function)
-            // Assume standard signature: func(input)
             if arg_exprs.is_empty() {
                 Ok(quote!(#rule_path(input)?))
             } else {
@@ -1269,9 +1240,6 @@ fn generate_rule_call_expr(
             }
         }
     } else {
-        // Multi-segment path
-        // Apply parse_ prefix ONLY if first segment is a known import alias
-
         let first_seg = &rule_path.segments.first().unwrap().ident;
         let is_import_alias = ctx
             .grammar
@@ -1284,7 +1252,6 @@ fn generate_rule_call_expr(
             let last_seg = new_path.segments.last_mut().unwrap();
             let last_ident = last_seg.ident.clone();
             
-            // CRITICAL FIX: Immer die interne _impl Funktion nutzen und den shared 'ctx' übergeben
             let new_ident = format_ident!("parse_{}_impl", last_ident);
             last_seg.ident = new_ident;
 
@@ -1294,7 +1261,6 @@ fn generate_rule_call_expr(
                 Ok(quote!(#new_path(&mut input, ctx, #(#arg_exprs),*)?))
             }
         } else {
-            // Standard call
             if arg_exprs.is_empty() {
                 Ok(quote!(#rule_path(input)?))
             } else {
