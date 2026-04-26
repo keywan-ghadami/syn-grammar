@@ -265,19 +265,7 @@ pub fn generate_variants_internal(
                  Some(l.clone())
              } else {
                 // Try to derive a label from the first token if possible
-                if variant.pattern.len() == 1 {
-                     if let ModelPattern::RuleCall { rule_path, .. } = &variant.pattern[0] {
-                         if rule_path.segments.len() == 1 {
-                            Some(rule_path.get_ident().unwrap().to_string())
-                         } else {
-                            analysis::get_peek_token_string(&variant.pattern)
-                         }
-                     } else {
-                         analysis::get_peek_token_string(&variant.pattern)
-                     }
-                } else {
-                    analysis::get_peek_token_string(&variant.pattern)
-                }
+                analysis::get_peek_token_string(&variant.pattern)
              };
 
              let label_lit = if let Some(l) = &label_str {
@@ -481,11 +469,11 @@ pub fn generate_variants_internal(
         #(#arms)*
 
         if ctx.stop_aggregation(_start_span) {
-            // CRITICAL FIX: Niemals take_best_error() mitten im Baum aufrufen!
-            // Wir geben einen Platzhalter-Fehler zurück, um das Bubbling (Abbruch) zu erzwingen.
-            // Der tatsächliche High-Priority-Fehler bleibt sicher unangetastet im `ctx` gespeichert 
-            // und wird von `record_error` der übergeordneten Caller priorisiert.
-            return Err(input.error("propagating significant error"));
+            // THE FIX: Do NOT destroy the best error by calling take_best_error here!
+            // Just bubble up our internal dummy error which record_error will ignore.
+            // This leaves the true significant error safely inside `ctx.best_error` 
+            // until the top-level parse wrapper consumes it.
+            return Err(input.error("__DUMMY_ERR_BUBBLE__"));
         }
 
         let mut error_to_return = if !_shallow_failures.is_empty() {
@@ -519,6 +507,11 @@ pub fn generate_variants_internal(
                     error_to_return = syn::Error::new(error_to_return.span(), new_message);
                 }
             }
+        }
+
+        // NEW: Record aggregated error before returning, but ONLY if we have one.
+        if !_shallow_failures.is_empty() {
+            ctx.record_error(error_to_return.clone(), _start_span, None, rt::ParseContext::PRIO_AGGREGATED);
         }
 
         Err(error_to_return)

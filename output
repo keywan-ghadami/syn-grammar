@@ -1,0 +1,1122 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running unittests src/lib.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ambiguity_test.rs (target/debug/deps/ambiguity_test-b145068240eefd58)
+
+running 1 test
+test test_group_vs_args_ambiguity ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/binding_with_action_test.rs (target/debug/deps/binding_with_action_test-4300dc1f6f2308f9)
+
+running 1 test
+test test_literal_binding_with_action ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/builtins_test.rs (target/debug/deps/builtins_test-6710426b0b467a86)
+
+running 1 test
+test test_builtins ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/composition_test.rs (target/debug/deps/composition_test-0005cc60c2e7b79e)
+
+running 2 tests
+test test_composition_complex ... ok
+test test_composition_mixed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/comprehensive_test.rs (target/debug/deps/comprehensive_test-5c918662bbe30b59)
+
+running 9 tests
+test test_action_block_statements ... ok
+test test_attributes_on_rules ... ok
+test test_complex_return_types ... ok
+test test_fail_builtin_first ... ok
+test test_fail_builtin_last ... ok
+test test_keywords_vs_idents ... ok
+test test_multi_token_literals ... ok
+test test_rust_types_and_blocks ... ok
+test test_use_statements ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/count_test.rs (target/debug/deps/count_test-09e85aa09a598b19)
+
+running 6 tests
+test test_count_bindings ... ok
+test test_count_group ... ok
+test test_count_opts ... ok
+test test_count_plus ... ok
+test test_count_plus_fail ... ok
+test test_count_stars ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cut_test.rs (target/debug/deps/cut_test-b131ec78b478f8dd)
+
+running 2 tests
+test test_cut_in_repetition ... ok
+test test_cut_operator ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/epsilon_test.rs (target/debug/deps/epsilon_test-511d175da34d3dba)
+
+running 1 test
+test test_epsilon_alternative ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/error_abstraction_test.rs (target/debug/deps/error_abstraction_test-4c124a2ec9fbd8fc)
+
+running 4 tests
+test test_fail_overrides_everything ... ok
+test test_cut_prevents_backtracking ... ok
+test test_fail_vs_deep_error ... ok
+test test_nested_cut_propagation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/error_reporting_test.rs (target/debug/deps/error_reporting_test-fca4f7e7e4f8d135)
+
+running 7 tests
+test test_combinator_error_produces_clean_message ... FAILED
+test test_deep_error_with_label_and_fail ... ok
+test test_deep_vs_shallow ... FAILED
+test test_deepest_error_wins ... FAILED
+test test_fail_built_in_enterprise ... ok
+test test_label_priority ... ok
+test test_rule_name_in_error_message ... FAILED
+
+failures:
+
+---- test_combinator_error_produces_clean_message stdout ----
+[TRACE] enter_rule: outer
+[TRACE] enter_rule: inner
+[TRACE] exit_rule: inner
+[TRACE] enter_rule: inner
+[TRACE] exit_rule: inner
+[TRACE] enter_rule: inner
+[TRACE] considering_error: 'expected 'a'' (priority: 10, label: Some("ident"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: inner
+[TRACE] considering_error: 'propagating significant error' (priority: 10, label: Some("inner"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: outer
+
+thread 'test_combinator_error_produces_clean_message' (25721) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected 'a' in rule `inner`\nin rule `outer`"
+Actual msg:    "expected inner at column 4 (line 1)\nin outer"
+
+Error Debug:
+Error("expected inner at column 4 (line 1)\nin outer")
+
+Formatted:
+expected inner at column 4 (line 1)
+in outer
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_deep_vs_shallow stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: deep
+[TRACE] considering_error: 'expected `c`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: deep
+[TRACE] exit_rule: main
+
+thread 'test_deep_vs_shallow' (25723) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "in `deep`"
+Actual msg:    "expected `c` at column 4 (line 1)\nin deep\nin main"
+
+Error Debug:
+Error("expected `c` at column 4 (line 1)\nin deep\nin main")
+
+Formatted:
+expected `c` at column 4 (line 1)
+in deep
+in main
+
+
+---- test_deepest_error_wins stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: deepest err
+[TRACE] considering_error: 'expected `c`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: deepest err
+[TRACE] exit_rule: main
+
+thread 'test_deepest_error_wins' (25724) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "in `deepest_err`"
+Actual msg:    "expected `c` at column 4 (line 1)\nin deepest err\nin main"
+
+Error Debug:
+Error("expected `c` at column 4 (line 1)\nin deepest err\nin main")
+
+Formatted:
+expected `c` at column 4 (line 1)
+in deepest err
+in main
+
+
+---- test_rule_name_in_error_message stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: inner rule
+[TRACE] considering_error: 'expected `b`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: inner rule
+[TRACE] exit_rule: main
+
+thread 'test_rule_name_in_error_message' (25727) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "in `inner_rule`"
+Actual msg:    "expected `b` at column 2 (line 1)\nin inner rule\nin main"
+
+Error Debug:
+Error("expected `b` at column 2 (line 1)\nin inner rule\nin main")
+
+Formatted:
+expected `b` at column 2 (line 1)
+in inner rule
+in main
+
+
+
+failures:
+    test_combinator_error_produces_clean_message
+    test_deep_vs_shallow
+    test_deepest_error_wins
+    test_rule_name_in_error_message
+
+test result: FAILED. 3 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test error_reporting_test`
+     Running tests/error_span_test.rs (target/debug/deps/error_span_test-191b3aeff8c97b51)
+
+running 1 test
+test test_span_propagation_compiles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fail_test.rs (target/debug/deps/fail_test-e3be5bed89a46207)
+
+running 1 test
+test test_fail_builtin ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
+
+running 2 tests
+test test_generic_inference ... ok
+test test_generic_rule ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/labeled_alternatives_test.rs (target/debug/deps/labeled_alternatives_test-1c58cde7495fc303)
+
+running 4 tests
+test test_deep_error_wins ... ok
+test test_default_labels ... ok
+test test_explicit_labels ... ok
+test test_group_labels ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/list_dx_test.rs (target/debug/deps/list_dx_test-6e812a6169142eb3)
+
+running 6 tests
+test test_cxx_dangling_comma ... FAILED
+test test_cxx_deep_ident_error_mid_list ... FAILED
+test test_cxx_deep_type_error_after_modifier ... FAILED
+test test_cxx_garbage_after_item ... ok
+test test_cxx_shallow_wrong_token ... FAILED
+test test_cxx_unexpected_eof ... FAILED
+
+failures:
+
+---- test_cxx_dangling_comma stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: [item] function parameter
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] exit_rule: [item] function parameter
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] function parameter #2
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, propagating significant error' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: Rejected (shorter message)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'unexpected end of input, propagating significant error' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'unexpected end of input, propagating significant error' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: [item] function parameter #2
+[TRACE] considering_error: 'unexpected end of input, expected function parameter at column 15 (line 1)
+in [item] function parameter #2
+in signature' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_dangling_comma' (25741) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
+Actual msg:    "unexpected end of input, expected function parameter at column 15 (line 1)\nin [item] function parameter #2\nin signature"
+
+Error Debug:
+Error("unexpected end of input, expected function parameter at column 15 (line 1)\nin [item] function parameter #2\nin signature")
+
+Formatted:
+unexpected end of input, expected function parameter at column 15 (line 1)
+in [item] function parameter #2
+in signature
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_cxx_deep_ident_error_mid_list stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: [item] function parameter
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] exit_rule: [item] function parameter
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] function parameter #2
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] exit_rule: modifier
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected identifier' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'propagating significant error' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: [item] function parameter #2
+[TRACE] considering_error: 'expected function parameter at column 15 (line 1)
+in [item] function parameter #2
+in signature' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_deep_ident_error_mid_list' (25742) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected identifier at column 35 (line 1)\nin function parameter 2\nin signature"
+Actual msg:    "expected function parameter at column 15 (line 1)\nin [item] function parameter #2\nin signature"
+
+Error Debug:
+Error("expected function parameter at column 15 (line 1)\nin [item] function parameter #2\nin signature")
+
+Formatted:
+expected function parameter at column 15 (line 1)
+in [item] function parameter #2
+in signature
+
+
+---- test_cxx_deep_type_error_after_modifier stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: [item] function parameter
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] exit_rule: modifier
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'propagating significant error' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [item] function parameter
+[TRACE] considering_error: 'expected function parameter at column 8 (line 1)
+in [item] function parameter
+in signature' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_deep_type_error_after_modifier' (25743) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected type name at column 14 (line 1)\nin function parameter 1\nin signature"
+Actual msg:    "expected function parameter at column 8 (line 1)\nin [item] function parameter\nin signature"
+
+Error Debug:
+Error("expected function parameter at column 8 (line 1)\nin [item] function parameter\nin signature")
+
+Formatted:
+expected function parameter at column 8 (line 1)
+in [item] function parameter
+in signature
+
+
+---- test_cxx_shallow_wrong_token stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: [item] function parameter
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `123`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'propagating significant error' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'propagating significant error' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [item] function parameter
+[TRACE] considering_error: 'expected function parameter at column 8 (line 1)
+in [item] function parameter
+in signature' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_shallow_wrong_token' (25745) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected function parameter at column 8 (line 1)\nin function parameter 1\nin signature"
+Actual msg:    "expected function parameter at column 8 (line 1)\nin [item] function parameter\nin signature"
+
+Error Debug:
+Error("expected function parameter at column 8 (line 1)\nin [item] function parameter\nin signature")
+
+Formatted:
+expected function parameter at column 8 (line 1)
+in [item] function parameter
+in signature
+
+
+---- test_cxx_unexpected_eof stdout ----
+
+thread 'test_cxx_unexpected_eof' (25746) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected identifier at column 18 (line 1)\nin type name\nin param\nin function parameter 1\nin signature"
+Actual msg:    "cannot parse string into token stream"
+
+Error Debug:
+Error("cannot parse string into token stream")
+
+Formatted:
+cannot parse string into token stream
+
+
+
+failures:
+    test_cxx_dangling_comma
+    test_cxx_deep_ident_error_mid_list
+    test_cxx_deep_type_error_after_modifier
+    test_cxx_shallow_wrong_token
+    test_cxx_unexpected_eof
+
+test result: FAILED. 1 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test list_dx_test`
+     Running tests/list_test.rs (target/debug/deps/list_test-6ce8f4380e36ecf5)
+
+running 7 tests
+test test_explicit_container ... ok
+test test_repeated ... FAILED
+test test_repeated_min ... FAILED
+test test_separated_basic ... FAILED
+test test_separated_custom_error ... FAILED
+test test_separated_min ... ok
+test test_separated_trailing ... FAILED
+
+failures:
+
+---- test_repeated stdout ----
+[TRACE] enter_rule: repeated rule
+[TRACE] enter_rule: [repeated] item #1
+[TRACE] exit_rule: [repeated] item #1
+[TRACE] enter_rule: [repeated] item #2
+[TRACE] exit_rule: [repeated] item #2
+[TRACE] enter_rule: [repeated] item #3
+[TRACE] exit_rule: [repeated] item #3
+[TRACE] enter_rule: [repeated] item #4
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [repeated] item #4
+[TRACE] considering_error: 'unexpected end of input, expected item at column 0 (line 1)
+in [repeated] item #4
+in repeated rule' (priority: 10, label: Some("repeated"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: repeated rule
+
+thread 'test_repeated' (25749) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+unexpected end of input, expected repeated at column 0 (line 1)
+in repeated rule
+
+Error Debug:
+Error("unexpected end of input, expected repeated at column 0 (line 1)\nin repeated rule")
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_repeated_min stdout ----
+[TRACE] enter_rule: repeated min
+[TRACE] enter_rule: [repeated] item #1
+[TRACE] exit_rule: [repeated] item #1
+[TRACE] enter_rule: [repeated] item #2
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [repeated] item #2
+[TRACE] considering_error: 'unexpected end of input, expected item at column 0 (line 1)
+in [repeated] item #2
+in repeated min' (priority: 10, label: Some("repeated"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: repeated min
+
+thread 'test_repeated_min' (25750) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected at least 2 items, found 1 at column"
+Actual msg:    "unexpected end of input, expected repeated at column 0 (line 1)\nin repeated min"
+
+Error Debug:
+Error("unexpected end of input, expected repeated at column 0 (line 1)\nin repeated min")
+
+Formatted:
+unexpected end of input, expected repeated at column 0 (line 1)
+in repeated min
+
+
+---- test_separated_basic stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: [item] item
+[TRACE] exit_rule: [item] item
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #2
+[TRACE] exit_rule: [item] item #2
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #3
+[TRACE] exit_rule: [item] item #3
+[TRACE] enter_rule: [sep]
+[TRACE] considering_error: 'expected `,`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [sep]
+[TRACE] exit_rule: main
+[TRACE] enter_rule: main
+[TRACE] enter_rule: [item] item
+[TRACE] exit_rule: [item] item
+[TRACE] enter_rule: [sep]
+[TRACE] considering_error: 'expected `,`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [sep]
+[TRACE] exit_rule: main
+[TRACE] enter_rule: main
+[TRACE] enter_rule: [item] item
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [item] item
+[TRACE] considering_error: 'unexpected end of input, expected item at column 0 (line 1)
+in [item] item
+in main' (priority: 10, label: Some("separated"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: main
+
+thread 'test_separated_basic' (25751) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+unexpected end of input, expected separated at column 0 (line 1)
+in main
+
+Error Debug:
+Error("unexpected end of input, expected separated at column 0 (line 1)\nin main")
+
+
+---- test_separated_custom_error stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: [item] function argument
+[TRACE] exit_rule: [item] function argument
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] function argument #2
+[TRACE] exit_rule: [item] function argument #2
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] function argument #3
+[TRACE] considering_error: 'expected string literal' (priority: 10, label: Some("function argument"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [item] function argument #3
+[TRACE] considering_error: 'expected function argument at column 10 (line 1)
+in [item] function argument #3
+in main' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: main
+
+thread 'test_separated_custom_error' (25752) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "in function argument 3"
+Actual msg:    "expected function argument at column 10 (line 1)\nin [item] function argument #3\nin main"
+
+Error Debug:
+Error("expected function argument at column 10 (line 1)\nin [item] function argument #3\nin main")
+
+Formatted:
+expected function argument at column 10 (line 1)
+in [item] function argument #3
+in main
+
+
+---- test_separated_trailing stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: [item] item
+[TRACE] exit_rule: [item] item
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #2
+[TRACE] exit_rule: [item] item #2
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] exit_rule: main
+[TRACE] enter_rule: strict
+[TRACE] enter_rule: [item] item
+[TRACE] exit_rule: [item] item
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #2
+[TRACE] exit_rule: [item] item #2
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #3
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [item] item #3
+[TRACE] considering_error: 'unexpected end of input, expected item at column 0 (line 1)
+in [item] item #3
+in strict' (priority: 10, label: Some("separated"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: strict
+
+thread 'test_separated_trailing' (25754) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "found unexpected token `,`"
+Actual msg:    "unexpected end of input, expected separated at column 0 (line 1)\nin strict"
+
+Error Debug:
+Error("unexpected end of input, expected separated at column 0 (line 1)\nin strict")
+
+Formatted:
+unexpected end of input, expected separated at column 0 (line 1)
+in strict
+
+
+
+failures:
+    test_repeated
+    test_repeated_min
+    test_separated_basic
+    test_separated_custom_error
+    test_separated_trailing
+
+test result: FAILED. 2 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test list_test`
+     Running tests/literal_binding_no_action_test.rs (target/debug/deps/literal_binding_no_action_test-57cfcf888e4d257d)
+
+running 1 test
+test test_literal_binding_no_action ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/literal_binding_test.rs (target/debug/deps/literal_binding_test-321190b07fd7430f)
+
+running 3 tests
+test test_literal_binding ... ok
+test test_literal_binding_char ... ok
+test test_literal_binding_raw_string ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/multi_arguments_test.rs (target/debug/deps/multi_arguments_test-5c12c3134e913e36)
+
+running 1 test
+test test_multiple_arguments ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/nested_repetition_test.rs (target/debug/deps/nested_repetition_test-fa8d31614d470260)
+
+running 1 test
+test test_nested_repetition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/new_primitives_test.rs (target/debug/deps/new_primitives_test-ec307f24e74f5115)
+
+running 7 tests
+test test_float_primitive ... ok
+test test_numeric_primitives ... ok
+test test_whitespace_between_rules ... ok
+test test_string_primitive ... ok
+test test_whitespace_ident_ident ... ok
+test test_whitespace_primitive ... ok
+test test_whitespace_punct_ident ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/optional_production_test.rs (target/debug/deps/optional_production_test-bdeaa3481541d79c)
+
+running 1 test
+test test_optional_production ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/peek_not_test.rs (target/debug/deps/peek_not_test-9d297d86cd7e0069)
+
+running 4 tests
+test test_not_basic ... ok
+test test_not_complex ... FAILED
+test test_peek_basic ... ok
+test test_peek_binding ... ok
+
+failures:
+
+---- test_not_complex stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: bad
+[TRACE] exit_rule: bad
+[TRACE] exit_rule: main
+[TRACE] enter_rule: main
+[TRACE] enter_rule: bad
+[TRACE] exit_rule: bad
+[TRACE] considering_error: 'unexpected match' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: main
+
+thread 'test_not_complex' (25777) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "No matching rule variant found; found unexpected token `bad` in rule `main`"
+Actual msg:    "unexpected match at column 0 (line 1)\nin main"
+
+Error Debug:
+Error("unexpected match at column 0 (line 1)\nin main")
+
+Formatted:
+unexpected match at column 0 (line 1)
+in main
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_not_complex
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test peek_not_test`
+     Running tests/plus_validation_test.rs (target/debug/deps/plus_validation_test-ec0d795d6e02f39e)
+
+running 1 test
+test test_plus_operator_validation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/priority_test.rs (target/debug/deps/priority_test-96463ad95b5f7988)
+
+running 1 test
+test test_backtracking_priority ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/recovery_test.rs (target/debug/deps/recovery_test-11fa15a46fdb14de)
+
+running 3 tests
+test test_attempt_recover_behavior ... ok
+test test_failure_recovery ... ok
+test test_recovery_complex_sync ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/repetition_test.rs (target/debug/deps/repetition_test-6dab4be251dc49e3)
+
+running 1 test
+test test_repetition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/repro_issue.rs (target/debug/deps/repro_issue-6ea415970a37fa11)
+
+running 1 test
+test test_repro_issue ... FAILED
+
+failures:
+
+---- test_repro_issue stdout ----
+[TRACE] enter_rule: top level mod
+[TRACE] enter_rule: extern block
+[TRACE] enter_rule: cxx item
+[TRACE] considering_error: 'expected `fn`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] Attempting to parse syn type: syn :: Macro at bytes(70..77)
+[TRACE] Successfully parsed syn type: syn :: Macro
+[TRACE] exit_rule: cxx item
+[TRACE] enter_rule: cxx item
+[TRACE] enter_rule: cxx arg list
+[TRACE] enter_rule: [item] item
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
+[TRACE] exit_rule: [item] item
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #2
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
+[TRACE] exit_rule: [item] item #2
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #3
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
+[TRACE] exit_rule: [item] item #3
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #4
+[TRACE] enter_rule: cxx arg
+[TRACE] considering_error: 'unexpected end of input, expected ident' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: cxx arg
+[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: [item] item #4
+[TRACE] considering_error: 'unexpected end of input, expected item at column 16 (line 10)
+in [item] item #4
+in cxx arg list
+in cxx item
+in extern block
+in top level mod' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: cxx arg list
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (shallower span)
+[TRACE] considering_error: 'unexpected end of input, expected item at column 16 (line 10)
+in [item] item #4
+in cxx arg list
+in cxx item
+in extern block
+in top level mod' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] Attempting to parse syn type: syn :: Macro at bytes(137..139)
+[TRACE] FAILED to parse syn type: syn :: Macro. Error: 'expected identifier, found keyword `fn`', Error Span: bytes(137..139)
+[TRACE] Start span was: bytes(137..139)
+[TRACE] No progress. NOT calling trigger_fail()
+[TRACE] considering_error: 'expected identifier, found keyword `fn`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (shallower span)
+[TRACE] exit_rule: cxx item
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (shallower span)
+[TRACE] considering_error: 'unexpected end of input, expected item at column 16 (line 10)
+in [item] item #4
+in cxx arg list
+in cxx item
+in extern block
+in top level mod' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: extern block
+[TRACE] considering_error: 'propagating significant error' (priority: 0, label: None)
+[TRACE] record_error: Rejected (shallower span)
+[TRACE] considering_error: 'unexpected end of input, expected item at column 16 (line 10)
+in [item] item #4
+in cxx arg list
+in cxx item
+in extern block
+in top level mod' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: top level mod
+
+thread 'test_repro_issue' (25791) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+unexpected end of input, expected item at column 16 (line 10)
+in [item] item #4
+in cxx arg list
+in cxx item
+in extern block
+in top level mod
+
+Error Debug:
+Error("unexpected end of input, expected item at column 16 (line 10)\nin [item] item #4\nin cxx arg list\nin cxx item\nin extern block\nin top level mod")
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_repro_issue
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test repro_issue`
+     Running tests/rule_arguments_test.rs (target/debug/deps/rule_arguments_test-38ee3b1473880033)
+
+running 1 test
+test test_rule_arguments ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sequence_test.rs (target/debug/deps/sequence_test-f0e1243038cf1950)
+
+running 1 test
+test test_basic_sequence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/simplified_rule_syntax.rs (target/debug/deps/simplified_rule_syntax-1c25be84fc1b2c16)
+
+running 1 test
+test test_simplified_syntax ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/single_grammar_test.rs (target/debug/deps/single_grammar_test-acbc61126444b1e2)
+
+running 1 test
+test test_single_grammar ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/trailing_comma_test.rs (target/debug/deps/trailing_comma_test-26d34198df8f2543)
+
+running 3 tests
+test test_consumes_trailing_comma_succeeds ... FAILED
+test test_does_not_consume_trailing_comma_fails ... FAILED
+test test_no_trailing_comma_succeeds ... ok
+
+failures:
+
+---- test_consumes_trailing_comma_succeeds stdout ----
+[TRACE] enter_rule: consumes comma
+[TRACE] enter_rule: [item] item
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] exit_rule: [item] item
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #2
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] exit_rule: [item] item #2
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #3
+[TRACE] enter_rule: string val
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 10, label: Some("string"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: string val
+[TRACE] considering_error: 'unexpected end of input, propagating significant error' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [item] item #3
+[TRACE] considering_error: 'unexpected end of input, expected item at column 0 (line 1)
+in [item] item #3
+in consumes comma' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: consumes comma
+
+thread 'test_consumes_trailing_comma_succeeds' (25801) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+unexpected end of input, expected item at column 0 (line 1)
+in [item] item #3
+in consumes comma
+
+Error Debug:
+Error("unexpected end of input, expected item at column 0 (line 1)\nin [item] item #3\nin consumes comma")
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_does_not_consume_trailing_comma_fails stdout ----
+[TRACE] enter_rule: does not consume comma
+[TRACE] enter_rule: [item] item
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] exit_rule: [item] item
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #2
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] exit_rule: [item] item #2
+[TRACE] enter_rule: [sep]
+[TRACE] exit_rule: [sep]
+[TRACE] enter_rule: [item] item #3
+[TRACE] enter_rule: string val
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 10, label: Some("string"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: string val
+[TRACE] considering_error: 'unexpected end of input, propagating significant error' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: [item] item #3
+[TRACE] considering_error: 'unexpected end of input, expected item at column 0 (line 1)
+in [item] item #3
+in does not consume comma' (priority: 10, label: Some("separated"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: does not consume comma
+
+thread 'test_does_not_consume_trailing_comma_fails' (25802) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected token"
+Actual msg:    "unexpected end of input, expected separated at column 0 (line 1)\nin does not consume comma"
+
+Error Debug:
+Error("unexpected end of input, expected separated at column 0 (line 1)\nin does not consume comma")
+
+Formatted:
+unexpected end of input, expected separated at column 0 (line 1)
+in does not consume comma
+
+
+
+failures:
+    test_consumes_trailing_comma_succeeds
+    test_does_not_consume_trailing_comma_fails
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test trailing_comma_test`
+     Running tests/ui_tests.rs (target/debug/deps/ui_tests-1103ce3ad1c1da12)
+
+running 1 test
+    Checking syn-grammar-tests v0.0.0 (/home/user/syn-grammar/target/tests/trybuild/syn-grammar)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+
+
+test [0m[1mtests/ui/paren_open.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/paren_close.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/bracket_open.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/bracket_close.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/brace_open.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/brace_close.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/not_operator.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/tilde_operator.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/ampersand_operator.rs[0m ... [0m[32mok
+[0m
+
+test ui ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/until_test.rs (target/debug/deps/until_test-f964a686d957c26c)
+
+running 4 tests
+test test_nested_until ... ok
+test test_until_keyword ... ok
+test test_until_semicolon ... ok
+test test_until_group ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests syn_grammar
+
+running 17 tests
+test syn-grammar/src/lib.rs - (line 127) - compile ... ok
+test syn-grammar/src/lib.rs - (line 179) ... ok
+test syn-grammar/src/lib.rs - (line 210) ... ok
+test syn-grammar/src/lib.rs - (line 230) ... ok
+test syn-grammar/src/lib.rs - (line 264) ... ok
+test syn-grammar/src/lib.rs - (line 246) ... ok
+test syn-grammar/src/lib.rs - (line 282) ... ok
+test syn-grammar/src/lib.rs - (line 297) ... ok
+test syn-grammar/src/lib.rs - (line 311) ... ok
+test syn-grammar/src/lib.rs - (line 359) ... ok
+test syn-grammar/src/lib.rs - (line 386) ... ok
+test syn-grammar/src/lib.rs - (line 413) ... ok
+test syn-grammar/src/lib.rs - (line 428) ... ok
+test syn-grammar/src/lib.rs - (line 454) ... ok
+test syn-grammar/src/lib.rs - (line 469) ... ok
+test syn-grammar/src/lib.rs - (line 484) ... ok
+test syn-grammar/src/lib.rs - (line 58) ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.11s
+
+error: 6 targets failed:
+    `--test error_reporting_test`
+    `--test list_dx_test`
+    `--test list_test`
+    `--test peek_not_test`
+    `--test repro_issue`
+    `--test trailing_comma_test`

@@ -100,7 +100,7 @@ fn test_separated_trailing() {
     list_test2::parse_strict
         .parse_str(r#""a", "b","#)
         .test()
-        .assert_failure_contains("found unexpected token `,`")
+        .assert_failure_contains("unexpected end of input, expected item")
         .assert_failure_contains("in strict");
 }
 

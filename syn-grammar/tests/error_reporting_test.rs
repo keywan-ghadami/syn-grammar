@@ -62,9 +62,7 @@ fn test_deepest_error_wins() {
     err_test_1::parse_main
         .parse_str("a b d")
         .test()
-        .assert_failure_contains("expected `c`")
-        .assert_failure_contains("in rule `deepest_err`")
-        .assert_failure_contains("in rule `main`");
+        .assert_failure_contains("expected `c` at column 4 (line 1)\nin deepest err\nin main");
 
     // "a b one c"
     // 'letter+' consumes "a b".
@@ -88,8 +86,7 @@ fn test_deep_vs_shallow() {
     prio_test::parse_main
         .parse_str("a b d")
         .test()
-        .assert_failure_contains("expected `c`")
-        .assert_failure_contains("in rule `deep`");
+        .assert_failure_contains("expected `c` at column 4 (line 1)\nin deep\nin main");
 }
 
 #[test]
@@ -97,8 +94,7 @@ fn test_rule_name_in_error_message() {
     rule_name_test::parse_main
         .parse_str("a c")
         .test()
-        .assert_failure_contains("in rule `inner_rule`")
-        .assert_failure_contains("expected `b`");
+        .assert_failure_contains("expected `b` at column 2 (line 1)\nin inner rule\nin main");
 }
 
 #[test]
@@ -149,5 +145,9 @@ fn test_combinator_error_produces_clean_message() {
     combinator_error_test::parse_outer
         .parse_str("a a b")
         .test()
-        .assert_failure_contains("expected \'a\' in rule `inner`\nin rule `outer`");
+        // This is the IDEAL error message. The current implementation loses the
+        // specific error ("expected 'a'") from the combinator and replaces it
+        // with a generic "expected inner". This test asserts the desired behavior
+        // where the specific error is propagated.
+        .assert_failure_contains("expected 'a' at column 4 (line 1)\nin inner\nin outer");
 }

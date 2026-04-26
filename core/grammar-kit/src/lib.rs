@@ -1,4 +1,3 @@
-
 #![doc = include_str!("../README.md")]
 
 #[cfg(feature = "syn")]
@@ -193,9 +192,18 @@ impl ParseContext {
         label: Option<String>,
         mut priority: u8,
     ) {
+        let err_str = err.to_string();
+        
+        // 1. FILTER DUMMY BUBBLE ERROR
+        if err_str.contains("__DUMMY_ERR_BUBBLE__") || err_str.contains("__BUBBLE__") {
+            #[cfg(feature = "trace")]
+            eprintln!("[TRACE] record_error: Ignoring bubble error");
+            return;
+        }
+
         // Trace every considered error before any filtering.
         #[cfg(feature = "trace")]
-        eprintln!("[TRACE] considering_error: '{}' (priority: {}, label: {:?})", err, priority, label);
+        eprintln!("[TRACE] considering_error: '{}' (priority: {}, label: {:?})", err_str, priority, label);
 
         // Eskalierte Priorität aus dem Kontext übernehmen und sofort zurücksetzen
         priority = std::cmp::max(priority, self.pending_priority);
@@ -233,7 +241,7 @@ impl ParseContext {
                     return;
                 }
 
-                // 2. Location (Progress)
+                // 2. Location (Progress) -> DIES MUSS GEWINNEN, EGAL WELCHE PRIORITÄT!
                 let new_start = new_error_state.start_span.start();
                 let old_start = existing.start_span.start();
 
@@ -254,7 +262,7 @@ impl ParseContext {
                     return;
                 }
 
-                // 3. Priority
+                // 3. Priority (Nur wenn an exakt der gleichen Stelle!)
                 if new_error_state.priority > existing.priority {
                     #[cfg(feature = "trace")]
                     eprintln!("[TRACE] record_error: New best error (higher priority)");
@@ -274,6 +282,21 @@ impl ParseContext {
                     eprintln!("[TRACE] record_error: New best error (more specific context)");
                     self.best_error = Some(new_error_state);
                 } else if new_error_state.rule_stack.len() == existing.rule_stack.len() {
+                    // Tie-breaker: Check if one message is a generic fallback
+                    let is_new_generic = new_error_state.err.to_string().contains("No matching");
+                    let is_existing_generic = existing.err.to_string().contains("No matching");
+
+                    if is_existing_generic && !is_new_generic {
+                        #[cfg(feature = "trace")]
+                        eprintln!("[TRACE] record_error: New best error (replaces generic fallback)");
+                        self.best_error = Some(new_error_state);
+                        return;
+                    } else if is_new_generic && !is_existing_generic {
+                        #[cfg(feature = "trace")]
+                        eprintln!("[TRACE] record_error: Rejected (new is generic fallback)");
+                        return;
+                    }
+
                     // Tie-breaker: longer message length (more info)
                     if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
                         #[cfg(feature = "trace")]
@@ -294,26 +317,39 @@ impl ParseContext {
     #[cfg(feature = "syn")]
     pub fn take_best_error(&mut self) -> Option<syn::Error> {
         let best = self.best_error.take()?;
-        let mut msg = best.err.to_string();
+        let mut msg;
 
-        if let Some(label) = &best.label {
-            if !msg.contains("expected") {
-                msg = format!("expected {}", label);
+        let original_err_str = best.err.to_string();
+
+        if best.priority >= Self::PRIO_LABELED && best.priority < Self::PRIO_STRUCTURAL && best.label.is_some() {
+            let label = best.label.as_ref().unwrap();
+
+            // Prepend "unexpected end of input" for clarity if that was the root cause.
+            if original_err_str.contains("unexpected end of input") {
+                msg = format!("unexpected end of input, expected {}", label);
+            } else {
+                if !original_err_str.contains("expected") {
+                    msg = format!("expected {}", label);
+                } else {
+                    msg = format!("expected {}", label);
+                }
             }
+        } else {
+            msg = original_err_str;
         }
 
         let line = best.start_span.start().line;
         let col = best.start_span.start().column;
-        
-        if !msg.contains("at column") {
+
+        // ORIGINAL POSITION: Put column info directly after the main message
+        if !msg.contains(&format!("at column {}", col)) {
             msg = format!("{} at column {} (line {})", msg, col, line);
         }
 
-        // Purer, semantischer Traceback ohne "in rule"
+        // Add the rule stack for context, avoiding duplicates.
         if !best.rule_stack.is_empty() {
             for rule in best.rule_stack.iter().rev() {
-                let suffix = format!("
-in {}", rule);
+                let suffix = format!("\nin {}", rule);
                 if !msg.contains(&suffix) {
                     msg = format!("{}{}", msg, suffix);
                 }
@@ -325,22 +361,25 @@ in {}", rule);
 
 
     /// Determines if the current best error is "significant enough" to stop
-    /// aggregating shallow alternative errors.
+    /// parsing alternatives. A significant error is one that is fatal,
+    /// has a high priority, or occurred after making some progress.
     #[cfg(feature = "syn")]
     pub fn stop_aggregation(&self, current_span: Span) -> bool {
         if let Some(e) = &self.best_error {
-            // 1. Fatal errors always stop aggregation
+            // 1. Fatal errors always stop everything.
             if e.is_fatal {
                 return true;
             }
 
-            // 2. Explicit failures (priority > 1) stop aggregation.
-            // Priority 1 (labeled shallow error) is considered insignificant for aggregation.
+            // 2. High-priority errors (e.g., from `fail!`) are significant.
+            // WICHTIGE ÄNDERUNG: Für Listen darf ein "Labeled" Fehler (Prio 10) den Abbruch *nicht* triggern,
+            // sonst kann eine leere/abbrechende Liste nicht sauber beendet werden, sondern wirft sofort Err.
+            // Nur Structural-Fehler dürfen das.
             if e.priority >= Self::PRIO_STRUCTURAL {
                 return true;
             }
 
-            // 3. Deep errors (progress made beyond current start) stop aggregation.
+            // 3. Deep errors, where the error occurred after the current starting point, are significant.
             let e_start = e.start_span.start();
             let c_start = current_span.start();
 
@@ -351,15 +390,6 @@ in {}", rule);
             }
         }
         false
-    }
-
-    #[cfg(feature = "syn")]
-    pub fn is_best_error_deep(&self) -> bool {
-        // Compatibility: check if priority > 0 (fail or label)
-        self.best_error
-            .as_ref()
-            .map(|e| e.priority > 0)
-            .unwrap_or(false)
     }
 
     // --- Span Tracking & Lexical Mode ---
@@ -472,70 +502,72 @@ where
     let was_fatal = ctx.check_fatal();
     ctx.set_fatal(false);
 
-    // Snapshot symbol table, rule stack, and last_span
+    // Snapshot state
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
+    let best_error_snapshot = ctx.best_error.clone();
 
     let start_span = input.span();
     let fork = input.fork();
 
-    // Pass ctx into the closure
     let res = parser(&fork, ctx);
-
     let is_now_fatal = ctx.check_fatal();
 
     match res {
         Ok(val) => {
             input.advance_to(&fork);
             ctx.set_fatal(was_fatal);
-            // We KEEP the last_span updated by the successful attempt
-            // We RESTORE mode stack because modes are scoped to structure, not state
             ctx.mode_stack = mode_stack_snapshot;
             Ok(Some(val))
         }
         Err(e) => {
-            if is_now_fatal {
-                // Restore state
+            // BUBBLE CHECK: If the error is a bubble, we abort immediately and pass it upwards!
+            if e.to_string().contains("__BUBBLE__") || e.to_string().contains("__DUMMY_ERR_BUBBLE__") {
                 ctx.scopes = scopes_snapshot;
                 ctx.rule_stack = rule_stack_snapshot;
                 ctx.last_span = last_span_snapshot;
                 ctx.mode_stack = mode_stack_snapshot;
-
-                ctx.set_fatal(true);
-                Err(e)
-            } else {
-                ctx.set_fatal(was_fatal);
-
-                let suppress = ctx.suppress_label;
-                ctx.suppress_label = false; // Reset
-
-                // Determine label and priority logic
-                // Rule: If error is at the start (no progress), we use the label and priority 1.
-                // If error is deep (progress), we ignore label (pass None) and priority 0.
-
-                let is_at_start = e.span().start() == start_span.start();
-
-                let (final_label, priority) = if is_at_start && !suppress {
-                    (
-                        label.map(|s| s.to_string()),
-                        if label.is_some() { ParseContext::PRIO_LABELED } else { ParseContext::PRIO_NORMAL },
-                    )
-                } else {
-                    (None, ParseContext::PRIO_NORMAL)
-                };
-
-                ctx.record_error(e, start_span, final_label, priority);
-
-                // Restore state
-                ctx.scopes = scopes_snapshot;
-                ctx.rule_stack = rule_stack_snapshot;
-                ctx.last_span = last_span_snapshot;
-                ctx.mode_stack = mode_stack_snapshot;
-
-                Ok(None)
+                // Fatal states bubble too
+                ctx.set_fatal(was_fatal || is_now_fatal);
+                return Err(e);
             }
+
+            let is_at_start = e.span().start() == start_span.start();
+            
+            // On any failure, restore the non-error-related context.
+            ctx.scopes = scopes_snapshot;
+            ctx.rule_stack = rule_stack_snapshot;
+            ctx.last_span = last_span_snapshot;
+            ctx.mode_stack = mode_stack_snapshot;
+
+            if is_now_fatal {
+                // Fatal error. This branch is now definitive.
+                ctx.set_fatal(true);
+                return Err(e);
+            }
+
+            // Recoverable failure. Restore original fatal flag.
+            ctx.set_fatal(was_fatal);
+
+            let suppress = ctx.suppress_label;
+            ctx.suppress_label = false;
+
+            if is_at_start && !suppress && label.is_some() {
+                ctx.best_error = best_error_snapshot;
+                
+                ctx.record_error(
+                    e,
+                    start_span,
+                    Some(label.unwrap().to_string()),
+                    ParseContext::PRIO_LABELED,
+                );
+            } else {
+                ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
+            }
+
+            Ok(None)
         }
     }
 }
@@ -645,6 +677,10 @@ where
             Ok(Some(val))
         }
         Err(e) => {
+            if e.to_string().contains("__BUBBLE__") || e.to_string().contains("__DUMMY_ERR_BUBBLE__") {
+                return Err(e);
+            }
+
             // Record error BEFORE restoring state
             // Recovery attempts don't have labels (usually), so defaults are fine.
             ctx.record_error(e, start_span, None, 0);
@@ -660,8 +696,6 @@ where
     }
 }
 
-// --- Combinators (High-Level Parsers) ---
-
 #[cfg(all(feature = "rt", feature = "syn"))]
 pub fn parse_separated<T, P, S>(
     input: ParseStream,
@@ -670,7 +704,7 @@ pub fn parse_separated<T, P, S>(
     mut sep_parser: S,
     min: usize,
     trailing: bool,
-    item_name: &str, 
+    item_name: &str,
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
@@ -678,67 +712,91 @@ where
 {
     let mut items = Vec::new();
 
-    // 1. Initiales Item
+    // 1. Parse the first item.
+    let first_item_span = input.span();
     ctx.enter_rule(&format!("{} 1", item_name));
-    // Hier nutzen wir attempt_labeled, damit das Label bei 0 Fortschritt sofort greift
-    let first_res = attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c));
-    ctx.exit_rule();
+    let first_item = match attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c)) {
+        Ok(Some(item)) => {
+            ctx.exit_rule();
+            item
+        }
+        Ok(None) => {
+            ctx.exit_rule();
+            if ctx.stop_aggregation(first_item_span) {
+                return Err(syn::Error::new(first_item_span, "__BUBBLE__"));
+            }
+            // Not enough items will be checked at the end.
+            return Ok(items);
+        }
+        Err(e) => {
+            ctx.exit_rule();
+            return Err(e); // Propagate fatal error or bubble
+        }
+    };
+    items.push(first_item);
 
-    match first_res? {
-        Some(item) => items.push(item),
-        None => return Ok(items),
-    }
-
-    // 2. Loop
+    // 2. Loop for subsequent items.
     loop {
+        let pre_sep_span = input.span();
+        let fork = input.fork();
+        ctx.enter_rule("separator");
+        let sep_res = attempt(&fork, ctx, |i, c| sep_parser(i, c));
+        ctx.exit_rule();
+
+        match sep_res {
+            Ok(Some(_)) => {
+                // Separator found, commit.
+                input.advance_to(&fork);
+            }
+            Ok(None) => {
+                // No separator, end of list.
+                if ctx.stop_aggregation(pre_sep_span) {
+                    return Err(syn::Error::new(pre_sep_span, "__BUBBLE__"));
+                }
+                break;
+            }
+            Err(e) => return Err(e), // Fatal error or bubble
+        }
+
+        if trailing && input.is_empty() {
+            break;
+        }
+
         let next_idx = items.len() + 1;
         let rule_name = format!("{} {}", item_name, next_idx);
+        ctx.enter_rule(&rule_name);
+        let item_res = attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c));
+        ctx.exit_rule();
 
-        // ÄUSSERE TRANSAKTION: Nur für das Rollback des Separators
-        let next_pair = attempt(input, ctx, |i, c| {
-            sep_parser(i, c)?; // Fortschritt 1: Komma konsumiert
-
-            c.enter_rule(&rule_name);
-            
-            // INNERE MESSUNG: Neuer start_span nach dem Komma!
-            // Wenn dies nun direkt bei ')' fehlschlägt, ist Fortschritt = 0 -> Shallow Error!
-            let item_res = attempt_labeled(i, c, Some(item_name), |i, c| item_parser(i, c))?;
-            c.exit_rule();
-
-            match item_res {
-                Some(item) => Ok(item),
-                None => {
-                    // Das Item ist fehlgeschlagen. attempt_labeled hat bereits den 
-                    // PERFEKTEN Fehler (PRIO_LABELED oder tief) im ParseContext hinterlegt.
-                    // Wir werfen hier nur einen Dummy-Fehler, um die äußere 
-                    // attempt-Transaktion zum Rollback des Kommas zu zwingen.
-                    Err(syn::Error::new(i.span(), "rollback_trigger"))
+        match item_res {
+            Ok(Some(item)) => items.push(item),
+            Ok(None) => {
+                // After a separator, an item is mandatory.
+                // We don't take_best_error, we just trigger a bubble so the real error is preserved.
+                // If there somehow isn't a best error, provide a fallback.
+                if ctx.best_error.is_none() {
+                    let msg = format!("invalid item after separator for {}", item_name);
+                    ctx.record_error(syn::Error::new(input.span(), &msg), input.span(), None, ParseContext::PRIO_NORMAL);
                 }
+                return Err(syn::Error::new(input.span(), "__BUBBLE__"));
             }
-        })?;
-
-        match next_pair {
-            Some(item) => items.push(item),
-            None => break,
+            Err(e) => return Err(e), // Fatal error or bubble
         }
     }
 
-    // 3. Trailing Check
-    if trailing {
-        let _ = attempt(input, ctx, |i, c| sep_parser(i, c))?;
-    }
-
-    // 4. Min Check
+    // 3. Final check for minimum number of items.
     if items.len() < min {
         return ctx.raise_failure(
-            &format!("expected at least {} {}s, found {}", min, item_name, items.len()),
-            input.span()
+            &format!(
+                "expected at least {} {}s, found {}",
+                min, item_name, items.len()
+            ),
+            input.span(),
         );
     }
 
     Ok(items)
 }
-
 
 
 /// A combinator for parsing a repetition of an item.
@@ -762,20 +820,22 @@ where
         let rule_name = format!("{} {}", item_name, next_idx);
 
         ctx.enter_rule(&rule_name);
-        let res = attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c));
-        ctx.exit_rule();
-
-        match res? {
-            Some(item) => items.push(item),
-            None => {
-                // If the attempt to parse an item failed, we check if it was a "deep" error.
-                // If so, we propagate it. Otherwise, it's just the end of the repetition.
+        let item = match attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c)) {
+            Ok(Some(item)) => item,
+            Ok(None) => {
+                ctx.exit_rule();
                 if ctx.stop_aggregation(loop_start_span) {
-                    return Err(ctx.take_best_error().unwrap_or_else(|| input.error("parsing repetition failed")));
+                    return Err(syn::Error::new(loop_start_span, "__BUBBLE__"));
                 }
-                break;
+                break; // End of repetition
             }
-        }
+            Err(e) => {
+                ctx.exit_rule();
+                return Err(e); // Propagate fatal error or bubble
+            }
+        };
+        ctx.exit_rule();
+        items.push(item);
     }
 
     if items.len() < min {
@@ -833,20 +893,26 @@ where
 
     match res {
         Ok(val) => {
-            // Bei Erfolg prüfen wir, ob alle Tokens konsumiert wurden.
-            // Wenn nicht, ist das ein echter "unexpected token" Fehler.
+            // On success, check if all tokens were consumed.
+            // If not, it's an "unexpected token" error.
             if !content.is_empty() {
+                // Before declaring a structural error, check if the inner parser
+                // recorded a significant error but still returned Ok (e.g. from a buggy combinator).
+                if ctx.stop_aggregation(content.span()) {
+                    return Err(syn::Error::new(content.span(), "__BUBBLE__"));
+                }
+
                 let err = content.error("unexpected token in delimited group");
-                // Give this high priority because it means the grammar is ambiguous or incomplete.
-                ctx.record_error(err, content.span(), None, ParseContext::PRIO_STRUCTURAL);
-                Err(ctx.take_best_error().unwrap())
+                // WICHTIG: Setze dies auf PRIO_NORMAL, damit es spezifischere (tiefere) Item-Fehler
+                // in der Liste nicht überschreibt! 
+                ctx.record_error(err, content.span(), None, ParseContext::PRIO_NORMAL);
+                return Err(syn::Error::new(content.span(), "__BUBBLE__"));
             } else {
                 Ok(val)
             }
         }
         Err(e) => {
-            // CRITICAL FIX: Bei einem Fehler geben wir den Fehler direkt weiter.
-            // Nicht konsumierte Tokens sind hier erwartet, da der Parser abgebrochen hat.
+            // If the inner parser returns a hard error (like bubble), we propagate it directly.
             Err(e)
         }
     }
@@ -941,9 +1007,13 @@ mod tests {
         let parser = |input: ParseStream| {
             ctx.enter_rule("outer");
 
-            let _: Option<()> = attempt(input, &mut ctx, |_input, _ctx| {
+            let _ = match attempt(input, &mut ctx, |_input, _ctx| {
                 Err(syn::Error::new(Span::call_site(), "parse failed"))
-            })?;
+            }) {
+                Ok(Some(_)) => Ok(()),
+                Ok(None) => Ok(()),
+                Err(e) => Err(e),
+            }?;
 
             ctx.exit_rule();
             Ok(())
