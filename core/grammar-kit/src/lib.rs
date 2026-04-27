@@ -1008,7 +1008,7 @@ mod tests {
             ctx.enter_rule("outer");
 
             let _ = match attempt(input, &mut ctx, |_input, _ctx| {
-                Err(syn::Error::new(Span::call_site(), "parse failed"))
+                Err::<(), syn::Error>(syn::Error::new(Span::call_site(), "parse failed"))
             }) {
                 Ok(Some(_)) => Ok(()),
                 Ok(None) => Ok(()),
