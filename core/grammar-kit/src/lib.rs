@@ -520,6 +520,8 @@ where
             input.advance_to(&fork);
             ctx.set_fatal(was_fatal);
             ctx.mode_stack = mode_stack_snapshot;
+            // Success! Clear any residue errors from this speculative attempt.
+            ctx.best_error = best_error_snapshot;
             Ok(Some(val))
         }
         Err(e) => {
@@ -587,6 +589,7 @@ where
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
+    let best_error_snapshot = ctx.best_error.clone();
 
     let res = parser(&fork, ctx);
 
@@ -595,6 +598,7 @@ where
     ctx.rule_stack = rule_stack_snapshot;
     ctx.last_span = last_span_snapshot;
     ctx.mode_stack = mode_stack_snapshot;
+    ctx.best_error = best_error_snapshot;
 
     res
 }
@@ -616,6 +620,7 @@ where
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
+    let best_error_snapshot = ctx.best_error.clone();
 
     // Disable fatal errors for the check to allow backtracking/failure
     let was_fatal = ctx.check_fatal();
@@ -631,6 +636,7 @@ where
     ctx.rule_stack = rule_stack_snapshot;
     ctx.last_span = last_span_snapshot;
     ctx.mode_stack = mode_stack_snapshot;
+    ctx.best_error = best_error_snapshot;
 
     match res {
         Ok(_) => Err(syn::Error::new(input.span(), "unexpected match")),
@@ -659,6 +665,7 @@ where
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
+    let best_error_snapshot = ctx.best_error.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -674,6 +681,8 @@ where
             // Keep last_span
             // Restore mode stack
             ctx.mode_stack = mode_stack_snapshot;
+            // Success! Clear any residue errors from this speculative attempt.
+            ctx.best_error = best_error_snapshot;
             Ok(Some(val))
         }
         Err(e) => {
@@ -1008,7 +1017,7 @@ mod tests {
             ctx.enter_rule("outer");
 
             let _ = match attempt(input, &mut ctx, |_input, _ctx| {
-                Err(syn::Error::new(Span::call_site(), "parse failed"))
+                Err::<(), syn::Error>(syn::Error::new(Span::call_site(), "parse failed"))
             }) {
                 Ok(Some(_)) => Ok(()),
                 Ok(None) => Ok(()),
