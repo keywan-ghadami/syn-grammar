@@ -1,188 +1,106 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.68s
-     Running unittests src/lib.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/ambiguity_test.rs (target/debug/deps/ambiguity_test-b145068240eefd58)
 
 running 1 test
-test test_group_vs_args_ambiguity ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/binding_with_action_test.rs (target/debug/deps/binding_with_action_test-4300dc1f6f2308f9)
 
 running 1 test
-test test_literal_binding_with_action ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/builtins_test.rs (target/debug/deps/builtins_test-6710426b0b467a86)
 
 running 1 test
-test test_builtins ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/composition_test.rs (target/debug/deps/composition_test-0005cc60c2e7b79e)
 
 running 2 tests
-test test_composition_complex ... ok
-test test_composition_mixed ... ok
-
+..
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running tests/comprehensive_test.rs (target/debug/deps/comprehensive_test-5c918662bbe30b59)
 
 running 9 tests
-test test_action_block_statements ... ok
-test test_attributes_on_rules ... ok
-test test_fail_builtin_first ... ok
-test test_complex_return_types ... ok
-test test_keywords_vs_idents ... ok
-test test_fail_builtin_last ... ok
-test test_multi_token_literals ... ok
-test test_rust_types_and_blocks ... ok
-test test_use_statements ... ok
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
-
-     Running tests/count_test.rs (target/debug/deps/count_test-09e85aa09a598b19)
 
 running 6 tests
-test test_count_group ... ok
-test test_count_bindings ... ok
-test test_count_opts ... ok
-test test_count_plus ... ok
-test test_count_plus_fail ... ok
-test test_count_stars ... ok
-
+......
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running tests/cut_test.rs (target/debug/deps/cut_test-b131ec78b478f8dd)
 
 running 2 tests
-test test_cut_in_repetition ... ok
-test test_cut_operator ... ok
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/epsilon_test.rs (target/debug/deps/epsilon_test-511d175da34d3dba)
 
 running 1 test
-test test_epsilon_alternative ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/error_abstraction_test.rs (target/debug/deps/error_abstraction_test-4c124a2ec9fbd8fc)
 
 running 4 tests
-test test_cut_prevents_backtracking ... ok
-test test_fail_overrides_everything ... ok
-test test_fail_vs_deep_error ... ok
-test test_nested_cut_propagation ... ok
-
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/error_reporting_test.rs (target/debug/deps/error_reporting_test-fca4f7e7e4f8d135)
-
-running 7 tests
-test test_combinator_error_produces_clean_message ... ok
-test test_deep_error_with_label_and_fail ... ok
-test test_deepest_error_wins ... ok
-test test_deep_vs_shallow ... ok
-test test_fail_built_in_enterprise ... ok
-test test_label_priority ... ok
-test test_rule_name_in_error_message ... ok
-
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-     Running tests/error_span_test.rs (target/debug/deps/error_span_test-191b3aeff8c97b51)
-
-running 1 test
-test test_span_propagation_compiles ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/fail_test.rs (target/debug/deps/fail_test-e3be5bed89a46207)
-
-running 1 test
-test test_fail_builtin ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
-
-running 2 tests
-test test_generic_rule ... ok
-test test_generic_inference ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/labeled_alternatives_test.rs (target/debug/deps/labeled_alternatives_test-1c58cde7495fc303)
-
-running 4 tests
-test test_deep_error_wins ... ok
-test test_default_labels ... ok
-test test_explicit_labels ... ok
-test test_group_labels ... ok
-
+....
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running tests/list_dx_test.rs (target/debug/deps/list_dx_test-6e812a6169142eb3)
-
-running 6 tests
-test test_cxx_deep_ident_error_mid_list ... ok
-test test_cxx_dangling_comma ... ok
-test test_cxx_deep_type_error_after_modifier ... ok
-test test_cxx_shallow_wrong_token ... ok
-test test_cxx_garbage_after_item ... ok
-test test_cxx_unexpected_eof ... ok
-
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-     Running tests/list_test.rs (target/debug/deps/list_test-6ce8f4380e36ecf5)
 
 running 7 tests
-test test_explicit_container ... ok
-test test_repeated ... ok
-test test_repeated_min ... ok
-test test_separated_basic ... ok
-test test_separated_custom_error ... ok
-test test_separated_min ... ok
-test test_separated_trailing ... ok
-
+.......
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running tests/literal_binding_no_action_test.rs (target/debug/deps/literal_binding_no_action_test-57cfcf888e4d257d)
 
 running 1 test
-test test_literal_binding_no_action ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/literal_binding_test.rs (target/debug/deps/literal_binding_test-321190b07fd7430f)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
 
 running 3 tests
-test test_literal_binding_char ... ok
-test test_literal_binding ... ok
-test test_literal_binding_raw_string ... ok
-
+...
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/multi_arguments_test.rs (target/debug/deps/multi_arguments_test-5c12c3134e913e36)
 
 running 1 test
-test test_multiple_arguments ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/nested_repetition_test.rs (target/debug/deps/nested_repetition_test-fa8d31614d470260)
 
 running 1 test
-test test_nested_repetition ... FAILED
+test_nested_repetition --- FAILED
 
 failures:
 
@@ -200,7 +118,7 @@ failures:
 [TRACE] exit_rule: group
 [TRACE] exit_rule: main
 
-thread 'test_nested_repetition' (2063) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_nested_repetition' (14038) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -220,35 +138,21 @@ failures:
 
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error: test failed, to rerun pass `-p syn-grammar --test nested_repetition_test`
-     Running tests/new_primitives_test.rs (target/debug/deps/new_primitives_test-ec307f24e74f5115)
 
 running 7 tests
-test test_float_primitive ... ok
-test test_numeric_primitives ... ok
-test test_string_primitive ... ok
-test test_whitespace_between_rules ... ok
-test test_whitespace_ident_ident ... ok
-test test_whitespace_primitive ... ok
-test test_whitespace_punct_ident ... ok
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-     Running tests/optional_production_test.rs (target/debug/deps/optional_production_test-bdeaa3481541d79c)
 
 running 1 test
-test test_optional_production ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/peek_not_test.rs (target/debug/deps/peek_not_test-9d297d86cd7e0069)
 
 running 4 tests
-test test_not_complex ... FAILED
-test test_not_basic ... ok
-test test_peek_basic ... ok
-test test_peek_binding ... ok
-
+. 1/4
+test_not_complex --- FAILED
+..
 failures:
 
 ---- test_not_complex stdout ----
@@ -265,7 +169,7 @@ failures:
 [TRACE] record_error: New best error (no previous)
 [TRACE] exit_rule: main
 
-thread 'test_not_complex' (2079) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_not_complex' (14051) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "No matching rule variant found; found unexpected token `bad` in rule `main`"
@@ -286,27 +190,20 @@ failures:
 
 test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error: test failed, to rerun pass `-p syn-grammar --test peek_not_test`
-     Running tests/plus_validation_test.rs (target/debug/deps/plus_validation_test-ec0d795d6e02f39e)
 
 running 1 test
-test test_plus_operator_validation ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/priority_test.rs (target/debug/deps/priority_test-96463ad95b5f7988)
 
 running 1 test
-test test_backtracking_priority ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/recovery_test.rs (target/debug/deps/recovery_test-11fa15a46fdb14de)
 
 running 3 tests
-test test_failure_recovery ... ok
-test test_attempt_recover_behavior ... ok
-test test_recovery_complex_sync ... FAILED
+.. 2/3
+test_recovery_complex_sync --- FAILED
 
 failures:
 
@@ -330,7 +227,7 @@ failures:
 [TRACE] exit_rule: item
 [TRACE] exit_rule: main
 
-thread 'test_recovery_complex_sync' (2089) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_recovery_complex_sync' (14061) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -349,20 +246,16 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 failures:
     test_recovery_complex_sync
 
-test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error: test failed, to rerun pass `-p syn-grammar --test recovery_test`
-     Running tests/repetition_test.rs (target/debug/deps/repetition_test-6dab4be251dc49e3)
 
 running 1 test
-test test_repetition ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/repro_issue.rs (target/debug/deps/repro_issue-6ea415970a37fa11)
 
 running 1 test
-test test_repro_issue ... FAILED
+test_repro_issue --- FAILED
 
 failures:
 
@@ -408,7 +301,7 @@ failures:
 [TRACE] exit_rule: extern block
 [TRACE] exit_rule: top level mod
 
-thread 'test_repro_issue' (2093) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_repro_issue' (14065) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -429,44 +322,33 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 failures:
     test_repro_issue
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error: test failed, to rerun pass `-p syn-grammar --test repro_issue`
-     Running tests/rule_arguments_test.rs (target/debug/deps/rule_arguments_test-38ee3b1473880033)
 
 running 1 test
-test test_rule_arguments ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/sequence_test.rs (target/debug/deps/sequence_test-f0e1243038cf1950)
 
 running 1 test
-test test_basic_sequence ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/simplified_rule_syntax.rs (target/debug/deps/simplified_rule_syntax-1c25be84fc1b2c16)
 
 running 1 test
-test test_simplified_syntax ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/single_grammar_test.rs (target/debug/deps/single_grammar_test-acbc61126444b1e2)
 
 running 1 test
-test test_single_grammar ... ok
-
+.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/trailing_comma_test.rs (target/debug/deps/trailing_comma_test-26d34198df8f2543)
 
 running 3 tests
-test test_consumes_trailing_comma_succeeds ... FAILED
-test test_does_not_consume_trailing_comma_fails ... FAILED
-test test_no_trailing_comma_succeeds ... ok
-
+test_consumes_trailing_comma_succeeds --- FAILED
+test_does_not_consume_trailing_comma_fails --- FAILED
+.
 failures:
 
 ---- test_consumes_trailing_comma_succeeds stdout ----
@@ -493,7 +375,7 @@ failures:
 [TRACE] exit_rule: item 3
 [TRACE] exit_rule: consumes comma
 
-thread 'test_consumes_trailing_comma_succeeds' (2106) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_consumes_trailing_comma_succeeds' (14075) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -531,7 +413,7 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 [TRACE] exit_rule: item 3
 [TRACE] exit_rule: does not consume comma
 
-thread 'test_does_not_consume_trailing_comma_fails' (2107) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_does_not_consume_trailing_comma_fails' (14076) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "unexpected token"
@@ -551,67 +433,20 @@ failures:
     test_consumes_trailing_comma_succeeds
     test_does_not_consume_trailing_comma_fails
 
-test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error: test failed, to rerun pass `-p syn-grammar --test trailing_comma_test`
-     Running tests/ui_tests.rs (target/debug/deps/ui_tests-1103ce3ad1c1da12)
 
 running 1 test
-    Checking syn-grammar-tests v0.0.0 (/home/user/syn-grammar/target/tests/trybuild/syn-grammar)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.32s
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
 
-
-test [0m[1mtests/ui/paren_open.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/paren_close.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/bracket_open.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/bracket_close.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/brace_open.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/brace_close.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/not_operator.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/tilde_operator.rs[0m ... [0m[32mok
-[0mtest [0m[1mtests/ui/ampersand_operator.rs[0m ... [0m[32mok
-[0m
-
-test ui ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.85s
-
-     Running tests/until_test.rs (target/debug/deps/until_test-f964a686d957c26c)
 
 running 4 tests
-test test_nested_until ... ok
-test test_until_group ... ok
-test test_until_keyword ... ok
-test test_until_semicolon ... ok
-
+....
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-   Doc-tests syn_grammar
 
 running 17 tests
-test syn-grammar/src/lib.rs - (line 127) - compile ... ok
-test syn-grammar/src/lib.rs - (line 210) ... ok
-test syn-grammar/src/lib.rs - (line 179) ... ok
-test syn-grammar/src/lib.rs - (line 230) ... ok
-test syn-grammar/src/lib.rs - (line 246) ... ok
-test syn-grammar/src/lib.rs - (line 264) ... ok
-test syn-grammar/src/lib.rs - (line 282) ... ok
-test syn-grammar/src/lib.rs - (line 297) ... ok
-test syn-grammar/src/lib.rs - (line 311) ... ok
-test syn-grammar/src/lib.rs - (line 386) ... ok
-test syn-grammar/src/lib.rs - (line 359) ... ok
-test syn-grammar/src/lib.rs - (line 413) ... ok
-test syn-grammar/src/lib.rs - (line 428) ... ok
-test syn-grammar/src/lib.rs - (line 454) ... ok
-test syn-grammar/src/lib.rs - (line 469) ... ok
-test syn-grammar/src/lib.rs - (line 484) ... ok
-test syn-grammar/src/lib.rs - (line 58) ... ok
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.32s
 
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.06s
-
-error: 5 targets failed:
-    `-p syn-grammar --test nested_repetition_test`
-    `-p syn-grammar --test peek_not_test`
-    `-p syn-grammar --test recovery_test`
-    `-p syn-grammar --test repro_issue`
-    `-p syn-grammar --test trailing_comma_test`
