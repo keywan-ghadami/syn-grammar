@@ -21,7 +21,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 2 tests
 ..
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 9 tests
@@ -36,7 +36,7 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 2 tests
 ..
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
@@ -51,7 +51,7 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 7 tests
 .......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
@@ -100,48 +100,13 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 1 test
-test_nested_repetition --- FAILED
-
-failures:
-
----- test_nested_repetition stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: group
-[TRACE] considering_error: 'unexpected end of input, expected integer literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: group
-[TRACE] enter_rule: group
-[TRACE] considering_error: 'unexpected end of input, expected integer literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (deeper span)
-[TRACE] exit_rule: group
-[TRACE] enter_rule: group
-[TRACE] exit_rule: group
-[TRACE] exit_rule: main
-
-thread 'test_nested_repetition' (14038) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
-
-🔴 TEST FAILED (Expected Success, but got Error):
-
-Error Message:
-unexpected end of input, expected integer literal at column 8 (line 1)
-in group
-in main
-
-Error Debug:
-Error("unexpected end of input, expected integer literal at column 8 (line 1)\nin group\nin main")
-
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-
-failures:
-    test_nested_repetition
-
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 7 tests
 .......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -169,7 +134,7 @@ failures:
 [TRACE] record_error: New best error (no previous)
 [TRACE] exit_rule: main
 
-thread 'test_not_complex' (14051) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_not_complex' (20104) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "No matching rule variant found; found unexpected token `bad` in rule `main`"
@@ -202,51 +167,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 3 tests
-.. 2/3
-test_recovery_complex_sync --- FAILED
-
-failures:
-
----- test_recovery_complex_sync stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: item
-[TRACE] enter_rule: val
-[TRACE] exit_rule: val
-[TRACE] exit_rule: item
-[TRACE] enter_rule: item
-[TRACE] enter_rule: val
-[TRACE] considering_error: 'expected integer literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: val
-[TRACE] considering_error: 'propagating fatal unique error' (priority: 0, label: None)
-[TRACE] record_error: Rejected (shallower span)
-[TRACE] exit_rule: item
-[TRACE] enter_rule: item
-[TRACE] enter_rule: val
-[TRACE] exit_rule: val
-[TRACE] exit_rule: item
-[TRACE] exit_rule: main
-
-thread 'test_recovery_complex_sync' (14061) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
-
-🔴 TEST FAILED (Expected Success, but got Error):
-
-Error Message:
-expected integer literal at column 16 (line 1)
-in val
-in item
-in main
-
-Error Debug:
-Error("expected integer literal at column 16 (line 1)\nin val\nin item\nin main")
-
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-
-failures:
-    test_recovery_complex_sync
-
-test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
@@ -291,17 +213,17 @@ failures:
 [TRACE] enter_rule: item 4
 [TRACE] enter_rule: cxx arg
 [TRACE] considering_error: 'unexpected end of input, expected ident' (priority: 0, label: None)
-[TRACE] record_error: New best error (deeper span)
+[TRACE] record_error: New best error (no previous)
 [TRACE] exit_rule: cxx arg
 [TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 10, label: Some("item"))
-[TRACE] record_error: New best error (deeper span)
+[TRACE] record_error: New best error (no previous)
 [TRACE] exit_rule: item 4
 [TRACE] exit_rule: cxx arg list
 [TRACE] exit_rule: cxx item
 [TRACE] exit_rule: extern block
 [TRACE] exit_rule: top level mod
 
-thread 'test_repro_issue' (14065) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_repro_issue' (20118) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -375,7 +297,7 @@ failures:
 [TRACE] exit_rule: item 3
 [TRACE] exit_rule: consumes comma
 
-thread 'test_consumes_trailing_comma_succeeds' (14075) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_consumes_trailing_comma_succeeds' (20128) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -413,7 +335,7 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 [TRACE] exit_rule: item 3
 [TRACE] exit_rule: does not consume comma
 
-thread 'test_does_not_consume_trailing_comma_fails' (14076) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_does_not_consume_trailing_comma_fails' (20129) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "unexpected token"
@@ -438,7 +360,7 @@ test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; 
 
 running 1 test
 .
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
 
 
 running 4 tests
@@ -448,5 +370,5 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 17 tests
 .................
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.32s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.96s
 
