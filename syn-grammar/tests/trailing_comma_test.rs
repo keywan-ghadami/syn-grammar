@@ -38,7 +38,7 @@ fn test_does_not_consume_trailing_comma_fails() {
     trailing_comma_handling::parse_does_not_consume_comma
         .parse_str(r#""a", "b","#)
         .test()
-        .assert_failure_contains("unexpected token");
+        .assert_failure_contains("unexpected end of input, expected item at column 0 (line 1)\nin item 3");
 }
 
 #[test]
