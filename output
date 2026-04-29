@@ -26,7 +26,7 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 9 tests
 .........
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
 
 
 running 6 tests
@@ -36,7 +36,7 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 2 tests
 ..
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -51,7 +51,7 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 7 tests
 .......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -61,52 +61,52 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 1 test
 .
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 2 tests
 ..
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 4 tests
 ....
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 
 running 6 tests
 ......
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-
-running 7 tests
-.......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 3 tests
-...
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 
 running 7 tests
 .......
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 
 running 1 test
@@ -134,7 +134,7 @@ failures:
 [TRACE] record_error: New best error (no previous)
 [TRACE] exit_rule: main
 
-thread 'test_not_complex' (20104) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_not_complex' (24566) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "No matching rule variant found; found unexpected token `bad` in rule `main`"
@@ -153,7 +153,7 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 failures:
     test_not_complex
 
-test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -223,7 +223,7 @@ failures:
 [TRACE] exit_rule: extern block
 [TRACE] exit_rule: top level mod
 
-thread 'test_repro_issue' (20118) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_repro_issue' (24580) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -244,7 +244,7 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 failures:
     test_repro_issue
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -269,8 +269,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 3 tests
 test_consumes_trailing_comma_succeeds --- FAILED
-test_does_not_consume_trailing_comma_fails --- FAILED
-.
+..
 failures:
 
 ---- test_consumes_trailing_comma_succeeds stdout ----
@@ -297,7 +296,7 @@ failures:
 [TRACE] exit_rule: item 3
 [TRACE] exit_rule: consumes comma
 
-thread 'test_consumes_trailing_comma_succeeds' (20128) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_consumes_trailing_comma_succeeds' (24590) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -311,56 +310,16 @@ Error("unexpected end of input, expected item at column 0 (line 1)\nin item 3\ni
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
----- test_does_not_consume_trailing_comma_fails stdout ----
-[TRACE] enter_rule: does not consume comma
-[TRACE] enter_rule: item 1
-[TRACE] enter_rule: string val
-[TRACE] exit_rule: string val
-[TRACE] exit_rule: item 1
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 2
-[TRACE] enter_rule: string val
-[TRACE] exit_rule: string val
-[TRACE] exit_rule: item 2
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 3
-[TRACE] enter_rule: string val
-[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: string val
-[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 10, label: Some("item"))
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: item 3
-[TRACE] exit_rule: does not consume comma
-
-thread 'test_does_not_consume_trailing_comma_fails' (20129) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
-
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "unexpected token"
-Actual msg:    "unexpected end of input, expected item at column 0 (line 1)\nin item 3\nin does not consume comma"
-
-Error Debug:
-Error("unexpected end of input, expected item at column 0 (line 1)\nin item 3\nin does not consume comma")
-
-Formatted:
-unexpected end of input, expected item at column 0 (line 1)
-in item 3
-in does not consume comma
-
-
 
 failures:
     test_consumes_trailing_comma_succeeds
-    test_does_not_consume_trailing_comma_fails
 
-test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
 .
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
 
 
 running 4 tests
@@ -370,5 +329,5 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 17 tests
 .................
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.96s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.73s
 
