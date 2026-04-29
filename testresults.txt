@@ -1,36 +1,333 @@
-   Compiling winnow-grammar v0.1.0 (/home/user/syn-grammar/winnow-grammar)
-error[E0308]: mismatched types
-   --> winnow-grammar/tests/oct_test.rs:4:1
-    |
-  4 | / grammar! {
-  5 | |     grammar OctParser {
-  6 | |         pub rule test_oct -> S...
-  7 | |             o:oct_digit1 -> { ...
-  8 | |     }
-  9 | | }
-    | | ^
-    | | |
-    | |_expected `Stateful<LocatingSlice<&str>, S>`, found `StrContext`
-    |   arguments to this method are incorrect
-    |
-    = note: expected struct `Stateful<LocatingSlice<&'a str>, S>`
-                 found enum `StrContext`
-help: the return type of this call is `StrContext` due to the type of the argument passed
-   --> winnow-grammar/tests/oct_test.rs:4:1
-    |
-  4 | / grammar! {
-  5 | |     grammar OctParser {
-  6 | |         pub rule test_oct -> S...
-  7 | |             o:oct_digit1 -> { ...
-  8 | |     }
-  9 | | }
-    | |_^ this argument influences the return type of `context`
-note: method defined here
-   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winnow-0.7.15/src/parser.rs:787:8
-    |
-787 |     fn context<C>(self, context:...
-    |        ^^^^^^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-For more information about this error, try `rustc --explain E0308`.
-error: could not compile `winnow-grammar` (test "oct_test") due to 1 previous error
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+. 1/4
+test_not_complex --- FAILED
+..
+failures:
+
+---- test_not_complex stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: bad
+[TRACE] considering_error: 'expected `bad`; found unexpected token `good`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: bad
+[TRACE] exit_rule: main
+[TRACE] enter_rule: main
+[TRACE] enter_rule: bad
+[TRACE] exit_rule: bad
+[TRACE] considering_error: 'unexpected match' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: main
+
+thread 'test_not_complex' (24566) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "No matching rule variant found; found unexpected token `bad` in rule `main`"
+Actual msg:    "unexpected match at column 0 (line 1)\nin main"
+
+Error Debug:
+Error("unexpected match at column 0 (line 1)\nin main")
+
+Formatted:
+unexpected match at column 0 (line 1)
+in main
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_not_complex
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test_repro_issue --- FAILED
+
+failures:
+
+---- test_repro_issue stdout ----
+[TRACE] enter_rule: top level mod
+[TRACE] enter_rule: extern block
+[TRACE] enter_rule: cxx item
+[TRACE] considering_error: 'expected `fn`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] Attempting to parse syn type: syn :: Macro at bytes(70..77)
+[TRACE] Successfully parsed syn type: syn :: Macro
+[TRACE] exit_rule: cxx item
+[TRACE] enter_rule: cxx item
+[TRACE] enter_rule: cxx arg list
+[TRACE] enter_rule: item 1
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
+[TRACE] exit_rule: item 1
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: item 2
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
+[TRACE] exit_rule: item 2
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: item 3
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
+[TRACE] exit_rule: item 3
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: item 4
+[TRACE] enter_rule: cxx arg
+[TRACE] considering_error: 'unexpected end of input, expected ident' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: cxx arg
+[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: item 4
+[TRACE] exit_rule: cxx arg list
+[TRACE] exit_rule: cxx item
+[TRACE] exit_rule: extern block
+[TRACE] exit_rule: top level mod
+
+thread 'test_repro_issue' (24580) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+unexpected end of input, expected item at column 16 (line 10)
+in item 4
+in cxx arg list
+in cxx item
+in extern block
+in top level mod
+
+Error Debug:
+Error("unexpected end of input, expected item at column 16 (line 10)\nin item 4\nin cxx arg list\nin cxx item\nin extern block\nin top level mod")
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_repro_issue
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test_consumes_trailing_comma_succeeds --- FAILED
+..
+failures:
+
+---- test_consumes_trailing_comma_succeeds stdout ----
+[TRACE] enter_rule: consumes comma
+[TRACE] enter_rule: item 1
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] exit_rule: item 1
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: item 2
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] exit_rule: item 2
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: item 3
+[TRACE] enter_rule: string val
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: string val
+[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 10, label: Some("item"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: item 3
+[TRACE] exit_rule: consumes comma
+
+thread 'test_consumes_trailing_comma_succeeds' (24590) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+unexpected end of input, expected item at column 0 (line 1)
+in item 3
+in consumes comma
+
+Error Debug:
+Error("unexpected end of input, expected item at column 0 (line 1)\nin item 3\nin consumes comma")
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_consumes_trailing_comma_succeeds
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.73s
+
