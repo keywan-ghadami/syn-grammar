@@ -6,6 +6,9 @@ description = "Testing and runtime utilities for syn-grammar generated parsers."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/keywan-ghadami/syn-grammar"
 
+[lib]
+path = "src/grammar_kit.rs"
+
 [features]
 default = ["syn", "rt", "testing"]
 syn = ["dep:syn", "dep:proc-macro2"]
