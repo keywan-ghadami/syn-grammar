@@ -84,5 +84,5 @@ fn test_not_complex() {
     not_complex::parse_main
         .parse_str("bad")
         .test()
-        .assert_failure_contains("unexpected match for rule \bad`; found `bad` in rule `main`");
+        .assert_failure_contains("unexpected match for rule `bad`; found `bad` in rule `main`");
 }

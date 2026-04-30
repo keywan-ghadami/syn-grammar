@@ -13,6 +13,7 @@ use syn::Result;
 #[cfg(feature = "testing")]
 pub mod testing;
 
+
 pub mod macros;
 
 pub use grammar_kit_macros::with_span;
@@ -179,6 +180,10 @@ impl ParseContext {
         if let Some(n) = _name {
             eprintln!("[TRACE] exit_rule: {}", n);
         }
+    }
+
+    pub fn current_rule_name(&self) -> Option<&str> {
+        self.rule_stack.last().map(|s| s.as_str())
     }
 
     /// Records an error if it is "better" than the current best error.

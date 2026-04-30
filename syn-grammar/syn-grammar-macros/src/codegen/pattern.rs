@@ -1005,11 +1005,56 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
         ModelPattern::Not(inner, _) => {
             let inner_logic = generate_pattern_step(inner, ctx)?;
+
+            // 1. Compile-Time: Extract the name of the forbidden pattern for better error messages.
+            let forbidden_name = match &**inner {
+                ModelPattern::RuleCall { rule_path, .. } => {
+                    rule_path.segments.last().unwrap().ident.to_string()
+                },
+                ModelPattern::Lit { lit: syn::Lit::Str(s), .. } => {
+                    s.value()
+                },
+                _ => "pattern".to_string(),
+            };
+
+            // 2. Runtime: Integrate with the parser's state machine.
             Ok(quote! {
-                rt::not_check(input, ctx, |mut input, ctx| {
+                let _start_cursor = input.cursor();
+                
+                // rt::not_check is still required to snapshot and roll back the error state
+                // when the inner pattern (correctly) fails to match.
+                let _res = rt::not_check(input, ctx, |mut input, ctx| {
                     #inner_logic
                     Ok(())
-                })?;
+                });
+
+                if _res.is_err() {
+                    // The forbidden pattern was found. Now, we create a high-quality error.
+                    let (found_token, err_span) = if let Some((tt, _)) = _start_cursor.token_tree() {
+                        (tt.to_string(), tt.span())
+                    } else {
+                        ("EOF".to_string(), input.span())
+                    };
+
+                    let parent_info = ctx.current_rule_name()
+                        .map(|n| format!(" in rule `{}`", n))
+                        .unwrap_or_default();
+                    
+                    let err_msg = format!("unexpected match for rule `{}`; found `{}`{}", #forbidden_name, found_token, parent_info);
+                    let precise_err = syn::Error::new(err_span, err_msg);
+
+                    // CRITICAL FIX: Register the precise error with the context.
+                    // This overwrites the generic error from rt::not_check and ensures
+                    // our new error is used for all subsequent tie-breaking.
+                    ctx.record_error(
+                        precise_err.clone(), 
+                        err_span, 
+                        None, 
+                        rt::ParseContext::PRIO_STRUCTURAL
+                    );
+
+                    return Err(precise_err);
+                }
             })
         }
 
