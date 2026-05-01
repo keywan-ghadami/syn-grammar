@@ -13,6 +13,8 @@ use syn::Result;
 #[cfg(feature = "testing")]
 pub mod testing;
 
+#[cfg(feature = "syn")]
+pub mod syn_rt;
 
 pub mod macros;
 

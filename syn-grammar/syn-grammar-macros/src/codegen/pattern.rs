@@ -273,14 +273,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     quote! { (#(#b),*) }
                 };
 
-                let item_label_expr = if let Some(msg) = item_label {
-                    quote!(#msg)
+                let label_tokens = if let Some(l) = item_label {
+                    quote!(Some(#l))
                 } else {
-                    quote!("item")
+                    quote!(None)
                 };
 
                 let refined_logic = quote! {
-                    let _items_vec = rt::parse_separated::<_, _, _>(
+                    let _items_vec = ::syn_grammar::rt::syn_rt::parse_separated_pure(
                         input,
                         ctx,
                         |mut input, ctx| {
@@ -293,7 +293,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         },
                         #min,
                         #trailing,
-                        #item_label_expr
+                        #label_tokens
                     )?;
                     let mut _items = #container_ty::from_iter(_items_vec);
                     _items
