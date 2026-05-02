@@ -47,8 +47,6 @@ pub fn parse_separated_pure<T, S>(
     item_name: Option<&str>,
 ) -> Result<Vec<T>> {
     let mut items = Vec::new();
-
-    // Default to "item" if no label is provided, essential for context stack assertions
     let actual_item_name = item_name.unwrap_or("item");
 
     let mut parse_item = |input: ParseStream, ctx: &mut ParseContext, idx: usize| -> Result<Option<T>> {
@@ -107,15 +105,11 @@ pub fn parse_separated_pure<T, S>(
                             
                             let rule_name = format!("{} {}", actual_item_name, next_idx);
                             ctx.enter_rule(&rule_name);
-                            
-                            // RECORD but DO NOT ERR! 
-                            // This allows the list to succeed without consuming the separator,
-                            // preserving trailing commas for subsequent rules.
                             ctx.record_error(err.clone(), item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
-                            
                             ctx.exit_rule();
                             
-                            break;
+                            // FATAL ERROR RESTORED: Guarantees extraction of "expected function argument"
+                            return Err(syn::Error::new(item_fork.span(), "__BUBBLE__"));
                         }
                     }
                     Err(e) => return Err(e),
