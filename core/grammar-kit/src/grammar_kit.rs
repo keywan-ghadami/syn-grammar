@@ -1,3 +1,5 @@
+
+
 #![doc = include_str!("../README.md")]
 
 #[cfg(feature = "syn")]
@@ -520,7 +522,7 @@ where
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
-    // let best_error_snapshot = ctx.best_error.clone();
+    let best_error_snapshot = ctx.best_error.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -533,8 +535,24 @@ where
             input.advance_to(&fork);
             ctx.set_fatal(was_fatal);
             ctx.mode_stack = mode_stack_snapshot;
-            // Success! Clear any residue errors from this speculative attempt.
-            // ctx.best_error = best_error_snapshot;
+
+            // THE HIGH-WATER MARK FIX:
+            // Wir behalten den inneren Fehler NUR, wenn er tiefer im Input 
+            // aufgetreten ist, als dieser Versuch gestartet wurde (echter Fortschritt).
+            // Zero-Progress-Fehler aus optionalen Zweigen (wie modifier?) werden verworfen.
+            let keep_error = match &ctx.best_error {
+                Some(e) => {
+                    let e_start = e.start_span.start();
+                    let s_start = start_span.start();
+                    e_start.line > s_start.line || (e_start.line == s_start.line && e_start.column > s_start.column)
+                }
+                None => false,
+            };
+
+            if !keep_error {
+                ctx.best_error = best_error_snapshot;
+            }
+
             Ok(Some(val))
         }
         Err(e) => {
@@ -678,7 +696,7 @@ where
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
-    // let best_error_snapshot = ctx.best_error.clone();
+    let best_error_snapshot = ctx.best_error.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -694,8 +712,21 @@ where
             // Keep last_span
             // Restore mode stack
             ctx.mode_stack = mode_stack_snapshot;
-            // Success! Clear any residue errors from this speculative attempt.
-            // ctx.best_error = best_error_snapshot;
+            
+            // HIGH-WATER MARK FIX:
+            let keep_error = match &ctx.best_error {
+                Some(e) => {
+                    let e_start = e.start_span.start();
+                    let s_start = start_span.start();
+                    e_start.line > s_start.line || (e_start.line == s_start.line && e_start.column > s_start.column)
+                }
+                None => false,
+            };
+
+            if !keep_error {
+                ctx.best_error = best_error_snapshot;
+            }
+
             Ok(Some(val))
         }
         Err(e) => {

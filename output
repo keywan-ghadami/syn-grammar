@@ -1,6 +1,6 @@
    Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
    Compiling syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 33.68s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.86s
      Running unittests src/syn_grammar.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
 running 0 tests
@@ -26,7 +26,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test test_builtins ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/composition_test.rs (target/debug/deps/composition_test-0005cc60c2e7b79e)
 
@@ -39,13 +39,13 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/comprehensive_test.rs (target/debug/deps/comprehensive_test-5c918662bbe30b59)
 
 running 9 tests
-test test_attributes_on_rules ... ok
 test test_action_block_statements ... ok
-test test_complex_return_types ... ok
+test test_attributes_on_rules ... ok
 test test_fail_builtin_first ... ok
+test test_complex_return_types ... ok
 test test_fail_builtin_last ... ok
-test test_multi_token_literals ... ok
 test test_keywords_vs_idents ... ok
+test test_multi_token_literals ... ok
 test test_rust_types_and_blocks ... ok
 test test_use_statements ... ok
 
@@ -54,10 +54,10 @@ test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/count_test.rs (target/debug/deps/count_test-09e85aa09a598b19)
 
 running 6 tests
+test test_count_bindings ... ok
 test test_count_group ... ok
 test test_count_opts ... ok
 test test_count_plus ... ok
-test test_count_bindings ... ok
 test test_count_plus_fail ... ok
 test test_count_stars ... ok
 
@@ -81,10 +81,10 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/error_abstraction_test.rs (target/debug/deps/error_abstraction_test-4c124a2ec9fbd8fc)
 
 running 4 tests
-test test_fail_overrides_everything ... ok
 test test_cut_prevents_backtracking ... ok
-test test_fail_vs_deep_error ... ok
+test test_fail_overrides_everything ... ok
 test test_nested_cut_propagation ... ok
+test test_fail_vs_deep_error ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -94,9 +94,9 @@ running 7 tests
 test test_combinator_error_produces_clean_message ... ok
 test test_deep_error_with_label_and_fail ... ok
 test test_deep_vs_shallow ... ok
-test test_fail_built_in_enterprise ... ok
 test test_deepest_error_wins ... ok
 test test_label_priority ... ok
+test test_fail_built_in_enterprise ... ok
 test test_rule_name_in_error_message ... ok
 
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
@@ -118,8 +118,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
 
 running 2 tests
-test test_generic_inference ... ok
 test test_generic_rule ... ok
+test test_generic_inference ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -177,7 +177,7 @@ failures:
 [TRACE] record_error: Rejected (lower priority)
 [TRACE] exit_rule: signature
 
-thread 'test_cxx_shallow_wrong_token' (25840) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_cxx_shallow_wrong_token' (42870) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin function parameter 1\nin signature"
