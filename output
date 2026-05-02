@@ -1,0 +1,131 @@
+   Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
+error[E0432]: unresolved import `crate::rt`
+ --> core/grammar-kit/src/syn_rt.rs:1:12
+  |
+1 | use crate::rt::ParseContext;
+  |            ^^
+  |            |
+  |            unresolved import
+  |            help: a similar path exists: `std::rt`
+
+error[E0433]: failed to resolve: unresolved import
+  --> core/grammar-kit/src/syn_rt.rs:39:24
+   |
+39 | ...   crate::rt::ParseContext::PRIO_NOR...
+   |              ^^ unresolved import
+   |
+help: a similar path exists
+   |
+39 |                 crate::std::rt::ParseContext::PRIO_NORMAL,
+   |                        +++++
+help: consider importing this struct
+   |
+ 1 + use crate::ParseContext;
+   |
+help: if you import `ParseContext`, refer to it directly
+   |
+39 -                 crate::rt::ParseContext::PRIO_NORMAL,
+39 +                 ParseContext::PRIO_NORMAL,
+   |
+
+error[E0433]: failed to resolve: unresolved import
+  --> core/grammar-kit/src/syn_rt.rs:85:74
+   |
+85 | ... crate::rt::ParseContext::PRIO_NORMAL);
+   |            ^^ unresolved import
+   |
+help: a similar path exists
+   |
+85 |                 ctx.record_error(err.clone(), input.span(), None, crate::std::rt::ParseContext::PRIO_NORMAL);
+   |                                                                          +++++
+help: consider importing this struct
+   |
+ 1 + use crate::ParseContext;
+   |
+help: if you import `ParseContext`, refer to it directly
+   |
+85 -                 ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+85 +                 ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
+   |
+
+error[E0433]: failed to resolve: unresolved import
+   --> core/grammar-kit/src/syn_rt.rs:125:90
+    |
+125 | ...crate::rt::ParseContext::PRIO_NORMAL);
+    |           ^^ unresolved import
+    |
+help: a similar path exists
+    |
+125 |                             ctx.record_error(err.clone(), item_fork.span(), None, crate::std::rt::ParseContext::PRIO_NORMAL);
+    |                                                                                          +++++
+help: consider importing this struct
+    |
+  1 + use crate::ParseContext;
+    |
+help: if you import `ParseContext`, refer to it directly
+    |
+125 -                             ctx.record_error(err.clone(), item_fork.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+125 +                             ctx.record_error(err.clone(), item_fork.span(), None, ParseContext::PRIO_NORMAL);
+    |
+
+error[E0433]: failed to resolve: unresolved import
+   --> core/grammar-kit/src/syn_rt.rs:142:66
+    |
+142 | ...crate::rt::ParseContext::PRIO_NORMAL);
+    |           ^^ unresolved import
+    |
+help: a similar path exists
+    |
+142 |         ctx.record_error(err.clone(), input.span(), None, crate::std::rt::ParseContext::PRIO_NORMAL);
+    |                                                                  +++++
+help: consider importing this struct
+    |
+  1 + use crate::ParseContext;
+    |
+help: if you import `ParseContext`, refer to it directly
+    |
+142 -         ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+142 +         ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
+    |
+
+error[E0599]: no method named `advance_to` found for reference `&ParseBuffer<'_>` in the current scope
+  --> core/grammar-kit/src/syn_rt.rs:17:19
+   |
+17 |             input.advance_to(&fork);
+   |                   ^^^^^^^^^^ method not found in `&ParseBuffer<'_>`
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `Speculative` which provides `advance_to` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use syn::parse::discouraged::Speculative;
+   |
+
+error[E0599]: no method named `advance_to` found for reference `&ParseBuffer<'_>` in the current scope
+   --> core/grammar-kit/src/syn_rt.rs:110:31
+    |
+110 | ...   input.advance_to(&item_fork);
+    |             ^^^^^^^^^^ method not found in `&ParseBuffer<'_>`
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `Speculative` which provides `advance_to` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use syn::parse::discouraged::Speculative;
+    |
+
+error[E0599]: no method named `advance_to` found for reference `&ParseBuffer<'_>` in the current scope
+   --> core/grammar-kit/src/syn_rt.rs:115:35
+    |
+115 | ...   input.advance_to(&sep_fork);
+    |             ^^^^^^^^^^ method not found in `&ParseBuffer<'_>`
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `Speculative` which provides `advance_to` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use syn::parse::discouraged::Speculative;
+    |
+
+Some errors have detailed explanations: E0432, E0433, E0599.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `grammar-kit` (lib) due to 8 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `grammar-kit` (lib test) due to 8 previous errors
