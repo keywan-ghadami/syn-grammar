@@ -1,6 +1,6 @@
    Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
    Compiling syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.86s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.30s
      Running unittests src/syn_grammar.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
 running 0 tests
@@ -12,44 +12,44 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test test_group_vs_args_ambiguity ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
 
      Running tests/binding_with_action_test.rs (target/debug/deps/binding_with_action_test-4300dc1f6f2308f9)
 
 running 1 test
 test test_literal_binding_with_action ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/builtins_test.rs (target/debug/deps/builtins_test-6710426b0b467a86)
 
 running 1 test
 test test_builtins ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/composition_test.rs (target/debug/deps/composition_test-0005cc60c2e7b79e)
 
 running 2 tests
-test test_composition_mixed ... ok
 test test_composition_complex ... ok
+test test_composition_mixed ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/comprehensive_test.rs (target/debug/deps/comprehensive_test-5c918662bbe30b59)
 
 running 9 tests
 test test_action_block_statements ... ok
 test test_attributes_on_rules ... ok
-test test_fail_builtin_first ... ok
 test test_complex_return_types ... ok
+test test_fail_builtin_first ... ok
 test test_fail_builtin_last ... ok
 test test_keywords_vs_idents ... ok
 test test_multi_token_literals ... ok
-test test_rust_types_and_blocks ... ok
 test test_use_statements ... ok
+test test_rust_types_and_blocks ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/count_test.rs (target/debug/deps/count_test-09e85aa09a598b19)
 
@@ -69,136 +69,91 @@ running 2 tests
 test test_cut_operator ... ok
 test test_cut_in_repetition ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/epsilon_test.rs (target/debug/deps/epsilon_test-511d175da34d3dba)
 
 running 1 test
 test test_epsilon_alternative ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
 
      Running tests/error_abstraction_test.rs (target/debug/deps/error_abstraction_test-4c124a2ec9fbd8fc)
 
 running 4 tests
-test test_cut_prevents_backtracking ... ok
 test test_fail_overrides_everything ... ok
-test test_nested_cut_propagation ... ok
 test test_fail_vs_deep_error ... ok
+test test_cut_prevents_backtracking ... ok
+test test_nested_cut_propagation ... ok
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
      Running tests/error_reporting_test.rs (target/debug/deps/error_reporting_test-fca4f7e7e4f8d135)
 
 running 7 tests
 test test_combinator_error_produces_clean_message ... ok
 test test_deep_error_with_label_and_fail ... ok
+test test_deepest_error_wins ... FAILED
 test test_deep_vs_shallow ... ok
-test test_deepest_error_wins ... ok
-test test_label_priority ... ok
 test test_fail_built_in_enterprise ... ok
+test test_label_priority ... ok
 test test_rule_name_in_error_message ... ok
-
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/error_span_test.rs (target/debug/deps/error_span_test-191b3aeff8c97b51)
-
-running 1 test
-test test_span_propagation_compiles ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/fail_test.rs (target/debug/deps/fail_test-e3be5bed89a46207)
-
-running 1 test
-test test_fail_builtin ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
-
-running 2 tests
-test test_generic_rule ... ok
-test test_generic_inference ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/labeled_alternatives_test.rs (target/debug/deps/labeled_alternatives_test-1c58cde7495fc303)
-
-running 4 tests
-test test_deep_error_wins ... ok
-test test_default_labels ... ok
-test test_explicit_labels ... ok
-test test_group_labels ... ok
-
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/list_dx_test.rs (target/debug/deps/list_dx_test-6e812a6169142eb3)
-
-running 6 tests
-test test_cxx_dangling_comma ... ok
-test test_cxx_deep_ident_error_mid_list ... ok
-test test_cxx_deep_type_error_after_modifier ... ok
-test test_cxx_garbage_after_item ... ok
-test test_cxx_shallow_wrong_token ... FAILED
-test test_cxx_unexpected_eof ... ok
 
 failures:
 
----- test_cxx_shallow_wrong_token stdout ----
-[TRACE] enter_rule: signature
-[TRACE] enter_rule: function parameter 1
-[TRACE] enter_rule: param
-[TRACE] enter_rule: modifier
-[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `123`' (priority: 20, label: None)
+---- test_deepest_error_wins stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: deepest err
+[TRACE] considering_error: 'expected `c`' (priority: 0, label: None)
 [TRACE] record_error: New best error (no previous)
-[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `123`' (priority: 10, label: Some("type modifier"))
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] considering_error: 'expected `type modifier`; found unexpected token `123`' (priority: 20, label: None)
-[TRACE] record_error: Rejected (shorter message)
-[TRACE] exit_rule: modifier
-[TRACE] considering_error: 'expected `type modifier`; found unexpected token `123`' (priority: 0, label: None)
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] enter_rule: type name
-[TRACE] considering_error: 'expected identifier' (priority: 10, label: Some("type name"))
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 20, label: None)
-[TRACE] record_error: Rejected (shorter message)
-[TRACE] exit_rule: type name
-[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 10, label: Some("function parameter"))
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] considering_error: 'expected `function parameter`; found unexpected token `123`' (priority: 20, label: None)
-[TRACE] record_error: Rejected (less specific context)
-[TRACE] exit_rule: param
-[TRACE] considering_error: 'expected `function parameter`; found unexpected token `123`' (priority: 0, label: Some("function parameter"))
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] exit_rule: function parameter 1
-[TRACE] considering_error: 'unexpected token in delimited group' (priority: 0, label: None)
-[TRACE] record_error: Rejected (lower priority)
-[TRACE] exit_rule: signature
+[TRACE] exit_rule: deepest err
+[TRACE] exit_rule: main
+[TRACE] enter_rule: main
+[TRACE] enter_rule: letter
+[TRACE] exit_rule: letter
+[TRACE] enter_rule: letter
+[TRACE] exit_rule: letter
+[TRACE] enter_rule: letter
+[TRACE] considering_error: 'expected one of: `a`, `b`, `c`; found unexpected token `one`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `a`, `b`, `c`; found unexpected token `one`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: letter
+[TRACE] considering_error: 'No matching rule variant found; found unexpected token `one`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] enter_rule: num word
+[TRACE] exit_rule: num word
+[TRACE] enter_rule: num word
+[TRACE] considering_error: 'expected one of: `one`, `two`, `zero`; found unexpected token `c`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected one of: `one`, `two`, `zero`; found unexpected token `c`' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: num word
+[TRACE] considering_error: 'No matching rule variant found; found unexpected token `c`' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected end of input' (priority: 0, label: None)
+[TRACE] record_error: New best error (replaces generic fallback)
+[TRACE] exit_rule: main
 
-thread 'test_cxx_shallow_wrong_token' (42870) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_deepest_error_wins' (50424) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin function parameter 1\nin signature"
-Actual msg:    "expected one of: `const`, `constexpr`; found unexpected token `123` at column 8 (line 1)\nin modifier\nin param\nin function parameter 1\nin signature"
+Expected part: "expected one of: `one`, `two`, `zero`"
+Actual msg:    "expected end of input at column 8 (line 1)\nin main"
 
 Error Debug:
-Error("expected one of: `const`, `constexpr`; found unexpected token `123` at column 8 (line 1)\nin modifier\nin param\nin function parameter 1\nin signature")
+Error("expected end of input at column 8 (line 1)\nin main")
 
 Formatted:
-expected one of: `const`, `constexpr`; found unexpected token `123` at column 8 (line 1)
-in modifier
-in param
-in function parameter 1
-in signature
+expected end of input at column 8 (line 1)
+in main
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 
 failures:
-    test_cxx_shallow_wrong_token
+    test_deepest_error_wins
 
-test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
 
-error: test failed, to rerun pass `-p syn-grammar --test list_dx_test`
+error: test failed, to rerun pass `-p syn-grammar --test error_reporting_test`

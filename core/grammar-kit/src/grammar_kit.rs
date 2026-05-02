@@ -587,16 +587,24 @@ where
             let suppress = ctx.suppress_label;
             ctx.suppress_label = false;
 
-            if is_at_start && !suppress && label.is_some() {
-                // ctx.best_error = best_error_snapshot;
-                
-                ctx.record_error(
-                    e,
-                    start_span,
-                    Some(label.unwrap().to_string()),
-                    ParseContext::PRIO_LABELED,
-                );
+            if is_at_start {
+                // THE MISSING HIGH-WATER MARK FIX:
+                // Wenn der Versuch bei Position 0 gescheitert ist (kein Fortschritt), 
+                // überschreiben wir sofort den best_error mit dem Snapshot. 
+                // Das löscht intern eskalierte Fehler (wie PRIO_AGGREGATED) aus optionalen Zweigen!
+                ctx.best_error = best_error_snapshot;
+
+                if !suppress {
+                    if let Some(lbl) = label {
+                        ctx.record_error(e, start_span, Some(lbl.to_string()), ParseContext::PRIO_LABELED);
+                    } else {
+                        // Der Fehler wird zur Sicherheit als PRIO_NORMAL registriert. 
+                        // Zwingende Regeln werden ihn somit immer überschreiben können.
+                        ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
+                    }
+                }
             } else {
+                // Wenn die Regel echten Fortschritt gemacht hat, ist ihr Fehler wertvoll.
                 ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
             }
 
