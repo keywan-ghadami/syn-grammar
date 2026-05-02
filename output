@@ -5,292 +5,421 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 1 test
-.
+test test_group_vs_args_ambiguity ... ok
+
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
-.
+test test_literal_binding_with_action ... ok
+
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
-.
+test test_builtins ... ok
+
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 2 tests
-..
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test test_composition_complex ... ok
+test test_composition_mixed ... ok
 
-
-running 9 tests
-.........
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 6 tests
-......
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 2 tests
-..
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 4 tests
-....
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 7 tests
-.......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 2 tests
-..
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
-running 4 tests
-....
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 9 tests
+test test_action_block_statements ... ok
+test test_attributes_on_rules ... ok
+test test_fail_builtin_first ... ok
+test test_complex_return_types ... ok
+test test_fail_builtin_last ... ok
+test test_keywords_vs_idents ... ok
+test test_multi_token_literals ... ok
+test test_rust_types_and_blocks ... ok
+test test_use_statements ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 6 tests
-......
+test test_count_group ... ok
+test test_count_bindings ... ok
+test test_count_opts ... ok
+test test_count_plus ... ok
+test test_count_plus_fail ... ok
+test test_count_stars ... ok
+
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-running 7 tests
-.......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests
+test test_cut_operator ... ok
+test test_cut_in_repetition ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test test_epsilon_alternative ... ok
 
-
-running 3 tests
-...
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 7 tests
-.......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 4 tests
-....
+test test_cut_prevents_backtracking ... ok
+test test_fail_vs_deep_error ... ok
+test test_nested_cut_propagation ... ok
+test test_fail_overrides_everything ... ok
+
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
+running 7 tests
+test test_combinator_error_produces_clean_message ... ok
+test test_deep_vs_shallow ... ok
+test test_deep_error_with_label_and_fail ... ok
+test test_fail_built_in_enterprise ... ok
+test test_deepest_error_wins ... ok
+test test_rule_name_in_error_message ... ok
+test test_label_priority ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
 running 1 test
-.
+test test_span_propagation_compiles ... ok
+
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
-.
+test test_fail_builtin ... ok
+
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-running 3 tests
-...
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 2 tests
+test test_generic_inference ... ok
+test test_generic_rule ... ok
 
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-test_repro_issue --- FAILED
-
-failures:
-
----- test_repro_issue stdout ----
-[TRACE] enter_rule: top level mod
-[TRACE] enter_rule: extern block
-[TRACE] enter_rule: cxx item
-[TRACE] considering_error: 'expected `fn`' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] Attempting to parse syn type: syn :: Macro at bytes(70..77)
-[TRACE] Successfully parsed syn type: syn :: Macro
-[TRACE] exit_rule: cxx item
-[TRACE] enter_rule: cxx item
-[TRACE] enter_rule: cxx arg list
-[TRACE] enter_rule: item 1
-[TRACE] enter_rule: cxx arg
-[TRACE] exit_rule: cxx arg
-[TRACE] exit_rule: item 1
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 2
-[TRACE] enter_rule: cxx arg
-[TRACE] exit_rule: cxx arg
-[TRACE] exit_rule: item 2
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 3
-[TRACE] enter_rule: cxx arg
-[TRACE] exit_rule: cxx arg
-[TRACE] exit_rule: item 3
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 4
-[TRACE] enter_rule: cxx arg
-[TRACE] considering_error: 'unexpected end of input, expected ident' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: cxx arg
-[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 10, label: Some("item"))
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: item 4
-[TRACE] exit_rule: cxx arg list
-[TRACE] exit_rule: cxx item
-[TRACE] exit_rule: extern block
-[TRACE] exit_rule: top level mod
-
-thread 'test_repro_issue' (47825) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
-
-🔴 TEST FAILED (Expected Success, but got Error):
-
-Error Message:
-unexpected end of input, expected item at column 16 (line 10)
-in item 4
-in cxx arg list
-in cxx item
-in extern block
-in top level mod
-
-Error Debug:
-Error("unexpected end of input, expected item at column 16 (line 10)\nin item 4\nin cxx arg list\nin cxx item\nin extern block\nin top level mod")
-
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-
-failures:
-    test_repro_issue
-
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 3 tests
-test_consumes_trailing_comma_succeeds --- FAILED
-..
-failures:
-
----- test_consumes_trailing_comma_succeeds stdout ----
-[TRACE] enter_rule: consumes comma
-[TRACE] enter_rule: item 1
-[TRACE] enter_rule: string val
-[TRACE] exit_rule: string val
-[TRACE] exit_rule: item 1
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 2
-[TRACE] enter_rule: string val
-[TRACE] exit_rule: string val
-[TRACE] exit_rule: item 2
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 3
-[TRACE] enter_rule: string val
-[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: string val
-[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 10, label: Some("item"))
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: item 3
-[TRACE] exit_rule: consumes comma
-
-thread 'test_consumes_trailing_comma_succeeds' (47835) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
-
-🔴 TEST FAILED (Expected Success, but got Error):
-
-Error Message:
-unexpected end of input, expected item at column 0 (line 1)
-in item 3
-in consumes comma
-
-Error Debug:
-Error("unexpected end of input, expected item at column 0 (line 1)\nin item 3\nin consumes comma")
-
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-
-failures:
-    test_consumes_trailing_comma_succeeds
-
-test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.50s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 4 tests
-....
+test test_deep_error_wins ... ok
+test test_default_labels ... ok
+test test_explicit_labels ... ok
+test test_group_labels ... ok
+
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-running 17 tests
-.................
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.38s
+running 6 tests
+test test_cxx_deep_ident_error_mid_list ... FAILED
+test test_cxx_dangling_comma ... FAILED
+test test_cxx_deep_type_error_after_modifier ... FAILED
+test test_cxx_shallow_wrong_token ... FAILED
+test test_cxx_garbage_after_item ... FAILED
+test test_cxx_unexpected_eof ... FAILED
+
+failures:
+
+---- test_cxx_deep_ident_error_mid_list stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] exit_rule: modifier
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `&`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `::`; found unexpected token `&`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected identifier' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'unexpected end of input, expected function parameter' (priority: 0, label: None)
+[TRACE] record_error: Rejected (shallower span)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_deep_ident_error_mid_list' (5713) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected identifier at column 35 (line 1)\nin param\nin function parameter 2\nin signature"
+Actual msg:    "expected identifier at column 35 (line 1)\nin param\nin signature"
+
+Error Debug:
+Error("expected identifier at column 35 (line 1)\nin param\nin signature")
+
+Formatted:
+expected identifier at column 35 (line 1)
+in param
+in signature
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_cxx_dangling_comma stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, expected one of: `const`, `constexpr`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected one of: `const`, `constexpr`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected `type modifier`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, expected `type modifier`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] considering_error: 'unexpected end of input, expected `type name`' (priority: 20, label: None)
+[TRACE] record_error: Rejected (shorter message)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected `type name`' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected `function parameter`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'unexpected end of input, expected function parameter' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_dangling_comma' (5712) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
+Actual msg:    "unexpected end of input, expected `function parameter` at column 15 (line 1)\nin param\nin signature"
+
+Error Debug:
+Error("unexpected end of input, expected `function parameter` at column 15 (line 1)\nin param\nin signature")
+
+Formatted:
+unexpected end of input, expected `function parameter` at column 15 (line 1)
+in param
+in signature
+
+
+---- test_cxx_deep_type_error_after_modifier stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] exit_rule: modifier
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_deep_type_error_after_modifier' (5714) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `type name`; found unexpected token `123` at column 14 (line 1)\nin type name\nin param\nin function parameter 1\nin signature"
+Actual msg:    "expected `type name`; found unexpected token `123` at column 14 (line 1)\nin type name\nin param\nin signature"
+
+Error Debug:
+Error("expected `type name`; found unexpected token `123` at column 14 (line 1)\nin type name\nin param\nin signature")
+
+Formatted:
+expected `type name`; found unexpected token `123` at column 14 (line 1)
+in type name
+in param
+in signature
+
+
+---- test_cxx_shallow_wrong_token stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `123`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `123`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: Rejected (shorter message)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `function parameter`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'unexpected token in delimited group' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_shallow_wrong_token' (5716) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected function parameter at column 8 (line 1)\nin function parameter 1\nin signature"
+Actual msg:    "expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin signature"
+
+Error Debug:
+Error("expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin signature")
+
+Formatted:
+expected `function parameter`; found unexpected token `123` at column 8 (line 1)
+in param
+in signature
+
+
+---- test_cxx_garbage_after_item stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'unexpected token in delimited group' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_garbage_after_item' (5715) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `,` at column 14 (line 1)\nin separator\nin signature"
+Actual msg:    "unexpected token in delimited group at column 14 (line 1)\nin signature"
+
+Error Debug:
+Error("unexpected token in delimited group at column 14 (line 1)\nin signature")
+
+Formatted:
+unexpected token in delimited group at column 14 (line 1)
+in signature
+
+
+---- test_cxx_unexpected_eof stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] exit_rule: modifier
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected identifier' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: type name
+[TRACE] exit_rule: param
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_unexpected_eof' (5717) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected identifier at column 20 (line 1)\nin type name\nin param\nin function parameter 1\nin signature"
+Actual msg:    "unexpected end of input, expected identifier at column 20 (line 1)\nin type name\nin param\nin signature"
+
+Error Debug:
+Error("unexpected end of input, expected identifier at column 20 (line 1)\nin type name\nin param\nin signature")
+
+Formatted:
+unexpected end of input, expected identifier at column 20 (line 1)
+in type name
+in param
+in signature
+
+
+
+failures:
+    test_cxx_dangling_comma
+    test_cxx_deep_ident_error_mid_list
+    test_cxx_deep_type_error_after_modifier
+    test_cxx_garbage_after_item
+    test_cxx_shallow_wrong_token
+    test_cxx_unexpected_eof
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
