@@ -1,15 +1,12 @@
-use super::ParseContext;
-use syn::parse::discouraged::Speculative;
+use crate::rt::ParseContext;
 use syn::parse::ParseStream;
 use syn::Result;
 
-/// Evaluates a parser on a fork.
-/// - Returns `Ok(Some)` if successful.
-/// - Returns `Ok(None)` if it fails WITHOUT consuming tokens (Shallow Error).
-/// - Returns `Err` if it fails AFTER consuming tokens (Deep Error).
-pub fn attempt_pure<T>(
+/// Evaluates a parser on a fork, tracking rule context and label priorities.
+pub fn attempt_labeled_pure<T>(
     input: ParseStream,
     ctx: &mut ParseContext,
+    label: Option<&str>,
     parser: impl FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
 ) -> Result<Option<T>> {
     let fork = input.fork();
@@ -21,12 +18,26 @@ pub fn attempt_pure<T>(
             Ok(Some(res))
         }
         Err(e) => {
-            // Consumption Tracking Heuristic:
-            // If the error span starts strictly after the current input span,
-            // the parser consumed tokens and hit a deep syntax error.
             let err_start = e.span().start();
             let is_deep = err_start.line > input_start.line
                 || (err_start.line == input_start.line && err_start.column > input_start.column);
+
+            // If it's a shallow error and we have a label, override the error message 
+            // for the tie-breaker to prevent leaking internal syntax requirements.
+            let err_to_record = if !is_deep && label.is_some() {
+                syn::Error::new(e.span(), format!("expected {}", label.unwrap()))
+            } else {
+                e.clone()
+            };
+
+            // Record the failure so the top-level "furthest failure" heuristic
+            // can use it if the parent rule ultimately fails.
+            ctx.record_error(
+                err_to_record,
+                e.span(),
+                label.map(|s| s.to_string()),
+                crate::rt::ParseContext::PRIO_NORMAL,
+            );
 
             if is_deep {
                 Err(e) // Escalate deep error immediately!
@@ -37,7 +48,7 @@ pub fn attempt_pure<T>(
     }
 }
 
-/// A pure, state-free combinator for separated lists.
+/// A pure, state-free combinator for separated lists with full context-stack tracking.
 pub fn parse_separated_pure<T, S>(
     input: ParseStream,
     ctx: &mut ParseContext,
@@ -49,55 +60,87 @@ pub fn parse_separated_pure<T, S>(
 ) -> Result<Vec<T>> {
     let mut items = Vec::new();
 
+    let mut parse_item = |input: ParseStream, ctx: &mut ParseContext, idx: usize| -> Result<Option<T>> {
+        let rule_name = item_name.map(|n| format!("{} {}", n, idx));
+        if let Some(ref name) = rule_name { ctx.enter_rule(name); }
+        
+        let res = attempt_labeled_pure(input, ctx, item_name, &mut item_parser);
+        
+        if let Some(ref name) = rule_name { ctx.exit_rule(); }
+        res
+    };
+
     // 1. Try to parse the very first item
-    match attempt_pure(input, ctx, &mut item_parser) {
+    match parse_item(input, ctx, 1) {
         Ok(Some(item)) => items.push(item),
         Ok(None) => {
             if min > 0 {
-                let msg = format!("expected at least {} items, found 0", min);
-                return Err(syn::Error::new(input.span(), msg));
+                let msg = item_name
+                    .map(|n| format!("expected {}", n))
+                    .unwrap_or_else(|| format!("expected at least {} items", min));
+                let err = syn::Error::new(input.span(), msg);
+                
+                let rule_name = item_name.map(|n| format!("{} 1", n));
+                if let Some(ref name) = rule_name { ctx.enter_rule(name); }
+                ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+                if let Some(ref name) = rule_name { ctx.exit_rule(); }
+                
+                return Err(err);
             }
-            return Ok(items); // Valid empty list
+            return Ok(items);
         }
-        Err(e) => return Err(e), // Deep error escalated
+        Err(e) => return Err(e),
     }
 
     // 2. Loop for subsequent items
     loop {
         let sep_fork = input.fork();
-        match attempt_pure(&sep_fork, ctx, &mut sep_parser) {
+        
+        ctx.enter_rule("separator");
+        let sep_res = attempt_labeled_pure(&sep_fork, ctx, Some("separator"), &mut sep_parser);
+        ctx.exit_rule();
+
+        match sep_res {
             Ok(Some(_)) => {
-                // Separator found on fork! Now check for the mandatory item.
                 let item_fork = sep_fork.fork();
-                match attempt_pure(&item_fork, ctx, &mut item_parser) {
+                let next_idx = items.len() + 1;
+                
+                match parse_item(&item_fork, ctx, next_idx) {
                     Ok(Some(item)) => {
-                        // Both sep and item succeeded. Commit everything.
                         input.advance_to(&item_fork);
                         items.push(item);
                     }
                     Ok(None) => {
-                        // Separator found, but no item followed (Shallow error on item).
                         if trailing {
-                            // Trailing comma allowed. Commit the separator, end the list.
                             input.advance_to(&sep_fork);
                             break;
                         } else {
-                            // Trailing comma not allowed.
-                            let msg = format!("unexpected end of input, expected {}", item_name.unwrap_or("item"));
-                            return Err(syn::Error::new(sep_fork.span(), msg));
+                            let msg = item_name
+                                .map(|n| format!("unexpected end of input, expected {}", n))
+                                .unwrap_or_else(|| "unexpected end of input".to_string());
+                            let err = syn::Error::new(item_fork.span(), msg);
+                            
+                            let rule_name = item_name.map(|n| format!("{} {}", n, next_idx));
+                            if let Some(ref name) = rule_name { ctx.enter_rule(name); }
+                            ctx.record_error(err.clone(), item_fork.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+                            if let Some(ref name) = rule_name { ctx.exit_rule(); }
+                            
+                            return Err(err);
                         }
                     }
-                    Err(e) => return Err(e), // Deep error in item, escalate immediately!
+                    Err(e) => return Err(e),
                 }
             }
-            Ok(None) => break, // No separator found, natural end of list.
+            Ok(None) => break,
             Err(e) => return Err(e),
         }
     }
 
     if items.len() < min {
         let msg = format!("expected at least {} items, found {}", min, items.len());
-        return Err(syn::Error::new(input.span(), msg));
+        let err = syn::Error::new(input.span(), msg);
+        ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+        return Err(err);
     }
 
     Ok(items)
