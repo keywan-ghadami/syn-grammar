@@ -520,7 +520,7 @@ where
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
-    let best_error_snapshot = ctx.best_error.clone();
+    // let best_error_snapshot = ctx.best_error.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -534,7 +534,7 @@ where
             ctx.set_fatal(was_fatal);
             ctx.mode_stack = mode_stack_snapshot;
             // Success! Clear any residue errors from this speculative attempt.
-            ctx.best_error = best_error_snapshot;
+            // ctx.best_error = best_error_snapshot;
             Ok(Some(val))
         }
         Err(e) => {
@@ -570,7 +570,7 @@ where
             ctx.suppress_label = false;
 
             if is_at_start && !suppress && label.is_some() {
-                ctx.best_error = best_error_snapshot;
+                // ctx.best_error = best_error_snapshot;
                 
                 ctx.record_error(
                     e,
@@ -678,7 +678,7 @@ where
     let rule_stack_snapshot = ctx.rule_stack.clone();
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
-    let best_error_snapshot = ctx.best_error.clone();
+    // let best_error_snapshot = ctx.best_error.clone();
 
     let start_span = input.span();
     let fork = input.fork();
@@ -695,7 +695,7 @@ where
             // Restore mode stack
             ctx.mode_stack = mode_stack_snapshot;
             // Success! Clear any residue errors from this speculative attempt.
-            ctx.best_error = best_error_snapshot;
+            // ctx.best_error = best_error_snapshot;
             Ok(Some(val))
         }
         Err(e) => {
