@@ -27,7 +27,7 @@ fn test_cxx_shallow_wrong_token() {
         .parse_str("fn foo( 123 );")
         .test()
         .assert_failure_contains(
-            "expected function parameter at column 8 (line 1)\nin function parameter 1\nin signature",
+            "expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin function parameter 1\nin signature",
         );
 }
 
