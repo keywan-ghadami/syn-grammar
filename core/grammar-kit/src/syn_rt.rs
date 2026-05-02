@@ -23,17 +23,15 @@ pub fn attempt_labeled_pure<T>(
                 || (err_start.line == input_start.line && err_start.column > input_start.column);
 
             if is_deep {
-                // Fix für test_cxx_unexpected_eof:
-                // Tiefe Fehler MÜSSEN im Kontext registriert werden, bevor sie 
-                // eskaliert werden, sonst überschreibt der Top-Level-Parser sie 
-                // mit einem generischen "propagating fatal unique error".
-                ctx.record_error(e.clone(), e.span(), None, ParseContext::PRIO_STRUCTURAL);
+                // FIX for test_cxx_unexpected_eof:
+                // Do NOT record `e` here. `e` is often the dummy bubble error 
+                // ("propagating fatal unique error") from the inner macro logic.
+                // The actual deep semantic error is already safely stored in the context.
                 Err(e)
             } else {
-                // Fix für test_cxx_shallow_wrong_token:
-                // Wir überschreiben den Fehlertext nicht manuell mit format!("expected {}", ...), 
-                // da dies zusätzliche Backticks einführt, die die Tests brechen.
-                // Wir übergeben das Label lediglich an record_error.
+                // FIX for test_cxx_garbage_after_item:
+                // Pass the label to `record_error` so it wins tie-breakers (less specific context),
+                // but do NOT overwrite the `e` message itself (keeps "expected `,`").
                 ctx.record_error(
                     e.clone(),
                     e.span(),
@@ -59,7 +57,7 @@ pub fn parse_separated_pure<T, S>(
 
     let mut parse_item = |input: ParseStream, ctx: &mut ParseContext, idx: usize| -> Result<Option<T>> {
         let rule_name = item_name.map(|n| format!("{} {}", n, idx));
-        if let Some(ref _name) = rule_name { ctx.enter_rule(_name); } // Warnung behoben
+        if let Some(ref _name) = rule_name { ctx.enter_rule(_name); }
         
         let res = attempt_labeled_pure(input, ctx, item_name, &mut item_parser);
         
@@ -78,10 +76,15 @@ pub fn parse_separated_pure<T, S>(
                 
                 let rule_name = item_name.map(|n| format!("{} 1", n));
                 if let Some(ref _name) = rule_name { ctx.enter_rule(_name); }
-                ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
+                
+                // FIX for test_cxx_shallow_wrong_token:
+                // Use PRIO_STRUCTURAL (50) to cleanly override any internal 
+                // PRIO_AGGREGATED (20) errors from the failed item rule.
+                ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_STRUCTURAL);
+                
                 if rule_name.is_some() { ctx.exit_rule(); }
                 
-                return Err(err);
+                return Err(syn::Error::new(input.span(), "__BUBBLE__"));
             }
             return Ok(items);
         }
@@ -91,10 +94,9 @@ pub fn parse_separated_pure<T, S>(
     loop {
         let sep_fork = input.fork();
         
-        // Fix für test_cxx_garbage_after_item:
-        // Keine Rule-Injection ("separator") mehr, damit das echte erwartete Token
-        // (z.B. "expected `,`") nicht durch "expected separator" maskiert wird.
-        let sep_res = attempt_labeled_pure(&sep_fork, ctx, None, &mut sep_parser);
+        ctx.enter_rule("separator");
+        let sep_res = attempt_labeled_pure(&sep_fork, ctx, Some("separator"), &mut sep_parser);
+        ctx.exit_rule();
 
         match sep_res {
             Ok(Some(_)) => {
@@ -111,11 +113,20 @@ pub fn parse_separated_pure<T, S>(
                             input.advance_to(&sep_fork);
                             break;
                         } else {
-                            // Fix für test_cxx_dangling_comma:
-                            // Wir generieren hier keinen eigenen Fehler mehr. Der tiefste 
-                            // Fehler (z.B. "expected function parameter") wurde bereits 
-                            // im Kontext registriert. Wir werfen nur noch den Bubble-Error,
-                            // damit die obere Schicht exakt diesen tiefsten Fehler extrahiert.
+                            let msg = item_name
+                                .map(|n| format!("unexpected end of input, expected {}", n))
+                                .unwrap_or_else(|| "unexpected end of input".to_string());
+                            let err = syn::Error::new(item_fork.span(), msg);
+                            
+                            let rule_name = item_name.map(|n| format!("{} {}", n, next_idx));
+                            if let Some(ref _name) = rule_name { ctx.enter_rule(_name); }
+                            
+                            // FIX for test_cxx_dangling_comma:
+                            // Use PRIO_STRUCTURAL to override internal shallow rule errors
+                            ctx.record_error(err.clone(), item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
+                            
+                            if rule_name.is_some() { ctx.exit_rule(); }
+                            
                             return Err(syn::Error::new(item_fork.span(), "__BUBBLE__"));
                         }
                     }
@@ -130,8 +141,8 @@ pub fn parse_separated_pure<T, S>(
     if items.len() < min {
         let msg = format!("expected at least {} items, found {}", min, items.len());
         let err = syn::Error::new(input.span(), msg);
-        ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
-        return Err(err);
+        ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_STRUCTURAL);
+        return Err(syn::Error::new(input.span(), "__BUBBLE__"));
     }
 
     Ok(items)
