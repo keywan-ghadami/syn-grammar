@@ -100,16 +100,18 @@ pub fn parse_separated_pure<T, S>(
                             input.advance_to(&sep_fork);
                             break;
                         } else {
-                            let msg = format!("unexpected end of input, expected {}", actual_item_name);
+                            // TRUE PEG SEMANTICS:
+                            // We record the deep "expected item" error for the parent context to use,
+                            // but we cleanly BREAK to rollback the comma into the stream.
+                            let msg = format!("expected {}", actual_item_name);
                             let err = syn::Error::new(item_fork.span(), msg);
                             
                             let rule_name = format!("{} {}", actual_item_name, next_idx);
                             ctx.enter_rule(&rule_name);
-                            ctx.record_error(err.clone(), item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
+                            ctx.record_error(err, item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
                             ctx.exit_rule();
                             
-                            // FATAL ERROR RESTORED: Guarantees extraction of "expected function argument"
-                            return Err(syn::Error::new(item_fork.span(), "__BUBBLE__"));
+                            break;
                         }
                     }
                     Err(e) => return Err(e),
@@ -123,7 +125,7 @@ pub fn parse_separated_pure<T, S>(
     if items.len() < min {
         let msg = format!("expected at least {} items, found {}", min, items.len());
         let err = syn::Error::new(input.span(), msg);
-        ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_STRUCTURAL);
+        ctx.record_error(err, input.span(), None, ParseContext::PRIO_STRUCTURAL);
         return Err(syn::Error::new(input.span(), "__BUBBLE__"));
     }
 
