@@ -567,8 +567,6 @@ where
                 return Err(e);
             }
 
-            let is_at_start = e.span().start() == start_span.start();
-            
             // On any failure, restore the non-error-related context.
             ctx.scopes = scopes_snapshot;
             ctx.rule_stack = rule_stack_snapshot;
@@ -587,25 +585,34 @@ where
             let suppress = ctx.suppress_label;
             ctx.suppress_label = false;
 
-            if is_at_start {
-                // THE MISSING HIGH-WATER MARK FIX:
-                // Wenn der Versuch bei Position 0 gescheitert ist (kein Fortschritt), 
-                // überschreiben wir sofort den best_error mit dem Snapshot. 
-                // Das löscht intern eskalierte Fehler (wie PRIO_AGGREGATED) aus optionalen Zweigen!
-                ctx.best_error = best_error_snapshot;
+            // THE HIGH-WATER MARK FIX:
+            // Prüfe, ob der Kontext (best_error) echten Fortschritt gemacht hat.
+            let made_deep_progress = match &ctx.best_error {
+                Some(best) => {
+                    let b_start = best.start_span.start();
+                    let s_start = start_span.start();
+                    b_start.line > s_start.line || (b_start.line == s_start.line && b_start.column > s_start.column)
+                }
+                None => false,
+            };
 
-                if !suppress {
-                    if let Some(lbl) = label {
+            // Nur wenn KEIN Fortschritt gemacht wurde, löschen wir angesammelte Fehler
+            // aus optionalen/gescheiterten Zweigen. Tiefe Fehler bleiben erhalten!
+            if !made_deep_progress {
+                ctx.best_error = best_error_snapshot;
+            }
+
+            if !suppress {
+                if let Some(lbl) = label {
+                    let e_is_at_start = e.span().start() == start_span.start();
+                    if e_is_at_start {
                         ctx.record_error(e, start_span, Some(lbl.to_string()), ParseContext::PRIO_LABELED);
                     } else {
-                        // Der Fehler wird zur Sicherheit als PRIO_NORMAL registriert. 
-                        // Zwingende Regeln werden ihn somit immer überschreiben können.
                         ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
                     }
+                } else {
+                    ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
                 }
-            } else {
-                // Wenn die Regel echten Fortschritt gemacht hat, ist ihr Fehler wertvoll.
-                ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
             }
 
             Ok(None)
