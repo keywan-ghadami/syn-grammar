@@ -1,131 +1,397 @@
    Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
-error[E0432]: unresolved import `crate::rt`
- --> core/grammar-kit/src/syn_rt.rs:1:12
-  |
-1 | use crate::rt::ParseContext;
-  |            ^^
-  |            |
-  |            unresolved import
-  |            help: a similar path exists: `std::rt`
+warning: unused variable: `name`
+  --> core/grammar-kit/src/syn_rt.rs:70:21
+   |
+70 | ...f let Some(ref name) = rule_name { c...
+   |               ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
 
-error[E0433]: failed to resolve: unresolved import
-  --> core/grammar-kit/src/syn_rt.rs:39:24
+warning: unused variable: `name`
+  --> core/grammar-kit/src/syn_rt.rs:87:29
    |
-39 | ...   crate::rt::ParseContext::PRIO_NOR...
-   |              ^^ unresolved import
-   |
-help: a similar path exists
-   |
-39 |                 crate::std::rt::ParseContext::PRIO_NORMAL,
-   |                        +++++
-help: consider importing this struct
-   |
- 1 + use crate::ParseContext;
-   |
-help: if you import `ParseContext`, refer to it directly
-   |
-39 -                 crate::rt::ParseContext::PRIO_NORMAL,
-39 +                 ParseContext::PRIO_NORMAL,
-   |
+87 | ...f let Some(ref name) = rule_name { c...
+   |               ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_name`
 
-error[E0433]: failed to resolve: unresolved import
-  --> core/grammar-kit/src/syn_rt.rs:85:74
-   |
-85 | ... crate::rt::ParseContext::PRIO_NORMAL);
-   |            ^^ unresolved import
-   |
-help: a similar path exists
-   |
-85 |                 ctx.record_error(err.clone(), input.span(), None, crate::std::rt::ParseContext::PRIO_NORMAL);
-   |                                                                          +++++
-help: consider importing this struct
-   |
- 1 + use crate::ParseContext;
-   |
-help: if you import `ParseContext`, refer to it directly
-   |
-85 -                 ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
-85 +                 ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
-   |
+warning: unused variable: `name`
+   --> core/grammar-kit/src/syn_rt.rs:127:41
+    |
+127 | ...f let Some(ref name) = rule_name { ...
+    |               ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_name`
 
-error[E0433]: failed to resolve: unresolved import
-   --> core/grammar-kit/src/syn_rt.rs:125:90
-    |
-125 | ...crate::rt::ParseContext::PRIO_NORMAL);
-    |           ^^ unresolved import
-    |
-help: a similar path exists
-    |
-125 |                             ctx.record_error(err.clone(), item_fork.span(), None, crate::std::rt::ParseContext::PRIO_NORMAL);
-    |                                                                                          +++++
-help: consider importing this struct
-    |
-  1 + use crate::ParseContext;
-    |
-help: if you import `ParseContext`, refer to it directly
-    |
-125 -                             ctx.record_error(err.clone(), item_fork.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
-125 +                             ctx.record_error(err.clone(), item_fork.span(), None, ParseContext::PRIO_NORMAL);
-    |
+   Compiling syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
+warning: `grammar-kit` (lib) generated 3 warnings (run `cargo fix --lib -p grammar-kit` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.77s
+     Running unittests src/syn_grammar.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
-error[E0433]: failed to resolve: unresolved import
-   --> core/grammar-kit/src/syn_rt.rs:142:66
-    |
-142 | ...crate::rt::ParseContext::PRIO_NORMAL);
-    |           ^^ unresolved import
-    |
-help: a similar path exists
-    |
-142 |         ctx.record_error(err.clone(), input.span(), None, crate::std::rt::ParseContext::PRIO_NORMAL);
-    |                                                                  +++++
-help: consider importing this struct
-    |
-  1 + use crate::ParseContext;
-    |
-help: if you import `ParseContext`, refer to it directly
-    |
-142 -         ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
-142 +         ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
-    |
+running 0 tests
 
-error[E0599]: no method named `advance_to` found for reference `&ParseBuffer<'_>` in the current scope
-  --> core/grammar-kit/src/syn_rt.rs:17:19
-   |
-17 |             input.advance_to(&fork);
-   |                   ^^^^^^^^^^ method not found in `&ParseBuffer<'_>`
-   |
-   = help: items from traits can only be used if the trait is in scope
-help: trait `Speculative` which provides `advance_to` is implemented but not in scope; perhaps you want to import it
-   |
- 1 + use syn::parse::discouraged::Speculative;
-   |
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error[E0599]: no method named `advance_to` found for reference `&ParseBuffer<'_>` in the current scope
-   --> core/grammar-kit/src/syn_rt.rs:110:31
-    |
-110 | ...   input.advance_to(&item_fork);
-    |             ^^^^^^^^^^ method not found in `&ParseBuffer<'_>`
-    |
-    = help: items from traits can only be used if the trait is in scope
-help: trait `Speculative` which provides `advance_to` is implemented but not in scope; perhaps you want to import it
-    |
-  1 + use syn::parse::discouraged::Speculative;
-    |
+     Running tests/ambiguity_test.rs (target/debug/deps/ambiguity_test-b145068240eefd58)
 
-error[E0599]: no method named `advance_to` found for reference `&ParseBuffer<'_>` in the current scope
-   --> core/grammar-kit/src/syn_rt.rs:115:35
-    |
-115 | ...   input.advance_to(&sep_fork);
-    |             ^^^^^^^^^^ method not found in `&ParseBuffer<'_>`
-    |
-    = help: items from traits can only be used if the trait is in scope
-help: trait `Speculative` which provides `advance_to` is implemented but not in scope; perhaps you want to import it
-    |
-  1 + use syn::parse::discouraged::Speculative;
-    |
+running 1 test
+test test_group_vs_args_ambiguity ... ok
 
-Some errors have detailed explanations: E0432, E0433, E0599.
-For more information about an error, try `rustc --explain E0432`.
-error: could not compile `grammar-kit` (lib) due to 8 previous errors
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `grammar-kit` (lib test) due to 8 previous errors
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/binding_with_action_test.rs (target/debug/deps/binding_with_action_test-4300dc1f6f2308f9)
+
+running 1 test
+test test_literal_binding_with_action ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/builtins_test.rs (target/debug/deps/builtins_test-6710426b0b467a86)
+
+running 1 test
+test test_builtins ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/composition_test.rs (target/debug/deps/composition_test-0005cc60c2e7b79e)
+
+running 2 tests
+test test_composition_complex ... ok
+test test_composition_mixed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/comprehensive_test.rs (target/debug/deps/comprehensive_test-5c918662bbe30b59)
+
+running 9 tests
+test test_attributes_on_rules ... ok
+test test_action_block_statements ... ok
+test test_complex_return_types ... ok
+test test_fail_builtin_first ... ok
+test test_fail_builtin_last ... ok
+test test_keywords_vs_idents ... ok
+test test_multi_token_literals ... ok
+test test_rust_types_and_blocks ... ok
+test test_use_statements ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/count_test.rs (target/debug/deps/count_test-09e85aa09a598b19)
+
+running 6 tests
+test test_count_bindings ... ok
+test test_count_group ... ok
+test test_count_opts ... ok
+test test_count_plus ... ok
+test test_count_plus_fail ... ok
+test test_count_stars ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cut_test.rs (target/debug/deps/cut_test-b131ec78b478f8dd)
+
+running 2 tests
+test test_cut_in_repetition ... ok
+test test_cut_operator ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/epsilon_test.rs (target/debug/deps/epsilon_test-511d175da34d3dba)
+
+running 1 test
+test test_epsilon_alternative ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/error_abstraction_test.rs (target/debug/deps/error_abstraction_test-4c124a2ec9fbd8fc)
+
+running 4 tests
+test test_cut_prevents_backtracking ... ok
+test test_fail_overrides_everything ... ok
+test test_fail_vs_deep_error ... ok
+test test_nested_cut_propagation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/error_reporting_test.rs (target/debug/deps/error_reporting_test-fca4f7e7e4f8d135)
+
+running 7 tests
+test test_combinator_error_produces_clean_message ... ok
+test test_deep_error_with_label_and_fail ... ok
+test test_deep_vs_shallow ... ok
+test test_deepest_error_wins ... ok
+test test_fail_built_in_enterprise ... ok
+test test_label_priority ... ok
+test test_rule_name_in_error_message ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/error_span_test.rs (target/debug/deps/error_span_test-191b3aeff8c97b51)
+
+running 1 test
+test test_span_propagation_compiles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fail_test.rs (target/debug/deps/fail_test-e3be5bed89a46207)
+
+running 1 test
+test test_fail_builtin ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
+
+running 2 tests
+test test_generic_inference ... ok
+test test_generic_rule ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/labeled_alternatives_test.rs (target/debug/deps/labeled_alternatives_test-1c58cde7495fc303)
+
+running 4 tests
+test test_deep_error_wins ... ok
+test test_default_labels ... ok
+test test_explicit_labels ... ok
+test test_group_labels ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/list_dx_test.rs (target/debug/deps/list_dx_test-6e812a6169142eb3)
+
+running 6 tests
+test test_cxx_deep_ident_error_mid_list ... ok
+test test_cxx_dangling_comma ... FAILED
+test test_cxx_garbage_after_item ... FAILED
+test test_cxx_deep_type_error_after_modifier ... ok
+test test_cxx_shallow_wrong_token ... FAILED
+test test_cxx_unexpected_eof ... FAILED
+
+failures:
+
+---- test_cxx_dangling_comma stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: function parameter 1
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] exit_rule: function parameter 1
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: function parameter 2
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, expected one of: `const`, `constexpr`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected one of: `const`, `constexpr`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected `type modifier`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, expected `type modifier`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] considering_error: 'unexpected end of input, expected `type name`' (priority: 20, label: None)
+[TRACE] record_error: Rejected (shorter message)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected `type name`' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected `function parameter`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'expected function parameter' (priority: 0, label: Some("function parameter"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: function parameter 2
+[TRACE] enter_rule: function parameter 2
+[TRACE] considering_error: 'unexpected end of input, expected function parameter' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: function parameter 2
+[TRACE] considering_error: 'unexpected end of input, expected function parameter' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_dangling_comma' (16139) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
+Actual msg:    "unexpected end of input, expected `function parameter` at column 15 (line 1)\nin param\nin function parameter 2\nin signature"
+
+Error Debug:
+Error("unexpected end of input, expected `function parameter` at column 15 (line 1)\nin param\nin function parameter 2\nin signature")
+
+Formatted:
+unexpected end of input, expected `function parameter` at column 15 (line 1)
+in param
+in function parameter 2
+in signature
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_cxx_garbage_after_item stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: function parameter 1
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] exit_rule: function parameter 1
+[TRACE] enter_rule: separator
+[TRACE] considering_error: 'expected separator' (priority: 0, label: Some("separator"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: separator
+[TRACE] considering_error: 'unexpected token in delimited group' (priority: 0, label: None)
+[TRACE] record_error: Rejected (less specific context)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_garbage_after_item' (16142) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `,` at column 14 (line 1)\nin separator\nin signature"
+Actual msg:    "expected separator at column 14 (line 1)\nin separator\nin signature"
+
+Error Debug:
+Error("expected separator at column 14 (line 1)\nin separator\nin signature")
+
+Formatted:
+expected separator at column 14 (line 1)
+in separator
+in signature
+
+
+---- test_cxx_shallow_wrong_token stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: function parameter 1
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `123`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `123`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: Rejected (shorter message)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'expected `type name`; found unexpected token `123`' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `function parameter`; found unexpected token `123`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'expected function parameter' (priority: 0, label: Some("function parameter"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: function parameter 1
+[TRACE] considering_error: 'unexpected token in delimited group' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_shallow_wrong_token' (16143) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected function parameter at column 8 (line 1)\nin function parameter 1\nin signature"
+Actual msg:    "expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin function parameter 1\nin signature"
+
+Error Debug:
+Error("expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin function parameter 1\nin signature")
+
+Formatted:
+expected `function parameter`; found unexpected token `123` at column 8 (line 1)
+in param
+in function parameter 1
+in signature
+
+
+---- test_cxx_unexpected_eof stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: function parameter 1
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] exit_rule: modifier
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected identifier' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: type name
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'propagating fatal unique error' (priority: 0, label: Some("function parameter"))
+[TRACE] record_error: New best error (is fatal)
+[TRACE] exit_rule: function parameter 1
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_unexpected_eof' (16144) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected identifier at column 20 (line 1)\nin type name\nin param\nin function parameter 1\nin signature"
+Actual msg:    "propagating fatal unique error at column 17 (line 1)\nin function parameter 1\nin signature"
+
+Error Debug:
+Error("propagating fatal unique error at column 17 (line 1)\nin function parameter 1\nin signature")
+
+Formatted:
+propagating fatal unique error at column 17 (line 1)
+in function parameter 1
+in signature
+
+
+
+failures:
+    test_cxx_dangling_comma
+    test_cxx_garbage_after_item
+    test_cxx_shallow_wrong_token
+    test_cxx_unexpected_eof
+
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p syn-grammar --test list_dx_test`

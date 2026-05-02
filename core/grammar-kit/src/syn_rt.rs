@@ -1,4 +1,5 @@
-use crate::rt::ParseContext;
+use crate::ParseContext;
+use syn::parse::discouraged::Speculative;
 use syn::parse::ParseStream;
 use syn::Result;
 
@@ -36,7 +37,7 @@ pub fn attempt_labeled_pure<T>(
                 err_to_record,
                 e.span(),
                 label.map(|s| s.to_string()),
-                crate::rt::ParseContext::PRIO_NORMAL,
+                ParseContext::PRIO_NORMAL,
             );
 
             if is_deep {
@@ -82,7 +83,7 @@ pub fn parse_separated_pure<T, S>(
                 
                 let rule_name = item_name.map(|n| format!("{} 1", n));
                 if let Some(ref name) = rule_name { ctx.enter_rule(name); }
-                ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+                ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
                 if let Some(ref name) = rule_name { ctx.exit_rule(); }
                 
                 return Err(err);
@@ -122,7 +123,7 @@ pub fn parse_separated_pure<T, S>(
                             
                             let rule_name = item_name.map(|n| format!("{} {}", n, next_idx));
                             if let Some(ref name) = rule_name { ctx.enter_rule(name); }
-                            ctx.record_error(err.clone(), item_fork.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+                            ctx.record_error(err.clone(), item_fork.span(), None, ParseContext::PRIO_NORMAL);
                             if let Some(ref name) = rule_name { ctx.exit_rule(); }
                             
                             return Err(err);
@@ -139,7 +140,7 @@ pub fn parse_separated_pure<T, S>(
     if items.len() < min {
         let msg = format!("expected at least {} items, found {}", min, items.len());
         let err = syn::Error::new(input.span(), msg);
-        ctx.record_error(err.clone(), input.span(), None, crate::rt::ParseContext::PRIO_NORMAL);
+        ctx.record_error(err.clone(), input.span(), None, ParseContext::PRIO_NORMAL);
         return Err(err);
     }
 
