@@ -1,6 +1,6 @@
    Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
    Compiling syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.83s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.05s
      Running unittests src/syn_grammar.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
 running 0 tests
@@ -56,8 +56,8 @@ test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 6 tests
 test test_count_bindings ... ok
 test test_count_group ... ok
-test test_count_opts ... ok
 test test_count_plus ... ok
+test test_count_opts ... ok
 test test_count_plus_fail ... ok
 test test_count_stars ... ok
 
@@ -83,8 +83,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 4 tests
 test test_cut_prevents_backtracking ... ok
 test test_fail_overrides_everything ... ok
-test test_nested_cut_propagation ... ok
 test test_fail_vs_deep_error ... ok
+test test_nested_cut_propagation ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -118,8 +118,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
 
 running 2 tests
-test test_generic_rule ... ok
 test test_generic_inference ... ok
+test test_generic_rule ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -127,8 +127,8 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 4 tests
 test test_deep_error_wins ... ok
-test test_explicit_labels ... ok
 test test_default_labels ... ok
+test test_explicit_labels ... ok
 test test_group_labels ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
@@ -137,207 +137,100 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 6 tests
 test test_cxx_deep_ident_error_mid_list ... ok
-test test_cxx_deep_type_error_after_modifier ... ok
-test test_cxx_dangling_comma ... ok
+test test_cxx_dangling_comma ... FAILED
 test test_cxx_garbage_after_item ... ok
 test test_cxx_shallow_wrong_token ... ok
+test test_cxx_deep_type_error_after_modifier ... ok
 test test_cxx_unexpected_eof ... ok
-
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/list_test.rs (target/debug/deps/list_test-6ce8f4380e36ecf5)
-
-running 7 tests
-test test_explicit_container ... ok
-test test_repeated ... ok
-test test_repeated_min ... ok
-test test_separated_basic ... ok
-test test_separated_custom_error ... ok
-test test_separated_min ... ok
-test test_separated_trailing ... ok
-
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/literal_binding_no_action_test.rs (target/debug/deps/literal_binding_no_action_test-57cfcf888e4d257d)
-
-running 1 test
-test test_literal_binding_no_action ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/literal_binding_test.rs (target/debug/deps/literal_binding_test-321190b07fd7430f)
-
-running 3 tests
-test test_literal_binding ... ok
-test test_literal_binding_char ... ok
-test test_literal_binding_raw_string ... ok
-
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/multi_arguments_test.rs (target/debug/deps/multi_arguments_test-5c12c3134e913e36)
-
-running 1 test
-test test_multiple_arguments ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/nested_repetition_test.rs (target/debug/deps/nested_repetition_test-fa8d31614d470260)
-
-running 1 test
-test test_nested_repetition ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/new_primitives_test.rs (target/debug/deps/new_primitives_test-ec307f24e74f5115)
-
-running 7 tests
-test test_float_primitive ... ok
-test test_numeric_primitives ... ok
-test test_string_primitive ... ok
-test test_whitespace_between_rules ... ok
-test test_whitespace_ident_ident ... ok
-test test_whitespace_primitive ... ok
-test test_whitespace_punct_ident ... ok
-
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/optional_production_test.rs (target/debug/deps/optional_production_test-bdeaa3481541d79c)
-
-running 1 test
-test test_optional_production ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/peek_not_test.rs (target/debug/deps/peek_not_test-9d297d86cd7e0069)
-
-running 4 tests
-test test_not_basic ... ok
-test test_not_complex ... ok
-test test_peek_basic ... ok
-test test_peek_binding ... ok
-
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/plus_validation_test.rs (target/debug/deps/plus_validation_test-ec0d795d6e02f39e)
-
-running 1 test
-test test_plus_operator_validation ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/priority_test.rs (target/debug/deps/priority_test-96463ad95b5f7988)
-
-running 1 test
-test test_backtracking_priority ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/recovery_test.rs (target/debug/deps/recovery_test-11fa15a46fdb14de)
-
-running 3 tests
-test test_attempt_recover_behavior ... ok
-test test_recovery_complex_sync ... ok
-test test_failure_recovery ... ok
-
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/repetition_test.rs (target/debug/deps/repetition_test-6dab4be251dc49e3)
-
-running 1 test
-test test_repetition ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/repro_issue.rs (target/debug/deps/repro_issue-6ea415970a37fa11)
-
-running 1 test
-test test_repro_issue ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/rule_arguments_test.rs (target/debug/deps/rule_arguments_test-38ee3b1473880033)
-
-running 1 test
-test test_rule_arguments ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/sequence_test.rs (target/debug/deps/sequence_test-f0e1243038cf1950)
-
-running 1 test
-test test_basic_sequence ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/simplified_rule_syntax.rs (target/debug/deps/simplified_rule_syntax-1c25be84fc1b2c16)
-
-running 1 test
-test test_simplified_syntax ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/single_grammar_test.rs (target/debug/deps/single_grammar_test-acbc61126444b1e2)
-
-running 1 test
-test test_single_grammar ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-     Running tests/trailing_comma_test.rs (target/debug/deps/trailing_comma_test-26d34198df8f2543)
-
-running 3 tests
-test test_consumes_trailing_comma_succeeds ... FAILED
-test test_does_not_consume_trailing_comma_fails ... ok
-test test_no_trailing_comma_succeeds ... ok
 
 failures:
 
----- test_consumes_trailing_comma_succeeds stdout ----
-[TRACE] enter_rule: consumes comma
-[TRACE] enter_rule: item 1
-[TRACE] enter_rule: string val
-[TRACE] exit_rule: string val
-[TRACE] exit_rule: item 1
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 2
-[TRACE] enter_rule: string val
-[TRACE] exit_rule: string val
-[TRACE] exit_rule: item 2
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: item 3
-[TRACE] enter_rule: string val
-[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+---- test_cxx_dangling_comma stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: function parameter 1
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 20, label: None)
 [TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: string val
-[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 0, label: None)
-[TRACE] record_error: Rejected (less specific context)
-[TRACE] exit_rule: item 3
-[TRACE] enter_rule: item 3
-[TRACE] considering_error: 'unexpected end of input, expected item' (priority: 50, label: None)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
 [TRACE] record_error: New best error (higher priority)
-[TRACE] exit_rule: item 3
-[TRACE] exit_rule: consumes comma
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: param
+[TRACE] exit_rule: function parameter 1
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: function parameter 2
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, expected one of: `const`, `constexpr`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected one of: `const`, `constexpr`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected `type modifier`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'unexpected end of input, expected `type modifier`' (priority: 0, label: None)
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected identifier' (priority: 10, label: Some("type name"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] considering_error: 'unexpected end of input, expected `type name`' (priority: 20, label: None)
+[TRACE] record_error: Rejected (shorter message)
+[TRACE] exit_rule: type name
+[TRACE] considering_error: 'unexpected end of input, expected `type name`' (priority: 10, label: Some("function parameter"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'unexpected end of input, expected `function parameter`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: param
+[TRACE] considering_error: 'unexpected end of input, expected `function parameter`' (priority: 0, label: Some("function parameter"))
+[TRACE] record_error: Rejected (lower priority)
+[TRACE] exit_rule: function parameter 2
+[TRACE] enter_rule: function parameter 2
+[TRACE] considering_error: 'expected function parameter' (priority: 50, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: function parameter 2
+[TRACE] exit_rule: signature
 
-thread 'test_consumes_trailing_comma_succeeds' (63760) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_cxx_dangling_comma' (75584) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
-🔴 TEST FAILED (Expected Success, but got Error):
-
-Error Message:
-unexpected end of input, expected item at column 0 (line 1)
-in item 3
-in consumes comma
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
+Actual msg:    "expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
 
 Error Debug:
-Error("unexpected end of input, expected item at column 0 (line 1)\nin item 3\nin consumes comma")
+Error("expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature")
+
+Formatted:
+expected function parameter at column 15 (line 1)
+in function parameter 2
+in signature
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 
 failures:
-    test_consumes_trailing_comma_succeeds
+    test_cxx_dangling_comma
 
-test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error: test failed, to rerun pass `-p syn-grammar --test trailing_comma_test`
+error: test failed, to rerun pass `-p syn-grammar --test list_dx_test`
