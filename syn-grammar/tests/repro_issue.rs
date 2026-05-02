@@ -22,7 +22,7 @@ grammar! {
             return_type ";" -> { () }
           | mac:syn::Macro ";" -> { () }
 
-        cxx_arg_list -> Vec<()> = items:separated(cxx_arg, ",") -> { items }
+        cxx_arg_list -> Vec<()> = items:separated(cxx_arg, ",", trailing=true) -> { items }
 
         cxx_arg -> () =
             any_ident ":" rust_type -> { () }

@@ -1,6 +1,6 @@
-   Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
+    Blocking waiting for file lock on artifact directory
    Compiling syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.41s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.50s
      Running unittests src/syn_grammar.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
 running 0 tests
@@ -12,7 +12,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test test_group_vs_args_ambiguity ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/binding_with_action_test.rs (target/debug/deps/binding_with_action_test-4300dc1f6f2308f9)
 
@@ -46,8 +46,8 @@ test test_fail_builtin_first ... ok
 test test_fail_builtin_last ... ok
 test test_keywords_vs_idents ... ok
 test test_multi_token_literals ... ok
-test test_use_statements ... ok
 test test_rust_types_and_blocks ... ok
+test test_use_statements ... ok
 
 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -55,19 +55,19 @@ test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 6 tests
 test test_count_bindings ... ok
-test test_count_group ... ok
 test test_count_opts ... ok
 test test_count_plus ... ok
+test test_count_group ... ok
 test test_count_plus_fail ... ok
 test test_count_stars ... ok
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/cut_test.rs (target/debug/deps/cut_test-b131ec78b478f8dd)
 
 running 2 tests
-test test_cut_operator ... ok
 test test_cut_in_repetition ... ok
+test test_cut_operator ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -76,7 +76,7 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test test_epsilon_alternative ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/error_abstraction_test.rs (target/debug/deps/error_abstraction_test-4c124a2ec9fbd8fc)
 
@@ -91,13 +91,13 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/error_reporting_test.rs (target/debug/deps/error_reporting_test-fca4f7e7e4f8d135)
 
 running 7 tests
-test test_combinator_error_produces_clean_message ... ok
 test test_deep_error_with_label_and_fail ... ok
 test test_deep_vs_shallow ... ok
-test test_fail_built_in_enterprise ... ok
+test test_combinator_error_produces_clean_message ... ok
 test test_deepest_error_wins ... ok
-test test_rule_name_in_error_message ... ok
+test test_fail_built_in_enterprise ... ok
 test test_label_priority ... ok
+test test_rule_name_in_error_message ... ok
 
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -128,8 +128,8 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 4 tests
 test test_deep_error_wins ... ok
 test test_default_labels ... ok
-test test_group_labels ... ok
 test test_explicit_labels ... ok
+test test_group_labels ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -137,26 +137,26 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 6 tests
 test test_cxx_dangling_comma ... ok
+test test_cxx_deep_ident_error_mid_list ... ok
 test test_cxx_deep_type_error_after_modifier ... ok
 test test_cxx_garbage_after_item ... ok
-test test_cxx_deep_ident_error_mid_list ... ok
 test test_cxx_shallow_wrong_token ... ok
 test test_cxx_unexpected_eof ... ok
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/list_test.rs (target/debug/deps/list_test-6ce8f4380e36ecf5)
 
 running 7 tests
 test test_explicit_container ... ok
 test test_repeated ... ok
-test test_separated_basic ... ok
 test test_repeated_min ... ok
+test test_separated_basic ... ok
 test test_separated_custom_error ... ok
-test test_separated_min ... ok
 test test_separated_trailing ... ok
+test test_separated_min ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running tests/literal_binding_no_action_test.rs (target/debug/deps/literal_binding_no_action_test-57cfcf888e4d257d)
 
@@ -168,8 +168,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/literal_binding_test.rs (target/debug/deps/literal_binding_test-321190b07fd7430f)
 
 running 3 tests
-test test_literal_binding_char ... ok
 test test_literal_binding ... ok
+test test_literal_binding_char ... ok
 test test_literal_binding_raw_string ... ok
 
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
@@ -191,15 +191,15 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/new_primitives_test.rs (target/debug/deps/new_primitives_test-ec307f24e74f5115)
 
 running 7 tests
+test test_float_primitive ... ok
 test test_numeric_primitives ... ok
 test test_string_primitive ... ok
-test test_float_primitive ... ok
+test test_whitespace_between_rules ... ok
 test test_whitespace_ident_ident ... ok
 test test_whitespace_primitive ... ok
 test test_whitespace_punct_ident ... ok
-test test_whitespace_between_rules ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/optional_production_test.rs (target/debug/deps/optional_production_test-bdeaa3481541d79c)
 
@@ -216,7 +216,7 @@ test test_not_complex ... ok
 test test_peek_binding ... ok
 test test_peek_basic ... ok
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/plus_validation_test.rs (target/debug/deps/plus_validation_test-ec0d795d6e02f39e)
 
@@ -230,16 +230,16 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 1 test
 test test_backtracking_priority ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/recovery_test.rs (target/debug/deps/recovery_test-11fa15a46fdb14de)
 
 running 3 tests
 test test_attempt_recover_behavior ... ok
-test test_recovery_complex_sync ... ok
 test test_failure_recovery ... ok
+test test_recovery_complex_sync ... ok
 
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/repetition_test.rs (target/debug/deps/repetition_test-6dab4be251dc49e3)
 
@@ -251,66 +251,119 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/repro_issue.rs (target/debug/deps/repro_issue-6ea415970a37fa11)
 
 running 1 test
-test test_repro_issue ... FAILED
+test test_repro_issue ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/rule_arguments_test.rs (target/debug/deps/rule_arguments_test-38ee3b1473880033)
+
+running 1 test
+test test_rule_arguments ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sequence_test.rs (target/debug/deps/sequence_test-f0e1243038cf1950)
+
+running 1 test
+test test_basic_sequence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/simplified_rule_syntax.rs (target/debug/deps/simplified_rule_syntax-1c25be84fc1b2c16)
+
+running 1 test
+test test_simplified_syntax ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/single_grammar_test.rs (target/debug/deps/single_grammar_test-acbc61126444b1e2)
+
+running 1 test
+test test_single_grammar ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/trailing_comma_test.rs (target/debug/deps/trailing_comma_test-26d34198df8f2543)
+
+running 3 tests
+test test_consumes_trailing_comma_succeeds ... FAILED
+test test_does_not_consume_trailing_comma_fails ... FAILED
+test test_no_trailing_comma_succeeds ... ok
 
 failures:
 
----- test_repro_issue stdout ----
-[TRACE] enter_rule: top level mod
-[TRACE] enter_rule: extern block
-[TRACE] enter_rule: cxx item
-[TRACE] considering_error: 'expected `fn`' (priority: 0, label: None)
+---- test_consumes_trailing_comma_succeeds stdout ----
+[TRACE] enter_rule: consumes comma
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: string val
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
 [TRACE] record_error: New best error (no previous)
-[TRACE] Attempting to parse syn type: syn :: Macro at bytes(70..77)
-[TRACE] Successfully parsed syn type: syn :: Macro
-[TRACE] exit_rule: cxx item
-[TRACE] enter_rule: cxx item
-[TRACE] enter_rule: cxx arg list
-[TRACE] enter_rule: cxx arg
-[TRACE] exit_rule: cxx arg
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: cxx arg
-[TRACE] exit_rule: cxx arg
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: cxx arg
-[TRACE] exit_rule: cxx arg
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: cxx arg
-[TRACE] considering_error: 'unexpected end of input, expected ident' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: cxx arg
+[TRACE] exit_rule: string val
 [TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 0, label: None)
 [TRACE] record_error: Rejected (less specific context)
 [TRACE] considering_error: 'unexpected end of input, expected item' (priority: 50, label: None)
 [TRACE] record_error: New best error (higher priority)
-[TRACE] exit_rule: cxx arg list
-[TRACE] exit_rule: cxx item
-[TRACE] exit_rule: extern block
-[TRACE] exit_rule: top level mod
+[TRACE] exit_rule: consumes comma
 
-thread 'test_repro_issue' (42961) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_consumes_trailing_comma_succeeds' (46993) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
 Error Message:
-unexpected end of input, expected item at column 16 (line 10)
-in cxx arg list
-in cxx item
-in extern block
-in top level mod
+unexpected end of input, expected item at column 0 (line 1)
+in consumes comma
 
 Error Debug:
-Error("unexpected end of input, expected item at column 16 (line 10)\nin cxx arg list\nin cxx item\nin extern block\nin top level mod")
+Error("unexpected end of input, expected item at column 0 (line 1)\nin consumes comma")
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
+---- test_does_not_consume_trailing_comma_fails stdout ----
+[TRACE] enter_rule: does not consume comma
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: string val
+[TRACE] exit_rule: string val
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: string val
+[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] exit_rule: string val
+[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 0, label: None)
+[TRACE] record_error: Rejected (less specific context)
+[TRACE] considering_error: 'unexpected end of input, expected item' (priority: 50, label: None)
+[TRACE] record_error: New best error (higher priority)
+[TRACE] exit_rule: does not consume comma
+
+thread 'test_does_not_consume_trailing_comma_fails' (46994) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected item at column 0 (line 1)\nin item 3"
+Actual msg:    "unexpected end of input, expected item at column 0 (line 1)\nin does not consume comma"
+
+Error Debug:
+Error("unexpected end of input, expected item at column 0 (line 1)\nin does not consume comma")
+
+Formatted:
+unexpected end of input, expected item at column 0 (line 1)
+in does not consume comma
+
+
 
 failures:
-    test_repro_issue
+    test_consumes_trailing_comma_succeeds
+    test_does_not_consume_trailing_comma_fails
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-error: test failed, to rerun pass `-p syn-grammar --test repro_issue`
+error: test failed, to rerun pass `-p syn-grammar --test trailing_comma_test`
