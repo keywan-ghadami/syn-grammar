@@ -1,5 +1,6 @@
+   Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
    Compiling syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.78s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.41s
      Running unittests src/syn_grammar.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
 running 0 tests
@@ -45,10 +46,10 @@ test test_fail_builtin_first ... ok
 test test_fail_builtin_last ... ok
 test test_keywords_vs_idents ... ok
 test test_multi_token_literals ... ok
-test test_rust_types_and_blocks ... ok
 test test_use_statements ... ok
+test test_rust_types_and_blocks ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/count_test.rs (target/debug/deps/count_test-09e85aa09a598b19)
 
@@ -65,8 +66,8 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/cut_test.rs (target/debug/deps/cut_test-b131ec78b478f8dd)
 
 running 2 tests
-test test_cut_in_repetition ... ok
 test test_cut_operator ... ok
+test test_cut_in_repetition ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -93,12 +94,12 @@ running 7 tests
 test test_combinator_error_produces_clean_message ... ok
 test test_deep_error_with_label_and_fail ... ok
 test test_deep_vs_shallow ... ok
-test test_deepest_error_wins ... ok
-test test_label_priority ... ok
 test test_fail_built_in_enterprise ... ok
+test test_deepest_error_wins ... ok
 test test_rule_name_in_error_message ... ok
+test test_label_priority ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/error_span_test.rs (target/debug/deps/error_span_test-191b3aeff8c97b51)
 
@@ -117,8 +118,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
 
 running 2 tests
-test test_generic_rule ... ok
 test test_generic_inference ... ok
+test test_generic_rule ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -136,66 +137,180 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 6 tests
 test test_cxx_dangling_comma ... ok
-test test_cxx_deep_ident_error_mid_list ... ok
 test test_cxx_deep_type_error_after_modifier ... ok
+test test_cxx_garbage_after_item ... ok
+test test_cxx_deep_ident_error_mid_list ... ok
 test test_cxx_shallow_wrong_token ... ok
 test test_cxx_unexpected_eof ... ok
-test test_cxx_garbage_after_item ... ok
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running tests/list_test.rs (target/debug/deps/list_test-6ce8f4380e36ecf5)
 
 running 7 tests
-test test_repeated ... ok
-test test_repeated_min ... ok
-test test_separated_basic ... ok
-test test_separated_custom_error ... ok
 test test_explicit_container ... ok
+test test_repeated ... ok
+test test_separated_basic ... ok
+test test_repeated_min ... ok
+test test_separated_custom_error ... ok
 test test_separated_min ... ok
-test test_separated_trailing ... FAILED
+test test_separated_trailing ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/literal_binding_no_action_test.rs (target/debug/deps/literal_binding_no_action_test-57cfcf888e4d257d)
+
+running 1 test
+test test_literal_binding_no_action ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/literal_binding_test.rs (target/debug/deps/literal_binding_test-321190b07fd7430f)
+
+running 3 tests
+test test_literal_binding_char ... ok
+test test_literal_binding ... ok
+test test_literal_binding_raw_string ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/multi_arguments_test.rs (target/debug/deps/multi_arguments_test-5c12c3134e913e36)
+
+running 1 test
+test test_multiple_arguments ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/nested_repetition_test.rs (target/debug/deps/nested_repetition_test-fa8d31614d470260)
+
+running 1 test
+test test_nested_repetition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/new_primitives_test.rs (target/debug/deps/new_primitives_test-ec307f24e74f5115)
+
+running 7 tests
+test test_numeric_primitives ... ok
+test test_string_primitive ... ok
+test test_float_primitive ... ok
+test test_whitespace_ident_ident ... ok
+test test_whitespace_primitive ... ok
+test test_whitespace_punct_ident ... ok
+test test_whitespace_between_rules ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/optional_production_test.rs (target/debug/deps/optional_production_test-bdeaa3481541d79c)
+
+running 1 test
+test test_optional_production ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/peek_not_test.rs (target/debug/deps/peek_not_test-9d297d86cd7e0069)
+
+running 4 tests
+test test_not_basic ... ok
+test test_not_complex ... ok
+test test_peek_binding ... ok
+test test_peek_basic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/plus_validation_test.rs (target/debug/deps/plus_validation_test-ec0d795d6e02f39e)
+
+running 1 test
+test test_plus_operator_validation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/priority_test.rs (target/debug/deps/priority_test-96463ad95b5f7988)
+
+running 1 test
+test test_backtracking_priority ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/recovery_test.rs (target/debug/deps/recovery_test-11fa15a46fdb14de)
+
+running 3 tests
+test test_attempt_recover_behavior ... ok
+test test_recovery_complex_sync ... ok
+test test_failure_recovery ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/repetition_test.rs (target/debug/deps/repetition_test-6dab4be251dc49e3)
+
+running 1 test
+test test_repetition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/repro_issue.rs (target/debug/deps/repro_issue-6ea415970a37fa11)
+
+running 1 test
+test test_repro_issue ... FAILED
 
 failures:
 
----- test_separated_trailing stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] enter_rule: separator
-[TRACE] exit_rule: separator
-[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+---- test_repro_issue stdout ----
+[TRACE] enter_rule: top level mod
+[TRACE] enter_rule: extern block
+[TRACE] enter_rule: cxx item
+[TRACE] considering_error: 'expected `fn`' (priority: 0, label: None)
 [TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: main
-[TRACE] enter_rule: strict
+[TRACE] Attempting to parse syn type: syn :: Macro at bytes(70..77)
+[TRACE] Successfully parsed syn type: syn :: Macro
+[TRACE] exit_rule: cxx item
+[TRACE] enter_rule: cxx item
+[TRACE] enter_rule: cxx arg list
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
 [TRACE] enter_rule: separator
 [TRACE] exit_rule: separator
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
 [TRACE] enter_rule: separator
 [TRACE] exit_rule: separator
-[TRACE] considering_error: 'unexpected end of input, expected string literal' (priority: 0, label: None)
+[TRACE] enter_rule: cxx arg
+[TRACE] exit_rule: cxx arg
+[TRACE] enter_rule: separator
+[TRACE] exit_rule: separator
+[TRACE] enter_rule: cxx arg
+[TRACE] considering_error: 'unexpected end of input, expected ident' (priority: 0, label: None)
 [TRACE] record_error: New best error (no previous)
-[TRACE] considering_error: 'unexpected end of input' (priority: 50, label: None)
+[TRACE] exit_rule: cxx arg
+[TRACE] considering_error: 'unexpected end of input, No matching rule variant found' (priority: 0, label: None)
+[TRACE] record_error: Rejected (less specific context)
+[TRACE] considering_error: 'unexpected end of input, expected item' (priority: 50, label: None)
 [TRACE] record_error: New best error (higher priority)
-[TRACE] exit_rule: strict
+[TRACE] exit_rule: cxx arg list
+[TRACE] exit_rule: cxx item
+[TRACE] exit_rule: extern block
+[TRACE] exit_rule: top level mod
 
-thread 'test_separated_trailing' (30828) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_repro_issue' (42961) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
-🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "unexpected end of input, expected item"
-Actual msg:    "unexpected end of input at column 0 (line 1)\nin strict"
+🔴 TEST FAILED (Expected Success, but got Error):
+
+Error Message:
+unexpected end of input, expected item at column 16 (line 10)
+in cxx arg list
+in cxx item
+in extern block
+in top level mod
 
 Error Debug:
-Error("unexpected end of input at column 0 (line 1)\nin strict")
-
-Formatted:
-unexpected end of input at column 0 (line 1)
-in strict
+Error("unexpected end of input, expected item at column 16 (line 10)\nin cxx arg list\nin cxx item\nin extern block\nin top level mod")
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 
 failures:
-    test_separated_trailing
+    test_repro_issue
 
-test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-error: test failed, to rerun pass `-p syn-grammar --test list_test`
+error: test failed, to rerun pass `-p syn-grammar --test repro_issue`

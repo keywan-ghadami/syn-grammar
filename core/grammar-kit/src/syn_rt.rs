@@ -115,7 +115,7 @@ pub fn parse_separated_pure<T, S>(
                         } else {
                             let msg = item_name
                                 .map(|n| format!("unexpected end of input, expected {}", n))
-                                .unwrap_or_else(|| "unexpected end of input".to_string());
+                                .unwrap_or_else(|| "unexpected end of input, expected item".to_string());
                             let err = syn::Error::new(item_fork.span(), msg);
                             
                             let rule_name = item_name.map(|n| format!("{} {}", n, next_idx));
