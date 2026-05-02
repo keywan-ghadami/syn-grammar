@@ -57,7 +57,7 @@ fn test_cxx_dangling_comma() {
         .parse_str("fn foo( int a, );")
         .test()
         .assert_failure_contains(
-            "unexpected end of input, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature",
+            "unexpected end of group, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature",
         );
 }
 
