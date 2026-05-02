@@ -63,7 +63,15 @@ pub fn parse_separated_pure<T, S>(
         Ok(Some(item)) => items.push(item),
         Ok(None) => {
             if min > 0 {
-                let msg = format!("expected {}", actual_item_name);
+                let msg = if input.is_empty() {
+                    if ctx.is_in_group() {
+                        format!("unexpected end of group, expected {}", actual_item_name)
+                    } else {
+                        format!("unexpected end of input, expected {}", actual_item_name)
+                    }
+                } else {
+                    format!("expected {}", actual_item_name)
+                };
                 let err = syn::Error::new(input.span(), msg);
                 
                 let rule_name = format!("{} 1", actual_item_name);
@@ -100,10 +108,15 @@ pub fn parse_separated_pure<T, S>(
                             input.advance_to(&sep_fork);
                             break;
                         } else {
-                            // TRUE PEG SEMANTICS:
-                            // We record the deep "expected item" error for the parent context to use,
-                            // but we cleanly BREAK to rollback the comma into the stream.
-                            let msg = format!("expected {}", actual_item_name);
+                            let msg = if item_fork.is_empty() {
+                                if ctx.is_in_group() {
+                                    format!("unexpected end of group, expected {}", actual_item_name)
+                                } else {
+                                    format!("unexpected end of input, expected {}", actual_item_name)
+                                }
+                            } else {
+                                format!("expected {}", actual_item_name)
+                            };
                             let err = syn::Error::new(item_fork.span(), msg);
                             
                             let rule_name = format!("{} {}", actual_item_name, next_idx);
@@ -123,7 +136,15 @@ pub fn parse_separated_pure<T, S>(
     }
 
     if items.len() < min {
-        let msg = format!("expected at least {} items, found {}", min, items.len());
+        let msg = if input.is_empty() {
+            if ctx.is_in_group() {
+                format!("unexpected end of group, expected at least {} items, found {}", min, items.len())
+            } else {
+                format!("unexpected end of input, expected at least {} items, found {}", min, items.len())
+            }
+        } else {
+            format!("expected at least {} items, found {}", min, items.len())
+        };
         let err = syn::Error::new(input.span(), msg);
         ctx.record_error(err, input.span(), None, ParseContext::PRIO_STRUCTURAL);
         return Err(syn::Error::new(input.span(), "__BUBBLE__"));

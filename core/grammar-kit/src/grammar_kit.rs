@@ -99,6 +99,7 @@ pub struct ParseContext {
     pub pending_priority: u8,
     suppress_label: bool,
     mode_stack: Vec<bool>, // true = lexical, false = spaced
+    group_depth: usize,
 }
 
 #[cfg(feature = "rt")]
@@ -127,8 +128,13 @@ impl ParseContext {
             pending_priority: Self::PRIO_NORMAL,
             suppress_label: false,
             mode_stack: Vec::new(),
+            group_depth: 0,
         }
     }
+
+    pub fn enter_group(&mut self) { self.group_depth += 1; }
+    pub fn exit_group(&mut self) { self.group_depth = self.group_depth.saturating_sub(1); }
+    pub fn is_in_group(&self) -> bool { self.group_depth > 0 }
 
     pub fn set_fatal(&mut self, fatal: bool) {
         self.is_fatal = fatal;
@@ -724,7 +730,7 @@ pub fn parse_separated<T, P, S>(
 ) -> Result<Vec<T>>
 where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
-    S: FnMut(ParseStream, &mut ParseContext) -> Result<()>,
+    S: FnMut(ParseStream, &mut ParseContext) -> Result<()> ,
 {
     let mut items = Vec::new();
 
@@ -905,7 +911,9 @@ where
     ctx.record_span(final_span)?;
 
     // Run the inner parser on the content stream.
+    ctx.enter_group();
     let res = parser(&content, ctx);
+    ctx.exit_group();
 
     match res {
         Ok(val) => {

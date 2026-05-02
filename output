@@ -1,6 +1,6 @@
    Compiling grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
    Compiling syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.05s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 30.75s
      Running unittests src/syn_grammar.rs (target/debug/deps/syn_grammar-129e330ddb0285cd)
 
 running 0 tests
@@ -43,9 +43,9 @@ test test_action_block_statements ... ok
 test test_attributes_on_rules ... ok
 test test_complex_return_types ... ok
 test test_fail_builtin_first ... ok
-test test_fail_builtin_last ... ok
 test test_keywords_vs_idents ... ok
 test test_multi_token_literals ... ok
+test test_fail_builtin_last ... ok
 test test_rust_types_and_blocks ... ok
 test test_use_statements ... ok
 
@@ -56,8 +56,8 @@ test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 6 tests
 test test_count_bindings ... ok
 test test_count_group ... ok
-test test_count_plus ... ok
 test test_count_opts ... ok
+test test_count_plus ... ok
 test test_count_plus_fail ... ok
 test test_count_stars ... ok
 
@@ -66,8 +66,8 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/cut_test.rs (target/debug/deps/cut_test-b131ec78b478f8dd)
 
 running 2 tests
-test test_cut_in_repetition ... ok
 test test_cut_operator ... ok
+test test_cut_in_repetition ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -91,8 +91,8 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/error_reporting_test.rs (target/debug/deps/error_reporting_test-fca4f7e7e4f8d135)
 
 running 7 tests
-test test_combinator_error_produces_clean_message ... ok
 test test_deep_error_with_label_and_fail ... ok
+test test_combinator_error_produces_clean_message ... ok
 test test_deep_vs_shallow ... ok
 test test_deepest_error_wins ... ok
 test test_fail_built_in_enterprise ... ok
@@ -118,8 +118,8 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/generic_test.rs (target/debug/deps/generic_test-7676530790e908f6)
 
 running 2 tests
-test test_generic_inference ... ok
 test test_generic_rule ... ok
+test test_generic_inference ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -138,9 +138,9 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 6 tests
 test test_cxx_deep_ident_error_mid_list ... ok
 test test_cxx_dangling_comma ... FAILED
+test test_cxx_deep_type_error_after_modifier ... ok
 test test_cxx_garbage_after_item ... ok
 test test_cxx_shallow_wrong_token ... ok
-test test_cxx_deep_type_error_after_modifier ... ok
 test test_cxx_unexpected_eof ... ok
 
 failures:
@@ -206,22 +206,22 @@ failures:
 [TRACE] record_error: Rejected (lower priority)
 [TRACE] exit_rule: function parameter 2
 [TRACE] enter_rule: function parameter 2
-[TRACE] considering_error: 'expected function parameter' (priority: 50, label: None)
+[TRACE] considering_error: 'unexpected end of group, expected function parameter' (priority: 50, label: None)
 [TRACE] record_error: New best error (higher priority)
 [TRACE] exit_rule: function parameter 2
 [TRACE] exit_rule: signature
 
-thread 'test_cxx_dangling_comma' (75584) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_cxx_dangling_comma' (90121) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "unexpected end of input, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
-Actual msg:    "expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
+Actual msg:    "unexpected end of group, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
 
 Error Debug:
-Error("expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature")
+Error("unexpected end of group, expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature")
 
 Formatted:
-expected function parameter at column 15 (line 1)
+unexpected end of group, expected function parameter at column 15 (line 1)
 in function parameter 2
 in signature
 
