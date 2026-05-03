@@ -1,270 +1,145 @@
-use syn::parse::discouraged::Speculative;
-use syn::parse::ParseStream;
-use syn::Result;
-use crate::{ParseContext, transaction::ParseTransaction};
+use syn::buffer::Cursor;
+use syn::parse::Parser;
+use proc_macro2::TokenStream;
 
-#[inline]
-pub fn attempt<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<Option<T>>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    attempt_labeled(input, ctx, None, parser)
+use crate::error::{ParseError, ParseResult};
+use crate::context::ParseContext;
+
+/// Der universelle Brücken-Kombinator.
+/// Verwandelt den Cursor in einen TokenStream, lässt syn parsen und rechnet
+/// anschließend exakt aus, um wie viele Schritte der Cursor vorrücken muss.
+pub fn invoke_syn_parser<'a, T: syn::parse::Parse>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
+    let stream = cursor.token_stream();
+    
+    // Wir erzeugen einen temporären Syn-Parser
+    let parser = |input: syn::parse::ParseStream| {
+        let val = input.parse::<T>()?;
+        // Zählen der verbleibenden Tokens im Stream
+        let remaining = input.cursor().token_stream().into_iter().count();
+        Ok((val, remaining))
+    };
+    
+    match Parser::parse2(parser, stream.clone()) {
+        Ok((val, remaining)) => {
+            let total = stream.into_iter().count();
+            let consumed = total - remaining;
+            
+            // Original-Cursor exakt um die Anzahl der verbrauchten Tokens vorschieben
+            for _ in 0..consumed {
+                if let Some((_, next)) = cursor.token_tree() {
+                    cursor = next;
+                }
+            }
+            
+            Ok((val, cursor))
+        }
+        Err(e) => Err(ParseError::new(e.span(), e.to_string())),
+    }
 }
 
-#[inline]
-pub fn attempt_labeled<T, F>(
-    input: ParseStream,
+/// Optionaler Parse-Versuch. Er fängt sanfte Fehler ab und reicht strukturelle Fehler hoch.
+pub fn attempt_labeled<'a, T, F>(
+    cursor: Cursor<'a>,
     ctx: &mut ParseContext,
     label: Option<&str>,
     parser: F,
-) -> Result<Option<T>>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
+) -> ParseResult<'a, Option<T>>
+where
+    F: FnOnce(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
 {
-    let fork = input.fork();
-    let transaction = ParseTransaction::begin(ctx, input.span());
-
-    match parser(&fork, transaction.ctx) {
-        Ok(val) => {
-            input.advance_to(&fork);
-            transaction.commit();
-            Ok(Some(val))
+    let mut fork_ctx = ctx.clone();
+    
+    match parser(cursor, &mut fork_ctx) {
+        Ok((val, next_cursor)) => {
+            *ctx = fork_ctx; // Zustand nach erfolgreichem Parse übernehmen
+            Ok((Some(val), next_cursor))
         }
-        Err(e) => {
-            let bubbled_err = transaction.rollback(e, label);
-            if bubbled_err.to_string().contains("__BUBBLE__") || bubbled_err.to_string().contains("__DUMMY_ERR_BUBBLE__") || ctx.check_fatal() {
-                return Err(bubbled_err);
+        Err(mut e) => {
+            // Label applizieren, falls der Fehler exakt am Startpunkt passierte
+            if let Some(lbl) = label {
+                if e.span.start() == cursor.span().start() {
+                    e.message = format!("expected {}", lbl);
+                    e.priority = std::cmp::max(e.priority, 10);
+                }
             }
-            Ok(None)
-        }
-    }
-}
-
-#[inline]
-pub fn peek<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<T>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let fork = input.fork();
-    let transaction = ParseTransaction::begin(ctx, input.span());
-    let res = parser(&fork, transaction.ctx);
-    // Peek ist destruktiv, wir werfen den neuen Zustand immer weg
-    let _ = transaction.rollback(syn::Error::new(input.span(), "peek"), None);
-    res
-}
-
-#[inline]
-pub fn not_check<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<()>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let fork = input.fork();
-    let transaction = ParseTransaction::begin(ctx, input.span());
-    let res = parser(&fork, transaction.ctx);
-    let _ = transaction.rollback(syn::Error::new(input.span(), "not"), None);
-
-    match res {
-        Ok(_) => Err(syn::Error::new(input.span(), "unexpected match")),
-        Err(_) => Ok(()),
-    }
-}
-
-#[inline]
-pub fn attempt_recover<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<Option<T>>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let fork = input.fork();
-    let transaction = ParseTransaction::begin(ctx, input.span());
-
-    match parser(&fork, transaction.ctx) {
-        Ok(val) => {
-            input.advance_to(&fork);
-            transaction.commit();
-            Ok(Some(val))
-        }
-        Err(e) => {
-            let bubbled_err = transaction.rollback_for_recovery(e);
-            if bubbled_err.to_string().contains("__BUBBLE__") || bubbled_err.to_string().contains("__DUMMY_ERR_BUBBLE__") {
-                return Err(bubbled_err);
+            
+            // Fatale / Strukturelle Fehler werden ge-bubbled
+            if e.priority >= 50 {
+                Err(e)
+            } else {
+                // Reguläres Backtracking: Wir geben den UNVERÄNDERTEN Cursor zurück
+                Ok((None, cursor))
             }
-            Ok(None)
         }
     }
 }
 
-pub fn parse_separated<T, P, S>(
-    input: ParseStream,
+pub fn parse_separated<'a, T, P, S>(
+    mut cursor: Cursor<'a>,
     ctx: &mut ParseContext,
     mut item_parser: P,
     mut sep_parser: S,
     min: usize,
     trailing: bool,
     item_name: &str,
-) -> Result<Vec<T>>
+) -> ParseResult<'a, Vec<T>>
 where
-    P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
-    S: FnMut(ParseStream, &mut ParseContext) -> Result<()> ,
+    P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
+    S: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, ()> ,
 {
     let mut items = Vec::new();
-    
-    let first_item_span = input.span();
-    ctx.enter_rule(&format!("{} 1", item_name));
-    let first_item = match attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c)) {
-        Ok(Some(item)) => { ctx.exit_rule(); item }
-        Ok(None) => {
-            ctx.exit_rule();
-            if ctx.stop_aggregation(first_item_span) { return Err(syn::Error::new(first_item_span, "__BUBBLE__")); }
-            return Ok(items);
+    let start_span = cursor.span();
+
+    // Erstes Element
+    match item_parser(cursor, ctx) {
+        Ok((item, next_cursor)) => {
+            items.push(item);
+            cursor = next_cursor;
         }
-        Err(e) => { ctx.exit_rule(); return Err(e); }
-    };
-    items.push(first_item);
+        Err(e) => {
+            if min > 0 {
+                return Err(e.merge(ParseError::new(start_span, format!("expected {}", item_name)).with_priority(50)));
+            }
+            return Ok((items, cursor));
+        }
+    }
 
     loop {
-        let pre_sep_span = input.span();
-        let sep_fork = input.fork();
-        ctx.enter_rule("separator");
-        let sep_res = attempt(&sep_fork, ctx, |i, c| sep_parser(i, c));
-        ctx.exit_rule();
+        let mut sep_ctx = ctx.clone();
         
-        match sep_res {
-            Ok(Some(_)) => {
-                let item_fork = sep_fork.fork();
-                let next_idx = items.len() + 1;
-                let rule_name = format!("{} {}", item_name, next_idx);
-                ctx.enter_rule(&rule_name);
-                let item_res = attempt_labeled(&item_fork, ctx, Some(item_name), |i, c| item_parser(i, c));
-                ctx.exit_rule();
+        // Separator versuchen
+        match sep_parser(cursor, &mut sep_ctx) {
+            Ok((_, after_sep_cursor)) => {
+                let mut item_ctx = sep_ctx.clone();
                 
-                match item_res {
-                    Ok(Some(item)) => {
-                        input.advance_to(&item_fork);
+                // Item NACH Separator versuchen
+                match item_parser(after_sep_cursor, &mut item_ctx) {
+                    Ok((item, after_item_cursor)) => {
                         items.push(item);
+                        cursor = after_item_cursor;
+                        *ctx = item_ctx; 
                     }
-                    Ok(None) => {
+                    Err(e) => {
                         if trailing {
-                            input.advance_to(&sep_fork);
+                            // Erlaubtes baumelndes Komma: Cursor stoppt nach dem Item davor.
                             break;
                         } else {
-                            let msg = format!("expected {}", item_name);
-                            ctx.record_error(syn::Error::new(item_fork.span(), &msg), item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
-                            break; 
+                            // Striktes Scheitern: Das Komma war da, das Item fehlt -> Harter Fehler!
+                            return Err(e.merge(
+                                ParseError::new(after_sep_cursor.span(), format!("expected {}", item_name))
+                                .with_priority(50)
+                            ));
                         }
                     }
-                    Err(e) => return Err(e),
                 }
             }
-            Ok(None) => {
-                if ctx.stop_aggregation(pre_sep_span) {
-                    return Err(syn::Error::new(pre_sep_span, "__BUBBLE__"));
-                }
-                break;
-            }
-            Err(e) => return Err(e), 
+            Err(_) => break, // Kein Komma mehr gefunden, Liste ist fertig
         }
     }
 
     if items.len() < min {
-        return ctx.raise_failure(
-            &format!("expected at least {} {}s, found {}", min, item_name, items.len()),
-            input.span(),
-        );
+        return Err(ParseError::new(cursor.span(), format!("expected at least {} {}s", min, item_name)).with_priority(50));
     }
 
-    Ok(items)
-}
-
-pub fn parse_repeated<T, P>(
-    input: ParseStream,
-    ctx: &mut ParseContext,
-    mut item_parser: P,
-    min: usize,
-    item_name: &str,
-) -> Result<Vec<T>>
-where
-    P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let mut items = Vec::new();
-    loop {
-        let loop_start_span = input.span();
-        let next_idx = items.len() + 1;
-        let rule_name = format!("{} {}", item_name, next_idx);
-
-        ctx.enter_rule(&rule_name);
-        let item = match attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c)) {
-            Ok(Some(item)) => item,
-            Ok(None) => {
-                ctx.exit_rule();
-                if ctx.stop_aggregation(loop_start_span) {
-                    return Err(syn::Error::new(loop_start_span, "__BUBBLE__"));
-                }
-                break;
-            }
-            Err(e) => {
-                ctx.exit_rule();
-                return Err(e);
-            }
-        };
-        ctx.exit_rule();
-        items.push(item);
-    }
-
-    if items.len() < min {
-        return ctx.raise_failure(
-            &format!("expected at least {} {}s, found {}", min, item_name, items.len()),
-            input.span()
-        );
-    }
-
-    Ok(items)
-}
-
-pub fn parse_delimited<T, F>(
-    input: ParseStream,
-    ctx: &mut ParseContext,
-    parser: F,
-    delimiter: char,
-) -> Result<T>
-where
-    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let content;
-    let final_span: proc_macro2::Span;
-    match delimiter {
-        '(' => {
-            let paren_token = syn::parenthesized!(content in input);
-            final_span = paren_token.span.join();
-        }
-        '{' => {
-            let brace_token = syn::braced!(content in input);
-            final_span = brace_token.span.join();
-        }
-        '[' => {
-            let bracket_token = syn::bracketed!(content in input);
-            final_span = bracket_token.span.join();
-        }
-        _ => {
-            return Err(syn::Error::new(
-                input.span(),
-                "unsupported delimiter for custom parsing",
-            ));
-        }
-    }
-    ctx.record_span(final_span)?;
-
-    ctx.enter_group();
-    let res = parser(&content, ctx);
-    ctx.exit_group();
-
-    match res {
-        Ok(val) => {
-            if !content.is_empty() {
-                if ctx.stop_aggregation(content.span()) {
-                    return Err(syn::Error::new(content.span(), "__BUBBLE__"));
-                }
-                let err = content.error("unexpected token in delimited group");
-                ctx.record_error(err, content.span(), None, ParseContext::PRIO_NORMAL);
-                return Err(syn::Error::new(content.span(), "__BUBBLE__"));
-            } else {
-                Ok(val)
-            }
-        }
-        Err(e) => Err(e)
-    }
+    Ok((items, cursor))
 }
