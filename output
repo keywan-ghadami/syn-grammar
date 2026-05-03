@@ -1,136 +1,50 @@
-error[E0433]: failed to resolve: could not find `syn_rt` in `rt`
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ could not find `syn_rt` in `rt`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
 error[E0425]: cannot find function `attempt` in module `rt`
-  --> syn-grammar/tests/repro_issue.rs:5:1
+  --> syn-grammar/tests/fail_test.rs:7:5
    |
- 5 | / grammar! {
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
+ 7 | /     grammar! {
+ 8 | |         grammar Fail {
 ...  |
-30 | | }
-   | |_^ not found in `rt`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0425]: cannot find function `parse_delimited` in module `rt`
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ help: a function with a similar name exists: `parse_separated`
-   |
-  ::: /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:76:1
-   |
-76 | / pub fn parse_separated<'a, T, P, S>(
-77 | |     mut cursor: Cursor<'a>,
-78 | |     ctx: &mut ParseContext,
-79 | |     mut item_parser: P,
-...  |
-86 | |     P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
-87 | |     S: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, ()> ,
-   | |____________________________________________________________________- similarly named function `parse_separated` defined here
+20 | |     }
+   | |_____^ not found in `rt`
    |
    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0599]: no method named `take_best_error` found for struct `ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
+  --> syn-grammar/tests/fail_test.rs:7:5
    |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
 ...  |
-30 | | }
-   | |_^ method not found in `ParseContext`
+20 | |     }
+   | |_____^ method not found in `ParseContext`
    |
    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0599]: no method named `enter_rule` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
+  --> syn-grammar/tests/fail_test.rs:7:5
    |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
 ...  |
-30 | | }
-   | |_^ method not found in `&mut ParseContext`
+20 | |     }
+   | |_____^ method not found in `&mut ParseContext`
    |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
-    |   arguments to this function are incorrect
-    |
-    = note: expected mutable reference `&mut &ParseBuffer<'_>`
-               found mutable reference `&mut syn::buffer::Cursor<'_>`
-note: function defined here
-   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:505:8
-    |
-505 | pub fn parse_any_ident_impl(
-    |        ^^^^^^^^^^^^^^^^^^^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0277]: `?` couldn't convert the error to `ParseError`
-  --> syn-grammar/tests/repro_issue.rs:30:1
-   |
- 5 | / grammar! {
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | | ^
-   | | |
-   | |_unsatisfied trait bound
-   |   this can't be annotated with `?` because it has type `Result<_, syn::Error>`
-   |
-   = help: the trait `From<syn::Error>` is not implemented for `ParseError`
-   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0599]: the method `parse` exists for struct `syn::buffer::Cursor<'_>`, but its trait bounds were not satisfied
-   --> syn-grammar/tests/repro_issue.rs:5:1
+   --> syn-grammar/tests/fail_test.rs:7:5
     |
-  5 |   grammar! {
-    |  _^
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
+  7 |       grammar! {
+    |  _____^
+  8 | |         grammar Fail {
 ...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_this is an associated function, not a method
-    |   help: use associated function syntax instead: `syn::buffer::Cursor<'_>::parse()`
+ 20 | |     }
+    | |     ^
+    | |     |
+    | |_____this is an associated function, not a method
+    |       help: use associated function syntax instead: `syn::buffer::Cursor<'_>::parse()`
     |
    ::: /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/buffer.rs:99:1
     |
@@ -158,646 +72,281 @@ note: the candidate is defined in the trait `Parse`
             which is required by `&mut syn::buffer::Cursor<'_>: syn::parse::Parser`
     = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0308]: mismatched types
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
-    |   arguments to this function are incorrect
-    |
-    = note: expected mutable reference `&mut &ParseBuffer<'_>`
-               found mutable reference `&mut syn::buffer::Cursor<'_>`
-note: function defined here
-   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:440:8
-    |
-440 | pub fn parse_rust_type_impl(input: &mut ParseStream, ...
-    |        ^^^^^^^^^^^^^^^^^^^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_expected `(_, Cursor<'_>)`, found `()`
-    |   arguments to this enum variant are incorrect
-    |
-    = note:  expected tuple `(_, syn::buffer::Cursor<'_>)`
-            found unit type `()`
-help: the type constructed contains `()` due to the type of the argument passed
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | |_^ this argument influences the type of `Ok`
-note: tuple variant defined here
-   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:561:5
-    |
-561 |     Ok(#[stable(feature = "rust1", since = "1.0.0")] T),
-    |     ^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `set_priority` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no associated item named `PRIO_STRUCTURAL` found for struct `ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ associated item not found in `ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_expected `ParseError`, found `Error`
-    |   arguments to this enum variant are incorrect
-    |
-help: the type constructed contains `syn::Error` due to the type of the argument passed
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | |_^ this argument influences the type of `Err`
-note: tuple variant defined here
-   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:566:5
-    |
-566 |     Err(#[stable(feature = "rust1", since = "1.0.0")]...
-    |     ^^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | | ^
-   | | |
-   | |_expected `Cursor<'_>`, found `&ParseBuffer<'_>`
-   |   arguments to this function are incorrect
-   |
-note: function defined here
-  --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:40:8
-   |
-40 | pub fn attempt_labeled<'a, T, F>(
-   |        ^^^^^^^^^^^^^^^
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0277]: `?` couldn't convert the error to `syn::Error`
-   --> syn-grammar/tests/repro_issue.rs:30:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_unsatisfied trait bound
-    |   this can't be annotated with `?` because it has type `Result<_, ParseError>`
-    |
-    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-help: the trait `From<ParseError>` is not implemented for `syn::Error`
-      but trait `From<LexError>` is implemented for it
-   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/error.rs:411:1
-    |
-411 | impl From<LexError> for Error {
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    = help: for that trait implementation, expected `LexError`, found `ParseError`
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ expected `(Option<_>, Cursor<'_>)`, found `Option<_>`
-   |
-   = note: expected tuple `(Option<_>, syn::buffer::Cursor<'_>)`
-               found enum `Option<_>`
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `stop_aggregation` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no associated item named `PRIO_AGGREGATED` found for struct `ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ associated item not found in `ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0425]: cannot find function `parse_delimited` in module `rt`
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ help: a function with a similar name exists: `parse_separated`
-   |
-  ::: /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:76:1
-   |
-76 | / pub fn parse_separated<'a, T, P, S>(
-77 | |     mut cursor: Cursor<'a>,
-78 | |     ctx: &mut ParseContext,
-79 | |     mut item_parser: P,
-...  |
-86 | |     P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
-87 | |     S: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, ()> ,
-   | |____________________________________________________________________- similarly named function `parse_separated` defined here
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0425]: cannot find function `attempt` in module `rt`
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ not found in `rt`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `record_error` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `exit_rule` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `take_best_error` found for struct `ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ method not found in `ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `enter_rule` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0282]: type annotations needed
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ cannot infer type
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `set_priority` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no associated item named `PRIO_STRUCTURAL` found for struct `ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ associated item not found in `ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-   --> syn-grammar/tests/nested_repetition_test.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar nested_repetition_test {
-  7 | |         pub rule main -> Vec<Vec<i32>> =
-  8 | |             groups:group* -> { groups }
-...   |
- 13 | | }
-    | | ^
-    | | |
-    | |_expected `ParseError`, found `Error`
-    |   arguments to this enum variant are incorrect
-    |
-help: the type constructed contains `syn::Error` due to the type of the argument passed
-   --> syn-grammar/tests/nested_repetition_test.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar nested_repetition_test {
-  7 | |         pub rule main -> Vec<Vec<i32>> =
-  8 | |             groups:group* -> { groups }
-...   |
- 13 | | }
-    | |_^ this argument influences the type of `Err`
-note: tuple variant defined here
-   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:566:5
-    |
-566 |     Err(#[stable(feature = "rust1", since = "1.0.0")]...
-    |     ^^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | | ^
-   | | |
-   | |_expected `Cursor<'_>`, found `&ParseBuffer<'_>`
-   |   arguments to this function are incorrect
-   |
-note: function defined here
-  --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:40:8
-   |
-40 | pub fn attempt_labeled<'a, T, F>(
-   |        ^^^^^^^^^^^^^^^
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0277]: `?` couldn't convert the error to `syn::Error`
-   --> syn-grammar/tests/nested_repetition_test.rs:13:1
-    |
-  5 | / grammar! {
-  6 | |     grammar nested_repetition_test {
-  7 | |         pub rule main -> Vec<Vec<i32>> =
-  8 | |             groups:group* -> { groups }
-...   |
- 13 | | }
-    | | ^
-    | | |
-    | |_unsatisfied trait bound
-    |   this can't be annotated with `?` because it has type `Result<_, ParseError>`
-    |
-    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-help: the trait `From<ParseError>` is not implemented for `syn::Error`
-      but trait `From<LexError>` is implemented for it
-   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/error.rs:411:1
-    |
-411 | impl From<LexError> for Error {
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    = help: for that trait implementation, expected `LexError`, found `ParseError`
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 | / grammar! {
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ expected `(Option<_>, Cursor<'_>)`, found `Option<_>`
-   |
-   = note: expected tuple `(Option<_>, syn::buffer::Cursor<'_>)`
-               found enum `Option<_>`
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `commit` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `stop_aggregation` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no associated item named `PRIO_AGGREGATED` found for struct `ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ associated item not found in `ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `record_error` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `exit_rule` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/nested_repetition_test.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar nested_repetition_test {
- 7 | |         pub rule main -> Vec<Vec<i32>> =
- 8 | |             groups:group* -> { groups }
-...  |
-13 | | }
-   | |_^
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
-    |   arguments to this function are incorrect
-    |
-    = note: expected mutable reference `&mut &ParseBuffer<'_>`
-               found mutable reference `&mut syn::buffer::Cursor<'_>`
-note: function defined here
-   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:494:8
-    |
-494 | pub fn parse_outer_attrs_impl(
-    |        ^^^^^^^^^^^^^^^^^^^^^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-   --> syn-grammar/tests/nested_repetition_test.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar nested_repetition_test {
-  7 | |         pub rule main -> Vec<Vec<i32>> =
-  8 | |             groups:group* -> { groups }
-...   |
- 13 | | }
-    | | ^
-    | | |
-    | |_expected `(_, Cursor<'_>)`, found `Vec<_>`
-    |   arguments to this enum variant are incorrect
-    |
-    = note: expected tuple `(_, syn::buffer::Cursor<'_>)`
-              found struct `Vec<_>`
-help: the type constructed contains `Vec<_>` due to the type of the argument passed
-   --> syn-grammar/tests/nested_repetition_test.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar nested_repetition_test {
-  7 | |         pub rule main -> Vec<Vec<i32>> =
-  8 | |             groups:group* -> { groups }
-...   |
- 13 | | }
-    | |_^ this argument influences the type of `Ok`
-note: tuple variant defined here
-   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:561:5
-    |
-561 |     Ok(#[stable(feature = "rust1", since = "1.0.0")] T),
-    |     ^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-   --> syn-grammar/tests/repro_issue.rs:5:1
-    |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
-...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
-    |   arguments to this function are incorrect
-    |
-    = note: expected mutable reference `&mut &ParseBuffer<'_>`
-               found mutable reference `&mut syn::buffer::Cursor<'_>`
-note: function defined here
-   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:554:8
-    |
-554 | pub fn parse_return_type_impl(
-    |        ^^^^^^^^^^^^^^^^^^^^^^
-    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0599]: no method named `trigger_fail` found for mutable reference `&mut ParseContext` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ method not found in `&mut ParseContext`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-Some errors have detailed explanations: E0277, E0308, E0425, E0599.
-For more information about an error, try `rustc --explain E0277`.
-error: could not compile `syn-grammar` (test "nested_repetition_test") due to 28 previous errors
-error[E0599]: no method named `peek` found for struct `syn::buffer::Cursor<'a>` in the current scope
-  --> syn-grammar/tests/repro_issue.rs:5:1
-   |
- 5 |   grammar! {
-   |  _^
- 6 | |     grammar repro_parser {
- 7 | |         pub top_level_mod -> () =
- 8 | |             outer_attrs
-...  |
-30 | | }
-   | |_^ method not found in `syn::buffer::Cursor<'_>`
-   |
-   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
-
 error[E0277]: `?` couldn't convert the error to `ParseError`
-  --> syn-grammar/tests/repro_issue.rs:30:1
+  --> syn-grammar/tests/fail_test.rs:20:5
    |
-30 | }
-   | ^ unsatisfied trait bound
+20 |     }
+   |     ^ unsatisfied trait bound
    |
    = help: the trait `From<syn::Error>` is not implemented for `ParseError`
    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
+error[E0599]: no method named `peek` found for struct `syn::buffer::Cursor<'a>` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `syn::buffer::Cursor<'_>`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error[E0308]: mismatched types
-   --> syn-grammar/tests/repro_issue.rs:5:1
+   --> syn-grammar/tests/fail_test.rs:7:5
     |
-  5 | / grammar! {
-  6 | |     grammar repro_parser {
-  7 | |         pub top_level_mod -> () =
-  8 | |             outer_attrs
+  7 | /     grammar! {
+  8 | |         grammar Fail {
 ...   |
- 30 | | }
-    | | ^
-    | | |
-    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
-    |   arguments to this function are incorrect
+ 20 | |     }
+    | |     ^
+    | |     |
+    | |_____expected `(_, Cursor<'_>)`, found `()`
+    |       arguments to this enum variant are incorrect
     |
-    = note: expected mutable reference `&mut &ParseBuffer<'_>`
-               found mutable reference `&mut syn::buffer::Cursor<'_>`
-note: function defined here
-   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:455:8
+    = note:  expected tuple `(_, syn::buffer::Cursor<'_>)`
+            found unit type `()`
+help: the type constructed contains `()` due to the type of the argument passed
+   --> syn-grammar/tests/fail_test.rs:7:5
     |
-455 | pub fn parse_lit_str_impl(input: &mut ParseStream, ct...
-    |        ^^^^^^^^^^^^^^^^^^
+  7 | /     grammar! {
+  8 | |         grammar Fail {
+...   |
+ 20 | |     }
+    | |_____^ this argument influences the type of `Ok`
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:561:5
+    |
+561 |     Ok(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ^^
     = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-Some errors have detailed explanations: E0277, E0282, E0308, E0425, E0433, E0599.
-error: could not compile `syn-grammar` (test "repro_issue") due to 88 previous errors
+error[E0277]: `?` couldn't convert the error to `syn::Error`
+   --> syn-grammar/tests/fail_test.rs:20:5
+    |
+  7 | /     grammar! {
+  8 | |         grammar Fail {
+...   |
+ 20 | |     }
+    | |     ^
+    | |     |
+    | |_____unsatisfied trait bound
+    |       this can't be annotated with `?` because it has type `Result<_, ParseError>`
+    |
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+help: the trait `From<ParseError>` is not implemented for `syn::Error`
+      but trait `From<LexError>` is implemented for it
+   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/error.rs:411:1
+    |
+411 | impl From<LexError> for Error {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for that trait implementation, expected `LexError`, found `ParseError`
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 | /     grammar! {
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ expected `(Option<_>, Cursor<'_>)`, found `Option<_>`
+   |
+   = note: expected tuple `(Option<_>, syn::buffer::Cursor<'_>)`
+               found enum `Option<_>`
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `raise_failure` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `set_priority` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no associated item named `PRIO_STRUCTURAL` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ associated item not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `commit` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `error` found for struct `syn::buffer::Cursor<'a>` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `syn::buffer::Cursor<'_>`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `stop_aggregation` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> syn-grammar/tests/fail_test.rs:7:5
+    |
+  7 | /     grammar! {
+  8 | |         grammar Fail {
+...   |
+ 20 | |     }
+    | |     ^
+    | |     |
+    | |_____expected `ParseError`, found `Error`
+    |       arguments to this enum variant are incorrect
+    |
+help: the type constructed contains `syn::Error` due to the type of the argument passed
+   --> syn-grammar/tests/fail_test.rs:7:5
+    |
+  7 | /     grammar! {
+  8 | |         grammar Fail {
+...   |
+ 20 | |     }
+    | |_____^ this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:566:5
+    |
+566 |     Err(#[stable(feature = "rust1", since = "1.0.0")]...
+    |     ^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no associated item named `PRIO_AGGREGATED` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ associated item not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `is_empty` found for struct `syn::buffer::Cursor<'a>` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `syn::buffer::Cursor<'_>`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `fork` found for struct `syn::buffer::Cursor<'a>` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `syn::buffer::Cursor<'_>`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0282]: type annotations needed
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 | /     grammar! {
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ cannot infer type
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `record_error` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 | /     grammar! {
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |     ^
+   | |     |
+   | |_____expected `Cursor<'_>`, found `&ParseBuffer<'_>`
+   |       arguments to this function are incorrect
+   |
+note: function defined here
+  --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:40:8
+   |
+40 | pub fn attempt_labeled<'a, T, F>(
+   |        ^^^^^^^^^^^^^^^
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `exit_rule` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/fail_test.rs:7:5
+   |
+ 7 |       grammar! {
+   |  _____^
+ 8 | |         grammar Fail {
+...  |
+20 | |     }
+   | |_____^
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0282, E0308, E0425, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `syn-grammar` (test "fail_test") due to 23 previous errors
