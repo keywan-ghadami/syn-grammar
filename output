@@ -1,323 +1,803 @@
-warning: unused import: `proc_macro2::TokenStream`
- --> core/grammar-kit/src/combinators.rs:3:5
-  |
-3 | use proc_macro2::TokenStream;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+error[E0433]: failed to resolve: could not find `syn_rt` in `rt`
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ could not find `syn_rt` in `rt`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:152:9
+error[E0425]: cannot find function `attempt` in module `rt`
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ not found in `rt`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find function `parse_delimited` in module `rt`
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ help: a function with a similar name exists: `parse_separated`
+   |
+  ::: /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:76:1
+   |
+76 | / pub fn parse_separated<'a, T, P, S>(
+77 | |     mut cursor: Cursor<'a>,
+78 | |     ctx: &mut ParseContext,
+79 | |     mut item_parser: P,
+...  |
+86 | |     P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
+87 | |     S: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, ()> ,
+   | |____________________________________________________________________- similarly named function `parse_separated` defined here
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `take_best_error` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ method not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `enter_rule` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-152 |     ctx.record_span(t.span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:161:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
+    |   arguments to this function are incorrect
     |
-161 |     ctx.record_span(s_lit.span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:167:9
+    = note: expected mutable reference `&mut &ParseBuffer<'_>`
+               found mutable reference `&mut syn::buffer::Cursor<'_>`
+note: function defined here
+   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:505:8
     |
-167 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+505 | pub fn parse_any_ident_impl(
+    |        ^^^^^^^^^^^^^^^^^^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:173:9
+error[E0277]: `?` couldn't convert the error to `ParseError`
+  --> syn-grammar/tests/repro_issue.rs:30:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | | ^
+   | | |
+   | |_unsatisfied trait bound
+   |   this can't be annotated with `?` because it has type `Result<_, syn::Error>`
+   |
+   = help: the trait `From<syn::Error>` is not implemented for `ParseError`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: the method `parse` exists for struct `syn::buffer::Cursor<'_>`, but its trait bounds were not satisfied
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-173 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:184:9
+  5 |   grammar! {
+    |  _^
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_this is an associated function, not a method
+    |   help: use associated function syntax instead: `syn::buffer::Cursor<'_>::parse()`
     |
-184 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:193:9
+   ::: /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/buffer.rs:99:1
     |
-193 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:202:9
+ 99 |   pub struct Cursor<'a> {
+    |   --------------------- doesn't satisfy `<_ as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, Error>`, `_: FnOnce<(&ParseBuffer<'_>,)>` or `syn::buffer::Cursor<'_>: syn::parse::Parser`
     |
-202 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:211:9
+    = note: found the following associated functions; to be used as methods, functions must have a `self` parameter
+note: the candidate is defined in the trait `Parse`
+   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/parse.rs:216:5
     |
-211 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+216 |     fn parse(input: ParseStream) -> Result<Self>;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: the following trait bounds were not satisfied:
+            `<syn::buffer::Cursor<'_> as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+            which is required by `syn::buffer::Cursor<'_>: syn::parse::Parser`
+            `syn::buffer::Cursor<'_>: FnOnce<(&ParseBuffer<'_>,)>`
+            which is required by `syn::buffer::Cursor<'_>: syn::parse::Parser`
+            `<&syn::buffer::Cursor<'_> as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+            which is required by `&syn::buffer::Cursor<'_>: syn::parse::Parser`
+            `&syn::buffer::Cursor<'_>: FnOnce<(&ParseBuffer<'_>,)>`
+            which is required by `&syn::buffer::Cursor<'_>: syn::parse::Parser`
+            `<&mut syn::buffer::Cursor<'_> as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+            which is required by `&mut syn::buffer::Cursor<'_>: syn::parse::Parser`
+            `&mut syn::buffer::Cursor<'_>: FnOnce<(&ParseBuffer<'_>,)>`
+            which is required by `&mut syn::buffer::Cursor<'_>: syn::parse::Parser`
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:220:9
+error[E0308]: mismatched types
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-220 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:229:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
+    |   arguments to this function are incorrect
     |
-229 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:238:9
+    = note: expected mutable reference `&mut &ParseBuffer<'_>`
+               found mutable reference `&mut syn::buffer::Cursor<'_>`
+note: function defined here
+   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:440:8
     |
-238 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+440 | pub fn parse_rust_type_impl(input: &mut ParseStream, ...
+    |        ^^^^^^^^^^^^^^^^^^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:247:9
+error[E0308]: mismatched types
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-247 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:256:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_expected `(_, Cursor<'_>)`, found `()`
+    |   arguments to this enum variant are incorrect
     |
-256 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:265:9
+    = note:  expected tuple `(_, syn::buffer::Cursor<'_>)`
+            found unit type `()`
+help: the type constructed contains `()` due to the type of the argument passed
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-265 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:274:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | |_^ this argument influences the type of `Ok`
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:561:5
     |
-274 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+561 |     Ok(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:283:9
+error[E0599]: no method named `set_priority` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no associated item named `PRIO_STRUCTURAL` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ associated item not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-283 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:292:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_expected `ParseError`, found `Error`
+    |   arguments to this enum variant are incorrect
     |
-292 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:301:9
+help: the type constructed contains `syn::Error` due to the type of the argument passed
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-301 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:310:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | |_^ this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:566:5
     |
-310 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+566 |     Err(#[stable(feature = "rust1", since = "1.0.0")]...
+    |     ^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:319:9
+error[E0308]: mismatched types
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | | ^
+   | | |
+   | |_expected `Cursor<'_>`, found `&ParseBuffer<'_>`
+   |   arguments to this function are incorrect
+   |
+note: function defined here
+  --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:40:8
+   |
+40 | pub fn attempt_labeled<'a, T, F>(
+   |        ^^^^^^^^^^^^^^^
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `syn::Error`
+   --> syn-grammar/tests/repro_issue.rs:30:1
     |
-319 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:326:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_unsatisfied trait bound
+    |   this can't be annotated with `?` because it has type `Result<_, ParseError>`
     |
-326 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:332:9
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+help: the trait `From<ParseError>` is not implemented for `syn::Error`
+      but trait `From<LexError>` is implemented for it
+   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/error.rs:411:1
     |
-332 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+411 | impl From<LexError> for Error {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for that trait implementation, expected `LexError`, found `ParseError`
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:338:9
+error[E0308]: mismatched types
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ expected `(Option<_>, Cursor<'_>)`, found `Option<_>`
+   |
+   = note: expected tuple `(Option<_>, syn::buffer::Cursor<'_>)`
+               found enum `Option<_>`
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `stop_aggregation` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no associated item named `PRIO_AGGREGATED` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ associated item not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find function `parse_delimited` in module `rt`
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ help: a function with a similar name exists: `parse_separated`
+   |
+  ::: /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:76:1
+   |
+76 | / pub fn parse_separated<'a, T, P, S>(
+77 | |     mut cursor: Cursor<'a>,
+78 | |     ctx: &mut ParseContext,
+79 | |     mut item_parser: P,
+...  |
+86 | |     P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
+87 | |     S: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, ()> ,
+   | |____________________________________________________________________- similarly named function `parse_separated` defined here
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find function `attempt` in module `rt`
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ not found in `rt`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `record_error` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `exit_rule` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `take_best_error` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ method not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `enter_rule` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0282]: type annotations needed
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ cannot infer type
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `set_priority` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no associated item named `PRIO_STRUCTURAL` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ associated item not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> syn-grammar/tests/nested_repetition_test.rs:5:1
     |
-338 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:344:9
+  5 | / grammar! {
+  6 | |     grammar nested_repetition_test {
+  7 | |         pub rule main -> Vec<Vec<i32>> =
+  8 | |             groups:group* -> { groups }
+...   |
+ 13 | | }
+    | | ^
+    | | |
+    | |_expected `ParseError`, found `Error`
+    |   arguments to this enum variant are incorrect
     |
-344 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:350:9
+help: the type constructed contains `syn::Error` due to the type of the argument passed
+   --> syn-grammar/tests/nested_repetition_test.rs:5:1
     |
-350 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:356:9
+  5 | / grammar! {
+  6 | |     grammar nested_repetition_test {
+  7 | |         pub rule main -> Vec<Vec<i32>> =
+  8 | |             groups:group* -> { groups }
+...   |
+ 13 | | }
+    | |_^ this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:566:5
     |
-356 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+566 |     Err(#[stable(feature = "rust1", since = "1.0.0")]...
+    |     ^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:363:9
+error[E0308]: mismatched types
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | | ^
+   | | |
+   | |_expected `Cursor<'_>`, found `&ParseBuffer<'_>`
+   |   arguments to this function are incorrect
+   |
+note: function defined here
+  --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:40:8
+   |
+40 | pub fn attempt_labeled<'a, T, F>(
+   |        ^^^^^^^^^^^^^^^
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `syn::Error`
+   --> syn-grammar/tests/nested_repetition_test.rs:13:1
     |
-363 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:369:9
+  5 | / grammar! {
+  6 | |     grammar nested_repetition_test {
+  7 | |         pub rule main -> Vec<Vec<i32>> =
+  8 | |             groups:group* -> { groups }
+...   |
+ 13 | | }
+    | | ^
+    | | |
+    | |_unsatisfied trait bound
+    |   this can't be annotated with `?` because it has type `Result<_, ParseError>`
     |
-369 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:375:9
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+help: the trait `From<ParseError>` is not implemented for `syn::Error`
+      but trait `From<LexError>` is implemented for it
+   --> /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.117/src/error.rs:411:1
     |
-375 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+411 | impl From<LexError> for Error {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for that trait implementation, expected `LexError`, found `ParseError`
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:381:9
+error[E0308]: mismatched types
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ expected `(Option<_>, Cursor<'_>)`, found `Option<_>`
+   |
+   = note: expected tuple `(Option<_>, syn::buffer::Cursor<'_>)`
+               found enum `Option<_>`
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `commit` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `stop_aggregation` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no associated item named `PRIO_AGGREGATED` found for struct `ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ associated item not found in `ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `record_error` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `exit_rule` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/nested_repetition_test.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar nested_repetition_test {
+ 7 | |         pub rule main -> Vec<Vec<i32>> =
+ 8 | |             groups:group* -> { groups }
+...  |
+13 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-381 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:387:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
+    |   arguments to this function are incorrect
     |
-387 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:393:9
+    = note: expected mutable reference `&mut &ParseBuffer<'_>`
+               found mutable reference `&mut syn::buffer::Cursor<'_>`
+note: function defined here
+   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:494:8
     |
-393 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+494 | pub fn parse_outer_attrs_impl(
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:400:9
+error[E0308]: mismatched types
+   --> syn-grammar/tests/nested_repetition_test.rs:5:1
     |
-400 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:406:9
+  5 | / grammar! {
+  6 | |     grammar nested_repetition_test {
+  7 | |         pub rule main -> Vec<Vec<i32>> =
+  8 | |             groups:group* -> { groups }
+...   |
+ 13 | | }
+    | | ^
+    | | |
+    | |_expected `(_, Cursor<'_>)`, found `Vec<_>`
+    |   arguments to this enum variant are incorrect
     |
-406 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:416:9
+    = note: expected tuple `(_, syn::buffer::Cursor<'_>)`
+              found struct `Vec<_>`
+help: the type constructed contains `Vec<_>` due to the type of the argument passed
+   --> syn-grammar/tests/nested_repetition_test.rs:5:1
     |
-416 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:425:9
+  5 | / grammar! {
+  6 | |     grammar nested_repetition_test {
+  7 | |         pub rule main -> Vec<Vec<i32>> =
+  8 | |             groups:group* -> { groups }
+...   |
+ 13 | | }
+    | |_^ this argument influences the type of `Ok`
+note: tuple variant defined here
+   --> /home/user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:561:5
     |
-425 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+561 |     Ok(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:434:9
+error[E0308]: mismatched types
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-434 |     ctx.record_span(span)?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:442:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
+    |   arguments to this function are incorrect
     |
-442 |     ctx.record_span(t.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:451:9
+    = note: expected mutable reference `&mut &ParseBuffer<'_>`
+               found mutable reference `&mut syn::buffer::Cursor<'_>`
+note: function defined here
+   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:554:8
     |
-451 |     ctx.record_span(b.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+554 | pub fn parse_return_type_impl(
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:457:9
+error[E0599]: no method named `trigger_fail` found for mutable reference `&mut ParseContext` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ method not found in `&mut ParseContext`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0308, E0425, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `syn-grammar` (test "nested_repetition_test") due to 28 previous errors
+error[E0599]: no method named `peek` found for struct `syn::buffer::Cursor<'a>` in the current scope
+  --> syn-grammar/tests/repro_issue.rs:5:1
+   |
+ 5 |   grammar! {
+   |  _^
+ 6 | |     grammar repro_parser {
+ 7 | |         pub top_level_mod -> () =
+ 8 | |             outer_attrs
+...  |
+30 | | }
+   | |_^ method not found in `syn::buffer::Cursor<'_>`
+   |
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `ParseError`
+  --> syn-grammar/tests/repro_issue.rs:30:1
+   |
+30 | }
+   | ^ unsatisfied trait bound
+   |
+   = help: the trait `From<syn::Error>` is not implemented for `ParseError`
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+   --> syn-grammar/tests/repro_issue.rs:5:1
     |
-457 |     ctx.record_span(t.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:463:9
+  5 | / grammar! {
+  6 | |     grammar repro_parser {
+  7 | |         pub top_level_mod -> () =
+  8 | |             outer_attrs
+...   |
+ 30 | | }
+    | | ^
+    | | |
+    | |_expected `&mut &ParseBuffer<'_>`, found `&mut Cursor<'_>`
+    |   arguments to this function are incorrect
     |
-463 |     ctx.record_span(t.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:472:9
+    = note: expected mutable reference `&mut &ParseBuffer<'_>`
+               found mutable reference `&mut syn::buffer::Cursor<'_>`
+note: function defined here
+   --> /home/user/syn-grammar/syn-grammar/src/builtins.rs:455:8
     |
-472 |     ctx.record_span(t.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+455 | pub fn parse_lit_str_impl(input: &mut ParseStream, ct...
+    |        ^^^^^^^^^^^^^^^^^^
+    = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:481:9
-    |
-481 |     ctx.record_span(t.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:490:9
-    |
-490 |     ctx.record_span(t.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:500:13
-    |
-500 |         ctx.record_span(last.span())?;
-    |             ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:510:9
-    |
-510 |     ctx.record_span(ident.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:519:9
-    |
-519 |     ctx.record_span(field.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:529:9
-    |
-529 |     ctx.record_span(field.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:539:9
-    |
-539 |     ctx.record_span(vis.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:549:9
-    |
-549 |     ctx.record_span(generics.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:559:9
-    |
-559 |     ctx.record_span(ret.span())?;
-    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
-   --> syn-grammar/src/builtins.rs:570:13
-    |
-570 |         ctx.record_span(last.span())?;
-    |             ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
-
-For more information about this error, try `rustc --explain E0599`.
-error: could not compile `syn-grammar` (lib) due to 52 previous errors
-error: could not compile `syn-grammar` (lib test) due to 52 previous errors
+Some errors have detailed explanations: E0277, E0282, E0308, E0425, E0433, E0599.
+error: could not compile `syn-grammar` (test "repro_issue") due to 88 previous errors
