@@ -26,7 +26,7 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 9 tests
 .........
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 
 running 6 tests
@@ -52,25 +52,21 @@ failures:
 
 ---- test_fail_vs_deep_error stdout ----
 [TRACE] enter_rule: main
-[TRACE] considering_error: 'expected `c`' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: main
-[TRACE] enter_rule: main
-[TRACE] considering_error: 'expected `b`' (priority: 0, label: None)
+[TRACE] considering_error: 'expected `a`; found unexpected token `a`' (priority: 20, label: None)
 [TRACE] record_error: New best error (no previous)
 [TRACE] exit_rule: main
 
-thread 'test_fail_vs_deep_error' (2403) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_fail_vs_deep_error' (6663) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "hard fail"
-Actual msg:    "expected `b` at column 2 (line 1)\nin main"
+Expected part: "expected `c`"
+Actual msg:    "expected `a`; found unexpected token `a` at column 0 (line 1)\nin main"
 
 Error Debug:
-Error("expected `b` at column 2 (line 1)\nin main")
+Error("expected `a`; found unexpected token `a` at column 0 (line 1)\nin main")
 
 Formatted:
-expected `b` at column 2 (line 1)
+expected `a`; found unexpected token `a` at column 0 (line 1)
 in main
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
@@ -79,69 +75,84 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 failures:
     test_fail_vs_deep_error
 
-test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 error: test failed, to rerun pass `-p syn-grammar --test error_abstraction_test`
 
 running 7 tests
-... 3/7
+.. 2/7
+test_deep_vs_shallow --- FAILED
 test_deepest_error_wins --- FAILED
-...
+.. 6/7
+test_rule_name_in_error_message --- FAILED
+
 failures:
+
+---- test_deep_vs_shallow stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: deep
+[TRACE] exit_rule: deep
+[TRACE] exit_rule: main
+
+thread 'test_deep_vs_shallow' (6668) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `c` at column 4 (line 1)\nin deep\nin main"
+Actual msg:    "propagating fatal unique error"
+
+Error Debug:
+Error("propagating fatal unique error")
+
+Formatted:
+propagating fatal unique error
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 ---- test_deepest_error_wins stdout ----
 [TRACE] enter_rule: main
 [TRACE] enter_rule: deepest err
-[TRACE] considering_error: 'expected `c`' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
 [TRACE] exit_rule: deepest err
 [TRACE] exit_rule: main
-[TRACE] enter_rule: main
-[TRACE] enter_rule: letter
-[TRACE] exit_rule: letter
-[TRACE] enter_rule: letter
-[TRACE] exit_rule: letter
-[TRACE] enter_rule: letter
-[TRACE] considering_error: 'expected one of: `a`, `b`, `c`; found unexpected token `one`' (priority: 20, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] considering_error: 'expected one of: `a`, `b`, `c`; found unexpected token `one`' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: letter
-[TRACE] considering_error: 'No matching rule variant found; found unexpected token `one`' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] enter_rule: num word
-[TRACE] exit_rule: num word
-[TRACE] enter_rule: num word
-[TRACE] considering_error: 'expected one of: `one`, `two`, `zero`; found unexpected token `c`' (priority: 20, label: None)
-[TRACE] record_error: New best error (deeper span)
-[TRACE] considering_error: 'expected one of: `one`, `two`, `zero`; found unexpected token `c`' (priority: 0, label: None)
-[TRACE] record_error: New best error (deeper span)
-[TRACE] exit_rule: num word
-[TRACE] considering_error: 'No matching rule variant found; found unexpected token `c`' (priority: 0, label: None)
-[TRACE] record_error: New best error (deeper span)
-[TRACE] considering_error: 'expected end of input' (priority: 0, label: None)
-[TRACE] exit_rule: main
 
-thread 'test_deepest_error_wins' (2409) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_deepest_error_wins' (6669) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
-Expected part: "expected one of: `one`, `two`, `zero`"
-Actual msg:    "expected end of input at column 8 (line 1)\nin main"
+Expected part: "expected `c` at column 4 (line 1)\nin deepest err\nin main"
+Actual msg:    "propagating fatal unique error"
 
 Error Debug:
-Error("expected end of input at column 8 (line 1)\nin main")
+Error("propagating fatal unique error")
 
 Formatted:
-expected end of input at column 8 (line 1)
-in main
+propagating fatal unique error
 
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_rule_name_in_error_message stdout ----
+[TRACE] enter_rule: main
+[TRACE] enter_rule: inner rule
+[TRACE] exit_rule: inner rule
+[TRACE] exit_rule: main
+
+thread 'test_rule_name_in_error_message' (6672) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `b` at column 2 (line 1)\nin inner rule\nin main"
+Actual msg:    "propagating fatal unique error"
+
+Error Debug:
+Error("propagating fatal unique error")
+
+Formatted:
+propagating fatal unique error
+
 
 
 failures:
+    test_deep_vs_shallow
     test_deepest_error_wins
+    test_rule_name_in_error_message
 
-test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 error: test failed, to rerun pass `-p syn-grammar --test error_reporting_test`
 
@@ -161,14 +172,44 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 4 tests
-....
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test_deep_error_wins --- FAILED
+...
+failures:
 
+---- test_deep_error_wins stdout ----
+[TRACE] enter_rule: main
+[TRACE] exit_rule: main
+
+thread 'test_deep_error_wins' (6681) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `b`"
+Actual msg:    "propagating fatal unique error"
+
+Error Debug:
+Error("propagating fatal unique error")
+
+Formatted:
+propagating fatal unique error
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_deep_error_wins
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p syn-grammar --test labeled_alternatives_test`
 
 running 6 tests
 . 1/6
 test_cxx_deep_ident_error_mid_list --- FAILED
-....
+. 3/6
+test_cxx_garbage_after_item --- FAILED
+. 5/6
+test_cxx_unexpected_eof --- FAILED
+
 failures:
 
 ---- test_cxx_deep_ident_error_mid_list stdout ----
@@ -181,6 +222,7 @@ failures:
 [TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
 [TRACE] record_error: New best error (no previous)
 [TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
 [TRACE] exit_rule: modifier
 [TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
 [TRACE] record_error: New best error (no previous)
@@ -192,10 +234,14 @@ failures:
 [TRACE] exit_rule: type name
 [TRACE] enter_rule: ref qual
 [TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
 [TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (higher/equal priority at same span)
 [TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
 [TRACE] exit_rule: ref qual
 [TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
 [TRACE] exit_rule: param
 [TRACE] exit_rule: function parameter 1
 [TRACE] enter_rule: separator
@@ -212,8 +258,6 @@ failures:
 [TRACE] exit_rule: type name
 [TRACE] enter_rule: ref qual
 [TRACE] exit_rule: ref qual
-[TRACE] considering_error: 'expected identifier' (priority: 0, label: None)
-[TRACE] record_error: New best error (deeper span)
 [TRACE] exit_rule: param
 [TRACE] exit_rule: function parameter 2
 [TRACE] enter_rule: function parameter 2
@@ -221,27 +265,110 @@ failures:
 [TRACE] exit_rule: function parameter 2
 [TRACE] exit_rule: signature
 
-thread 'test_cxx_deep_ident_error_mid_list' (2427) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_cxx_deep_ident_error_mid_list' (6687) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "expected identifier at column 35 (line 1)\nin param\nin function parameter 2\nin signature"
-Actual msg:    "expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature"
+Actual msg:    "expected `::`; found unexpected token `&` at column 33 (line 1)\nin type name\nin param\nin function parameter 2\nin signature"
 
 Error Debug:
-Error("expected function parameter at column 15 (line 1)\nin function parameter 2\nin signature")
+Error("expected `::`; found unexpected token `&` at column 33 (line 1)\nin type name\nin param\nin function parameter 2\nin signature")
 
 Formatted:
-expected function parameter at column 15 (line 1)
+expected `::`; found unexpected token `&` at column 33 (line 1)
+in type name
+in param
 in function parameter 2
 in signature
 
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
+---- test_cxx_garbage_after_item stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: function parameter 1
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected one of: `const`, `constexpr`; found unexpected token `int`' (priority: 10, label: Some("type modifier"))
+[TRACE] record_error: New best error (no previous)
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
+[TRACE] exit_rule: modifier
+[TRACE] considering_error: 'expected `type modifier`; found unexpected token `int`' (priority: 0, label: None)
+[TRACE] record_error: New best error (no previous)
+[TRACE] enter_rule: type name
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] considering_error: 'expected `::`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: type name
+[TRACE] enter_rule: ref qual
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
+[TRACE] considering_error: 'expected one of: `&`, `&&`, `*`; found unexpected token `a`' (priority: 10, label: Some("reference qualifier"))
+[TRACE] record_error: New best error (higher/equal priority at same span)
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 20, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
+[TRACE] exit_rule: ref qual
+[TRACE] considering_error: 'expected `reference qualifier`; found unexpected token `a`' (priority: 0, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
+[TRACE] exit_rule: param
+[TRACE] exit_rule: function parameter 1
+[TRACE] enter_rule: separator
+[TRACE] considering_error: 'expected `,`' (priority: 0, label: Some("separator"))
+[TRACE] record_error: New best error (deeper span)
+[TRACE] exit_rule: separator
+[TRACE] considering_error: 'unexpected token in delimited group' (priority: 0, label: None)
+[TRACE] record_error: New best error (higher/equal priority at same span)
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_garbage_after_item' (6689) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `,` at column 14 (line 1)\nin separator\nin signature"
+Actual msg:    "unexpected token in delimited group at column 14 (line 1)\nin signature"
+
+Error Debug:
+Error("unexpected token in delimited group at column 14 (line 1)\nin signature")
+
+Formatted:
+unexpected token in delimited group at column 14 (line 1)
+in signature
+
+
+---- test_cxx_unexpected_eof stdout ----
+[TRACE] enter_rule: signature
+[TRACE] enter_rule: function parameter 1
+[TRACE] enter_rule: param
+[TRACE] enter_rule: modifier
+[TRACE] exit_rule: modifier
+[TRACE] enter_rule: type name
+[TRACE] exit_rule: type name
+[TRACE] exit_rule: param
+[TRACE] exit_rule: function parameter 1
+[TRACE] exit_rule: signature
+
+thread 'test_cxx_unexpected_eof' (6691) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "unexpected end of input, expected identifier at column 20 (line 1)\nin type name\nin param\nin function parameter 1\nin signature"
+Actual msg:    "propagating fatal unique error"
+
+Error Debug:
+Error("propagating fatal unique error")
+
+Formatted:
+propagating fatal unique error
+
+
 
 failures:
     test_cxx_deep_ident_error_mid_list
+    test_cxx_garbage_after_item
+    test_cxx_unexpected_eof
 
-test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 error: test failed, to rerun pass `-p syn-grammar --test list_dx_test`
 
@@ -261,7 +388,7 @@ failures:
 [TRACE] exit_rule: item 2
 [TRACE] exit_rule: repeated min
 
-thread 'test_repeated_min' (2435) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+thread 'test_repeated_min' (6695) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
 
 🔴 TEST FAILED (Error Message Mismatch):
 Expected part: "expected at least 2 items, found 1 at column"
@@ -279,7 +406,7 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 failures:
     test_repeated_min
 
-test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 error: test failed, to rerun pass `-p syn-grammar --test list_test`
 
@@ -290,7 +417,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 3 tests
 ...
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -317,7 +444,7 @@ failures:
 [TRACE] exit_rule: group
 [TRACE] exit_rule: main
 
-thread 'test_nested_repetition' (2449) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
+thread 'test_nested_repetition' (6709) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
 
 🔴 TEST FAILED (Expected Success, but got Error):
 
@@ -335,13 +462,13 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 failures:
     test_nested_repetition
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 error: test failed, to rerun pass `-p syn-grammar --test nested_repetition_test`
 
 running 7 tests
 .......
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -350,9 +477,38 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 4 tests
-....
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+.. 2/4
+test_peek_basic --- FAILED
+.
+failures:
 
+---- test_peek_basic stdout ----
+[TRACE] enter_rule: main
+[TRACE] exit_rule: main
+[TRACE] enter_rule: main
+[TRACE] exit_rule: main
+
+thread 'test_peek_basic' (6723) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:214:21:
+
+🔴 TEST FAILED (Error Message Mismatch):
+Expected part: "expected `b`"
+Actual msg:    "propagating fatal unique error"
+
+Error Debug:
+Error("propagating fatal unique error")
+
+Formatted:
+propagating fatal unique error
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_peek_basic
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p syn-grammar --test peek_not_test`
 
 running 1 test
 .
@@ -365,52 +521,9 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 3 tests
-.. 2/3
-test_recovery_complex_sync --- FAILED
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-failures:
-
----- test_recovery_complex_sync stdout ----
-[TRACE] enter_rule: main
-[TRACE] enter_rule: item
-[TRACE] enter_rule: val
-[TRACE] exit_rule: val
-[TRACE] exit_rule: item
-[TRACE] enter_rule: item
-[TRACE] enter_rule: val
-[TRACE] considering_error: 'expected integer literal' (priority: 0, label: None)
-[TRACE] record_error: New best error (no previous)
-[TRACE] exit_rule: val
-[TRACE] considering_error: 'propagating fatal unique error' (priority: 0, label: None)
-[TRACE] exit_rule: item
-[TRACE] enter_rule: item
-[TRACE] enter_rule: val
-[TRACE] exit_rule: val
-[TRACE] exit_rule: item
-[TRACE] exit_rule: main
-
-thread 'test_recovery_complex_sync' (2472) panicked at /home/user/syn-grammar/core/grammar-kit/src/testing.rs:105:17:
-
-🔴 TEST FAILED (Expected Success, but got Error):
-
-Error Message:
-expected integer literal at column 16 (line 1)
-in val
-in item
-in main
-
-Error Debug:
-Error("expected integer literal at column 16 (line 1)\nin val\nin item\nin main")
-
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-
-failures:
-    test_recovery_complex_sync
-
-test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-error: test failed, to rerun pass `-p syn-grammar --test recovery_test`
 
 running 1 test
 .
@@ -419,7 +532,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 1 test
 .
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
@@ -444,12 +557,14 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 3 tests
 ...
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
 running 1 test
+    Checking grammar-kit v0.9.0 (/home/user/syn-grammar/core/grammar-kit)
+    Checking syn-grammar v0.9.0 (/home/user/syn-grammar/syn-grammar)
     Checking syn-grammar-tests v0.0.0 (/home/user/syn-grammar/target/tests/trybuild/syn-grammar)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.89s
 
 
 test [0m[1mtests/ui/paren_open.rs[0m ... [0m[32mok
@@ -464,7 +579,7 @@ test [0m[1mtests/ui/paren_open.rs[0m ... [0m[32mok
 [0m
 
 .
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.53s
 
 
 running 4 tests
@@ -474,12 +589,13 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 17 tests
 .................
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.33s
 
-error: 6 targets failed:
+error: 7 targets failed:
     `-p syn-grammar --test error_abstraction_test`
     `-p syn-grammar --test error_reporting_test`
+    `-p syn-grammar --test labeled_alternatives_test`
     `-p syn-grammar --test list_dx_test`
     `-p syn-grammar --test list_test`
     `-p syn-grammar --test nested_repetition_test`
-    `-p syn-grammar --test recovery_test`
+    `-p syn-grammar --test peek_not_test`
