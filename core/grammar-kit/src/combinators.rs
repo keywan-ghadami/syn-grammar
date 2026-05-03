@@ -1,6 +1,5 @@
 use syn::buffer::Cursor;
 use syn::parse::Parser;
-use proc_macro2::TokenStream;
 
 use crate::error::{ParseError, ParseResult};
 use crate::context::ParseContext;
