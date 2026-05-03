@@ -117,11 +117,9 @@ pub fn parse_separated_pure<T, S>(
                             let err = syn::Error::new(item_fork.span(), msg);
                             let rule_name = format!("{} {}", actual_item_name, next_idx);
                             ctx.enter_rule(&rule_name);
+                            // STRUCTURAL FEHLER SPEICHERN, ABER SOFT-BACKTRACK!
                             ctx.record_error(err, item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
                             ctx.exit_rule();
-                            
-                            // SOFT-BACKTRACK: Das Komma wird nicht in den Stream konsumiert.
-                            // Der harte PRIO_STRUCTURAL Fehler überlebt im Kontext!
                             break;
                         }
                     }
