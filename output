@@ -1,26 +1,323 @@
-error[E0616]: field `ctx` of struct `ParseTransaction` is private
-  --> core/grammar-kit/src/combinators.rs:25:37
-   |
-25 | ...ion.ctx) {
-   |        ^^^ private field
+warning: unused import: `proc_macro2::TokenStream`
+ --> core/grammar-kit/src/combinators.rs:3:5
+  |
+3 | use proc_macro2::TokenStream;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-error[E0616]: field `ctx` of struct `ParseTransaction` is private
-  --> core/grammar-kit/src/combinators.rs:47:41
-   |
-47 | ...ion.ctx);
-   |        ^^^ private field
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:152:9
+    |
+152 |     ctx.record_span(t.span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
 
-error[E0616]: field `ctx` of struct `ParseTransaction` is private
-  --> core/grammar-kit/src/combinators.rs:59:41
-   |
-59 | ...ion.ctx);
-   |        ^^^ private field
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:161:9
+    |
+161 |     ctx.record_span(s_lit.span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
 
-error[E0616]: field `ctx` of struct `ParseTransaction` is private
-  --> core/grammar-kit/src/combinators.rs:75:37
-   |
-75 | ...ion.ctx) {
-   |        ^^^ private field
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:167:9
+    |
+167 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
 
-For more information about this error, try `rustc --explain E0616`.
-error: could not compile `grammar-kit` (lib) due to 4 previous errors
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:173:9
+    |
+173 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:184:9
+    |
+184 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:193:9
+    |
+193 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:202:9
+    |
+202 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:211:9
+    |
+211 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:220:9
+    |
+220 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:229:9
+    |
+229 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:238:9
+    |
+238 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:247:9
+    |
+247 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:256:9
+    |
+256 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:265:9
+    |
+265 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:274:9
+    |
+274 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:283:9
+    |
+283 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:292:9
+    |
+292 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:301:9
+    |
+301 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:310:9
+    |
+310 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:319:9
+    |
+319 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:326:9
+    |
+326 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:332:9
+    |
+332 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:338:9
+    |
+338 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:344:9
+    |
+344 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:350:9
+    |
+350 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:356:9
+    |
+356 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:363:9
+    |
+363 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:369:9
+    |
+369 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:375:9
+    |
+375 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:381:9
+    |
+381 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:387:9
+    |
+387 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:393:9
+    |
+393 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:400:9
+    |
+400 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:406:9
+    |
+406 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:416:9
+    |
+416 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:425:9
+    |
+425 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:434:9
+    |
+434 |     ctx.record_span(span)?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:442:9
+    |
+442 |     ctx.record_span(t.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:451:9
+    |
+451 |     ctx.record_span(b.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:457:9
+    |
+457 |     ctx.record_span(t.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:463:9
+    |
+463 |     ctx.record_span(t.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:472:9
+    |
+472 |     ctx.record_span(t.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:481:9
+    |
+481 |     ctx.record_span(t.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:490:9
+    |
+490 |     ctx.record_span(t.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:500:13
+    |
+500 |         ctx.record_span(last.span())?;
+    |             ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:510:9
+    |
+510 |     ctx.record_span(ident.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:519:9
+    |
+519 |     ctx.record_span(field.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:529:9
+    |
+529 |     ctx.record_span(field.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:539:9
+    |
+539 |     ctx.record_span(vis.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:549:9
+    |
+549 |     ctx.record_span(generics.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:559:9
+    |
+559 |     ctx.record_span(ret.span())?;
+    |         ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+error[E0599]: no method named `record_span` found for mutable reference `&mut grammar_kit::ParseContext` in the current scope
+   --> syn-grammar/src/builtins.rs:570:13
+    |
+570 |         ctx.record_span(last.span())?;
+    |             ^^^^^^^^^^^ method not found in `&mut grammar_kit::ParseContext`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `syn-grammar` (lib) due to 52 previous errors
+error: could not compile `syn-grammar` (lib test) due to 52 previous errors
