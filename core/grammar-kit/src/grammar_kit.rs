@@ -4,10 +4,6 @@
 use proc_macro2::Span;
 use std::collections::HashSet;
 #[cfg(feature = "syn")]
-use syn::parse::discouraged::Speculative;
-#[cfg(feature = "syn")]
-use syn::parse::ParseStream;
-#[cfg(feature = "syn")]
 use syn::Result;
 
 #[cfg(feature = "testing")]
@@ -18,7 +14,17 @@ pub mod syn_rt;
 
 pub mod macros;
 
+// --- NEUE SUB-MODULE ---
+#[cfg(all(feature = "rt", feature = "syn"))]
+pub mod transaction;
+#[cfg(all(feature = "rt", feature = "syn"))]
+pub mod combinators;
+
 pub use grammar_kit_macros::with_span;
+
+// Exportiere alle Kombinatoren direkt, damit bestehender Code nicht bricht
+#[cfg(all(feature = "rt", feature = "syn"))]
+pub use combinators::*;
 
 pub trait WithSpan<ParsedData> {
     fn with_span(parsed_data: ParsedData, span: std::ops::Range<usize>) -> Self;
@@ -26,13 +32,11 @@ pub trait WithSpan<ParsedData> {
 
 #[derive(Clone, Default)]
 pub struct ScopeStack {
-    scopes: Vec<HashSet<String>>,
+    pub(crate) scopes: Vec<HashSet<String>>,
 }
 
 impl ScopeStack {
-    pub fn new() -> Self {
-        Self { scopes: vec![HashSet::new()] }
-    }
+    pub fn new() -> Self { Self { scopes: vec![HashSet::new()] } }
     pub fn enter_scope(&mut self) { self.scopes.push(HashSet::new()); }
     pub fn exit_scope(&mut self) { if self.scopes.len() > 1 { self.scopes.pop(); } }
     pub fn define(&mut self, name: impl Into<String>) {
@@ -47,29 +51,29 @@ impl ScopeStack {
 
 #[cfg(all(feature = "rt", feature = "syn"))]
 #[derive(Clone, Debug)]
-struct ErrorState {
-    err: syn::Error,
-    rule_stack: Vec<String>,
-    start_span: Span,
-    priority: u8,
-    is_fatal: bool,
-    label: Option<String>,
+pub(crate) struct ErrorState {
+    pub(crate) err: syn::Error,
+    pub(crate) rule_stack: Vec<String>,
+    pub(crate) start_span: Span,
+    pub(crate) priority: u8,
+    pub(crate) is_fatal: bool,
+    pub(crate) label: Option<String>,
 }
 
 #[cfg(feature = "rt")]
 #[derive(Clone)]
 pub struct ParseContext {
-    is_fatal: bool,
+    pub(crate) is_fatal: bool,
     #[cfg(feature = "syn")]
-    best_error: Option<ErrorState>,
+    pub(crate) best_error: Option<ErrorState>,
     pub scopes: ScopeStack,
-    rule_stack: Vec<String>,
+    pub(crate) rule_stack: Vec<String>,
     #[cfg(feature = "syn")]
     pub last_span: Option<Span>,
     pub pending_priority: u8,
-    suppress_label: bool,
-    mode_stack: Vec<bool>, 
-    group_depth: usize,
+    pub(crate) suppress_label: bool,
+    pub(crate) mode_stack: Vec<bool>, 
+    pub(crate) group_depth: usize,
 }
 
 #[cfg(feature = "rt")]
@@ -180,7 +184,6 @@ impl ParseContext {
                     return;
                 }
 
-                // Gleiche Position: Priorität entscheidet, bei Gleichstand gewinnt der NEUERE.
                 if new_error_state.priority >= existing.priority {
                     #[cfg(feature = "trace")]
                     eprintln!("[TRACE] record_error: New best error (higher/equal priority at same span)");
@@ -277,442 +280,11 @@ impl ParseContext {
 #[cfg(feature = "rt")]
 impl Default for ParseContext { fn default() -> Self { Self::new() } }
 
-#[cfg(all(feature = "rt", feature = "syn"))]
-#[inline]
-pub fn attempt<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<Option<T>>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    attempt_labeled(input, ctx, None, parser)
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-#[inline]
-pub fn attempt_labeled<T, F>(
-    input: ParseStream,
-    ctx: &mut ParseContext,
-    label: Option<&str>,
-    parser: F,
-) -> Result<Option<T>>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let was_fatal = ctx.check_fatal();
-    ctx.set_fatal(false);
-
-    let scopes_snapshot = ctx.scopes.clone();
-    let rule_stack_snapshot = ctx.rule_stack.clone();
-    let last_span_snapshot = ctx.last_span;
-    let mode_stack_snapshot = ctx.mode_stack.clone();
-    let best_error_snapshot = ctx.best_error.clone();
-
-    let start_span = input.span();
-    let fork = input.fork();
-    let res = parser(&fork, ctx);
-    let is_now_fatal = ctx.check_fatal();
-
-    match res {
-        Ok(val) => {
-            input.advance_to(&fork);
-            ctx.set_fatal(was_fatal);
-            ctx.mode_stack = mode_stack_snapshot;
-
-            let keep_error = match &ctx.best_error {
-                Some(e) => {
-                    let e_start = e.start_span.start();
-                    let s_start = start_span.start();
-                    e.priority >= ParseContext::PRIO_AGGREGATED ||
-                    e_start.line > s_start.line || (e_start.line == s_start.line && e_start.column > s_start.column)
-                }
-                None => false,
-            };
-            if !keep_error { ctx.best_error = best_error_snapshot; }
-            Ok(Some(val))
-        }
-        Err(e) => {
-            if e.to_string().contains("__BUBBLE__") || e.to_string().contains("__DUMMY_ERR_BUBBLE__") {
-                ctx.scopes = scopes_snapshot;
-                ctx.rule_stack = rule_stack_snapshot;
-                ctx.last_span = last_span_snapshot;
-                ctx.mode_stack = mode_stack_snapshot;
-                ctx.set_fatal(was_fatal || is_now_fatal);
-                return Err(e);
-            }
-
-            ctx.scopes = scopes_snapshot;
-            ctx.rule_stack = rule_stack_snapshot;
-            ctx.last_span = last_span_snapshot;
-            ctx.mode_stack = mode_stack_snapshot;
-
-            if is_now_fatal {
-                ctx.set_fatal(true);
-                return Err(e);
-            }
-
-            ctx.set_fatal(was_fatal);
-            let suppress = ctx.suppress_label;
-            ctx.suppress_label = false;
-
-            let is_at_start = e.span().start() == start_span.start();
-
-            // PROGRESS = PRESERVATION:
-            let keep_error = match &ctx.best_error {
-                Some(best) => {
-                    let b_start = best.start_span.start();
-                    let s_start = start_span.start();
-                    best.priority >= ParseContext::PRIO_AGGREGATED ||
-                    b_start.line > s_start.line || (b_start.line == s_start.line && b_start.column > s_start.column)
-                }
-                None => false,
-            };
-
-            if !keep_error {
-                ctx.best_error = best_error_snapshot;
-            }
-
-            if !suppress {
-                if is_at_start {
-                    if let Some(lbl) = label {
-                        ctx.record_error(e.clone(), start_span, Some(lbl.to_string()), ParseContext::PRIO_LABELED);
-                    } else {
-                        ctx.record_error(e.clone(), start_span, None, ParseContext::PRIO_NORMAL);
-                    }
-                } else {
-                    // DER RETTENDE ELSE-ZWEIG: Tiefe Fehler aus Basis-Parsern (wie fail, min-length etc.)
-                    // dürfen niemals verschluckt werden!
-                    ctx.record_error(e.clone(), start_span, None, ParseContext::PRIO_NORMAL);
-                }
-            }
-
-            Ok(None)
-        }
-    }
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-#[inline]
-pub fn peek<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<T>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let fork = input.fork();
-    let scopes_snapshot = ctx.scopes.clone();
-    let rule_stack_snapshot = ctx.rule_stack.clone();
-    let last_span_snapshot = ctx.last_span;
-    let mode_stack_snapshot = ctx.mode_stack.clone();
-    let best_error_snapshot = ctx.best_error.clone();
-    
-    let res = parser(&fork, ctx);
-    
-    ctx.scopes = scopes_snapshot;
-    ctx.rule_stack = rule_stack_snapshot;
-    ctx.last_span = last_span_snapshot;
-    ctx.mode_stack = mode_stack_snapshot;
-    ctx.best_error = best_error_snapshot;
-    res
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-#[inline]
-pub fn not_check<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<()>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let fork = input.fork();
-    let scopes_snapshot = ctx.scopes.clone();
-    let rule_stack_snapshot = ctx.rule_stack.clone();
-    let last_span_snapshot = ctx.last_span;
-    let mode_stack_snapshot = ctx.mode_stack.clone();
-    let best_error_snapshot = ctx.best_error.clone();
-
-    let was_fatal = ctx.check_fatal();
-    ctx.set_fatal(false);
-
-    let res = parser(&fork, ctx);
-
-    ctx.set_fatal(was_fatal);
-    ctx.scopes = scopes_snapshot;
-    ctx.rule_stack = rule_stack_snapshot;
-    ctx.last_span = last_span_snapshot;
-    ctx.mode_stack = mode_stack_snapshot;
-    ctx.best_error = best_error_snapshot;
-
-    match res {
-        Ok(_) => Err(syn::Error::new(input.span(), "unexpected match")),
-        Err(_) => Ok(()),
-    }
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-#[inline]
-pub fn attempt_recover<T, F>(input: ParseStream, ctx: &mut ParseContext, parser: F) -> Result<Option<T>>
-where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let was_fatal = ctx.check_fatal();
-    ctx.set_fatal(false);
-
-    let scopes_snapshot = ctx.scopes.clone();
-    let rule_stack_snapshot = ctx.rule_stack.clone();
-    let last_span_snapshot = ctx.last_span;
-    let mode_stack_snapshot = ctx.mode_stack.clone();
-    let best_error_snapshot = ctx.best_error.clone();
-
-    let start_span = input.span();
-    let fork = input.fork();
-    let res = parser(&fork, ctx);
-
-    ctx.set_fatal(was_fatal);
-    
-    match res {
-        Ok(val) => {
-            input.advance_to(&fork);
-            ctx.mode_stack = mode_stack_snapshot;
-
-            let keep_error = match &ctx.best_error {
-                Some(e) => {
-                    let e_start = e.start_span.start();
-                    let s_start = start_span.start();
-                    e.priority >= ParseContext::PRIO_AGGREGATED ||
-                    e_start.line > s_start.line || (e_start.line == s_start.line && e_start.column > s_start.column)
-                }
-                None => false,
-            };
-
-            if !keep_error { ctx.best_error = best_error_snapshot; }
-            Ok(Some(val))
-        }
-        Err(e) => {
-            if e.to_string().contains("__BUBBLE__") || e.to_string().contains("__DUMMY_ERR_BUBBLE__") {
-                return Err(e);
-            }
-
-            ctx.record_error(e, start_span, None, 0);
-            ctx.scopes = scopes_snapshot;
-            ctx.rule_stack = rule_stack_snapshot;
-            ctx.last_span = last_span_snapshot;
-            ctx.mode_stack = mode_stack_snapshot;
-
-            let keep_error = match &ctx.best_error {
-                Some(best) => {
-                    let b_start = best.start_span.start();
-                    let s_start = start_span.start();
-                    best.priority >= ParseContext::PRIO_AGGREGATED ||
-                    b_start.line > s_start.line || (b_start.line == s_start.line && b_start.column > s_start.column)
-                }
-                None => false,
-            };
-
-            if !keep_error { ctx.best_error = best_error_snapshot; }
-
-            Ok(None)
-        }
-    }
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-pub fn parse_separated<T, P, S>(
-    input: ParseStream,
-    ctx: &mut ParseContext,
-    mut item_parser: P,
-    mut sep_parser: S,
-    min: usize,
-    trailing: bool,
-    item_name: &str,
-) -> Result<Vec<T>>
-where
-    P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
-    S: FnMut(ParseStream, &mut ParseContext) -> Result<()> ,
-{
-    let mut items = Vec::new();
-    
-    let first_item_span = input.span();
-    ctx.enter_rule(&format!("{} 1", item_name));
-    let first_item = match attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c)) {
-        Ok(Some(item)) => { ctx.exit_rule(); item }
-        Ok(None) => {
-            ctx.exit_rule();
-            if ctx.stop_aggregation(first_item_span) { return Err(syn::Error::new(first_item_span, "__BUBBLE__")); }
-            return Ok(items);
-        }
-        Err(e) => { ctx.exit_rule(); return Err(e); }
-    };
-    items.push(first_item);
-
-    loop {
-        let pre_sep_span = input.span();
-        let sep_fork = input.fork();
-        ctx.enter_rule("separator");
-        let sep_res = attempt(&sep_fork, ctx, |i, c| sep_parser(i, c));
-        ctx.exit_rule();
-        
-        match sep_res {
-            Ok(Some(_)) => {
-                let item_fork = sep_fork.fork();
-                let next_idx = items.len() + 1;
-                let rule_name = format!("{} {}", item_name, next_idx);
-                ctx.enter_rule(&rule_name);
-                let item_res = attempt_labeled(&item_fork, ctx, Some(item_name), |i, c| item_parser(i, c));
-                ctx.exit_rule();
-                
-                match item_res {
-                    Ok(Some(item)) => {
-                        input.advance_to(&item_fork);
-                        items.push(item);
-                    }
-                    Ok(None) => {
-                        if trailing {
-                            input.advance_to(&sep_fork);
-                            break;
-                        } else {
-                            let msg = format!("expected {}", item_name);
-                            // STRUCTURAL FEHLER SPEICHERN, ABER SOFT-BACKTRACK!
-                            ctx.record_error(syn::Error::new(item_fork.span(), &msg), item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
-                            break; 
-                        }
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
-            Ok(None) => {
-                if ctx.stop_aggregation(pre_sep_span) {
-                    return Err(syn::Error::new(pre_sep_span, "__BUBBLE__"));
-                }
-                break;
-            }
-            Err(e) => return Err(e), 
-        }
-    }
-
-    if items.len() < min {
-        return ctx.raise_failure(
-            &format!("expected at least {} {}s, found {}", min, item_name, items.len()),
-            input.span(),
-        );
-    }
-
-    Ok(items)
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-pub fn parse_repeated<T, P>(
-    input: ParseStream,
-    ctx: &mut ParseContext,
-    mut item_parser: P,
-    min: usize,
-    item_name: &str,
-) -> Result<Vec<T>>
-where
-    P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let mut items = Vec::new();
-    loop {
-        let loop_start_span = input.span();
-        let next_idx = items.len() + 1;
-        let rule_name = format!("{} {}", item_name, next_idx);
-
-        ctx.enter_rule(&rule_name);
-        let item = match attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c)) {
-            Ok(Some(item)) => item,
-            Ok(None) => {
-                ctx.exit_rule();
-                if ctx.stop_aggregation(loop_start_span) {
-                    return Err(syn::Error::new(loop_start_span, "__BUBBLE__"));
-                }
-                break;
-            }
-            Err(e) => {
-                ctx.exit_rule();
-                return Err(e);
-            }
-        };
-        ctx.exit_rule();
-        items.push(item);
-    }
-
-    if items.len() < min {
-        return ctx.raise_failure(
-            &format!("expected at least {} {}s, found {}", min, item_name, items.len()),
-            input.span()
-        );
-    }
-
-    Ok(items)
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-pub fn parse_delimited<T, F>(
-    input: ParseStream,
-    ctx: &mut ParseContext,
-    parser: F,
-    delimiter: char,
-) -> Result<T>
-where
-    F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
-{
-    let content;
-    let final_span: proc_macro2::Span;
-    match delimiter {
-        '(' => {
-            let paren_token = syn::parenthesized!(content in input);
-            final_span = paren_token.span.join();
-        }
-        '{' => {
-            let brace_token = syn::braced!(content in input);
-            final_span = brace_token.span.join();
-        }
-        '[' => {
-            let bracket_token = syn::bracketed!(content in input);
-            final_span = bracket_token.span.join();
-        }
-        _ => {
-            return Err(syn::Error::new(
-                input.span(),
-                "unsupported delimiter for custom parsing",
-            ));
-        }
-    }
-    ctx.record_span(final_span)?;
-
-    ctx.enter_group();
-    let res = parser(&content, ctx);
-    ctx.exit_group();
-
-    match res {
-        Ok(val) => {
-            if !content.is_empty() {
-                if ctx.stop_aggregation(content.span()) {
-                    return Err(syn::Error::new(content.span(), "__BUBBLE__"));
-                }
-                let err = content.error("unexpected token in delimited group");
-                ctx.record_error(err, content.span(), None, ParseContext::PRIO_NORMAL);
-                return Err(syn::Error::new(content.span(), "__BUBBLE__"));
-            } else {
-                Ok(val)
-            }
-        }
-        Err(e) => Err(e)
-    }
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-#[inline]
-pub fn parse_ident(input: ParseStream) -> Result<syn::Ident> { input.parse() }
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-#[inline]
-pub fn parse_int<T: std::str::FromStr>(input: ParseStream) -> Result<T>
-where T::Err: std::fmt::Display,
-{
-    input.parse::<syn::LitInt>()?.base10_parse()
-}
-
-#[cfg(all(feature = "rt", feature = "syn"))]
-pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -> Result<()> {
-    while !input.is_empty() && !predicate(input) {
-        if input.parse::<proc_macro2::TokenTree>().is_err() { break; }
-    }
-    Ok(())
-}
-
 #[cfg(all(test, feature = "rt", feature = "syn"))]
 mod tests {
     use super::*;
+    use syn::parse::Parser;
+    use syn::parse::ParseStream;
 
     #[test]
     fn test_rule_name_in_error() {
@@ -725,25 +297,11 @@ mod tests {
     }
 
     #[test]
-    fn test_nested_rule_name_in_error() {
-        let mut ctx = ParseContext::new();
-        ctx.enter_rule("outer");
-        ctx.enter_rule("inner");
-        let err = syn::Error::new(Span::call_site(), "fail");
-        ctx.record_error(err, Span::call_site(), None, 0);
-        let final_err = ctx.take_best_error().unwrap();
-        assert!(final_err.to_string().contains("fail"));
-        assert!(final_err.to_string().contains("in inner"));
-        assert!(final_err.to_string().contains("in outer"));
-    }
-
-    #[test]
     fn test_attempt_captures_rule_context() {
-        use syn::parse::Parser;
         let mut ctx = ParseContext::new();
         let parser = |input: ParseStream| {
             ctx.enter_rule("outer");
-            let _ = match attempt(input, &mut ctx, |_input, _ctx| {
+            let _ = match crate::combinators::attempt(input, &mut ctx, |_input, _ctx| {
                 Err::<(), syn::Error>(syn::Error::new(Span::call_site(), "parse failed"))
             }) {
                 Ok(Some(_)) => Ok(()),
@@ -755,18 +313,6 @@ mod tests {
         };
         let _ = parser.parse_str("");
         let err = ctx.take_best_error().expect("Error should be recorded");
-        assert!(err.to_string().contains("parse failed"));
-        assert!(err.to_string().contains("in outer"));
-    }
-
-    #[test]
-    fn test_raise_failure() {
-        let mut ctx = ParseContext::new();
-        let span = Span::call_site();
-        ctx.record_error(syn::Error::new(span, "normal error"), span, None, 0);
-        let res: Result<()> = ctx.raise_failure("critical failure", span);
-        assert!(res.is_err());
-        assert_eq!(res.unwrap_err().to_string(), "critical failure");
-        assert!(!ctx.check_fatal());
+        assert!(err.to_string().contains("parse failed") && err.to_string().contains("in outer"));
     }
 }
