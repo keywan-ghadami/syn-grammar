@@ -1,8 +1,7 @@
 use proc_macro2::Span;
 use syn::buffer::Cursor;
+use std::fmt;
 
-/// Die fundamentale Parser-Monade.
-/// Gibt bei Erfolg den generierten AST-Knoten und den GESTEPPTEN Cursor zurück.
 pub type ParseResult<'a, T> = Result<(T, Cursor<'a>), ParseError>;
 
 #[derive(Debug, Clone)]
@@ -10,6 +9,7 @@ pub struct ParseError {
     pub span: Span,
     pub message: String,
     pub priority: u8,
+    pub rule_stack: Vec<String>, // Funktionaler Kontext-Speicher!
 }
 
 impl ParseError {
@@ -18,6 +18,7 @@ impl ParseError {
             span,
             message: message.into(),
             priority: 0,
+            rule_stack: Vec::new(),
         }
     }
 
@@ -26,14 +27,14 @@ impl ParseError {
         self
     }
 
-    /// Die funktionale Alternative zu `take_best_error`.
-    /// Führt deterministisch zwei gescheiterte ODER-Zweige zusammen.
+    pub fn push_rule(&mut self, rule: &str) {
+        self.rule_stack.push(rule.to_string());
+    }
+
     pub fn merge(self, other: Self) -> Self {
-        // 1. Fatale/Strukturelle Fehler (wie fehlende Kommas oder fail!) gewinnen immer
         if self.priority >= 50 && other.priority < 50 { return self; }
         if other.priority >= 50 && self.priority < 50 { return other; }
 
-        // 2. Tiefe im Stream (Progress = Preservation)
         let s_start = self.span.start();
         let o_start = other.span.start();
 
@@ -43,11 +44,30 @@ impl ParseError {
             return other;
         }
 
-        // 3. Gleiche Position: Priorität entscheidet.
-        if self.priority > other.priority {
-            self
-        } else {
-            other
-        }
+        if self.priority > other.priority { self } else { other }
     }
 }
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut msg = self.message.clone();
+        let line = self.span.start().line;
+        let col = self.span.start().column;
+        
+        if !msg.contains(&format!("at column {}", col)) {
+            msg = format!("{} at column {} (line {})", msg, col, line);
+        }
+
+        if !self.rule_stack.is_empty() {
+            for rule in &self.rule_stack {
+                let suffix = format!("\nin {}", rule);
+                if !msg.contains(&suffix) { 
+                    msg = format!("{}{}", msg, suffix); 
+                }
+            }
+        }
+        write!(f, "{}", msg)
+    }
+}
+
+impl std::error::Error for ParseError {}
