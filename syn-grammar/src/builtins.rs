@@ -1,8 +1,34 @@
 use crate::rt::{invoke_syn_parser, ParseContext, ParseError, ParseResult};
 use syn::buffer::Cursor;
+use syn::parse::Parser; // WICHTIG für .parse2()
 use syn::spanned::Spanned;
 use syn::Ident;
 use syn_grammar_model::model::types::{Identifier, SpannedValue, StringLiteral};
+
+// --- Der Retter: Ein Helper für syn-Typen, die nicht das `Parse` Trait nutzen ---
+fn invoke_custom_parser<'a, T, F>(mut cursor: Cursor<'a>, parse_fn: F) -> ParseResult<'a, T>
+where
+    F: FnOnce(syn::parse::ParseStream) -> syn::Result<T>,
+{
+    let stream = cursor.token_stream();
+    let parser = |input: syn::parse::ParseStream| {
+        let val = parse_fn(input)?;
+        let remaining = input.cursor().token_stream().into_iter().count();
+        Ok((val, remaining))
+    };
+    
+    match Parser::parse2(parser, stream.clone()) {
+        Ok((val, remaining)) => {
+            let total = stream.into_iter().count();
+            let consumed = total - remaining;
+            for _ in 0..consumed {
+                if let Some((_, next)) = cursor.token_tree() { cursor = next; }
+            }
+            Ok((val, cursor))
+        }
+        Err(e) => Err(ParseError::new(e.span(), e.to_string())),
+    }
+}
 
 pub fn parse_ident_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext) -> ParseResult<'a, Identifier> {
     let (t, next) = invoke_syn_parser::<syn::Ident>(cursor)?;
@@ -127,13 +153,26 @@ impl_syn_builtin!(parse_lit_char_impl, syn::LitChar);
 impl_syn_builtin!(parse_lit_bool_impl, syn::LitBool);
 impl_syn_builtin!(parse_lit_float_impl, syn::LitFloat);
 impl_syn_builtin!(parse_any_ident_impl, Ident);
-impl_syn_builtin!(parse_named_field_impl, syn::Field); 
 impl_syn_builtin!(parse_visibility_impl, syn::Visibility);
 impl_syn_builtin!(parse_generics_impl, syn::Generics);
 impl_syn_builtin!(parse_return_type_impl, syn::ReturnType);
 
+// --- Custom Parsers (Field, Attribute, Block::parse_within) ---
+
+pub fn parse_named_field_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext) -> ParseResult<'a, syn::Field> {
+    let (t, next) = invoke_custom_parser(cursor, syn::Field::parse_named)?;
+    ctx.record_span(t.span()).map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
+    Ok((t, next))
+}
+
+pub fn parse_unnamed_field_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext) -> ParseResult<'a, syn::Field> {
+    let (t, next) = invoke_custom_parser(cursor, syn::Field::parse_unnamed)?;
+    ctx.record_span(t.span()).map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
+    Ok((t, next))
+}
+
 pub fn parse_outer_attrs_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext) -> ParseResult<'a, Vec<syn::Attribute>> {
-    let (attrs, next) = invoke_syn_parser::<syn::Attribute>(cursor).map(|(a, c)| (vec![a], c))?; 
+    let (attrs, next) = invoke_custom_parser(cursor, syn::Attribute::parse_outer)?; 
     if let Some(last) = attrs.last() {
         ctx.record_span(last.span()).map_err(|e: syn::Error| ParseError::new(last.span(), e.to_string()))?;
     }
@@ -141,9 +180,9 @@ pub fn parse_outer_attrs_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext) ->
 }
 
 pub fn parse_statements_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext) -> ParseResult<'a, Vec<syn::Stmt>> {
-    let (block, next) = invoke_syn_parser::<syn::Block>(cursor)?;
-    if let Some(last) = block.stmts.last() {
+    let (stmts, next) = invoke_custom_parser(cursor, syn::Block::parse_within)?;
+    if let Some(last) = stmts.last() {
         ctx.record_span(last.span()).map_err(|e: syn::Error| ParseError::new(last.span(), e.to_string()))?;
     }
-    Ok((block.stmts, next))
+    Ok((stmts, next))
 }
