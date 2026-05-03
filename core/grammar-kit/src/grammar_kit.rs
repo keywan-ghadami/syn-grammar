@@ -315,12 +315,11 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
             ctx.set_fatal(was_fatal);
             ctx.mode_stack = mode_stack_snapshot;
 
-            // Zero-Progress-Erfolg bedeutet, wir reinigen optionale Überbleibsel.
             let keep_error = match &ctx.best_error {
                 Some(e) => {
                     let e_start = e.start_span.start();
                     let s_start = start_span.start();
-                    e.priority >= ParseContext::PRIO_STRUCTURAL ||
+                    e.priority >= ParseContext::PRIO_AGGREGATED ||
                     e_start.line > s_start.line || (e_start.line == s_start.line && e_start.column > s_start.column)
                 }
                 None => false,
@@ -355,23 +354,32 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
             let is_at_start = e.span().start() == start_span.start();
 
             // PROGRESS = PRESERVATION:
-            // Wir löschen NUR, wenn absolut kein Fortschritt gemacht wurde.
-            if is_at_start {
+            let keep_error = match &ctx.best_error {
+                Some(best) => {
+                    let b_start = best.start_span.start();
+                    let s_start = start_span.start();
+                    best.priority >= ParseContext::PRIO_AGGREGATED ||
+                    b_start.line > s_start.line || (b_start.line == s_start.line && b_start.column > s_start.column)
+                }
+                None => false,
+            };
+
+            if !keep_error {
                 ctx.best_error = best_error_snapshot;
             }
 
             if !suppress {
                 if is_at_start {
-                    // Flacher Fehler: Hier greifen Labels für optionale Zweige!
                     if let Some(lbl) = label {
-                        ctx.record_error(e, start_span, Some(lbl.to_string()), ParseContext::PRIO_LABELED);
+                        ctx.record_error(e.clone(), start_span, Some(lbl.to_string()), ParseContext::PRIO_LABELED);
                     } else {
-                        ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
+                        ctx.record_error(e.clone(), start_span, None, ParseContext::PRIO_NORMAL);
                     }
+                } else {
+                    // DER RETTENDE ELSE-ZWEIG: Tiefe Fehler aus Basis-Parsern (wie fail, min-length etc.)
+                    // dürfen niemals verschluckt werden!
+                    ctx.record_error(e.clone(), start_span, None, ParseContext::PRIO_NORMAL);
                 }
-                // KEIN else-Zweig für tiefe Fehler! 
-                // Wenn Progress gemacht wurde, hat die innere Regel den Fehler bereits perfekt aufgezeichnet.
-                // Das verhindert das zerstörerische Double-Reporting!
             }
 
             Ok(None)
@@ -460,7 +468,7 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
                 Some(e) => {
                     let e_start = e.start_span.start();
                     let s_start = start_span.start();
-                    e.priority >= ParseContext::PRIO_STRUCTURAL ||
+                    e.priority >= ParseContext::PRIO_AGGREGATED ||
                     e_start.line > s_start.line || (e_start.line == s_start.line && e_start.column > s_start.column)
                 }
                 None => false,
@@ -484,7 +492,7 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
                 Some(best) => {
                     let b_start = best.start_span.start();
                     let s_start = start_span.start();
-                    best.priority >= ParseContext::PRIO_STRUCTURAL ||
+                    best.priority >= ParseContext::PRIO_AGGREGATED ||
                     b_start.line > s_start.line || (b_start.line == s_start.line && b_start.column > s_start.column)
                 }
                 None => false,
