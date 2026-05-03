@@ -306,15 +306,13 @@ impl ParseContext {
                         return;
                     }
 
-                    // Tie-breaker: longer message length (more info)
-                    if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
-                        #[cfg(feature = "trace")]
-                        eprintln!("[TRACE] record_error: New best error (longer message)");
-                        self.best_error = Some(new_error_state);
-                    } else {
-                        #[cfg(feature = "trace")]
-                        eprintln!("[TRACE] record_error: Rejected (shorter message)");
-                    }
+                    // Tie-breaker: Always prefer the newest error if all else is equal.
+                    // In a sequence like `A? B`, if A fails and B fails at the exact same location 
+                    // with the same priority, B is the mandatory rule that the parser evaluated last.
+                    // Preferring the newest error correctly overwrites residual errors from optional paths.
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: New best error (newer error at same position wins)");
+                    self.best_error = Some(new_error_state);
                 } else {
                     #[cfg(feature = "trace")]
                     eprintln!("[TRACE] record_error: Rejected (less specific context)");
@@ -527,7 +525,7 @@ where
             // THE HIGH-WATER MARK FIX:
             // Wir behalten den inneren Fehler NUR, wenn er tiefer im Input 
             // aufgetreten ist, als dieser Versuch gestartet wurde (echter Fortschritt).
-            // Zero-Progress-Fehler aus optionalen Zweigen (wie modifier?) werden verworfen.
+            // Zero-Progress-Fehler aus erfolgreichen aber leeren Zweigen werden verworfen.
             let keep_error = match &ctx.best_error {
                 Some(e) => {
                     let e_start = e.start_span.start();
@@ -555,6 +553,8 @@ where
                 return Err(e);
             }
 
+            let is_at_start = e.span().start() == start_span.start();
+
             // On any failure, restore the non-error-related context.
             ctx.scopes = scopes_snapshot;
             ctx.rule_stack = rule_stack_snapshot;
@@ -573,27 +573,11 @@ where
             let suppress = ctx.suppress_label;
             ctx.suppress_label = false;
 
-            // THE HIGH-WATER MARK FIX:
-            // Prüfe, ob der Kontext (best_error) echten Fortschritt gemacht hat.
-            let made_deep_progress = match &ctx.best_error {
-                Some(best) => {
-                    let b_start = best.start_span.start();
-                    let s_start = start_span.start();
-                    b_start.line > s_start.line || (b_start.line == s_start.line && b_start.column > s_start.column)
-                }
-                None => false,
-            };
-
-            // Nur wenn KEIN Fortschritt gemacht wurde, löschen wir angesammelte Fehler
-            // aus optionalen/gescheiterten Zweigen. Tiefe Fehler bleiben erhalten!
-            if !made_deep_progress {
-                ctx.best_error = best_error_snapshot;
-            }
-
+            // Es findet HIER KEIN WIPE-OUT MEHR STATT! 
+            // Tiefe Fehler oder Aggregationen in Alternativen überleben wie vorgesehen.
             if !suppress {
                 if let Some(lbl) = label {
-                    let e_is_at_start = e.span().start() == start_span.start();
-                    if e_is_at_start {
+                    if is_at_start {
                         ctx.record_error(e, start_span, Some(lbl.to_string()), ParseContext::PRIO_LABELED);
                     } else {
                         ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
