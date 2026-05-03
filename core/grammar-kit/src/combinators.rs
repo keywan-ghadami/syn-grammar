@@ -1,8 +1,17 @@
 use syn::buffer::Cursor;
+use proc_macro2::TokenStream;
 use syn::parse::Parser;
+use crate::{ParseContext, ParseError, ParseResult};
 
-use crate::error::{ParseError, ParseResult};
-use crate::context::ParseContext;
+/// Erlaubt das Peeken von spezifischen syn::Tokens auf einem Cursor
+pub fn peek_syn<'a, F>(cursor: Cursor<'a>, peek_fn: F) -> bool
+where
+    F: FnOnce(syn::parse::ParseStream) -> bool,
+{
+    let stream = cursor.token_stream();
+    let parser = |input: syn::parse::ParseStream| Ok(peek_fn(input));
+    Parser::parse2(parser, stream).unwrap_or(false)
+}
 
 /// Der universelle Brücken-Kombinator.
 /// Verwandelt den Cursor in einen TokenStream, lässt syn parsen und rechnet
