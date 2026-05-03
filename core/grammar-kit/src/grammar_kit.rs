@@ -160,17 +160,10 @@ impl ParseContext {
             }
             Some(existing) => {
                 if new_error_state.is_fatal && !existing.is_fatal {
-                    self.best_error = Some(new_error_state); return;
-                }
-                if existing.is_fatal && !new_error_state.is_fatal { return; }
-
-                // PRIO_STRUCTURAL (wie `fail` oder Listenabbrüche) überschreibt ALLES
-                if new_error_state.priority >= Self::PRIO_STRUCTURAL && existing.priority < Self::PRIO_STRUCTURAL {
-                    self.best_error = Some(new_error_state); return;
-                }
-                if existing.priority >= Self::PRIO_STRUCTURAL && new_error_state.priority < Self::PRIO_STRUCTURAL {
+                    self.best_error = Some(new_error_state);
                     return;
                 }
+                if existing.is_fatal && !new_error_state.is_fatal { return; }
 
                 let new_start = new_error_state.start_span.start();
                 let old_start = existing.start_span.start();
@@ -181,32 +174,20 @@ impl ParseContext {
                 if is_deeper {
                     #[cfg(feature = "trace")]
                     eprintln!("[TRACE] record_error: New best error (deeper span)");
-                    self.best_error = Some(new_error_state); return;
+                    self.best_error = Some(new_error_state); 
+                    return;
                 } else if is_shallower {
                     return;
                 }
 
-                if new_error_state.priority > existing.priority {
-                    self.best_error = Some(new_error_state); return;
-                } else if existing.priority > new_error_state.priority {
-                    return;
-                }
-
-                if new_error_state.rule_stack.len() > existing.rule_stack.len() || (new_error_state.label.is_some() && existing.label.is_none()) {
-                    self.best_error = Some(new_error_state);
-                } else if new_error_state.rule_stack.len() == existing.rule_stack.len() {
-                    let is_new_generic = new_error_state.err.to_string().contains("No matching");
-                    let is_existing_generic = existing.err.to_string().contains("No matching");
-
-                    if is_existing_generic && !is_new_generic {
-                        self.best_error = Some(new_error_state); return;
-                    } else if is_new_generic && !is_existing_generic {
-                        return;
-                    }
-                    
+                // Gleiche Position: Priorität entscheidet, bei Gleichstand gewinnt der NEUERE.
+                if new_error_state.priority >= existing.priority {
                     #[cfg(feature = "trace")]
-                    eprintln!("[TRACE] record_error: New best error (newer error at same position wins)");
+                    eprintln!("[TRACE] record_error: New best error (higher/equal priority at same span)");
                     self.best_error = Some(new_error_state);
+                } else {
+                    #[cfg(feature = "trace")]
+                    eprintln!("[TRACE] record_error: Rejected (lower priority at same span)");
                 }
             }
         }
@@ -255,7 +236,6 @@ impl ParseContext {
 
             let e_start = e.start_span.start();
             let c_start = current_span.start();
-
             if e_start.line > c_start.line || (e_start.line == c_start.line && e_start.column > c_start.column) {
                 return true;
             }
@@ -335,6 +315,7 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
             ctx.set_fatal(was_fatal);
             ctx.mode_stack = mode_stack_snapshot;
 
+            // Zero-Progress-Erfolg bedeutet, wir reinigen optionale Überbleibsel.
             let keep_error = match &ctx.best_error {
                 Some(e) => {
                     let e_start = e.start_span.start();
@@ -344,7 +325,6 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
                 }
                 None => false,
             };
-
             if !keep_error { ctx.best_error = best_error_snapshot; }
             Ok(Some(val))
         }
@@ -372,32 +352,26 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
             let suppress = ctx.suppress_label;
             ctx.suppress_label = false;
 
-            let keep_error = match &ctx.best_error {
-                Some(e) => {
-                    let e_start = e.start_span.start();
-                    let s_start = start_span.start();
-                    e.priority >= ParseContext::PRIO_STRUCTURAL ||
-                    e_start.line > s_start.line || (e_start.line == s_start.line && e_start.column > s_start.column)
-                }
-                None => false,
-            };
+            let is_at_start = e.span().start() == start_span.start();
 
-            if !keep_error { ctx.best_error = best_error_snapshot; }
+            // PROGRESS = PRESERVATION:
+            // Wir löschen NUR, wenn absolut kein Fortschritt gemacht wurde.
+            if is_at_start {
+                ctx.best_error = best_error_snapshot;
+            }
 
             if !suppress {
-                let e_start = e.span().start();
-                let s_start = start_span.start();
-                let is_at_start = e_start.line == s_start.line && e_start.column == s_start.column;
-                
-                if let Some(lbl) = label {
-                    if is_at_start {
+                if is_at_start {
+                    // Flacher Fehler: Hier greifen Labels für optionale Zweige!
+                    if let Some(lbl) = label {
                         ctx.record_error(e, start_span, Some(lbl.to_string()), ParseContext::PRIO_LABELED);
                     } else {
                         ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
                     }
-                } else {
-                    ctx.record_error(e, start_span, None, ParseContext::PRIO_NORMAL);
                 }
+                // KEIN else-Zweig für tiefe Fehler! 
+                // Wenn Progress gemacht wurde, hat die innere Regel den Fehler bereits perfekt aufgezeichnet.
+                // Das verhindert das zerstörerische Double-Reporting!
             }
 
             Ok(None)
@@ -416,7 +390,7 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
     let last_span_snapshot = ctx.last_span;
     let mode_stack_snapshot = ctx.mode_stack.clone();
     let best_error_snapshot = ctx.best_error.clone();
-
+    
     let res = parser(&fork, ctx);
     
     ctx.scopes = scopes_snapshot;
@@ -424,7 +398,6 @@ where F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
     ctx.last_span = last_span_snapshot;
     ctx.mode_stack = mode_stack_snapshot;
     ctx.best_error = best_error_snapshot;
-
     res
 }
 
@@ -580,8 +553,9 @@ where
                             break;
                         } else {
                             let msg = format!("expected {}", item_name);
+                            // STRUCTURAL FEHLER SPEICHERN, ABER SOFT-BACKTRACK!
                             ctx.record_error(syn::Error::new(item_fork.span(), &msg), item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
-                            break; // Soft-backtrack!
+                            break; 
                         }
                     }
                     Err(e) => return Err(e),
@@ -731,7 +705,7 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
 #[cfg(all(test, feature = "rt", feature = "syn"))]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_rule_name_in_error() {
         let mut ctx = ParseContext::new();
