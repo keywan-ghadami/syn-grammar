@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use proc_macro2::Span;
 
 #[derive(Clone, Default)]
 pub struct ScopeStack {
@@ -19,12 +20,13 @@ impl ScopeStack {
     }
 }
 
-/// Schlanker State für Variablen und Whitespace-Modus.
-/// Muss bei Backtracking geklont werden (billig, da meist winzig).
+/// Schlanker State für Variablen, Whitespace-Modus und Span-Tracking.
+/// Wird beim Backtracking geklont (billig, da meist winzig).
 #[derive(Clone)]
 pub struct ParseContext {
     pub scopes: ScopeStack,
     pub mode_stack: Vec<bool>, 
+    pub last_span: Option<Span>, // Wichtig für den Lexical-Mode!
 }
 
 impl ParseContext {
@@ -32,12 +34,36 @@ impl ParseContext {
         Self {
             scopes: ScopeStack::new(),
             mode_stack: Vec::new(),
+            last_span: None,
         }
     }
 
     pub fn enter_lexical(&mut self) { self.mode_stack.push(true); }
     pub fn exit_mode(&mut self) { self.mode_stack.pop(); }
     pub fn is_lexical(&self) -> bool { *self.mode_stack.last().unwrap_or(&false) }
+
+    /// Zeichnet den Span auf und wirft einen Fehler, wenn im Lexical-Mode 
+    /// fälschlicherweise Leerzeichen zwischen den Tokens stehen.
+    pub fn record_span(&mut self, span: Span) -> syn::Result<()> {
+        if self.is_lexical() {
+            if let Some(last) = self.last_span {
+                // Wenn das Ende des letzten Tokens nicht der Anfang des neuen ist, gibt es Whitespace
+                if last.end() != span.start() {
+                    return Err(syn::Error::new(span, "expected no whitespace"));
+                }
+            }
+        }
+        self.last_span = Some(span);
+        Ok(())
+    }
+
+    pub fn check_whitespace(&self, next_span: Span) -> bool {
+        if let Some(last) = self.last_span { 
+            last.end() != next_span.start() 
+        } else { 
+            true 
+        }
+    }
 }
 
 impl Default for ParseContext {
