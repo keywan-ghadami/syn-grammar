@@ -52,9 +52,7 @@ pub fn parse_separated_pure<T, S>(
     let mut parse_item = |input: ParseStream, ctx: &mut ParseContext, idx: usize| -> Result<Option<T>> {
         let rule_name = format!("{} {}", actual_item_name, idx);
         ctx.enter_rule(&rule_name);
-        
         let res = attempt_labeled_pure(input, ctx, item_name, &mut item_parser);
-        
         ctx.exit_rule();
         res
     };
@@ -88,7 +86,6 @@ pub fn parse_separated_pure<T, S>(
 
     loop {
         let sep_fork = input.fork();
-        
         ctx.enter_rule("separator");
         let sep_res = attempt_labeled_pure(&sep_fork, ctx, Some("separator"), &mut sep_parser);
         ctx.exit_rule();
@@ -118,13 +115,14 @@ pub fn parse_separated_pure<T, S>(
                                 format!("expected {}", actual_item_name)
                             };
                             let err = syn::Error::new(item_fork.span(), msg);
-                            
                             let rule_name = format!("{} {}", actual_item_name, next_idx);
                             ctx.enter_rule(&rule_name);
                             ctx.record_error(err, item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
                             ctx.exit_rule();
                             
-                            return Err(syn::Error::new(item_fork.span(), "__BUBBLE__"));
+                            // SOFT-BACKTRACK: Das Komma wird nicht in den Stream konsumiert.
+                            // Der harte PRIO_STRUCTURAL Fehler überlebt im Kontext!
+                            break;
                         }
                     }
                     Err(e) => return Err(e),
