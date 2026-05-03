@@ -1,5 +1,3 @@
-
-
 #![doc = include_str!("../README.md")]
 
 #[cfg(feature = "syn")]
@@ -171,10 +169,8 @@ impl ParseContext {
     pub fn raise_failure<T>(&mut self, msg: impl std::fmt::Display, span: Span) -> Result<T> {
         // Trigger high priority handling
         self.set_priority(Self::PRIO_STRUCTURAL);
-
         // Don't auto-label this error (e.g. don't say "expected identifier" if we explicitly say "number too big")
         self.suppress_label = true;
-
         Err(syn::Error::new(span, msg))
     }
 
@@ -208,7 +204,6 @@ impl ParseContext {
         mut priority: u8,
     ) {
         let err_str = err.to_string();
-        
         // 1. FILTER DUMMY BUBBLE ERROR
         if err_str.contains("__DUMMY_ERR_BUBBLE__") || err_str.contains("__BUBBLE__") {
             #[cfg(feature = "trace")]
@@ -219,14 +214,13 @@ impl ParseContext {
         // Trace every considered error before any filtering.
         #[cfg(feature = "trace")]
         eprintln!("[TRACE] considering_error: '{}' (priority: {}, label: {:?})", err_str, priority, label);
-
+        
         // Eskalierte Priorität aus dem Kontext übernehmen und sofort zurücksetzen
         priority = std::cmp::max(priority, self.pending_priority);
         self.pending_priority = Self::PRIO_NORMAL;
 
         // We use the error's actual location for comparison
         let error_span = err.span();
-
         let new_error_state = ErrorState {
             err,
             rule_stack: self.rule_stack.clone(),
@@ -235,7 +229,7 @@ impl ParseContext {
             is_fatal: self.is_fatal,
             label,
         };
-
+        
         match &mut self.best_error {
             None => {
                 #[cfg(feature = "trace")]
@@ -338,7 +332,6 @@ impl ParseContext {
 
         if best.priority >= Self::PRIO_LABELED && best.priority < Self::PRIO_STRUCTURAL && best.label.is_some() {
             let label = best.label.as_ref().unwrap();
-
             // Prepend "unexpected end of input" for clarity if that was the root cause.
             if original_err_str.contains("unexpected end of input") {
                 msg = format!("unexpected end of input, expected {}", label);
@@ -355,7 +348,7 @@ impl ParseContext {
 
         let line = best.start_span.start().line;
         let col = best.start_span.start().column;
-
+        
         // ORIGINAL POSITION: Put column info directly after the main message
         if !msg.contains(&format!("at column {}", col)) {
             msg = format!("{} at column {} (line {})", msg, col, line);
@@ -373,7 +366,6 @@ impl ParseContext {
 
         Some(syn::Error::new(best.start_span, msg))
     }
-
 
     /// Determines if the current best error is "significant enough" to stop
     /// parsing alternatives. A significant error is one that is fatal,
@@ -408,7 +400,6 @@ impl ParseContext {
     }
 
     // --- Span Tracking & Lexical Mode ---
-
 
     pub fn enter_lexical(&mut self) {
         self.mode_stack.push(true);
@@ -452,7 +443,6 @@ impl ParseContext {
 
     // --- Symbol Table Methods ---
 
-
     pub fn enter_scope(&mut self) {
         self.scopes.enter_scope();
     }
@@ -470,7 +460,6 @@ impl ParseContext {
     }
 
     // --- Inspection Methods ---
-
 
     pub fn scopes(&self) -> &Vec<HashSet<String>> {
         self.scopes.scopes()
@@ -526,7 +515,6 @@ where
 
     let start_span = input.span();
     let fork = input.fork();
-
     let res = parser(&fork, ctx);
     let is_now_fatal = ctx.check_fatal();
 
@@ -629,7 +617,7 @@ where
     F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
 {
     let fork = input.fork();
-
+    
     // Snapshot state
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
@@ -638,7 +626,7 @@ where
     let best_error_snapshot = ctx.best_error.clone();
 
     let res = parser(&fork, ctx);
-
+    
     // Always restore state because we are peeking (state side effects should not persist)
     ctx.scopes = scopes_snapshot;
     ctx.rule_stack = rule_stack_snapshot;
@@ -660,7 +648,7 @@ where
     F: FnOnce(ParseStream, &mut ParseContext) -> Result<T>,
 {
     let fork = input.fork();
-
+    
     // Snapshot state
     let scopes_snapshot = ctx.scopes.clone();
     let rule_stack_snapshot = ctx.rule_stack.clone();
@@ -676,7 +664,7 @@ where
 
     // Restore fatal flag
     ctx.set_fatal(was_fatal);
-
+    
     // Restore state
     ctx.scopes = scopes_snapshot;
     ctx.rule_stack = rule_stack_snapshot;
@@ -715,19 +703,18 @@ where
 
     let start_span = input.span();
     let fork = input.fork();
-
     let res = parser(&fork, ctx);
 
     // Always restore fatal state, ignoring whatever happened inside.
     ctx.set_fatal(was_fatal);
-
+    
     match res {
         Ok(val) => {
             input.advance_to(&fork);
             // Keep last_span
             // Restore mode stack
             ctx.mode_stack = mode_stack_snapshot;
-            
+
             // HIGH-WATER MARK FIX:
             let keep_error = match &ctx.best_error {
                 Some(e) => {
@@ -779,7 +766,7 @@ where
     S: FnMut(ParseStream, &mut ParseContext) -> Result<()> ,
 {
     let mut items = Vec::new();
-
+    
     // 1. Parse the first item.
     let first_item_span = input.span();
     ctx.enter_rule(&format!("{} 1", item_name));
@@ -810,7 +797,7 @@ where
         ctx.enter_rule("separator");
         let sep_res = attempt(&fork, ctx, |i, c| sep_parser(i, c));
         ctx.exit_rule();
-
+        
         match sep_res {
             Ok(Some(_)) => {
                 // Separator found, commit.
@@ -835,7 +822,7 @@ where
         ctx.enter_rule(&rule_name);
         let item_res = attempt_labeled(input, ctx, Some(item_name), |i, c| item_parser(i, c));
         ctx.exit_rule();
-
+        
         match item_res {
             Ok(Some(item)) => items.push(item),
             Ok(None) => {
@@ -866,7 +853,6 @@ where
     Ok(items)
 }
 
-
 /// A combinator for parsing a repetition of an item.
 /// It continues parsing until the item parser fails and handles a minimum number of items.
 #[cfg(all(feature = "rt", feature = "syn"))]
@@ -881,7 +867,6 @@ where
     P: FnMut(ParseStream, &mut ParseContext) -> Result<T>,
 {
     let mut items = Vec::new();
-
     loop {
         let loop_start_span = input.span();
         let next_idx = items.len() + 1;
@@ -915,8 +900,6 @@ where
 
     Ok(items)
 }
-
-
 
 // --- Delimited Parsing ---
 
@@ -974,7 +957,7 @@ where
 
                 let err = content.error("unexpected token in delimited group");
                 // WICHTIG: Setze dies auf PRIO_NORMAL, damit es spezifischere (tiefere) Item-Fehler
-                // in der Liste nicht überschreibt! 
+                // in der Liste nicht überschreibt!
                 ctx.record_error(err, content.span(), None, ParseContext::PRIO_NORMAL);
                 return Err(syn::Error::new(content.span(), "__BUBBLE__"));
             } else {
@@ -987,7 +970,6 @@ where
         }
     }
 }
-
 
 // --- Stateless Helpers (No Context Needed) ---
 
@@ -1019,16 +1001,17 @@ pub fn skip_until(input: ParseStream, predicate: impl Fn(ParseStream) -> bool) -
 #[cfg(all(test, feature = "rt", feature = "syn"))]
 mod tests {
     use super::*;
-
+    
     #[test]
     fn test_rule_name_in_error() {
         let mut ctx = ParseContext::new();
         ctx.enter_rule("test_rule");
-
+        
         let err = syn::Error::new(Span::call_site(), "expected something");
         ctx.record_error(err, Span::call_site(), None, 0);
 
         let final_err = ctx.take_best_error().unwrap();
+        
         // Updated expectation to match new format
         assert!(
             final_err.to_string().contains("expected something") &&
@@ -1039,6 +1022,7 @@ mod tests {
     #[test]
     fn test_nested_rule_name_in_error() {
         let mut ctx = ParseContext::new();
+        
         ctx.enter_rule("outer");
         ctx.enter_rule("inner");
 
@@ -1052,13 +1036,13 @@ mod tests {
         assert!(final_err_str.contains("in inner"));
         assert!(final_err_str.contains("in outer"));
 
-
         // Simulate outer rule recording it too
-        ctx.exit_rule(); // inner popped
+        ctx.exit_rule();
+        // inner popped
 
         // record the ALREADY FORMATTED error
         ctx.record_error(final_err, Span::call_site(), None, 0);
-
+        
         let final_err2 = ctx.take_best_error().unwrap();
         let final_err2_str = final_err2.to_string();
 
@@ -1071,12 +1055,12 @@ mod tests {
     #[test]
     fn test_attempt_captures_rule_context() {
         use syn::parse::Parser;
-
+        
         let mut ctx = ParseContext::new();
 
         let parser = |input: ParseStream| {
             ctx.enter_rule("outer");
-
+            
             let _ = match attempt(input, &mut ctx, |_input, _ctx| {
                 Err::<(), syn::Error>(syn::Error::new(Span::call_site(), "parse failed"))
             }) {
@@ -1088,7 +1072,7 @@ mod tests {
             ctx.exit_rule();
             Ok(())
         };
-
+        
         let _ = parser.parse_str("");
 
         let err = ctx.take_best_error().expect("Error should be recorded");
@@ -1103,7 +1087,7 @@ mod tests {
 
         // Record a normal error first
         ctx.record_error(syn::Error::new(span, "normal error"), span, None, 0);
-
+        
         // Now raise a failure
         let res: Result<()> = ctx.raise_failure("critical failure", span);
 
@@ -1112,11 +1096,10 @@ mod tests {
 
         // Assert that it is NOT fatal by default (reverted behavior)
         assert!(!ctx.check_fatal());
-
+        
         // The pattern for `fail` is: return Err from parser immediately.
         // The attempt() wrapper catches it.
         // If it's caught, record_error is called.
         // record_error sees `fail_triggered` is true, so priority becomes 2.
     }
-
 }
