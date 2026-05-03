@@ -14,102 +14,133 @@ warning: unused import: `syn::spanned::Spanned`
   |
   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-error[E0277]: the trait bound `syn::Field: Parse` is not satisfied
-   --> syn-grammar/src/builtins.rs:130:43
-    |
-130 | impl_syn_builtin!(parse_named_field_impl, syn::Field); 
-    |                                           ^^^^^^^^^^ the trait `Parse` is not implemented for `syn::Field`
-    |
-    = help: the following other types implement trait `Parse`:
-              Abstract
-              AndAnd
-              AndEq
-              AngleBracketedGenericArguments
-              Arm
-              As
-              At
-              Auto
-            and 268 others
-note: required by a bound in `grammar_kit::invoke_syn_parser`
-   --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:19:33
-    |
- 19 | ...arser<'a, T: syn::parse::Parse>(mut cursor: Cursor...
-    |                 ^^^^^^^^^^^^^^^^^ required by this bound in `invoke_syn_parser`
-    = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/syn_grammar-129e330ddb0285cd.long-type-1629909431652945372.txt'
-    = note: consider using `--verbose` to print the full type name to the console
+error[E0308]: mismatched types
+  --> syn-grammar/tests/literal_binding_test.rs:5:1
+   |
+ 5 | / grammar! {
+ 6 | |     grammar LitBind1 {
+...  |
+12 | | }
+   | |_^ expected `(String, String)`, found `()`
+   |
+   = note:  expected tuple `(String, String)`
+           found unit type `()`
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0277]: the trait bound `syn::Field: Parse` is not satisfied
-   --> syn-grammar/src/builtins.rs:130:43
-    |
-130 | impl_syn_builtin!(parse_named_field_impl, syn::Field); 
-    |                                           ^^^^^^^^^^ the trait `Parse` is not implemented for `syn::Field`
-    |
-    = help: the following other types implement trait `Parse`:
-              Abstract
-              AndAnd
-              AndEq
-              AngleBracketedGenericArguments
-              Arm
-              As
-              At
-              Auto
-            and 268 others
-note: required by a bound in `grammar_kit::invoke_syn_parser`
-   --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:19:33
-    |
- 19 | ...arser<'a, T: syn::parse::Parse>(mut cursor: Cursor...
-    |                 ^^^^^^^^^^^^^^^^^ required by this bound in `invoke_syn_parser`
-    = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/syn_grammar-ea4af77c59c45b66.long-type-1208617771503033949.txt'
-    = note: consider using `--verbose` to print the full type name to the console
+error[E0308]: mismatched types
+  --> syn-grammar/tests/literal_binding_test.rs:14:1
+   |
+14 | / grammar! {
+15 | |     grammar LitBind2 {
+16 | |         pub rule main -> (char, char) =
+17 | |             a:"a" b:"b" -> { ('a', 'b') }
+18 | |     }
+19 | | }
+   | |_^ expected `(char, char)`, found `()`
+   |
+   = note:  expected tuple `(char, char)`
+           found unit type `()`
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0277]: the trait bound `Attribute: Parse` is not satisfied
-   --> syn-grammar/src/builtins.rs:136:45
-    |
-136 | ...e_syn_parser::<syn::Attribute>(cursor).map(|(a, c)...
-    |                   ^^^^^^^^^^^^^^ the trait `Parse` is not implemented for `Attribute`
-    |
-    = help: the following other types implement trait `Parse`:
-              Abstract
-              AndAnd
-              AndEq
-              AngleBracketedGenericArguments
-              Arm
-              As
-              At
-              Auto
-            and 268 others
-note: required by a bound in `grammar_kit::invoke_syn_parser`
-   --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:19:33
-    |
- 19 | ...arser<'a, T: syn::parse::Parse>(mut cursor: Cursor...
-    |                 ^^^^^^^^^^^^^^^^^ required by this bound in `invoke_syn_parser`
-    = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/syn_grammar-ea4af77c59c45b66.long-type-1208617771503033949.txt'
-    = note: consider using `--verbose` to print the full type name to the console
+error[E0308]: mismatched types
+  --> syn-grammar/tests/literal_binding_test.rs:21:1
+   |
+21 | / grammar! {
+22 | |     grammar LitBind3 {
+23 | |         pub rule main -> (String, String) =
+24 | |             a:r"a" b:r#"b"# -> { (a.to_string(), b.t...
+25 | |     }
+26 | | }
+   | |_^ expected `(String, String)`, found `()`
+   |
+   = note:  expected tuple `(String, String)`
+           found unit type `()`
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0277]: the trait bound `Attribute: Parse` is not satisfied
-   --> syn-grammar/src/builtins.rs:136:45
-    |
-136 | ...e_syn_parser::<syn::Attribute>(cursor).map(|(a, c)...
-    |                   ^^^^^^^^^^^^^^ the trait `Parse` is not implemented for `Attribute`
-    |
-    = help: the following other types implement trait `Parse`:
-              Abstract
-              AndAnd
-              AndEq
-              AngleBracketedGenericArguments
-              Arm
-              As
-              At
-              Auto
-            and 268 others
-note: required by a bound in `grammar_kit::invoke_syn_parser`
-   --> /home/user/syn-grammar/core/grammar-kit/src/combinators.rs:19:33
-    |
- 19 | ...arser<'a, T: syn::parse::Parse>(mut cursor: Cursor...
-    |                 ^^^^^^^^^^^^^^^^^ required by this bound in `invoke_syn_parser`
-    = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/syn_grammar-129e330ddb0285cd.long-type-1629909431652945372.txt'
-    = note: consider using `--verbose` to print the full type name to the console
+error[E0599]: the method `parse_str` exists for fn item `fn(...) -> ... {parse_main}`, but its trait bounds were not satisfied
+  --> syn-grammar/tests/literal_binding_test.rs:31:10
+   |
+30 | /     LitBind1::parse_main
+31 | |         .parse_str("a b")
+   | |_________-^^^^^^^^^
+   |
+   = note: the following trait bounds were not satisfied:
+           `<for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: Parser`
+           `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: Parser`
+           `<&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: Parser`
+           `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: Parser`
+           `<&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: Parser`
+           `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind1::parse_main}: Parser`
+   = help: items from traits can only be used if the trait is in scope
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/literal_binding_test-321190b07fd7430f.long-type-2844552433621032270.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+help: trait `ParserExt` which provides `parse_str` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use syn_grammar::ParserExt;
+   |
 
-For more information about this error, try `rustc --explain E0277`.
-error: could not compile `syn-grammar` (lib) due to 2 previous errors
-error: could not compile `syn-grammar` (lib test) due to 2 previous errors
+error[E0599]: the method `parse_str` exists for fn item `fn(...) -> ... {parse_main}`, but its trait bounds were not satisfied
+  --> syn-grammar/tests/literal_binding_test.rs:39:10
+   |
+38 | /     LitBind2::parse_main
+39 | |         .parse_str("a b")
+   | |_________-^^^^^^^^^
+   |
+   = note: the following trait bounds were not satisfied:
+           `<for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: Parser`
+           `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: Parser`
+           `<&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: Parser`
+           `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: Parser`
+           `<&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: Parser`
+           `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((char, char), syn::buffer::Cursor<'a>), ParseError> {LitBind2::parse_main}: Parser`
+   = help: items from traits can only be used if the trait is in scope
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/literal_binding_test-321190b07fd7430f.long-type-5557878162161907872.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+help: trait `ParserExt` which provides `parse_str` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use syn_grammar::ParserExt;
+   |
+
+error[E0599]: the method `parse_str` exists for fn item `fn(...) -> ... {parse_main}`, but its trait bounds were not satisfied
+  --> syn-grammar/tests/literal_binding_test.rs:47:10
+   |
+46 | /     LitBind3::parse_main
+47 | |         .parse_str("a b")
+   | |_________-^^^^^^^^^
+   |
+   = note: the following trait bounds were not satisfied:
+           `<for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: Parser`
+           `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: Parser`
+           `<&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: Parser`
+           `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `&for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: Parser`
+           `<&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main} as FnOnce<(&ParseBuffer<'_>,)>>::Output = Result<_, syn::Error>`
+           which is required by `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: Parser`
+           `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: FnOnce<(&ParseBuffer<'_>,)>`
+           which is required by `&mut for<'a> fn(syn::buffer::Cursor<'a>) -> Result<((String, String), syn::buffer::Cursor<'a>), ParseError> {LitBind3::parse_main}: Parser`
+   = help: items from traits can only be used if the trait is in scope
+   = note: the full name for the type has been written to '/home/user/syn-grammar/target/debug/deps/literal_binding_test-321190b07fd7430f.long-type-8050344235357575223.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+help: trait `ParserExt` which provides `parse_str` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use syn_grammar::ParserExt;
+   |
+
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `syn-grammar` (test "literal_binding_test") due to 6 previous errors
