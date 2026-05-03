@@ -38,7 +38,6 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
 
     let uses = &grammar.uses;
 
-    // Generate imports inside the module
     let imports = grammar.imports.iter().map(|imp| {
         let path = &imp.path;
         let alias = &imp.alias;
@@ -51,7 +50,6 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
         .map(|r| rule::generate_rule(r, &ctx))
         .collect::<Result<Vec<_>>>()?;
 
-    // Capture the rules as a TokenStream to reuse for both code generation and string introspection
     let rules_stream = quote! { #(#rules)* };
     let rules_str = rules_stream.to_string();
 
@@ -62,26 +60,20 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             #![allow(clippy::all)]
 
             pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);
-
-            /// The generated source code of the rules, used for testing verification.
             pub const GENERATED_SOURCE: &str = #rules_str;
 
             use super::*;
-            use syn::parse::{Parse, ParseStream};
+            use syn::buffer::Cursor; // DIE WICHTIGSTE ÄNDERUNG
             use syn::Result;
             use syn::Token;
             use syn::ext::IdentExt;
             use syn::spanned::Spanned;
 
-            // Import runtime from syn_grammar
             use syn_grammar::rt;
-
-            // Import builtins (can be shadowed by local imports or rules)
             #[allow(unused_imports)]
             use syn_grammar::builtins::*;
 
             #kw_defs
-
             #(#uses)*
             #(#imports)*
 
