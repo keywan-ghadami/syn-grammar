@@ -306,13 +306,10 @@ impl ParseContext {
                         return;
                     }
 
-                    // Tie-breaker: Always prefer the newest error if all else is equal.
-                    // In a sequence like `A? B`, if A fails and B fails at the exact same location 
-                    // with the same priority, B is the mandatory rule that the parser evaluated last.
-                    // Preferring the newest error correctly overwrites residual errors from optional paths.
-                    #[cfg(feature = "trace")]
-                    eprintln!("[TRACE] record_error: New best error (newer error at same position wins)");
-                    self.best_error = Some(new_error_state);
+                    // TIE-BREAKER: Längere Message gewinnt (Sicherster Fallback)
+                    if new_error_state.err.to_string().len() >= existing.err.to_string().len() {
+                        self.best_error = Some(new_error_state);
+                    }
                 } else {
                     #[cfg(feature = "trace")]
                     eprintln!("[TRACE] record_error: Rejected (less specific context)");
@@ -569,12 +566,19 @@ where
 
             // Recoverable failure. Restore original fatal flag.
             ctx.set_fatal(was_fatal);
-
+            
             let suppress = ctx.suppress_label;
             ctx.suppress_label = false;
 
-            // Es findet HIER KEIN WIPE-OUT MEHR STATT! 
-            // Tiefe Fehler oder Aggregationen in Alternativen überleben wie vorgesehen.
+            // KORREKTE HIGH-WATER MARK:
+            // Wenn der aktuelle Parse-Versuch KEINEN Fortschritt gemacht hat (Fehler direkt am Start),
+            // dann setzen wir den Error-State auf den Snapshot ZURÜCK.
+            // WARUM DAS FUNKTIONIERT: Wenn ein vorheriger OR-Zweig bereits einen tiefen Fehler
+            // geworfen hatte, ist dieser tiefe Fehler IM SNAPSHOT gespeichert und wird hiermit restauriert!
+            if is_at_start {
+                ctx.best_error = best_error_snapshot;
+            }
+
             if !suppress {
                 if let Some(lbl) = label {
                     if is_at_start {

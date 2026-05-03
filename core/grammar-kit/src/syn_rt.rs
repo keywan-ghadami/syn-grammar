@@ -124,7 +124,7 @@ pub fn parse_separated_pure<T, S>(
                             ctx.record_error(err, item_fork.span(), None, ParseContext::PRIO_STRUCTURAL);
                             ctx.exit_rule();
                             
-                            break;
+                            return Err(syn::Error::new(item_fork.span(), "__BUBBLE__"));
                         }
                     }
                     Err(e) => return Err(e),
