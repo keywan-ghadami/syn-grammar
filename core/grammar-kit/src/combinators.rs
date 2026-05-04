@@ -1,5 +1,4 @@
 use syn::buffer::Cursor;
-use proc_macro2::TokenStream;
 use syn::parse::Parser;
 use crate::{ParseContext, ParseError, ParseResult};
 
