@@ -73,21 +73,21 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     Ok(quote! {
         #(#attrs)*
         #default_doc
-        // PUBLIC API: Akzeptiert ParseStream (Zustand), nutzt Cursor intern und synchronisiert!
         #vis fn #fn_name(input: syn::parse::ParseStream #(#params)*) -> syn::Result<#ret_type> #where_clause {
-            let cursor = input.cursor();
             let mut ctx = rt::ParseContext::new();
-            match #impl_name(cursor, &mut ctx #(#param_names)*) {
-                Ok((res, next_cursor)) => {
-                    // Syn's ParseStream auf den fortgeschrittenen Cursor setzen!
-                    input.step(|_| Ok(((), next_cursor))).unwrap();
-                    Ok(res)
+            
+            // DIE ELEGANTE LÖSUNG FÜR DIE LIFETIMES:
+            // input.step übergibt uns einen Cursor mit der exakten Lebensdauer, 
+            // die wir zurückgeben müssen!
+            input.step(|cursor| {
+                match #impl_name(cursor, &mut ctx #(#param_names)*) {
+                    Ok((res, next_cursor)) => Ok((res, next_cursor)),
+                    Err(mut e) => {
+                        e.push_rule(#context_name);
+                        Err(syn::Error::new(e.span, e.to_string()))
+                    }
                 }
-                Err(mut e) => {
-                    e.push_rule(#context_name);
-                    Err(syn::Error::new(e.span, e.to_string()))
-                }
-            }
+            })
         }
 
         #[doc(hidden)]
@@ -124,7 +124,7 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], ctx: &CodegenContext) 
 
         let arm_logic = quote! {
             let _start_cursor = cursor;
-            let _arm_res = (|| -> rt::ParseResult<_> {
+            let _arm_res = (|| -> rt::ParseResult<'a, _> {
                 let mut cursor = _start_cursor;
                 #bind_stmt
                 #logic
@@ -187,7 +187,7 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
             let pre_bindings = analysis::collect_bindings(cut.pre_cut);
 
             let cut_block = quote! {
-                let pre_res = (|| -> rt::ParseResult<_> {
+                let pre_res = (|| -> rt::ParseResult<'a, _> {
                     let mut cursor = _start_cursor;
                     #pre_logic
                     Ok(((#(#pre_bindings),*), cursor))
@@ -195,7 +195,7 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
 
                 match pre_res {
                     Ok(((#(#pre_bindings),*), mut cursor)) => {
-                        let post_res = (|| -> rt::ParseResult<_> {
+                        let post_res = (|| -> rt::ParseResult<'a, _> {
                             #post_logic
                             Ok(( { #action }, cursor ))
                         })();
@@ -220,7 +220,7 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
         } else {
             let inner_logic = pattern::generate_sequence(&variant.pattern, &variant.action, ctx)?;
             quote! {
-                let _arm_res = (|| -> rt::ParseResult<_> {
+                let _arm_res = (|| -> rt::ParseResult<'a, _> {
                     let mut cursor = _start_cursor;
                     #inner_logic
                 })();
