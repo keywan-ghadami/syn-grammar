@@ -4,6 +4,7 @@
 
 pub mod rt {
     pub use super::token_filter;
+    pub use super::builtins; // FIX: Das hat gefehlt!
     pub use grammar_kit::*;
 }
 
