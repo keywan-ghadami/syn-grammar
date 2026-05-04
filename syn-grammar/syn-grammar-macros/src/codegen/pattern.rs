@@ -223,7 +223,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     #(#init_vecs)*
                     loop {
                         let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<_> {
+                        let _res = (|| -> rt::ParseResult<'a, _> {
                             #inner_logic
                             Ok((#return_tuple, cursor))
                         })();
@@ -245,7 +245,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 Ok(quote! {
                     loop {
                         let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<_> {
+                        let _res = (|| -> rt::ParseResult<'a, _> {
                             #inner_logic
                             Ok(((), cursor))
                         })();
@@ -281,7 +281,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     }
                     loop {
                         let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<_> {
+                        let _res = (|| -> rt::ParseResult<'a, _> {
                             #inner_logic
                             Ok((#return_tuple, cursor))
                         })();
@@ -304,7 +304,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     #inner_logic
                     loop {
                         let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<_> {
+                        let _res = (|| -> rt::ParseResult<'a, _> {
                             #inner_logic
                             Ok(((), cursor))
                         })();
@@ -326,7 +326,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             if bindings.is_empty() {
                 Ok(quote! {
                     let _start_cursor = cursor;
-                    let _opt_res = (|| -> rt::ParseResult<_> {
+                    let _opt_res = (|| -> rt::ParseResult<'a, _> {
                         #inner_logic
                         Ok(((), cursor))
                     })();
@@ -341,7 +341,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
                 Ok(quote! {
                     let _start_cursor = cursor;
-                    let _opt_res = (|| -> rt::ParseResult<_> {
+                    let _opt_res = (|| -> rt::ParseResult<'a, _> {
                         #inner_logic
                         Ok(( (#(#vars),*) , cursor))
                     })();
@@ -371,8 +371,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _val;) } else { let b = analysis::collect_bindings(std::slice::from_ref(pattern)); if b.is_empty() { quote!() } else { quote!(let (#(#b),*) = _val;) } };
 
             Ok(quote! {
-                // HIER IST DAS FEHLENDE FRAGEZEICHEN INTEGRIERT
-                let (_val, next_cursor) = (|| -> rt::ParseResult<_> { #variant_logic })()?;
+                let (_val, next_cursor) = (|| -> rt::ParseResult<'a, _> { #variant_logic })()?;
                 #bind_stmt
                 let mut cursor = next_cursor;
             })
@@ -386,7 +385,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
             Ok(quote! {
                 if let Some((inner_cursor, _span, next_cursor)) = cursor.group(proc_macro2::Delimiter::#delimiter) {
-                    let (_val, _inner_end) = (|| -> rt::ParseResult<_> {
+                    let (_val, _inner_end) = (|| -> rt::ParseResult<'a, _> {
                         let mut cursor = inner_cursor;
                         #inner_logic
                         Ok((#return_expr, cursor))
@@ -403,7 +402,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
                 ctx.enter_lexical();
-                let (_res, next_cursor) = (|| -> rt::ParseResult<_> {
+                let (_res, next_cursor) = (|| -> rt::ParseResult<'a, _> {
                     #inner_logic
                     Ok(((), cursor))
                 })()?;
@@ -415,7 +414,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
                 ctx.enter_spaced();
-                let (_res, next_cursor) = (|| -> rt::ParseResult<_> {
+                let (_res, next_cursor) = (|| -> rt::ParseResult<'a, _> {
                     #inner_logic
                     Ok(((), cursor))
                 })()?;
@@ -449,7 +448,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
             Ok(quote! {
                 let _start_cursor = cursor;
-                let _rec_res = (|| -> rt::ParseResult<_> {
+                let _rec_res = (|| -> rt::ParseResult<'a, _> {
                     #inner_logic
                     Ok((#return_expr, cursor))
                 })();
@@ -480,7 +479,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let bind_stmt = if bindings.is_empty() { quote!() } else if bindings.len() == 1 { let bind = &bindings[0]; quote!(let #bind = _val;) } else { quote!(let (#(#bindings),*) = _val;) };
 
             Ok(quote! {
-                let (_val, _) = (|| -> rt::ParseResult<_> {
+                let (_val, _) = (|| -> rt::ParseResult<'a, _> {
                     let mut cursor = cursor; // copy
                     #inner_logic
                     Ok((#return_expr, cursor))
@@ -491,7 +490,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         ModelPattern::Not(inner, _) => {
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
-                let _not_res = (|| -> rt::ParseResult<_> {
+                let _not_res = (|| -> rt::ParseResult<'a, _> {
                     let mut cursor = cursor; // copy
                     #inner_logic
                     Ok(((), cursor))
@@ -506,7 +505,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let mut _tokens = Vec::new();
                 loop {
                     if cursor.eof() { break; }
-                    let _is_match = (|| -> rt::ParseResult<_> {
+                    let _is_match = (|| -> rt::ParseResult<'a, _> {
                         let mut cursor = cursor; // copy
                         #inner_logic
                         Ok(((), cursor))
@@ -528,7 +527,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let mut _count: usize = 0;
                 loop {
                     let _start_cursor = cursor;
-                    let _res = (|| -> rt::ParseResult<_> {
+                    let _res = (|| -> rt::ParseResult<'a, _> {
                         #inner_logic
                         Ok(((), cursor))
                     })();
