@@ -2,7 +2,6 @@ use crate::backend::SynBackend;
 use crate::codegen::CodegenContext;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::spanned::Spanned;
 use syn::{Lit, Result};
 use syn_grammar_model::{analysis, model::*, Backend};
 
@@ -56,8 +55,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             let prev = format_ident!("_t{}", i - 1);
                             let err_msg = format!("expected '{}', found space between tokens", lit.value());
                             checks.push(quote! {
-                                if #prev.span().end() != #var.span().start() {
-                                    return Err(rt::ParseError::new(#var.span(), #err_msg));
+                                if syn::spanned::Spanned::span(&#prev).end() != syn::spanned::Spanned::span(&#var).start() {
+                                    return Err(rt::ParseError::new(syn::spanned::Spanned::span(&#var), #err_msg));
                                 }
                             });
                         }
@@ -372,7 +371,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _val;) } else { let b = analysis::collect_bindings(std::slice::from_ref(pattern)); if b.is_empty() { quote!() } else { quote!(let (#(#b),*) = _val;) } };
 
             Ok(quote! {
-                let (_val, next_cursor) = (|| -> rt::ParseResult<_> { #variant_logic })();
+                // HIER IST DAS FEHLENDE FRAGEZEICHEN INTEGRIERT
+                let (_val, next_cursor) = (|| -> rt::ParseResult<_> { #variant_logic })()?;
                 #bind_stmt
                 let mut cursor = next_cursor;
             })
@@ -486,7 +486,6 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     Ok((#return_expr, cursor))
                 })()?;
                 #bind_stmt
-                // Cursor wird absichtlich NICHT fortgeschritten!
             })
         }
         ModelPattern::Not(inner, _) => {
