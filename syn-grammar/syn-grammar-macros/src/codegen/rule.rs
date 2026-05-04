@@ -53,7 +53,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
         quote! {
             let mut lhs = {
-                let base_parser = |cursor: Cursor<'a>, ctx: &mut rt::ParseContext| -> rt::ParseResult<'a, #ret_type> {
+                let base_parser = |cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext| -> rt::ParseResult<'a, #ret_type> {
                     #base_logic
                 };
                 let (val, next_cursor) = base_parser(cursor, ctx)?;
@@ -73,20 +73,26 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     Ok(quote! {
         #(#attrs)*
         #default_doc
-        #vis fn #fn_name<'a>(cursor: Cursor<'a> #(#params)*) -> rt::ParseResult<'a, #ret_type> #where_clause {
+        // PUBLIC API: Akzeptiert ParseStream (Zustand), nutzt Cursor intern und synchronisiert!
+        #vis fn #fn_name(input: syn::parse::ParseStream #(#params)*) -> syn::Result<#ret_type> #where_clause {
+            let cursor = input.cursor();
             let mut ctx = rt::ParseContext::new();
             match #impl_name(cursor, &mut ctx #(#param_names)*) {
-                Ok(res) => Ok(res),
+                Ok((res, next_cursor)) => {
+                    // Syn's ParseStream auf den fortgeschrittenen Cursor setzen!
+                    input.step(|_| Ok(((), next_cursor))).unwrap();
+                    Ok(res)
+                }
                 Err(mut e) => {
                     e.push_rule(#context_name);
-                    Err(e)
+                    Err(syn::Error::new(e.span, e.to_string()))
                 }
             }
         }
 
         #[doc(hidden)]
         #(#impl_attrs)*
-        pub fn #impl_name<'a>(mut cursor: Cursor<'a>, ctx: &mut rt::ParseContext #(#params)*) -> rt::ParseResult<'a, #ret_type> #where_clause {
+        pub fn #impl_name<'a>(mut cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext #(#params)*) -> rt::ParseResult<'a, #ret_type> #where_clause {
             #lexical_block_start
             let _res = (|| -> rt::ParseResult<'a, #ret_type> {
                 #body
@@ -238,18 +244,13 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
             let token_code = peek_token_obj.as_ref().unwrap();
             Ok(quote! {
                 if rt::peek_syn(_start_cursor, |i| i.peek(#token_code)) {
-                    match (|| -> rt::ParseResult<_> {
-                        let mut cursor = _start_cursor;
-                        let inner_logic = {
-                            let mut cursor = _start_cursor;
-                            #logic
-                        };
-                        Ok(((), cursor)) // Not strictly used for unique wrapper
-                    })() {
-                        _ => { /* Logic above has already returned Ok or Err */ }
+                    #logic
+                    // Wenn wir hierher kommen, ist der Zweig fatal gescheitert!
+                    if let Some(err) = _best_err.take() {
+                        return Err(err.with_priority(50));
+                    } else {
+                        return Err(rt::ParseError::new(_start_cursor.span(), "propagating fatal unique error").with_priority(50));
                     }
-                    // If we reach here, we must fail fatally since it matched peek
-                    return Err(rt::ParseError::new(_start_cursor.span(), "propagating fatal unique error").with_priority(50));
                 }
             })
         } else if let Some(token_code) = peek_token_obj {
