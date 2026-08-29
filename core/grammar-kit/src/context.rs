@@ -39,6 +39,7 @@ impl ParseContext {
     }
 
     pub fn enter_lexical(&mut self) { self.mode_stack.push(true); }
+    pub fn enter_spaced(&mut self) { self.mode_stack.push(false); }
     pub fn exit_mode(&mut self) { self.mode_stack.pop(); }
     pub fn is_lexical(&self) -> bool { *self.mode_stack.last().unwrap_or(&false) }
 

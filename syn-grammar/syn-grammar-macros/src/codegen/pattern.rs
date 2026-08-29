@@ -9,7 +9,11 @@ pub fn generate_sequence(patterns: &[ModelPattern], action: &TokenStream, ctx: &
     let steps = generate_sequence_steps(patterns, ctx)?;
     Ok(quote! {
         #steps
-        let _action_res = { #action };
+        // Der Action-Block laeuft in einer eigenen syn::Result-Closure, damit
+        // Nutzercode darin weiterhin `return Err(syn::Error::new(..))` und `?`
+        // auf syn-Ergebnisse verwenden kann.
+        let _action_res = (|| -> syn::Result<_> { Ok({ #action }) })()
+            .map_err(rt::ParseError::from)?;
         Ok((_action_res, cursor))
     })
 }
@@ -229,6 +233,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         })();
                         match _res {
                             Ok((vals, next_cursor)) => {
+                                // Zero-Progress-Schutz (siehe oben).
+                                if next_cursor == _start_cursor { break; }
                                 let #tuple_pat = vals;
                                 #(#push_vecs)*
                                 cursor = next_cursor;
@@ -250,7 +256,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             Ok(((), cursor))
                         })();
                         match _res {
-                            Ok((_, next_cursor)) => { cursor = next_cursor; }
+                            Ok((_, next_cursor)) => {
+                                // Zero-Progress-Schutz: sonst dreht sich die Schleife ewig,
+                                // wenn das innere Muster ohne Tokenverbrauch matcht.
+                                if next_cursor == _start_cursor { break; }
+                                cursor = next_cursor;
+                            }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
                                 break;
@@ -287,6 +298,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         })();
                         match _res {
                             Ok((vals, next_cursor)) => {
+                                // Zero-Progress-Schutz (siehe oben).
+                                if next_cursor == _start_cursor { break; }
                                 let #tuple_pat = vals;
                                 #(#push_vecs)*
                                 cursor = next_cursor;
@@ -309,7 +322,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             Ok(((), cursor))
                         })();
                         match _res {
-                            Ok((_, next_cursor)) => { cursor = next_cursor; }
+                            Ok((_, next_cursor)) => {
+                                // Zero-Progress-Schutz: sonst dreht sich die Schleife ewig,
+                                // wenn das innere Muster ohne Tokenverbrauch matcht.
+                                if next_cursor == _start_cursor { break; }
+                                cursor = next_cursor;
+                            }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
                                 break;
@@ -383,19 +401,22 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let return_expr = if bindings.is_empty() { quote!(()) } else if bindings.len() == 1 { let b = &bindings[0]; quote!(#b) } else { quote!((#(#bindings),*)) };
             let bind_stmt = if bindings.is_empty() { quote!() } else if bindings.len() == 1 { let bind = &bindings[0]; quote!(let #bind = _val;) } else { quote!(let (#(#bindings),*) = _val;) };
 
+            // Die Bindings der Gruppe muessen im UMGEBENDEN Scope landen, sonst
+            // sieht der Action-Block sie nicht (sie starben frueher mit dem if-let-Block).
             Ok(quote! {
-                if let Some((inner_cursor, _span, next_cursor)) = cursor.group(proc_macro2::Delimiter::#delimiter) {
+                let (_val, _after_group) = if let Some((inner_cursor, _span, _next_cursor)) = cursor.group(proc_macro2::Delimiter::#delimiter) {
                     let (_val, _inner_end) = (|| -> rt::ParseResult<'a, _> {
                         let mut cursor = inner_cursor;
                         #inner_logic
                         Ok((#return_expr, cursor))
                     })()?;
                     if !_inner_end.eof() { return Err(rt::ParseError::new(_inner_end.span(), "unexpected token in delimited group").with_priority(50)); }
-                    #bind_stmt
-                    let mut cursor = next_cursor;
+                    (_val, _next_cursor)
                 } else {
                     return Err(rt::ParseError::new(cursor.span(), "expected delimited group").with_priority(50));
-                }
+                };
+                #bind_stmt
+                let mut cursor = _after_group;
             })
         }
         ModelPattern::LexicalScope(inner, _) => {
@@ -432,9 +453,26 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             })
         }
         ModelPattern::Recover { binding, body, sync, span: _ } => {
-            let inner_logic = generate_pattern_step(body, ctx)?;
+            // Ein ungebundener Regelaufruf im Body erbt den aeusseren Binding-Namen,
+            // sonst haette der Body keinen Wert und recover() lieferte () statt Option<T>.
+            let effective_body = if let Some(bind) = binding {
+                match &**body {
+                    ModelPattern::RuleCall { binding: None, rule_path, generics, args } => {
+                        Box::new(ModelPattern::RuleCall {
+                            binding: Some(bind.clone()),
+                            rule_path: rule_path.clone(),
+                            generics: generics.clone(),
+                            args: args.clone(),
+                        })
+                    }
+                    _ => body.clone(),
+                }
+            } else {
+                body.clone()
+            };
+            let inner_logic = generate_pattern_step(&effective_body, ctx)?;
             let sync_peek = analysis::get_simple_peek(sync, ctx.custom_keywords)?.unwrap();
-            let bindings = analysis::collect_bindings(std::slice::from_ref(body));
+            let bindings = analysis::collect_bindings(std::slice::from_ref(&effective_body));
 
             let return_expr = if bindings.is_empty() { quote!(()) } else if bindings.len() == 1 { let b = &bindings[0]; quote!(#b) } else { quote!((#(#bindings),*)) };
             let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _val;) } else if bindings.is_empty() { quote!() } else { quote!(let (#(#bindings),*) = _val;) };
@@ -442,8 +480,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let none_exprs = bindings.iter().map(|_| quote!(Option::<_>::None));
             let some_exprs = bindings.iter().map(|b| quote!(Some(#b)));
 
-            let some_assign = if bindings.is_empty() { quote!() } else if bindings.len() == 1 { let b = &bindings[0]; quote!(let #b = _val;) } else { quote!(let (#(#bindings),*) = _val;) };
-            let option_ret = if bindings.is_empty() { quote!(()) } else if bindings.len() == 1 { quote!(_val) } else { quote!((#(#some_exprs),*)) };
+            // Bei genau einem Binding wird _val direkt in Some(..) gewickelt; eine
+            // Zwischenzuweisung wuerde den Wert vorher wegbewegen.
+            let some_assign = if bindings.len() == 1 { quote!() } else if bindings.is_empty() { quote!() } else { quote!(let (#(#bindings),*) = _val;) };
+            let option_ret = if bindings.is_empty() { quote!(()) } else if bindings.len() == 1 { quote!(Some(_val)) } else { quote!((#(#some_exprs),*)) };
             let none_ret = if bindings.is_empty() { quote!(()) } else if bindings.len() == 1 { quote!(None) } else { quote!((#(#none_exprs),*)) };
 
             Ok(quote! {
@@ -521,27 +561,82 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             })
         }
         ModelPattern::Count { binding, pattern: inner, .. } => {
-            let inner_logic = generate_pattern_step(inner, ctx)?;
-            let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _count;) } else { quote!() };
-            Ok(quote! {
-                let mut _count: usize = 0;
-                loop {
-                    let _start_cursor = cursor;
-                    let _res = (|| -> rt::ParseResult<'a, _> {
-                        #inner_logic
-                        Ok(((), cursor))
-                    })();
-                    match _res {
-                        Ok((_, next_cursor)) => {
-                            _count += 1;
-                            cursor = next_cursor;
-                        }
-                        Err(e) => {
-                            if e.priority >= 50 { return Err(e); }
-                            break;
+            // count(..) zaehlt das ELEMENT, nicht den Wiederholungs-Operator.
+            // `count("a"*)` auf "a a a" ist 3, nicht 1: also muss der Operator
+            // abgestreift und sein Element gezaehlt werden. Eine generische
+            // Schleife ueber "a"* wuerde beim ersten Durchlauf alles verbrauchen
+            // und danach endlos leer weiterlaufen.
+            let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _count;) } else { quote!(let _ = _count;) };
+
+            // Ein Schleifendurchlauf ueber das Element, mit Zero-Progress-Schutz.
+            let loop_over = |elem_logic: &proc_macro2::TokenStream| {
+                quote! {
+                    loop {
+                        let _start_cursor = cursor;
+                        let _res = (|| -> rt::ParseResult<'a, _> {
+                            #elem_logic
+                            Ok(((), cursor))
+                        })();
+                        match _res {
+                            Ok((_, next_cursor)) => {
+                                if next_cursor == _start_cursor { break; }
+                                cursor = next_cursor;
+                                _count += 1;
+                            }
+                            Err(e) => {
+                                if e.priority >= 50 { return Err(e); }
+                                break;
+                            }
                         }
                     }
                 }
+            };
+
+            let count_logic = match &**inner {
+                ModelPattern::Repeat(elem, _) => {
+                    let elem_logic = generate_pattern_step(elem, ctx)?;
+                    let lp = loop_over(&elem_logic);
+                    quote! { let mut _count: usize = 0; #lp }
+                }
+                ModelPattern::Plus(elem, _) => {
+                    let elem_logic = generate_pattern_step(elem, ctx)?;
+                    let lp = loop_over(&elem_logic);
+                    // Erstes Element ist Pflicht: nicht in einen Block wickeln,
+                    // sonst geht das Vorruecken des Cursors beim Blockende verloren.
+                    quote! {
+                        let mut _count: usize = 0;
+                        #elem_logic
+                        _count += 1;
+                        #lp
+                    }
+                }
+                ModelPattern::Optional(elem, _) => {
+                    let elem_logic = generate_pattern_step(elem, ctx)?;
+                    quote! {
+                        let mut _count: usize = 0;
+                        let _start_cursor = cursor;
+                        let _res = (|| -> rt::ParseResult<'a, _> {
+                            #elem_logic
+                            Ok(((), cursor))
+                        })();
+                        match _res {
+                            Ok((_, next_cursor)) => { cursor = next_cursor; _count += 1; }
+                            Err(e) => { if e.priority >= 50 { return Err(e); } }
+                        }
+                    }
+                }
+                _ => {
+                    let elem_logic = generate_pattern_step(inner, ctx)?;
+                    quote! {
+                        let mut _count: usize = 0;
+                        #elem_logic
+                        _count += 1;
+                    }
+                }
+            };
+
+            Ok(quote! {
+                #count_logic
                 #bind_stmt
             })
         }

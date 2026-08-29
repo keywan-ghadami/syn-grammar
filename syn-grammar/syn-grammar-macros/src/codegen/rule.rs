@@ -80,7 +80,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
             // input.step übergibt uns einen Cursor mit der exakten Lebensdauer, 
             // die wir zurückgeben müssen!
             input.step(|cursor| {
-                match #impl_name(cursor, &mut ctx #(#param_names)*) {
+                match #impl_name(*cursor, &mut ctx #(#param_names)*) {
                     Ok((res, next_cursor)) => Ok((res, next_cursor)),
                     Err(mut e) => {
                         e.push_rule(#context_name);
@@ -169,7 +169,7 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
 
     let arms = variants.iter().map(|variant| {
         let label_str = if let Some(l) = &variant.label { Some(l.clone()) } else { analysis::get_peek_token_string(&variant.pattern) };
-        let label_lit = if let Some(l) = &label_str { quote!(Some(#l)) } else { quote!(None) };
+        let label_lit = if let Some(l) = &label_str { quote!(Some(#l)) } else { quote!(None::<&str>) };
 
         let cut_info = analysis::find_cut(&variant.pattern);
         let first_pat = variant.pattern.first();
@@ -197,7 +197,7 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                     Ok(((#(#pre_bindings),*), mut cursor)) => {
                         let post_res = (|| -> rt::ParseResult<'a, _> {
                             #post_logic
-                            Ok(( { #action }, cursor ))
+                            Ok(( (|| -> syn::Result<_> { Ok({ #action }) })().map_err(rt::ParseError::from)?, cursor ))
                         })();
                         match post_res {
                             Ok(res) => return Ok(res),

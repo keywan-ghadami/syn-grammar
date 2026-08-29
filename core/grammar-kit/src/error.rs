@@ -48,6 +48,13 @@ impl ParseError {
     }
 }
 
+/// Action-Bloecke in Grammatiken duerfen weiterhin mit `syn::Error` scheitern.
+impl From<syn::Error> for ParseError {
+    fn from(e: syn::Error) -> Self {
+        ParseError::new(e.span(), e.to_string())
+    }
+}
+
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut msg = self.message.clone();

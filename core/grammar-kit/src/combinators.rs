@@ -8,7 +8,15 @@ where
     F: FnOnce(syn::parse::ParseStream) -> bool,
 {
     let stream = cursor.token_stream();
-    let parser = |input: syn::parse::ParseStream| Ok(peek_fn(input));
+    // `Parser::parse2` verlangt, dass der Parser den GESAMTEN Stream verbraucht.
+    // Ein Peek verbraucht nichts, deshalb muss der Rest hier explizit geleert
+    // werden - sonst scheitert parse2 bei jedem nicht-leeren Input und die
+    // Funktion liefert immer `false`.
+    let parser = |input: syn::parse::ParseStream| {
+        let result = peek_fn(input);
+        input.parse::<proc_macro2::TokenStream>()?;
+        Ok(result)
+    };
     Parser::parse2(parser, stream).unwrap_or(false)
 }
 
@@ -23,6 +31,10 @@ pub fn invoke_syn_parser<'a, T: syn::parse::Parse>(mut cursor: Cursor<'a>) -> Pa
         let val = input.parse::<T>()?;
         // Zählen der verbleibenden Tokens im Stream
         let remaining = input.cursor().token_stream().into_iter().count();
+        // `Parser::parse2` verlangt, dass der GESAMTE Stream verbraucht wird.
+        // Ohne dieses Leeren scheitert jeder Aufruf, bei dem T nicht zufaellig
+        // bis zum Ende reicht - also bei jeder Sequenz mit mehr als einem Token.
+        input.parse::<proc_macro2::TokenStream>()?;
         Ok((val, remaining))
     };
     
@@ -146,6 +158,59 @@ where
 
     if items.len() < min {
         return Err(ParseError::new(cursor.span(), format!("expected at least {} {}s", min, item_name)).with_priority(50));
+    }
+
+    Ok((items, cursor))
+}
+
+/// Kombinator für Wiederholungen ohne Separator.
+///
+/// Gegenstück zu `parse_separated`, im selben funktionalen Stil: der Cursor wird
+/// per Wert weitergereicht, Backtracking heißt schlicht, den Cursor von vor dem
+/// gescheiterten Versuch weiterzubenutzen. Ein struktureller Fehler (Priorität
+/// >= 50) bricht die Schleife hart ab, statt sie nur zu beenden.
+pub fn parse_repeated<'a, T, P>(
+    mut cursor: Cursor<'a>,
+    ctx: &mut ParseContext,
+    mut item_parser: P,
+    min: usize,
+    item_name: &str,
+) -> ParseResult<'a, Vec<T>>
+where
+    P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
+{
+    let mut items = Vec::new();
+    let start_span = cursor.span();
+
+    loop {
+        let mut item_ctx = ctx.clone();
+        match item_parser(cursor, &mut item_ctx) {
+            Ok((item, next_cursor)) => {
+                // Kein Fortschritt trotz Erfolg -> sonst Endlosschleife.
+                if next_cursor == cursor {
+                    break;
+                }
+                items.push(item);
+                cursor = next_cursor;
+                *ctx = item_ctx;
+            }
+            Err(e) => {
+                // Strukturelle/fatale Fehler durchreichen, alles andere beendet
+                // die Wiederholung regulär.
+                if e.priority >= 50 {
+                    return Err(e);
+                }
+                break;
+            }
+        }
+    }
+
+    if items.len() < min {
+        return Err(ParseError::new(
+            if items.is_empty() { start_span } else { cursor.span() },
+            format!("expected at least {} {}s, found {}", min, item_name, items.len()),
+        )
+        .with_priority(50));
     }
 
     Ok((items, cursor))
