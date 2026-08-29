@@ -157,7 +157,11 @@ where
     }
 
     if items.len() < min {
-        return Err(ParseError::new(cursor.span(), format!("expected at least {} {}s", min, item_name)).with_priority(50));
+        return Err(ParseError::new(
+            cursor.span(),
+            format!("expected at least {} {}s, found {}", min, item_name, items.len()),
+        )
+        .with_priority(50));
     }
 
     Ok((items, cursor))
