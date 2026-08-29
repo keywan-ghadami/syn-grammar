@@ -285,11 +285,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 Ok(quote! {
                     #(#init_vecs)*
-                    {
-                        #inner_logic
-                        let #tuple_pat = #return_tuple;
-                        #(#push_vecs)*
-                    }
+                    // Erstes Pflicht-Element NICHT in einen Block wickeln: #inner_logic
+                    // endet mit `let mut cursor = next_cursor;`, das Vorruecken ginge
+                    // sonst am Blockende verloren und die Schleife liefe erneut darauf.
+                    #inner_logic
+                    let #tuple_pat = #return_tuple;
+                    #(#push_vecs)*
                     loop {
                         let _start_cursor = cursor;
                         let _res = (|| -> rt::ParseResult<'a, _> {
