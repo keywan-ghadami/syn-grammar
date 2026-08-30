@@ -253,11 +253,16 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
             Ok(quote! {
                 if rt::peek_syn(_start_cursor, |i| i.peek(#token_code)) {
                     #logic
-                    // Wenn wir hierher kommen, ist der Zweig fatal gescheitert!
+                    // Das Peek-Token gehoert eindeutig zu dieser Variante: scheitert
+                    // sie, brauchen die uebrigen gar nicht mehr versucht zu werden.
+                    // Das leistet bereits das `return` - die Prioritaet wird NICHT
+                    // angehoben. Ein struktureller Fehler waere hier fatal im Sinne
+                    // von "nicht behebbar", und genau das machte recover() auf jeder
+                    // Regel mit eindeutigem Anfangstoken unbrauchbar.
                     if let Some(err) = _best_err.take() {
-                        return Err(err.with_priority(rt::PRIO_STRUCTURAL));
+                        return Err(err);
                     } else {
-                        return Err(rt::ParseError::at_cursor(_start_cursor, "propagating fatal unique error").with_priority(rt::PRIO_STRUCTURAL));
+                        return Err(rt::ParseError::at_cursor(_start_cursor, "propagating unique variant error"));
                     }
                 }
                 #sonst_erwartet
