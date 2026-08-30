@@ -14,9 +14,14 @@ where
     let parser = |input: syn::parse::ParseStream| {
         let val = parse_fn(input)?;
         let remaining = input.cursor().token_stream().into_iter().count();
+        // `Parser::parse2` verlangt, dass der GESAMTE Stream verbraucht wird. Ohne
+        // dieses Leeren scheitert jeder Aufruf, auf den noch Tokens folgen - und das
+        // ist bei einem Builtin mitten in einer Regel der Normalfall. Dieselbe Zeile
+        // steht aus demselben Grund in `invoke_syn_parser`.
+        input.parse::<proc_macro2::TokenStream>()?;
         Ok((val, remaining))
     };
-    
+
     match Parser::parse2(parser, stream.clone()) {
         Ok((val, remaining)) => {
             let total = stream.into_iter().count();
@@ -26,7 +31,7 @@ where
             }
             Ok((val, cursor))
         }
-        Err(e) => Err(ParseError::new(e.span(), e.to_string())),
+        Err(e) => Err(ParseError::new(e.span(), e.to_string()).with_cursor(cursor)),
     }
 }
 
