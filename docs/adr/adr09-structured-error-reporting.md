@@ -1,7 +1,22 @@
 # ADR: Enhanced Error Reporting with Structured Context and Lazy Formatting
 
 ## Status
-Proposed
+
+Accepted — umgesetzt, dann verloren, wird neu gebaut.
+
+Der hier beschriebene `ErrorState` existierte bis Commit `0aace8a` in
+`core/grammar-kit/src/lib.rs` und wurde beim Umbau auf Cursor-Parsing (Mai 2026)
+ersatzlos gelöscht. „Proposed" war dadurch irreführend.
+
+**Eine Festlegung dieses ADR ist überholt:** Punkt 2 der Auswahlhierarchie („Location
+(Progress)") stützt sich auf `start_span` und damit auf `Span::start()`. Auf stable Rust
+liefert das im Prozedurmakro immer `(0,0)`
+(`proc-macro2-1.0.106/src/wrapper.rs:449-450`), die Heuristik ist dort also wirkungslos.
+Ersatz ist `PartialOrd for Cursor` (syn 2.0.114, `src/buffer.rs:401-409`).
+Siehe [ADR 13](adr13-error-message-contract.md), Punkt 8.
+
+Das beobachtbare Ergebnis regelt [ADR 13](adr13-error-message-contract.md); dieses
+Dokument beschreibt die Mechanik dahinter.
 
 ## Context
 The current error reporting in `syn-grammar` struggles with precision and consistency, particularly in complex grammars involving labeled alternatives, deep nesting, and manual failure points (`fail` built-in).

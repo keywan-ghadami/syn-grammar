@@ -1,6 +1,8 @@
-'''# ADR-11: Shared Context Pattern für String Interning
+# ADR 14: Shared Context Pattern für String Interning
 
-**Status:** Proposed
+**Status:** Proposed. Betrifft ausschließlich `winnow-grammar` und zieht mit diesem
+Projekt um (siehe [`GOALS.md`](../../GOALS.md), Nicht-Ziele). Zuvor als „ADR-11"
+geführt — die Nummer war doppelt vergeben (siehe `adr11-error-handling-abstraction.md`).
 
 **Datum:** 2024-03-15
 

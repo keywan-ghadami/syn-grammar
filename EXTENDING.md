@@ -1,5 +1,17 @@
 # Building a Custom Parser Backend
 
+> **⚠️ VERALTET (Stand 2026-08-30).** Dieses Dokument beschreibt eine API, die es im Code
+> nicht mehr gibt. Konkret: `parse_grammar_with_builtins(…)` existiert nicht — der Einstieg
+> ist `parse_grammar::<B: Backend>` (`core/syn-grammar-model/src/syn_grammar_model.rs:30`);
+> Builtins sind `&'static [BuiltIn]` mit `name` und `return_type`, nicht `&[&str]`; der
+> `Backend`-Trait, der der eigentliche Erweiterungspunkt ist, wird unten gar nicht erwähnt;
+> die Mustertabelle listet 6 von 19 `ModelPattern`-Varianten, und `ModelPattern::Lit` hat
+> die Form `Lit { binding, lit: syn::Lit }`, nicht `Lit(LitStr)`. Der Beispielcode würde
+> nicht kompilieren.
+>
+> Verlässlich sind stattdessen [`ARCHITECTURE.md`](ARCHITECTURE.md) und der Code selbst.
+> Dieses Dokument wird überarbeitet oder zurückgezogen.
+
 This guide is for developers who want to create their own parser generator backend using `syn-grammar` as the frontend (DSL). The primary use case is building a library like `winnow-grammar` that targets a specific parsing library (e.g., `winnow`, `chumsky`) but offers the ergonomic `grammar! { ... }` syntax.
 
 ## Why use `syn-grammar` as a frontend?
