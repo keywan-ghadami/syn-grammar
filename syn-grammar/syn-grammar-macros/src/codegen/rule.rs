@@ -205,11 +205,15 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                         })();
                         match post_res {
                             Ok(res) => return Ok(res),
-                            Err(e) => return Err(e.with_priority(50)), // CUT: fatal!
+                            // CUT: die Ableitung ist festgelegt, Zuruecksetzen sinnlos.
+                            Err(e) => return Err(e.as_fatal()),
                         }
                     }
                     Err(e) => {
-                        if e.priority >= rt::PRIO_STRUCTURAL { return Err(e); }
+                        // Nur ein Cut schliesst kurz. Ein `fail(..)` ist hochprior,
+                        // aber nicht fatal - es muss in den Vergleich, sonst gewinnt
+                        // es auch gegen einen weiter gekommenen Fehler.
+                        if e.is_fatal { return Err(e); }
                         // Ohne Fortschritt ist die Alternative an ihrer Grenze
                         // gescheitert. Dann zaehlt ihr Label als Erwartung, statt
                         // die interne Meldung nach aussen zu tragen (ADR 13, Punkt 6).
@@ -231,7 +235,10 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                 match _arm_res {
                     Ok(res) => return Ok(res),
                     Err(e) => {
-                        if e.priority >= rt::PRIO_STRUCTURAL { return Err(e); }
+                        // Nur ein Cut schliesst kurz. Ein `fail(..)` ist hochprior,
+                        // aber nicht fatal - es muss in den Vergleich, sonst gewinnt
+                        // es auch gegen einen weiter gekommenen Fehler.
+                        if e.is_fatal { return Err(e); }
                         // Ohne Fortschritt ist die Alternative an ihrer Grenze
                         // gescheitert. Dann zaehlt ihr Label als Erwartung, statt
                         // die interne Meldung nach aussen zu tragen (ADR 13, Punkt 6).

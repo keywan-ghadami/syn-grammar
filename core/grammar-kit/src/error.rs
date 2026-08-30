@@ -34,6 +34,10 @@ pub struct ParseError<'a> {
     pub at: Option<Cursor<'a>>,
     pub message: String,
     pub priority: u8,
+    /// Hinter einem Cut (`=>`): die Ableitung ist festgelegt, Zurücksetzen ist
+    /// sinnlos. Bewusst getrennt von `priority` — `fail(..)` ist hochprior, aber
+    /// nicht fatal und nimmt deshalb am Fortschrittsvergleich teil.
+    pub is_fatal: bool,
     pub rule_stack: Vec<String>,
 }
 
@@ -46,6 +50,7 @@ impl<'a> ParseError<'a> {
             at: None,
             message: message.into(),
             priority: 0,
+            is_fatal: false,
             rule_stack: Vec::new(),
         }
     }
@@ -57,6 +62,7 @@ impl<'a> ParseError<'a> {
             at: Some(cursor),
             message: message.into(),
             priority: 0,
+            is_fatal: false,
             rule_stack: Vec::new(),
         }
     }
@@ -69,6 +75,13 @@ impl<'a> ParseError<'a> {
 
     pub fn with_priority(mut self, prio: u8) -> Self {
         self.priority = prio;
+        self
+    }
+
+    /// Markiert den Fehler als hinter einem Cut entstanden.
+    pub fn as_fatal(mut self) -> Self {
+        self.is_fatal = true;
+        self.priority = PRIO_STRUCTURAL;
         self
     }
 
@@ -91,19 +104,16 @@ impl<'a> ParseError<'a> {
 
     /// Wählt aus zwei konkurrierenden Fehlern den aussagekräftigeren.
     ///
-    /// Reihenfolge nach ADR 13, Punkt 8: Fatalität, dann Fortschritt, dann Priorität.
+    /// Reihenfolge: Fortschritt, dann Priorität (`fail`/Cut > Label > Standard).
+    ///
+    /// Fortschritt kommt bewusst ZUERST - auch vor einem `fail(..)`. Wer mehr Tokens
+    /// erfolgreich verarbeitet hat, war näher an der gemeinten Ableitung; ein früher
+    /// stehendes `fail` beschreibt dann einen Zweig, den der Parser gar nicht meinte.
+    /// Siehe `error_abstraction_test::test_fail_vs_deep_error`.
     pub fn merge(self, other: Self) -> Self {
-        // 1. Fatalität: ein Fehler hinter Cut / aus fail(..) schlägt alles.
-        let s_fatal = self.priority >= PRIO_STRUCTURAL;
-        let o_fatal = other.priority >= PRIO_STRUCTURAL;
-        if s_fatal && !o_fatal {
-            return self;
-        }
-        if o_fatal && !s_fatal {
-            return other;
-        }
-
-        // 2. Fortschritt: wer weiter im Input kam, gewinnt.
+        // 1. Fortschritt: wer weiter im Input kam, gewinnt - auch gegen einen
+        //    `fail(..)`, das frueher stand. Wer mehr Tokens erfolgreich verarbeitet
+        //    hat, war naeher an der gemeinten Ableitung.
         match self.progress_cmp(&other) {
             Some(std::cmp::Ordering::Greater) => return self,
             Some(std::cmp::Ordering::Less) => return other,
@@ -117,6 +127,11 @@ impl<'a> ParseError<'a> {
                     _ => {}
                 }
             }
+        }
+
+        // 2. Fatalität schlägt bei GLEICHER Stelle alles andere.
+        if self.is_fatal != other.is_fatal {
+            return if self.is_fatal { self } else { other };
         }
 
         // 3. Priorität: fail > Label > Standard. Bei Gleichstand gewinnt der neuere.
@@ -198,20 +213,35 @@ mod tests {
         assert_eq!(tieferer.merge(flacher).message, "tief");
     }
 
-    /// Fatalität schlägt Fortschritt (ADR 13, Punkt 8, Stufe 1 vor Stufe 2).
+    /// Fortschritt schlägt Priorität — auch ein `fail(..)`, das früher steht.
+    /// Wer mehr Tokens verarbeitet hat, war näher an der gemeinten Ableitung.
     #[test]
-    fn fatal_schlaegt_fortschritt() {
+    fn fortschritt_schlaegt_fail_prioritaet() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
 
         let flach = buf.begin();
         let tief = flach.token_tree().unwrap().1.token_tree().unwrap().1;
 
-        let flach_fatal = ParseError::at_cursor(flach, "cut").with_priority(PRIO_STRUCTURAL);
+        let flach_fail = ParseError::at_cursor(flach, "hard fail").with_priority(PRIO_STRUCTURAL);
         let tief_normal = ParseError::at_cursor(tief, "tief");
 
-        assert_eq!(flach_fatal.clone().merge(tief_normal.clone()).message, "cut");
-        assert_eq!(tief_normal.merge(flach_fatal).message, "cut");
+        assert_eq!(flach_fail.clone().merge(tief_normal.clone()).message, "tief");
+        assert_eq!(tief_normal.merge(flach_fail).message, "tief");
+    }
+
+    /// An DERSELBEN Stelle entscheidet dann die Priorität zugunsten von `fail`.
+    #[test]
+    fn bei_gleicher_stelle_gewinnt_fail() {
+        let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
+        let buf = TokenBuffer::new2(tokens);
+        let hier = buf.begin();
+
+        let f = ParseError::at_cursor(hier, "hard fail").with_priority(PRIO_STRUCTURAL);
+        let n = ParseError::at_cursor(hier, "normal");
+
+        assert_eq!(f.clone().merge(n.clone()).message, "hard fail");
+        assert_eq!(n.merge(f).message, "hard fail");
     }
 
     /// Ein Fehler ohne Fortschrittsangabe verliert gegen einen mit.

@@ -95,12 +95,26 @@ Kam der Parser in einer Alternative weiter, verdrängt dieser Fehler die Aufzäh
 
 Bei konkurrierenden Fehlern entscheidet, in dieser Reihenfolge:
 
-1. **Fatalität** — ein Fehler hinter einem Cut (`=>`) gewinnt immer
-2. **Fortschritt** — wer weiter im Input kam, gewinnt.
+1. **Fortschritt** — wer weiter im Input kam, gewinnt.
    Gemessen am Cursor über `PartialOrd for Cursor` (syn 2.0.114, `src/buffer.rs:401-409`),
    **nicht** an Zeile/Spalte (siehe Punkt 4)
+2. **Fatalität** — hinter einem Cut (`=>`)
 3. **Priorität** — `fail` > Label > Standard
-4. **Kontext-Spezifität** — tieferer Regel-Stack oder vorhandenes Label
+
+**Fortschritt kommt vor Fatalität und Priorität**, auch vor einem `fail(..)`. Wer mehr
+Tokens erfolgreich verarbeitet hat, war näher an der gemeinten Ableitung; ein früher
+stehendes `fail` beschreibt dann einen Zweig, den der Parser gar nicht meinte. Belegt in
+`error_abstraction_test.rs:124` (`a b d` → `expected \`c\`` schlägt das `fail` bei
+Spalte 2) gegen `:136` (`a d` → bei gleicher Stelle gewinnt `hard fail`).
+
+Daraus folgt, dass **Fatalität und Priorität getrennte Felder** sein müssen: ein Cut legt
+die Ableitung fest und schließt die Alternativenkette kurz; ein `fail(..)` ist nur
+hochprior und muss am Fortschrittsvergleich teilnehmen. Werden beide über `priority`
+ausgedrückt, schließt `fail` die Kette kurz und gewinnt fälschlich gegen den tieferen
+Fehler.
+
+*Frühere Fassungen dieses ADR nannten Fatalität an erster Stelle. Das widersprach den
+Tests und ist korrigiert — die Tests sind die Spezifikation.*
 
 Die Länge der Nachricht ist **kein** Kriterium (ADR-09 nennt sie als Instabilitätsquelle).
 
