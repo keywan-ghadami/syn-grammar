@@ -406,11 +406,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             // sieht der Action-Block sie nicht (sie starben frueher mit dem if-let-Block).
             Ok(quote! {
                 let (_val, _after_group) = if let Some((inner_cursor, _span, _next_cursor)) = cursor.group(proc_macro2::Delimiter::#delimiter) {
-                    let (_val, _inner_end) = (|| -> rt::ParseResult<'a, _> {
+                    // Innerhalb der Gruppe meldet Cursor::eof() das Gruppenende, nicht
+                    // das Eingabeende. Die Tiefe merken, damit Meldungen den
+                    // Unterschied benennen koennen.
+                    ctx.enter_group();
+                    let _grp_res = (|| -> rt::ParseResult<'a, _> {
                         let mut cursor = inner_cursor;
                         #inner_logic
                         Ok((#return_expr, cursor))
-                    })()?;
+                    })();
+                    ctx.exit_group();
+                    let (_val, _inner_end) = _grp_res?;
                     if !_inner_end.eof() { return Err(rt::ParseError::at_cursor(_inner_end, "unexpected token in delimited group").with_priority(50)); }
                     (_val, _next_cursor)
                 } else {

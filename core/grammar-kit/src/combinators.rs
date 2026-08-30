@@ -190,16 +190,25 @@ where
                     }
                     Err(e) => {
                         if trailing {
-                            // Erlaubtes baumelndes Komma: Cursor stoppt nach dem Item davor.
+                            // Baumelnder Trenner ist erlaubt: er GEHOERT zur Liste und
+                            // wird verbraucht. Ohne das blieb er im Strom stehen und
+                            // die umgebende Regel scheiterte an ihm.
+                            cursor = after_sep_cursor;
+                            *ctx = sep_ctx;
                             break;
                         } else {
-                            // Striktes Scheitern: Das Komma war da, das Item fehlt -> Harter Fehler!
+                            // Striktes Scheitern: Der Trenner war da, das Item fehlt.
+                            // Steht der Cursor dabei am Ende, wird das benannt - je
+                            // nachdem, ob wir in einer Gruppe stehen oder am Ende der
+                            // Eingabe (ADR 13, Punkt 3).
+                            let msg = if after_sep_cursor.eof() {
+                                format!("{}, expected {}", ctx.end_of_scope_msg(), item_name)
+                            } else {
+                                format!("expected {}", item_name)
+                            };
                             return Err(e.merge(
-                                ParseError::at_cursor(
-                                    after_sep_cursor,
-                                    format!("expected {}", item_name),
-                                )
-                                .with_priority(PRIO_STRUCTURAL),
+                                ParseError::at_cursor(after_sep_cursor, msg)
+                                    .with_priority(PRIO_STRUCTURAL),
                             ));
                         }
                     }

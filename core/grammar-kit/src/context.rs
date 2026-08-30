@@ -25,8 +25,15 @@ impl ScopeStack {
 #[derive(Clone)]
 pub struct ParseContext {
     pub scopes: ScopeStack,
-    pub mode_stack: Vec<bool>, 
+    pub mode_stack: Vec<bool>,
     pub last_span: Option<Span>, // Wichtig für den Lexical-Mode!
+    /// Wie tief stehen wir in Delimiter-Gruppen (`paren(..)`, `{..}`, `[..]`)?
+    ///
+    /// `Cursor::eof()` bezieht sich auf den *Scope*, meldet am Ende einer Gruppe
+    /// also dasselbe wie am Ende der Eingabe. Für die Meldung ist der Unterschied
+    /// aber wesentlich: "unexpected end of group" gegen "unexpected end of input".
+    /// Zur Laufzeit sind beide nicht unterscheidbar, der Codegen weiss es jedoch.
+    pub group_depth: usize,
 }
 
 impl ParseContext {
@@ -35,6 +42,18 @@ impl ParseContext {
             scopes: ScopeStack::new(),
             mode_stack: Vec::new(),
             last_span: None,
+            group_depth: 0,
+        }
+    }
+
+    pub fn enter_group(&mut self) { self.group_depth += 1; }
+    pub fn exit_group(&mut self) { self.group_depth = self.group_depth.saturating_sub(1); }
+    /// Beschreibt das Ende des aktuellen Scopes so, wie es in einer Meldung stehen soll.
+    pub fn end_of_scope_msg(&self) -> &'static str {
+        if self.group_depth > 0 {
+            "unexpected end of group"
+        } else {
+            "unexpected end of input"
         }
     }
 
