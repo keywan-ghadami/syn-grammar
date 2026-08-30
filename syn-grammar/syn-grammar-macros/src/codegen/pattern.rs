@@ -183,10 +183,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         quote! { rt::token_filter::#func(cursor)? }
                     },
                     "eof" => return Ok(quote! {
-                        if !cursor.eof() { return Err(rt::ParseError::new(cursor.span(), "expected end of input")); }
+                        if !cursor.eof() { return Err(rt::ParseError::at_cursor(cursor, "expected end of input")); }
                     }),
                     "whitespace" => return Ok(quote! {
-                        if !ctx.check_whitespace(cursor.span()) { return Err(rt::ParseError::new(cursor.span(), "expected whitespace")); }
+                        if !ctx.check_whitespace(cursor.span()) { return Err(rt::ParseError::at_cursor(cursor, "expected whitespace")); }
                     }),
                     "any_byte" => quote! { rt::invoke_syn_parser::<syn::LitByte>(cursor)? },
                     _ => {
@@ -411,10 +411,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         #inner_logic
                         Ok((#return_expr, cursor))
                     })()?;
-                    if !_inner_end.eof() { return Err(rt::ParseError::new(_inner_end.span(), "unexpected token in delimited group").with_priority(50)); }
+                    if !_inner_end.eof() { return Err(rt::ParseError::at_cursor(_inner_end, "unexpected token in delimited group").with_priority(50)); }
                     (_val, _next_cursor)
                 } else {
-                    return Err(rt::ParseError::new(cursor.span(), "expected delimited group").with_priority(50));
+                    return Err(rt::ParseError::at_cursor(cursor, "expected delimited group").with_priority(50));
                 };
                 #bind_stmt
                 let mut cursor = _after_group;
@@ -536,7 +536,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     #inner_logic
                     Ok(((), cursor))
                 })();
-                if _not_res.is_ok() { return Err(rt::ParseError::new(cursor.span(), "unexpected match").with_priority(50)); }
+                if _not_res.is_ok() { return Err(rt::ParseError::at_cursor(cursor, "unexpected match").with_priority(50)); }
             })
         }
         ModelPattern::Until { binding, pattern, .. } => {
@@ -643,7 +643,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         }
         ModelPattern::Fail { message, .. } => {
             let arg_expr = if let Some(Lit::Str(s)) = message { s.value() } else { "Explicit failure".to_string() };
-            Ok(quote! { return Err(rt::ParseError::new(cursor.span(), #arg_expr).with_priority(50)); })
+            Ok(quote! { return Err(rt::ParseError::at_cursor(cursor, #arg_expr).with_priority(50)); })
         }
     }
 }

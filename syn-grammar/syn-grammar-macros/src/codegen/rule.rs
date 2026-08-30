@@ -133,7 +133,7 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], ctx: &CodegenContext) 
             match _arm_res {
                 Ok((new_lhs, next_cursor)) => {
                     if _start_cursor.span().start() == next_cursor.span().start() {
-                        return Err(rt::ParseError::new(_start_cursor.span(), "Left-recursive rule matched empty string").with_priority(50));
+                        return Err(rt::ParseError::at_cursor(_start_cursor, "Left-recursive rule matched empty string").with_priority(50));
                     }
                     lhs = new_lhs;
                     cursor = next_cursor;
@@ -155,7 +155,7 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], ctx: &CodegenContext) 
 }
 
 pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, ctx: &CodegenContext) -> Result<TokenStream> {
-    if variants.is_empty() { return Ok(quote! { Err(rt::ParseError::new(cursor.span(), "No variants defined")) }); }
+    if variants.is_empty() { return Ok(quote! { Err(rt::ParseError::at_cursor(cursor, "No variants defined")) }); }
 
     let mut token_counts = HashMap::new();
     for v in variants {
@@ -249,7 +249,7 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                     if let Some(err) = _best_err.take() {
                         return Err(err.with_priority(50));
                     } else {
-                        return Err(rt::ParseError::new(_start_cursor.span(), "propagating fatal unique error").with_priority(50));
+                        return Err(rt::ParseError::at_cursor(_start_cursor, "propagating fatal unique error").with_priority(50));
                     }
                 }
             })
@@ -268,6 +268,6 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
 
         #(#arms)*
 
-        Err(_best_err.unwrap_or_else(|| rt::ParseError::new(_start_cursor.span(), #error_msg)))
+        Err(_best_err.unwrap_or_else(|| rt::ParseError::at_cursor(_start_cursor, #error_msg)))
     })
 }

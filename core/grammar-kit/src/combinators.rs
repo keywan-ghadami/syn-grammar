@@ -1,6 +1,6 @@
 use syn::buffer::Cursor;
 use syn::parse::Parser;
-use crate::{ParseContext, ParseError, ParseResult};
+use crate::{ParseContext, ParseError, ParseResult, PRIO_LABELED, PRIO_STRUCTURAL};
 
 /// Erlaubt das Peeken von spezifischen syn::Tokens auf einem Cursor
 pub fn peek_syn<'a, F>(cursor: Cursor<'a>, peek_fn: F) -> bool
@@ -52,7 +52,10 @@ pub fn invoke_syn_parser<'a, T: syn::parse::Parse>(mut cursor: Cursor<'a>) -> Pa
             
             Ok((val, cursor))
         }
-        Err(e) => Err(ParseError::new(e.span(), e.to_string())),
+        // Span von syn (praezise fuer die Anzeige), Fortschritt vom Eintrittscursor:
+        // der steht in einer Sequenz `a b c` beim Scheitern von `c` bereits hinter
+        // `a b` und misst die Tiefe damit korrekt.
+        Err(e) => Err(ParseError::new(e.span(), e.to_string()).with_cursor(cursor)),
     }
 }
 
@@ -74,16 +77,19 @@ where
             Ok((Some(val), next_cursor))
         }
         Err(mut e) => {
-            // Label applizieren, falls der Fehler exakt am Startpunkt passierte
+            // Label applizieren, falls der Fehler exakt am Startpunkt passierte.
+            // Verglichen wird ueber den Cursor, nicht ueber span.start() - letzteres
+            // ist im Prozedurmakro auf stable immer (0,0) und wuerde das Label dort
+            // faelschlich auf JEDEN Fehler anwenden. Siehe ADR 13, Punkt 8.
             if let Some(lbl) = label {
-                if e.span.start() == cursor.span().start() {
+                if e.at == Some(cursor) {
                     e.message = format!("expected {}", lbl);
-                    e.priority = std::cmp::max(e.priority, 10);
+                    e.priority = std::cmp::max(e.priority, PRIO_LABELED);
                 }
             }
-            
+
             // Fatale / Strukturelle Fehler werden ge-bubbled
-            if e.priority >= 50 {
+            if e.priority >= PRIO_STRUCTURAL {
                 Err(e)
             } else {
                 // Reguläres Backtracking: Wir geben den UNVERÄNDERTEN Cursor zurück
@@ -107,7 +113,6 @@ where
     S: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, ()> ,
 {
     let mut items = Vec::new();
-    let start_span = cursor.span();
 
     // Erstes Element
     match item_parser(cursor, ctx) {
@@ -117,7 +122,10 @@ where
         }
         Err(e) => {
             if min > 0 {
-                return Err(e.merge(ParseError::new(start_span, format!("expected {}", item_name)).with_priority(50)));
+                return Err(e.merge(
+                    ParseError::at_cursor(cursor, format!("expected {}", item_name))
+                        .with_priority(PRIO_STRUCTURAL),
+                ));
             }
             return Ok((items, cursor));
         }
@@ -145,8 +153,11 @@ where
                         } else {
                             // Striktes Scheitern: Das Komma war da, das Item fehlt -> Harter Fehler!
                             return Err(e.merge(
-                                ParseError::new(after_sep_cursor.span(), format!("expected {}", item_name))
-                                .with_priority(50)
+                                ParseError::at_cursor(
+                                    after_sep_cursor,
+                                    format!("expected {}", item_name),
+                                )
+                                .with_priority(PRIO_STRUCTURAL),
                             ));
                         }
                     }
@@ -157,11 +168,11 @@ where
     }
 
     if items.len() < min {
-        return Err(ParseError::new(
-            cursor.span(),
+        return Err(ParseError::at_cursor(
+            cursor,
             format!("expected at least {} {}s, found {}", min, item_name, items.len()),
         )
-        .with_priority(50));
+        .with_priority(PRIO_STRUCTURAL));
     }
 
     Ok((items, cursor))
@@ -184,7 +195,6 @@ where
     P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
 {
     let mut items = Vec::new();
-    let start_span = cursor.span();
 
     loop {
         let mut item_ctx = ctx.clone();
@@ -201,7 +211,7 @@ where
             Err(e) => {
                 // Strukturelle/fatale Fehler durchreichen, alles andere beendet
                 // die Wiederholung regulär.
-                if e.priority >= 50 {
+                if e.priority >= PRIO_STRUCTURAL {
                     return Err(e);
                 }
                 break;
@@ -210,11 +220,11 @@ where
     }
 
     if items.len() < min {
-        return Err(ParseError::new(
-            if items.is_empty() { start_span } else { cursor.span() },
+        return Err(ParseError::at_cursor(
+            cursor,
             format!("expected at least {} {}s, found {}", min, item_name, items.len()),
         )
-        .with_priority(50));
+        .with_priority(PRIO_STRUCTURAL));
     }
 
     Ok((items, cursor))
