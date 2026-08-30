@@ -241,6 +241,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
+                                // Die Wiederholung endet regulaer - der Grund wird
+                                // gemerkt, sonst geht er hier verloren.
+                                ctx.record_failure(&e);
                                 break;
                             }
                         }
@@ -264,6 +267,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
+                                // Die Wiederholung endet regulaer - der Grund wird
+                                // gemerkt, sonst geht er hier verloren.
+                                ctx.record_failure(&e);
                                 break;
                             }
                         }
@@ -307,6 +313,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
+                                // Die Wiederholung endet regulaer - der Grund wird
+                                // gemerkt, sonst geht er hier verloren.
+                                ctx.record_failure(&e);
                                 break;
                             }
                         }
@@ -331,6 +340,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
+                                // Die Wiederholung endet regulaer - der Grund wird
+                                // gemerkt, sonst geht er hier verloren.
+                                ctx.record_failure(&e);
                                 break;
                             }
                         }
@@ -351,7 +363,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     })();
                     match _opt_res {
                         Ok((_, next_cursor)) => { cursor = next_cursor; }
-                        Err(e) => { if e.priority >= 50 { return Err(e); } }
+                        Err(e) => {
+                            if e.priority >= 50 { return Err(e); }
+                            ctx.record_failure(&e);
+                        }
                     }
                 })
             } else {
@@ -372,6 +387,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         }
                         Err(e) => {
                             if e.priority >= 50 { return Err(e); }
+                            ctx.record_failure(&e);
                             (#(#none_vars),*)
                         }
                     };
@@ -417,7 +433,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     })();
                     ctx.exit_group();
                     let (_val, _inner_end) = _grp_res?;
-                    if !_inner_end.eof() { return Err(rt::ParseError::at_cursor(_inner_end, "unexpected token in delimited group").with_priority(50)); }
+                    // "unexpected token in delimited group" ist nur ein Platzhalter fuer
+                    // "der Inhalt wurde nicht vollstaendig verbraucht". Wurde unterwegs
+                    // ein Grund gemerkt, ist der strikt aussagekraeftiger - deshalb
+                    // nicht strukturell, damit er nicht gewinnt.
+                    if !_inner_end.eof() {
+                        return Err(ctx.best_error(
+                            rt::ParseError::at_cursor(_inner_end, "unexpected token in delimited group")
+                        ));
+                    }
                     (_val, _next_cursor)
                 } else {
                     return Err(rt::ParseError::at_cursor(cursor, "expected delimited group").with_priority(50));
@@ -592,6 +616,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
+                                // Die Wiederholung endet regulaer - der Grund wird
+                                // gemerkt, sonst geht er hier verloren.
+                                ctx.record_failure(&e);
                                 break;
                             }
                         }
@@ -628,7 +655,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         })();
                         match _res {
                             Ok((_, next_cursor)) => { cursor = next_cursor; _count += 1; }
-                            Err(e) => { if e.priority >= 50 { return Err(e); } }
+                            Err(e) => {
+                            if e.priority >= 50 { return Err(e); }
+                            ctx.record_failure(&e);
+                        }
                         }
                     }
                 }

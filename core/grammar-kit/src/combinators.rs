@@ -85,9 +85,22 @@ pub fn finish_variants<'a>(
     expected.sort();
     expected.dedup();
 
+    // Was steht an der Stelle tatsaechlich? (ADR 13, Punkt 3)
+    let gefunden = match start.token_tree() {
+        Some((tt, _)) => {
+            let t = tt.to_string();
+            if t.trim().is_empty() {
+                String::new()
+            } else {
+                format!("; found unexpected token `{}`", t)
+            }
+        }
+        None => String::new(),
+    };
+
     match expected.len() {
         0 => best.unwrap_or_else(|| ParseError::at_cursor(start, fallback_msg)),
-        1 => ParseError::at_cursor(start, format!("expected `{}`", expected[0]))
+        1 => ParseError::at_cursor(start, format!("expected `{}`{}", expected[0], gefunden))
             .with_priority(PRIO_LABELED),
         _ => {
             let liste = expected
@@ -95,7 +108,7 @@ pub fn finish_variants<'a>(
                 .map(|e| format!("`{}`", e))
                 .collect::<Vec<_>>()
                 .join(", ");
-            ParseError::at_cursor(start, format!("expected one of: {}", liste))
+            ParseError::at_cursor(start, format!("expected one of: {}{}", liste, gefunden))
                 .with_priority(PRIO_AGGREGATED)
         }
     }
@@ -104,12 +117,12 @@ pub fn finish_variants<'a>(
 /// Optionaler Parse-Versuch. Er fängt sanfte Fehler ab und reicht strukturelle Fehler hoch.
 pub fn attempt_labeled<'a, T, F>(
     cursor: Cursor<'a>,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'a>,
     label: Option<&str>,
     parser: F,
 ) -> ParseResult<'a, Option<T>>
 where
-    F: FnOnce(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
+    F: FnOnce(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
 {
     let mut fork_ctx = ctx.clone();
     
@@ -130,10 +143,15 @@ where
                 }
             }
 
+            // Merkstelle des verworfenen Klons uebernehmen, dann den eigenen
+            // Fehler merken - sonst geht er beim Zuruecksetzen verloren.
+            ctx.absorb(&fork_ctx);
+
             // Fatale / Strukturelle Fehler werden ge-bubbled
             if e.priority >= PRIO_STRUCTURAL {
                 Err(e)
             } else {
+                ctx.record_failure(&e);
                 // Reguläres Backtracking: Wir geben den UNVERÄNDERTEN Cursor zurück
                 Ok((None, cursor))
             }
@@ -155,7 +173,7 @@ fn label_missing_item<'a>(
     mut e: ParseError<'a>,
     at: Cursor<'a>,
     item_name: &str,
-    ctx: &ParseContext,
+    ctx: &ParseContext<'a>,
 ) -> ParseError<'a> {
     if e.at == Some(at) {
         e.message = if at.eof() {
@@ -171,7 +189,7 @@ fn label_missing_item<'a>(
 
 pub fn parse_separated<'a, T, P, S>(
     mut cursor: Cursor<'a>,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'a>,
     mut item_parser: P,
     mut sep_parser: S,
     min: usize,
@@ -179,8 +197,8 @@ pub fn parse_separated<'a, T, P, S>(
     item_name: &str,
 ) -> ParseResult<'a, Vec<T>>
 where
-    P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
-    S: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, ()> ,
+    P: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
+    S: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, ()> ,
 {
     let mut items = Vec::new();
 
@@ -192,10 +210,21 @@ where
         }
         Err(mut e) => {
             if min > 0 {
+                // Hat das Element nichts verbraucht, sagt sein interner Regelstapel
+                // nichts ueber den Fehler aus - dann zaehlt nur der Listenkontext.
+                if e.at == Some(cursor) {
+                    e.rule_stack.clear();
+                }
                 // Der Fehler gehoert zum ersten Element der Liste (ADR 13, Punkt 11).
                 e.push_rule(&format!("{} 1", item_name));
                 return Err(label_missing_item(e, cursor, item_name, ctx));
             }
+            // Leere Liste ist erlaubt - der Grund, warum kein Element kam, wird
+            // aber gemerkt. Sonst bleibt spaeter nur eine generische Meldung.
+            // Hier wird die Meldung NICHT ersetzt, also bleibt der interne
+            // Regelstapel des Elements aussagekraeftig und wird behalten.
+            e.push_rule(&format!("{} 1", item_name));
+            ctx.record_failure(&e);
             return Ok((items, cursor));
         }
     }
@@ -216,6 +245,10 @@ where
                         *ctx = item_ctx; 
                     }
                     Err(mut e) => {
+                        // Siehe oben: ohne Fortschritt traegt der interne Stapel nichts bei.
+                        if e.at == Some(after_sep_cursor) {
+                            e.rule_stack.clear();
+                        }
                         // Index des VERSUCHTEN Elements, 1-basiert.
                         e.push_rule(&format!("{} {}", item_name, items.len() + 1));
                         if trailing {
@@ -224,6 +257,7 @@ where
                             // die umgebende Regel scheiterte an ihm.
                             cursor = after_sep_cursor;
                             *ctx = sep_ctx;
+                            ctx.record_failure(&e);
                             break;
                         } else {
                             // Striktes Scheitern: Der Trenner war da, ein Element ist
@@ -236,7 +270,15 @@ where
                     }
                 }
             }
-            Err(_) => break, // Kein Komma mehr gefunden, Liste ist fertig
+            Err(mut e) => {
+                // Kein Trenner mehr - die Liste ist fertig. Warum es hier nicht
+                // weiterging, wird trotzdem gemerkt (ADR 13, Punkt 11).
+                e.rule_stack.clear();
+                e.push_rule("separator");
+                ctx.record_failure(&e);
+                ctx.absorb(&sep_ctx);
+                break;
+            }
         }
     }
 
@@ -259,13 +301,13 @@ where
 /// >= 50) bricht die Schleife hart ab, statt sie nur zu beenden.
 pub fn parse_repeated<'a, T, P>(
     mut cursor: Cursor<'a>,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'a>,
     mut item_parser: P,
     min: usize,
     item_name: &str,
 ) -> ParseResult<'a, Vec<T>>
 where
-    P: FnMut(Cursor<'a>, &mut ParseContext) -> ParseResult<'a, T>,
+    P: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
 {
     let mut items = Vec::new();
 
@@ -287,6 +329,9 @@ where
                 if e.priority >= PRIO_STRUCTURAL {
                     return Err(e);
                 }
+                // Wiederholung endet regulaer - der Grund wird gemerkt.
+                ctx.record_failure(&e);
+                ctx.absorb(&item_ctx);
                 break;
             }
         }

@@ -53,7 +53,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
         quote! {
             let mut lhs = {
-                let base_parser = |cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext| -> rt::ParseResult<'a, #ret_type> {
+                let base_parser = |cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext<'a>| -> rt::ParseResult<'a, #ret_type> {
                     #base_logic
                 };
                 let (val, next_cursor) = base_parser(cursor, ctx)?;
@@ -74,15 +74,19 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         #(#attrs)*
         #default_doc
         #vis fn #fn_name(input: syn::parse::ParseStream #(#params)*) -> syn::Result<#ret_type> #where_clause {
-            let mut ctx = rt::ParseContext::new();
-            
-            // DIE ELEGANTE LÖSUNG FÜR DIE LIFETIMES:
-            // input.step übergibt uns einen Cursor mit der exakten Lebensdauer, 
-            // die wir zurückgeben müssen!
+            // input.step uebergibt einen Cursor mit der exakten Lebensdauer, die
+            // zurueckgegeben werden muss. Der ParseContext wird INNERHALB der Closure
+            // erzeugt: nur hier ist die Cursor-Lifetime benennbar, und er traegt mit
+            // `furthest` einen Fehler, der einen Cursor enthaelt.
             input.step(|cursor| {
+                let mut ctx = rt::ParseContext::new();
                 match #impl_name(*cursor, &mut ctx #(#param_names)*) {
                     Ok((res, next_cursor)) => Ok((res, next_cursor)),
-                    Err(mut e) => {
+                    Err(e) => {
+                        // Der zurueckgegebene Fehler ist nicht zwingend der
+                        // aussagekraeftigste - ein weiter gekommener kann unterwegs
+                        // von einem erfolgreichen Zuruecksetzen ueberdeckt worden sein.
+                        let mut e = ctx.best_error(e);
                         e.push_rule(#context_name);
                         Err(syn::Error::new(e.span, e.to_string()))
                     }
@@ -92,7 +96,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
         #[doc(hidden)]
         #(#impl_attrs)*
-        pub fn #impl_name<'a>(mut cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext #(#params)*) -> rt::ParseResult<'a, #ret_type> #where_clause {
+        pub fn #impl_name<'a>(mut cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext<'a> #(#params)*) -> rt::ParseResult<'a, #ret_type> #where_clause {
             #lexical_block_start
             let _res = (|| -> rt::ParseResult<'a, #ret_type> {
                 #body

@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use crate::ParseError;
 use proc_macro2::Span;
+use std::collections::HashSet;
 
 #[derive(Clone, Default)]
 pub struct ScopeStack {
@@ -23,7 +24,16 @@ impl ScopeStack {
 /// Schlanker State für Variablen, Whitespace-Modus und Span-Tracking.
 /// Wird beim Backtracking geklont (billig, da meist winzig).
 #[derive(Clone)]
-pub struct ParseContext {
+pub struct ParseContext<'a> {
+    /// Die weiteste Stelle, an der das Parsen jemals gescheitert ist.
+    ///
+    /// Ein rein funktionales Modell verliert jeden Fehler, der von einem
+    /// *erfolgreichen* Zuruecksetzen ueberdeckt wird: `separated` mit `min=0`, ein
+    /// gescheitertes `?` oder `*` liefern `Ok`, und ein `Ok` traegt keinen Fehler.
+    /// Genau dann bleibt am Ende nur eine flache, generische Meldung uebrig.
+    /// Dieses Feld ist der Kanal dafuer - es wird beim Zuruecksetzen NICHT
+    /// verworfen, sondern hochgereicht.
+    pub furthest: Option<ParseError<'a>>,
     pub scopes: ScopeStack,
     pub mode_stack: Vec<bool>,
     pub last_span: Option<Span>, // Wichtig für den Lexical-Mode!
@@ -36,13 +46,40 @@ pub struct ParseContext {
     pub group_depth: usize,
 }
 
-impl ParseContext {
+impl<'a> ParseContext<'a> {
     pub fn new() -> Self {
         Self {
             scopes: ScopeStack::new(),
             mode_stack: Vec::new(),
             last_span: None,
             group_depth: 0,
+            furthest: None,
+        }
+    }
+
+    /// Merkt sich einen Fehler, auch wenn der Parser danach erfolgreich weitermacht.
+    pub fn record_failure(&mut self, e: &ParseError<'a>) {
+        self.furthest = Some(match self.furthest.take() {
+            Some(bisher) => bisher.merge(e.clone()),
+            None => e.clone(),
+        });
+    }
+
+    /// Uebernimmt die Merkstelle eines verworfenen Kontext-Klons.
+    ///
+    /// Ohne das ginge der Fehler genau in den Faellen verloren, um die es geht:
+    /// beim Backtracking wird der Klon weggeworfen.
+    pub fn absorb(&mut self, other: &ParseContext<'a>) {
+        if let Some(e) = &other.furthest {
+            self.record_failure(e);
+        }
+    }
+
+    /// Waehlt zwischen dem zurueckgegebenen Fehler und der gemerkten Stelle.
+    pub fn best_error(&self, returned: ParseError<'a>) -> ParseError<'a> {
+        match &self.furthest {
+            Some(f) => returned.merge(f.clone()),
+            None => returned,
         }
     }
 
@@ -86,6 +123,6 @@ impl ParseContext {
     }
 }
 
-impl Default for ParseContext {
+impl<'a> Default for ParseContext<'a> {
     fn default() -> Self { Self::new() }
 }
