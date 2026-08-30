@@ -141,6 +141,34 @@ where
     }
 }
 
+/// Beschriftet einen gescheiterten Listen-Elementversuch.
+///
+/// Scheiterte das Element gleich an seiner Anfangsstelle, sagt seine interne Meldung
+/// nichts ueber die Liste aus - dann tritt die Erwartung des Elements an ihre Stelle,
+/// bei Bedarf mit der Angabe, dass die Eingabe bzw. die Gruppe zu Ende ist
+/// (ADR 13, Punkt 3). Kam es dagegen voran, ist sein eigener Fehler die
+/// aussagekraeftigere Meldung und bleibt unangetastet.
+///
+/// In beiden Faellen bleibt der Regelstapel des Fehlers erhalten - dort steht bereits
+/// der Elementindex (`in item 3`).
+fn label_missing_item<'a>(
+    mut e: ParseError<'a>,
+    at: Cursor<'a>,
+    item_name: &str,
+    ctx: &ParseContext,
+) -> ParseError<'a> {
+    if e.at == Some(at) {
+        e.message = if at.eof() {
+            format!("{}, expected {}", ctx.end_of_scope_msg(), item_name)
+        } else {
+            format!("expected {}", item_name)
+        };
+        e.span = at.span();
+    }
+    e.priority = PRIO_STRUCTURAL;
+    e
+}
+
 pub fn parse_separated<'a, T, P, S>(
     mut cursor: Cursor<'a>,
     ctx: &mut ParseContext,
@@ -162,12 +190,11 @@ where
             items.push(item);
             cursor = next_cursor;
         }
-        Err(e) => {
+        Err(mut e) => {
             if min > 0 {
-                return Err(e.merge(
-                    ParseError::at_cursor(cursor, format!("expected {}", item_name))
-                        .with_priority(PRIO_STRUCTURAL),
-                ));
+                // Der Fehler gehoert zum ersten Element der Liste (ADR 13, Punkt 11).
+                e.push_rule(&format!("{} 1", item_name));
+                return Err(label_missing_item(e, cursor, item_name, ctx));
             }
             return Ok((items, cursor));
         }
@@ -188,7 +215,9 @@ where
                         cursor = after_item_cursor;
                         *ctx = item_ctx; 
                     }
-                    Err(e) => {
+                    Err(mut e) => {
+                        // Index des VERSUCHTEN Elements, 1-basiert.
+                        e.push_rule(&format!("{} {}", item_name, items.len() + 1));
                         if trailing {
                             // Baumelnder Trenner ist erlaubt: er GEHOERT zur Liste und
                             // wird verbraucht. Ohne das blieb er im Strom stehen und
@@ -197,19 +226,12 @@ where
                             *ctx = sep_ctx;
                             break;
                         } else {
-                            // Striktes Scheitern: Der Trenner war da, das Item fehlt.
-                            // Steht der Cursor dabei am Ende, wird das benannt - je
-                            // nachdem, ob wir in einer Gruppe stehen oder am Ende der
-                            // Eingabe (ADR 13, Punkt 3).
-                            let msg = if after_sep_cursor.eof() {
-                                format!("{}, expected {}", ctx.end_of_scope_msg(), item_name)
-                            } else {
-                                format!("expected {}", item_name)
-                            };
-                            return Err(e.merge(
-                                ParseError::at_cursor(after_sep_cursor, msg)
-                                    .with_priority(PRIO_STRUCTURAL),
-                            ));
+                            // Striktes Scheitern: Der Trenner war da, ein Element ist
+                            // Pflicht. Der echte Fehler wird ANGEREICHERT, nicht gegen
+                            // einen synthetischen ausgetauscht - sonst ginge mit ihm
+                            // sein Regelstapel und, wenn er tiefer lag, die
+                            // aussagekraeftigere Stelle verloren.
+                            return Err(label_missing_item(e, after_sep_cursor, item_name, ctx));
                         }
                     }
                 }
