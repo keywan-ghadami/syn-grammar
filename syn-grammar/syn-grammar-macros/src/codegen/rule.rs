@@ -204,14 +204,14 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                             Err(e) => return Err(e.with_priority(50)), // CUT: fatal!
                         }
                     }
-                    Err(mut e) => {
-                        if let Some(lbl) = #label_lit {
-                            if e.span.start() == _start_cursor.span().start() {
-                                e.message = format!("expected {}", lbl);
-                                e.priority = std::cmp::max(e.priority, 10);
-                            }
+                    Err(e) => {
+                        if e.priority >= rt::PRIO_STRUCTURAL { return Err(e); }
+                        // Ohne Fortschritt ist die Alternative an ihrer Grenze
+                        // gescheitert. Dann zaehlt ihr Label als Erwartung, statt
+                        // die interne Meldung nach aussen zu tragen (ADR 13, Punkt 6).
+                        if e.at == Some(_start_cursor) {
+                            if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
                         }
-                        if e.priority >= 50 { return Err(e); }
                         _best_err = Some(_best_err.map_or(e.clone(), |b| b.merge(e)));
                     }
                 }
@@ -226,18 +226,26 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                 })();
                 match _arm_res {
                     Ok(res) => return Ok(res),
-                    Err(mut e) => {
-                        if let Some(lbl) = #label_lit {
-                            if e.span.start() == _start_cursor.span().start() {
-                                e.message = format!("expected {}", lbl);
-                                e.priority = std::cmp::max(e.priority, 10);
-                            }
+                    Err(e) => {
+                        if e.priority >= rt::PRIO_STRUCTURAL { return Err(e); }
+                        // Ohne Fortschritt ist die Alternative an ihrer Grenze
+                        // gescheitert. Dann zaehlt ihr Label als Erwartung, statt
+                        // die interne Meldung nach aussen zu tragen (ADR 13, Punkt 6).
+                        if e.at == Some(_start_cursor) {
+                            if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
                         }
-                        if e.priority >= 50 { return Err(e); }
                         _best_err = Some(_best_err.map_or(e.clone(), |b| b.merge(e)));
                     }
                 }
             }
+        };
+
+        // Scheitert der Peek, laeuft der Zweig gar nicht erst und erzeugt keinen
+        // Fehler. Sein Label ist dann trotzdem eine gueltige Erwartung an dieser
+        // Stelle und muss in die Aufzaehlung (ADR 13, Punkt 6) - sonst bleibt nur
+        // die nichtssagende Meldung "No matching rule variant found".
+        let sonst_erwartet = quote! {
+            else if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
         };
 
         if is_unique {
@@ -247,14 +255,18 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                     #logic
                     // Wenn wir hierher kommen, ist der Zweig fatal gescheitert!
                     if let Some(err) = _best_err.take() {
-                        return Err(err.with_priority(50));
+                        return Err(err.with_priority(rt::PRIO_STRUCTURAL));
                     } else {
-                        return Err(rt::ParseError::at_cursor(_start_cursor, "propagating fatal unique error").with_priority(50));
+                        return Err(rt::ParseError::at_cursor(_start_cursor, "propagating fatal unique error").with_priority(rt::PRIO_STRUCTURAL));
                     }
                 }
+                #sonst_erwartet
             })
         } else if let Some(token_code) = peek_token_obj {
-            Ok(quote! { if rt::peek_syn(_start_cursor, |i| i.peek(#token_code)) { #logic } })
+            Ok(quote! {
+                if rt::peek_syn(_start_cursor, |i| i.peek(#token_code)) { #logic }
+                #sonst_erwartet
+            })
         } else {
             Ok(logic)
         }
@@ -264,10 +276,11 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
 
     Ok(quote! {
         let mut _best_err: Option<rt::ParseError> = None;
+        let mut _expected: Vec<String> = Vec::new();
         let _start_cursor = cursor;
 
         #(#arms)*
 
-        Err(_best_err.unwrap_or_else(|| rt::ParseError::at_cursor(_start_cursor, #error_msg)))
+        Err(rt::finish_variants(_best_err, _expected, _start_cursor, #error_msg))
     })
 }

@@ -1,6 +1,8 @@
 use syn::buffer::Cursor;
 use syn::parse::Parser;
-use crate::{ParseContext, ParseError, ParseResult, PRIO_LABELED, PRIO_STRUCTURAL};
+use crate::{
+    ParseContext, ParseError, ParseResult, PRIO_AGGREGATED, PRIO_LABELED, PRIO_STRUCTURAL,
+};
 
 /// Erlaubt das Peeken von spezifischen syn::Tokens auf einem Cursor
 pub fn peek_syn<'a, F>(cursor: Cursor<'a>, peek_fn: F) -> bool
@@ -56,6 +58,46 @@ pub fn invoke_syn_parser<'a, T: syn::parse::Parse>(mut cursor: Cursor<'a>) -> Pa
         // der steht in einer Sequenz `a b c` beim Scheitern von `c` bereits hinter
         // `a b` und misst die Tiefe damit korrekt.
         Err(e) => Err(ParseError::new(e.span(), e.to_string()).with_cursor(cursor)),
+    }
+}
+
+/// Schliesst eine Alternativenkette ab und waehlt die Meldung, die nach aussen geht.
+///
+/// `best` ist der beste Einzelfehler aus den Zweigen, `expected` sammelt die Labels der
+/// Zweige, die schon an ihrer Grenze gescheitert sind (also ohne ein einziges Token zu
+/// verbrauchen). Umsetzung von ADR 13, Punkte 6 und 7.
+pub fn finish_variants<'a>(
+    best: Option<ParseError<'a>>,
+    mut expected: Vec<String>,
+    start: Cursor<'a>,
+    fallback_msg: &str,
+) -> ParseError<'a> {
+    // Ein Fehler, der ueber den Startpunkt hinauskam, ist aussagekraeftiger als die
+    // Aufzaehlung der Alternativen an der Startstelle - dann darf `expected one of:`
+    // gar nicht erst erscheinen (ADR 13, Punkt 7).
+    if let Some(b) = &best {
+        let kam_weiter = b.at.map(|at| at > start).unwrap_or(false);
+        if kam_weiter || b.priority >= PRIO_STRUCTURAL {
+            return best.unwrap();
+        }
+    }
+
+    expected.sort();
+    expected.dedup();
+
+    match expected.len() {
+        0 => best.unwrap_or_else(|| ParseError::at_cursor(start, fallback_msg)),
+        1 => ParseError::at_cursor(start, format!("expected `{}`", expected[0]))
+            .with_priority(PRIO_LABELED),
+        _ => {
+            let liste = expected
+                .iter()
+                .map(|e| format!("`{}`", e))
+                .collect::<Vec<_>>()
+                .join(", ");
+            ParseError::at_cursor(start, format!("expected one of: {}", liste))
+                .with_priority(PRIO_AGGREGATED)
+        }
     }
 }
 
