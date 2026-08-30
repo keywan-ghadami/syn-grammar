@@ -10,6 +10,11 @@ pub mod rt {
 
 pub use grammar_kit::testing;
 
+/// Die Werttypen, die die eingebauten Regeln liefern (`Identifier`, `StringLiteral`,
+/// `SpannedValue`). Sie stammen aus dem gemeinsamen Modell und werden hier
+/// re-exportiert, damit Nutzer dafür nicht `syn-grammar-model` einbinden müssen.
+pub use syn_grammar_model::model::types;
+
 pub trait SynTestExt<O> {
     fn parse_test(self, input: &str) -> testing::TestResult<O, syn::Error>;
 }

@@ -1,55 +1,66 @@
 //! Token filters for emulating character-level primitives in a token stream.
+//!
+//! Sie arbeiten auf dem `Cursor` wie der uebrige generierte Code: sie lesen ein
+//! Token ueber die Bruecke und pruefen es nach. Vor der Umstellung auf
+//! Cursor-Parsing nahmen sie noch einen `ParseStream` und waren dadurch aus dem
+//! generierten Code gar nicht mehr aufrufbar.
 
-use syn::parse::ParseStream;
-use syn::{Ident, LitInt, Result};
+use crate::rt::{invoke_syn_parser, ParseError, ParseResult};
+use syn::buffer::Cursor;
+use syn::spanned::Spanned;
+use syn::{Ident, LitInt};
 
-pub fn alpha(input: ParseStream) -> Result<Ident> {
-    let ident: Ident = input.parse()?;
-    if ident.to_string().chars().all(char::is_alphabetic) {
-        Ok(ident)
+/// Liest ein Token und prueft es; schlaegt die Pruefung fehl, entsteht ein Fehler
+/// an der Stelle, an der der Parser stand.
+fn filtered<'a, T, F>(cursor: Cursor<'a>, pruefung: F, erwartet: &str) -> ParseResult<'a, T>
+where
+    T: syn::parse::Parse + Spanned,
+    F: FnOnce(&T) -> bool,
+{
+    let (wert, next) = invoke_syn_parser::<T>(cursor)?;
+    if pruefung(&wert) {
+        Ok((wert, next))
     } else {
-        Err(syn::Error::new(
-            ident.span(),
-            "expected an alphabetic identifier",
-        ))
+        Err(ParseError::new(wert.span(), format!("expected {}", erwartet)).with_cursor(cursor))
     }
 }
 
-pub fn digit(input: ParseStream) -> Result<LitInt> {
-    let lit: LitInt = input.parse()?;
-    if lit.base10_digits().chars().all(|c| c.is_ascii_digit()) {
-        Ok(lit)
-    } else {
-        Err(syn::Error::new(lit.span(), "expected a numeric literal"))
-    }
+pub fn alpha(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
+    filtered(
+        cursor,
+        |i: &Ident| i.to_string().chars().all(char::is_alphabetic),
+        "an alphabetic identifier",
+    )
 }
 
-pub fn alphanumeric(input: ParseStream) -> Result<Ident> {
-    let ident: Ident = input.parse()?;
-    if ident.to_string().chars().all(char::is_alphanumeric) {
-        Ok(ident)
-    } else {
-        Err(syn::Error::new(
-            ident.span(),
-            "expected an alphanumeric identifier",
-        ))
-    }
+pub fn alphanumeric(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
+    filtered(
+        cursor,
+        |i: &Ident| i.to_string().chars().all(char::is_alphanumeric),
+        "an alphanumeric identifier",
+    )
 }
 
-pub fn hex_digit(input: ParseStream) -> Result<LitInt> {
-    let lit: LitInt = input.parse()?;
-    if lit.base10_digits().chars().all(|c| c.is_ascii_hexdigit()) {
-        Ok(lit)
-    } else {
-        Err(syn::Error::new(lit.span(), "expected a hex literal"))
-    }
+pub fn digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
+    filtered(
+        cursor,
+        |l: &LitInt| l.base10_digits().chars().all(|c| c.is_ascii_digit()),
+        "a numeric literal",
+    )
 }
 
-pub fn oct_digit(input: ParseStream) -> Result<LitInt> {
-    let lit: LitInt = input.parse()?;
-    if lit.base10_digits().chars().all(|c| c.is_digit(8)) {
-        Ok(lit)
-    } else {
-        Err(syn::Error::new(lit.span(), "expected an octal literal"))
-    }
+pub fn hex_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
+    filtered(
+        cursor,
+        |l: &LitInt| l.base10_digits().chars().all(|c| c.is_ascii_hexdigit()),
+        "a hex literal",
+    )
+}
+
+pub fn oct_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
+    filtered(
+        cursor,
+        |l: &LitInt| l.base10_digits().chars().all(|c| c.is_digit(8)),
+        "an octal literal",
+    )
 }
