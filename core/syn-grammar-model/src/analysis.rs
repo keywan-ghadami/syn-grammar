@@ -284,6 +284,24 @@ pub fn resolve_token_types(
             format!("Numeric literal '{}' cannot be used as a token. Use `integer` or `lit_int` parsers instead.", s)));
     }
 
+    // Zusammengesetzte Operatoren bleiben EIN Token.
+    //
+    // Ohne diese Abkuerzung zerlegt die Schleife unten `"::"` in
+    // `[Token![:], Token![:]]` und ueberlaesst die Frage, ob die beiden
+    // wirklich zusammengehoeren, einem Span-Adjazenztest im Codegen
+    // (`Spanned::span(&a).end() != Spanned::span(&b).start()`). Der haengt
+    // daran, dass Spans ueberhaupt Positionen tragen - was im Prozedurmakro
+    // erst ab Rust 1.88 der Fall ist (proc-macro2 `build.rs`, cfg
+    // `proc_macro_span_location`). Auf aelteren Toolchains ist die Pruefung
+    // wirkungslos und `a : : b` wuerde als `::` durchgehen.
+    //
+    // syns eigene Token-Typen pruefen `Spacing::Joint` selbst und auf jeder
+    // Toolchain korrekt. Ein Eintrag hier spart ausserdem einen kompletten
+    // Bridge-Aufruf pro Operator.
+    if let Some(ty) = zusammengesetzter_operator(&s) {
+        return Ok(vec![ty]);
+    }
+
     let ts: proc_macro2::TokenStream = syn::parse_str(&s)
         .map_err(|_| syn::Error::new(lit.span(), format!("Invalid token literal: '{}'", s)))?;
 
@@ -1136,6 +1154,24 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
         }
         _ => false,
     }
+}
+
+/// Bildet einen mehrzeichigen Rust-Operator auf seinen `syn`-Token-Typ ab.
+///
+/// `None` fuer alles, was kein bekannter Operator ist - dann greift die
+/// zeichenweise Zerlegung in [`resolve_token_types`].
+fn zusammengesetzter_operator(s: &str) -> Option<syn::Type> {
+    // Nur Operatoren, die `Token![..]` als eigenen Typ kennt. Bewusst als
+    // Liste statt per Heuristik: ein falsch geratener Operator wuerde still
+    // ein anderes Token akzeptieren.
+    let bekannt = [
+        "::", "->", "=>", "==", "!=", "<=", ">=", "&&", "||", "..", "..=", "...", "+=", "-=", "*=",
+        "/=", "%=", "^=", "&=", "|=", "<<", ">>", "<<=", ">>=",
+    ];
+    if !bekannt.contains(&s) {
+        return None;
+    }
+    syn::parse_str::<syn::Type>(&format!("Token![{}]", s)).ok()
 }
 
 #[cfg(test)]

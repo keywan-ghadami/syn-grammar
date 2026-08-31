@@ -1,6 +1,6 @@
-error: expected '::', found space between tokens at column 20 (line 8)
+error: expected `::` at column 18 (line 11)
        in pfad
- --> tests/ui/joint_operator_real_macro.rs:8:21
-  |
-8 | ui_macro::pfad!(a : : b);
-  |                     ^
+  --> tests/ui/joint_operator_real_macro.rs:11:19
+   |
+11 | ui_macro::pfad!(a : : b);
+   |                   ^
