@@ -385,6 +385,19 @@ fn validate_args_recursive(
     Ok(())
 }
 
+/// Traegt dieser `use`-Baum irgendwo einen Glob (`::*`)?
+///
+/// Rekursiv, weil der Glob in einem Pfad (`a::b::*`) oder in einer Gruppe
+/// (`a::{b, c::*}`) stecken kann.
+fn use_tree_has_glob(tree: &syn::UseTree) -> bool {
+    match tree {
+        syn::UseTree::Glob(_) => true,
+        syn::UseTree::Path(p) => use_tree_has_glob(&p.tree),
+        syn::UseTree::Group(g) => g.items.iter().any(use_tree_has_glob),
+        syn::UseTree::Name(_) | syn::UseTree::Rename(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,18 +543,5 @@ mod tests {
             err.to_string(),
             "Bindings are not allowed inside 'until' patterns."
         );
-    }
-}
-
-/// Traegt dieser `use`-Baum irgendwo einen Glob (`::*`)?
-///
-/// Rekursiv, weil der Glob in einem Pfad (`a::b::*`) oder in einer Gruppe
-/// (`a::{b, c::*}`) stecken kann.
-fn use_tree_has_glob(tree: &syn::UseTree) -> bool {
-    match tree {
-        syn::UseTree::Glob(_) => true,
-        syn::UseTree::Path(p) => use_tree_has_glob(&p.tree),
-        syn::UseTree::Group(g) => g.items.iter().any(use_tree_has_glob),
-        syn::UseTree::Name(_) | syn::UseTree::Rename(_) => false,
     }
 }
