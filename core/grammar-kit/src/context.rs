@@ -44,6 +44,13 @@ pub struct ParseContext<'a> {
     /// aber wesentlich: "unexpected end of group" gegen "unexpected end of input".
     /// Zur Laufzeit sind beide nicht unterscheidbar, der Codegen weiss es jedoch.
     pub group_depth: usize,
+    /// Die Regeln, in denen der Parser GERADE steht, aeusserste zuerst.
+    ///
+    /// Ein Fehler, der herausgereicht wird, sammelt seine Regelnamen unterwegs selbst
+    /// ein (`push_rule`). Ein Fehler, der von einem erfolgreichen Zuruecksetzen
+    /// ueberdeckt und nur gemerkt wird, nimmt diesen Weg nie - fuer ihn wird hier
+    /// eine Momentaufnahme genommen.
+    pub rule_stack: Vec<String>,
 }
 
 impl<'a> ParseContext<'a> {
@@ -54,14 +61,33 @@ impl<'a> ParseContext<'a> {
             last_span: None,
             group_depth: 0,
             furthest: None,
+            rule_stack: Vec::new(),
         }
     }
 
+    pub fn enter_rule(&mut self, name: &str) {
+        self.rule_stack.push(name.to_string());
+    }
+
+    pub fn exit_rule(&mut self) {
+        self.rule_stack.pop();
+    }
+
     /// Merkt sich einen Fehler, auch wenn der Parser danach erfolgreich weitermacht.
+    ///
+    /// Dabei bekommt er die Regeln mit, in denen der Parser gerade steht - von innen
+    /// nach aussen, passend zu dem, was schon an ihm haengt. Ohne das traegt ein
+    /// ueberdeckter Fehler nur den Kontext, den er bis zum Verwerfen gesammelt hat.
     pub fn record_failure(&mut self, e: &ParseError<'a>) {
+        let mut e = e.clone();
+        for name in self.rule_stack.iter().rev() {
+            if !e.rule_stack.iter().any(|r| r == name) {
+                e.rule_stack.push(name.clone());
+            }
+        }
         self.furthest = Some(match self.furthest.take() {
-            Some(bisher) => bisher.merge(e.clone()),
-            None => e.clone(),
+            Some(bisher) => bisher.merge(e),
+            None => e,
         });
     }
 

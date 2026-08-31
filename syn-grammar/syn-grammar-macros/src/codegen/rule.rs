@@ -97,11 +97,18 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         #[doc(hidden)]
         #(#impl_attrs)*
         pub fn #impl_name<'a>(mut cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext<'a> #(#params)*) -> rt::ParseResult<'a, #ret_type> #where_clause {
+            // Der Regelname liegt waehrend des Rumpfs auf dem lebenden Stapel, damit
+            // ein hier gemerkter (statt herausgereichter) Fehler ihn mitbekommt.
+            // enter/exit umschliessen die Rumpf-Closure - alle frueh zurueckkehrenden
+            // Pfade darin (Cut, is_fatal, unique-Peek) verlassen nur die Closure, das
+            // Paar bleibt also automatisch balanciert.
+            ctx.enter_rule(#context_name);
             #lexical_block_start
             let _res = (|| -> rt::ParseResult<'a, #ret_type> {
                 #body
             })();
             #lexical_block_end
+            ctx.exit_rule();
             
             match _res {
                 Ok(res) => Ok(res),

@@ -57,7 +57,14 @@ pub fn invoke_syn_parser<'a, T: syn::parse::Parse>(mut cursor: Cursor<'a>) -> Pa
         // Span von syn (praezise fuer die Anzeige), Fortschritt vom Eintrittscursor:
         // der steht in einer Sequenz `a b c` beim Scheitern von `c` bereits hinter
         // `a b` und misst die Tiefe damit korrekt.
-        Err(e) => Err(ParseError::new(e.span(), e.to_string()).with_cursor(cursor)),
+        // Am Ende der Eingabe bzw. der Gruppe traegt syns Fehler nur
+        // `Span::call_site()`; der Cursor zeigt dort auf das schliessende Trennzeichen
+        // und ist die bessere Quelle fuer die Anzeige. Sonst ist syns Span praeziser,
+        // weil er auch innerhalb eines mehrtokenigen Typs zeigen kann.
+        Err(e) => {
+            let span = if cursor.eof() { cursor.span() } else { e.span() };
+            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
+        }
     }
 }
 
@@ -202,8 +209,12 @@ where
 {
     let mut items = Vec::new();
 
-    // Erstes Element
-    match item_parser(cursor, ctx) {
+    // Erstes Element. Der Elementname liegt waehrend des Versuchs auf dem lebenden
+    // Stapel - nur so traegt ein TIEF im Element gemerkter Fehler den Listenindex.
+    ctx.enter_rule(&format!("{} 1", item_name));
+    let erstes = item_parser(cursor, ctx);
+    ctx.exit_rule();
+    match erstes {
         Ok((item, next_cursor)) => {
             items.push(item);
             cursor = next_cursor;
@@ -233,12 +244,18 @@ where
         let mut sep_ctx = ctx.clone();
         
         // Separator versuchen
-        match sep_parser(cursor, &mut sep_ctx) {
+        sep_ctx.enter_rule("separator");
+        let sep_res = sep_parser(cursor, &mut sep_ctx);
+        sep_ctx.exit_rule();
+        match sep_res {
             Ok((_, after_sep_cursor)) => {
                 let mut item_ctx = sep_ctx.clone();
                 
                 // Item NACH Separator versuchen
-                match item_parser(after_sep_cursor, &mut item_ctx) {
+                item_ctx.enter_rule(&format!("{} {}", item_name, items.len() + 1));
+                let item_res = item_parser(after_sep_cursor, &mut item_ctx);
+                item_ctx.exit_rule();
+                match item_res {
                     Ok((item, after_item_cursor)) => {
                         items.push(item);
                         cursor = after_item_cursor;
@@ -313,7 +330,10 @@ where
 
     loop {
         let mut item_ctx = ctx.clone();
-        match item_parser(cursor, &mut item_ctx) {
+        item_ctx.enter_rule(&format!("{} {}", item_name, items.len() + 1));
+        let item_res = item_parser(cursor, &mut item_ctx);
+        item_ctx.exit_rule();
+        match item_res {
             Ok((item, next_cursor)) => {
                 // Kein Fortschritt trotz Erfolg -> sonst Endlosschleife.
                 if next_cursor == cursor {

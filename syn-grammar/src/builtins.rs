@@ -31,7 +31,14 @@ where
             }
             Ok((val, cursor))
         }
-        Err(e) => Err(ParseError::new(e.span(), e.to_string()).with_cursor(cursor)),
+        // Am Ende der Eingabe bzw. der Gruppe traegt syns Fehler nur
+        // `Span::call_site()`; der Cursor zeigt dort auf das schliessende Trennzeichen
+        // und ist die bessere Quelle fuer die Anzeige. Sonst ist syns Span praeziser,
+        // weil er auch innerhalb eines mehrtokenigen Typs zeigen kann.
+        Err(e) => {
+            let span = if cursor.eof() { cursor.span() } else { e.span() };
+            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
+        }
     }
 }
 
