@@ -1,6 +1,6 @@
+use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
-use syn::parse::Parser;
 
 grammar! {
     grammar repro_parser {

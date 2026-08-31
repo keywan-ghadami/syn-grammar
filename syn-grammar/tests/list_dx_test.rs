@@ -16,7 +16,7 @@ grammar! {
         ref_qual
             = ("&" | "&&" | "*") # "reference qualifier"
 
-        type_name 
+        type_name
             = ident ("::" ident)* # "type name"
     }
 }
@@ -78,7 +78,5 @@ fn test_cxx_garbage_after_item() {
     cxx_dx::parse_signature
         .parse_str("fn foo( int a garbage );")
         .test()
-        .assert_failure_contains(
-            "expected `,` at column 14 (line 1)\nin separator\nin signature"
-        );
+        .assert_failure_contains("expected `,` at column 14 (line 1)\nin separator\nin signature");
 }

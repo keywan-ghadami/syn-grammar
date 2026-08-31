@@ -12,15 +12,27 @@ pub struct ScopeStack {
 
 impl ScopeStack {
     /// Ein Stapel mit einer leeren aeussersten Ebene.
-    pub fn new() -> Self { Self { scopes: vec![HashSet::new()] } }
+    pub fn new() -> Self {
+        Self {
+            scopes: vec![HashSet::new()],
+        }
+    }
     /// Oeffnet eine neue innere Ebene.
-    pub fn enter_scope(&mut self) { self.scopes.push(HashSet::new()); }
+    pub fn enter_scope(&mut self) {
+        self.scopes.push(HashSet::new());
+    }
     /// Schliesst die innerste Ebene; die aeusserste bleibt immer bestehen.
-    pub fn exit_scope(&mut self) { if self.scopes.len() > 1 { self.scopes.pop(); } }
+    pub fn exit_scope(&mut self) {
+        if self.scopes.len() > 1 {
+            self.scopes.pop();
+        }
+    }
 
     /// Traegt `name` in die innerste Ebene ein.
     pub fn define(&mut self, name: impl Into<String>) {
-        if let Some(scope) = self.scopes.last_mut() { scope.insert(name.into()); }
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.into());
+        }
     }
 
     /// Ist `name` in irgendeiner Ebene bekannt? Sucht von innen nach aussen.
@@ -127,9 +139,13 @@ impl<'a> ParseContext<'a> {
     }
 
     /// Betritt eine Delimiter-Gruppe (`paren(..)`, `{..}`, `[..]`).
-    pub fn enter_group(&mut self) { self.group_depth += 1; }
+    pub fn enter_group(&mut self) {
+        self.group_depth += 1;
+    }
     /// Verlaesst eine Delimiter-Gruppe.
-    pub fn exit_group(&mut self) { self.group_depth = self.group_depth.saturating_sub(1); }
+    pub fn exit_group(&mut self) {
+        self.group_depth = self.group_depth.saturating_sub(1);
+    }
     /// Beschreibt das Ende des aktuellen Scopes so, wie es in einer Meldung stehen soll.
     pub fn end_of_scope_msg(&self) -> &'static str {
         if self.group_depth > 0 {
@@ -140,15 +156,23 @@ impl<'a> ParseContext<'a> {
     }
 
     /// Betritt einen `lex(..)`-Block: zwischen den Tokens ist kein Zwischenraum erlaubt.
-    pub fn enter_lexical(&mut self) { self.mode_stack.push(true); }
+    pub fn enter_lexical(&mut self) {
+        self.mode_stack.push(true);
+    }
     /// Betritt einen `spaced(..)`-Block: Zwischenraum ist wieder erlaubt.
-    pub fn enter_spaced(&mut self) { self.mode_stack.push(false); }
+    pub fn enter_spaced(&mut self) {
+        self.mode_stack.push(false);
+    }
     /// Verlaesst den innersten Whitespace-Modus.
-    pub fn exit_mode(&mut self) { self.mode_stack.pop(); }
+    pub fn exit_mode(&mut self) {
+        self.mode_stack.pop();
+    }
     /// Gilt gerade der lexikalische Modus?
-    pub fn is_lexical(&self) -> bool { *self.mode_stack.last().unwrap_or(&false) }
+    pub fn is_lexical(&self) -> bool {
+        *self.mode_stack.last().unwrap_or(&false)
+    }
 
-    /// Zeichnet den Span auf und wirft einen Fehler, wenn im Lexical-Mode 
+    /// Zeichnet den Span auf und wirft einen Fehler, wenn im Lexical-Mode
     /// fälschlicherweise Leerzeichen zwischen den Tokens stehen.
     pub fn record_span(&mut self, span: Span) -> syn::Result<()> {
         if self.is_lexical() {
@@ -166,14 +190,16 @@ impl<'a> ParseContext<'a> {
     /// Steht vor `next_span` tatsaechlich ein Zwischenraum? Traegt das
     /// `whitespace`-Builtin.
     pub fn check_whitespace(&self, next_span: Span) -> bool {
-        if let Some(last) = self.last_span { 
-            last.end() != next_span.start() 
-        } else { 
-            true 
+        if let Some(last) = self.last_span {
+            last.end() != next_span.start()
+        } else {
+            true
         }
     }
 }
 
 impl<'a> Default for ParseContext<'a> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

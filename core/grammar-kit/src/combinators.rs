@@ -1,8 +1,8 @@
-use syn::buffer::Cursor;
-use syn::parse::Parser;
 use crate::{
     ParseContext, ParseError, ParseResult, PRIO_AGGREGATED, PRIO_LABELED, PRIO_STRUCTURAL,
 };
+use syn::buffer::Cursor;
+use syn::parse::Parser;
 
 /// Erlaubt das Peeken von spezifischen syn::Tokens auf einem Cursor
 pub fn peek_syn<'a, F>(cursor: Cursor<'a>, peek_fn: F) -> bool
@@ -51,7 +51,7 @@ impl<T: syn::parse::Parse> SynParsable for T {}
 /// verstaendliche Meldung erzeugt statt eines rohen Trait-Bound-Fehlers.
 pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
     let stream = cursor.token_stream();
-    
+
     // Wir erzeugen einen temporären Syn-Parser
     let parser = |input: syn::parse::ParseStream| {
         let val = input.parse::<T>()?;
@@ -63,19 +63,19 @@ pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseRes
         input.parse::<proc_macro2::TokenStream>()?;
         Ok((val, remaining))
     };
-    
+
     match Parser::parse2(parser, stream.clone()) {
         Ok((val, remaining)) => {
             let total = stream.into_iter().count();
             let consumed = total - remaining;
-            
+
             // Original-Cursor exakt um die Anzahl der verbrauchten Tokens vorschieben
             for _ in 0..consumed {
                 if let Some((_, next)) = cursor.token_tree() {
                     cursor = next;
                 }
             }
-            
+
             Ok((val, cursor))
         }
         // Span von syn (praezise fuer die Anzeige), Fortschritt vom Eintrittscursor:
@@ -86,7 +86,11 @@ pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseRes
         // und ist die bessere Quelle fuer die Anzeige. Sonst ist syns Span praeziser,
         // weil er auch innerhalb eines mehrtokenigen Typs zeigen kann.
         Err(e) => {
-            let span = if cursor.eof() { cursor.span() } else { e.span() };
+            let span = if cursor.eof() {
+                cursor.span()
+            } else {
+                e.span()
+            };
             Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
         }
     }
@@ -156,7 +160,7 @@ where
     F: FnOnce(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
 {
     let mut fork_ctx = ctx.clone();
-    
+
     match parser(cursor, &mut fork_ctx) {
         Ok((val, next_cursor)) => {
             *ctx = fork_ctx; // Zustand nach erfolgreichem Parse übernehmen
@@ -235,7 +239,7 @@ pub fn parse_separated<'a, T, P, S>(
 ) -> ParseResult<'a, Vec<T>>
 where
     P: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
-    S: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, ()> ,
+    S: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, ()>,
 {
     let mut items = Vec::new();
 
@@ -272,7 +276,7 @@ where
 
     loop {
         let mut sep_ctx = ctx.clone();
-        
+
         // Separator versuchen
         sep_ctx.enter_rule("separator");
         let sep_res = sep_parser(cursor, &mut sep_ctx);
@@ -280,7 +284,7 @@ where
         match sep_res {
             Ok((_, after_sep_cursor)) => {
                 let mut item_ctx = sep_ctx.clone();
-                
+
                 // Item NACH Separator versuchen
                 item_ctx.enter_rule(&format!("{} {}", item_name, items.len() + 1));
                 let item_res = item_parser(after_sep_cursor, &mut item_ctx);
@@ -289,7 +293,7 @@ where
                     Ok((item, after_item_cursor)) => {
                         items.push(item);
                         cursor = after_item_cursor;
-                        *ctx = item_ctx; 
+                        *ctx = item_ctx;
                     }
                     Err(mut e) => {
                         // Siehe oben: ohne Fortschritt traegt der interne Stapel nichts bei.
@@ -317,8 +321,7 @@ where
                             // ersetzt zu werden. Angereichert wird der ECHTE Fehler,
                             // damit sein Regelstapel und, wenn er tiefer lag, seine
                             // Stelle erhalten bleiben.
-                            let markiert =
-                                label_missing_item(e, after_sep_cursor, item_name, ctx);
+                            let markiert = label_missing_item(e, after_sep_cursor, item_name, ctx);
                             ctx.record_failure(&markiert);
                             ctx.absorb(&item_ctx);
                             break;
@@ -341,7 +344,12 @@ where
     if items.len() < min {
         return Err(ParseError::at_cursor(
             cursor,
-            format!("expected at least {} {}s, found {}", min, item_name, items.len()),
+            format!(
+                "expected at least {} {}s, found {}",
+                min,
+                item_name,
+                items.len()
+            ),
         )
         .with_priority(PRIO_STRUCTURAL));
     }
@@ -399,7 +407,12 @@ where
     if items.len() < min {
         return Err(ParseError::at_cursor(
             cursor,
-            format!("expected at least {} {}s, found {}", min, item_name, items.len()),
+            format!(
+                "expected at least {} {}s, found {}",
+                min,
+                item_name,
+                items.len()
+            ),
         )
         .with_priority(PRIO_STRUCTURAL));
     }

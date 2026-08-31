@@ -16,7 +16,10 @@ use syn_grammar::testing::Testable;
 
 /// Kurzform: Quelltext parsen und in das gemeinsame `TestResult` heben.
 fn parse(src: &str) -> syn_grammar::testing::TestResult<cxx_parser::FfiMod, syn::Error> {
-    CxxParser::parse_top_level_mod.parse_str(src).test().with_source(src)
+    CxxParser::parse_top_level_mod
+        .parse_str(src)
+        .test()
+        .with_source(src)
 }
 
 /// ADR 13, Punkt 4: der Regelstapel wird mehrzeilig von innen nach aussen

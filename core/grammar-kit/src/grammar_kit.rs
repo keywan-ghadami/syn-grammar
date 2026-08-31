@@ -1,19 +1,18 @@
 #![doc = include_str!("../README.md")]
-
 // Die oeffentliche API dieses Crates ist die Laufzeit generierter Parser -
 // undokumentierte Elemente darin sind ein Fehler, kein Schoenheitsmakel.
 #![warn(missing_docs)]
 
-/// Der Fehlertyp der Laufzeit und seine Auswahlregeln.
+/// Die Bausteine, aus denen der generierte Code besteht.
 #[cfg(feature = "syn")]
-pub mod error;
+pub mod combinators;
 /// Der waehrend eines Parselaufs mitgefuehrte Zustand: Regelstapel,
 /// Hochwasserstand der Fehler, Gruppentiefe, lexikalischer Modus.
 #[cfg(feature = "syn")]
 pub mod context;
-/// Die Bausteine, aus denen der generierte Code besteht.
+/// Der Fehlertyp der Laufzeit und seine Auswahlregeln.
 #[cfg(feature = "syn")]
-pub mod combinators;
+pub mod error;
 
 /// Fluente Zusicherungen zum Testen generierter Parser.
 #[cfg(feature = "testing")]
@@ -31,8 +30,8 @@ pub trait WithSpan<ParsedData> {
 
 // Exportiere die gekapselten Module flach für den Codegenerator
 #[cfg(feature = "syn")]
-pub use error::*;
+pub use combinators::*;
 #[cfg(feature = "syn")]
 pub use context::*;
 #[cfg(feature = "syn")]
-pub use combinators::*;
+pub use error::*;

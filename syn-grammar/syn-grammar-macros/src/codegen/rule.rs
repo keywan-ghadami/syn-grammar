@@ -19,7 +19,12 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         .iter()
         .filter(|a| {
             let p = a.path();
-            p.is_ident("cfg") || p.is_ident("cfg_attr") || p.is_ident("allow") || p.is_ident("warn") || p.is_ident("deny") || p.is_ident("forbid")
+            p.is_ident("cfg")
+                || p.is_ident("cfg_attr")
+                || p.is_ident("allow")
+                || p.is_ident("warn")
+                || p.is_ident("deny")
+                || p.is_ident("forbid")
         })
         .collect();
 
@@ -30,8 +35,26 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         quote!(#[doc = #msg])
     };
 
-    let params: Vec<_> = rule.params.iter().filter_map(|p| p.ty.as_ref().map(|t| { let name = &p.name; quote! { , #name : #t } })).collect();
-    let param_names: Vec<_> = rule.params.iter().filter_map(|p| p.ty.as_ref().map(|_| { let name = &p.name; quote! { , #name } })).collect();
+    let params: Vec<_> = rule
+        .params
+        .iter()
+        .filter_map(|p| {
+            p.ty.as_ref().map(|t| {
+                let name = &p.name;
+                quote! { , #name : #t }
+            })
+        })
+        .collect();
+    let param_names: Vec<_> = rule
+        .params
+        .iter()
+        .filter_map(|p| {
+            p.ty.as_ref().map(|_| {
+                let name = &p.name;
+                quote! { , #name }
+            })
+        })
+        .collect();
 
     let is_public = rule.is_pub || name == "main";
     let vis = if is_public { quote!(pub) } else { quote!() };
@@ -46,12 +69,23 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     };
     let ctx = &rule_ctx;
 
-    let lexical_block_start = if rule.is_lexical { quote! { ctx.enter_lexical(); } } else { quote! {} };
-    let lexical_block_end = if rule.is_lexical { quote! { ctx.exit_mode(); } } else { quote! {} };
+    let lexical_block_start = if rule.is_lexical {
+        quote! { ctx.enter_lexical(); }
+    } else {
+        quote! {}
+    };
+    let lexical_block_end = if rule.is_lexical {
+        quote! { ctx.exit_mode(); }
+    } else {
+        quote! {}
+    };
 
     let body = if !recursive_refs.is_empty() {
         if base_refs.is_empty() {
-            return Err(syn::Error::new(name.span(), "Left-recursive rule requires at least one non-recursive base variant."));
+            return Err(syn::Error::new(
+                name.span(),
+                "Left-recursive rule requires at least one non-recursive base variant.",
+            ));
         }
 
         let base_owned: Vec<RuleVariant> = base_refs.into_iter().cloned().collect();
@@ -129,7 +163,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
             })();
             #lexical_block_end
             ctx.exit_rule();
-            
+
             match _res {
                 Ok(res) => Ok(res),
                 Err(mut e) => {
@@ -141,7 +175,10 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     })
 }
 
-fn generate_recursive_loop_body(variants: &[RuleVariant], ctx: &CodegenContext) -> Result<TokenStream> {
+fn generate_recursive_loop_body(
+    variants: &[RuleVariant],
+    ctx: &CodegenContext,
+) -> Result<TokenStream> {
     let arms = variants.iter().map(|variant| {
         let tail_pattern = &variant.pattern[1..];
         let lhs_binding = match &variant.pattern[0] {
@@ -189,8 +226,14 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], ctx: &CodegenContext) 
     Ok(quote! { #(#arms)* })
 }
 
-pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, ctx: &CodegenContext) -> Result<TokenStream> {
-    if variants.is_empty() { return Ok(quote! { Err(rt::ParseError::at_cursor(cursor, "No variants defined")) }); }
+pub fn generate_variants_internal(
+    variants: &[RuleVariant],
+    is_top_level: bool,
+    ctx: &CodegenContext,
+) -> Result<TokenStream> {
+    if variants.is_empty() {
+        return Ok(quote! { Err(rt::ParseError::at_cursor(cursor, "No variants defined")) });
+    }
 
     let mut token_counts = HashMap::new();
     for v in variants {
@@ -341,7 +384,11 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
         }
     }).collect::<Result<Vec<_>>>()?;
 
-    let error_msg = if is_top_level { "No matching rule variant found" } else { "No matching variant in group" };
+    let error_msg = if is_top_level {
+        "No matching rule variant found"
+    } else {
+        "No matching variant in group"
+    };
 
     Ok(quote! {
         let mut _best_err: Option<rt::ParseError> = None;

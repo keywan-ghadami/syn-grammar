@@ -150,7 +150,9 @@ impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
     {
         let state = self.state.take();
         let val = self.assert_success();
-        let state_ref = state.as_ref().expect("State must be provided to use assert_success_with");
+        let state_ref = state
+            .as_ref()
+            .expect("State must be provided to use assert_success_with");
         f(&val, state_ref);
         val
     }

@@ -1,7 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![doc = "\n\n"]
 #![doc = include_str!("../SYNTAX.md")]
-
 // Nutzerseitige API: undokumentierte oeffentliche Elemente sind ein Fehler.
 #![warn(missing_docs)]
 
@@ -11,8 +10,8 @@
 /// Grammatik keine Annahmen ueber die Modulstruktur des Nutzer-Crates macht.
 /// Nicht als oeffentliche API gedacht.
 pub mod rt {
-    pub use super::token_filter;
     pub use super::builtins; // FIX: Das hat gefehlt!
+    pub use super::token_filter;
     pub use grammar_kit::*;
 }
 

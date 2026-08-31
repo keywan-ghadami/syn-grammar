@@ -1,8 +1,8 @@
 // CXX Parser Library
 // Contains the AST struct definitions and the grammar for parsing CXX FFI bridges.
 
-use syn::{self, Attribute, Ident, LitStr, Macro};
 use syn::parse::{Parse, ParseStream, Result};
+use syn::{self, Attribute, Ident, LitStr, Macro};
 use syn_grammar::grammar;
 
 // 1. AST Node Definitions
@@ -23,7 +23,13 @@ pub struct ExternBlock {
 #[derive(Debug)]
 pub enum CxxItem {
     Type(Vec<Attribute>, Ident, syn::Generics),
-    Function(Vec<Attribute>, Ident, syn::Generics, Vec<CxxArg>, syn::ReturnType),
+    Function(
+        Vec<Attribute>,
+        Ident,
+        syn::Generics,
+        Vec<CxxArg>,
+        syn::ReturnType,
+    ),
     Macro(Macro),
 }
 
@@ -101,7 +107,7 @@ mod tests {
             mod ffi {
                 unsafe extern "C++" {
                     include!("engine/core/events.h");
-                    
+
                     type EventPayload<'b>;
                     type DispatchReceipt;
 
@@ -115,14 +121,14 @@ mod tests {
             }
         };
 
-        let parsed_mod: FfiMod = parse2(input_tokens)
-            .expect("Parser failed to process the TokenStream");
+        let parsed_mod: FfiMod =
+            parse2(input_tokens).expect("Parser failed to process the TokenStream");
 
         // Assertions
         assert_eq!(parsed_mod.name.to_string(), "ffi");
         assert_eq!(parsed_mod.attrs.len(), 1);
         assert_eq!(parsed_mod.blocks.len(), 1);
-        
+
         let extern_block = &parsed_mod.blocks[0];
         assert!(extern_block.is_unsafe);
         assert_eq!(extern_block.lang.value(), "C++");
@@ -154,19 +160,26 @@ mod tests {
 
         let function_item = match &extern_block.items[3] {
             CxxItem::Function(a, n, g, args, r) => Some((a, n, g, args, r)),
-            _ => None
-        }.expect("Expected a function item at index 3");
+            _ => None,
+        }
+        .expect("Expected a function item at index 3");
 
         let (_attrs, _name, generics, args, ret) = function_item;
 
         assert_eq!(args.len(), 3);
         assert_eq!(args[2].name.to_string(), "filter");
-        assert!(generics.params.iter().any(|p| match p { syn::GenericParam::Lifetime(_) => true, _ => false}));
+        assert!(generics.params.iter().any(|p| match p {
+            syn::GenericParam::Lifetime(_) => true,
+            _ => false,
+        }));
 
         let filter_type = &args[2].ty;
         let filter_type_string = quote!(#filter_type).to_string();
         let expected_filter_type = "fn ( & CxxString , Option < & [u8] > ) -> bool";
-        assert_eq!(filter_type_string.replace(" ", ""), expected_filter_type.replace(" ", ""));
+        assert_eq!(
+            filter_type_string.replace(" ", ""),
+            expected_filter_type.replace(" ", "")
+        );
 
         let ret_type = &ret;
         let ret_type_string = quote!(#ret_type).to_string();

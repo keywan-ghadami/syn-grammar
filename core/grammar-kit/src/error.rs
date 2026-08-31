@@ -242,7 +242,10 @@ mod tests {
         let flach_fail = ParseError::at_cursor(flach, "hard fail").with_priority(PRIO_STRUCTURAL);
         let tief_normal = ParseError::at_cursor(tief, "tief");
 
-        assert_eq!(flach_fail.clone().merge(tief_normal.clone()).message, "tief");
+        assert_eq!(
+            flach_fail.clone().merge(tief_normal.clone()).message,
+            "tief"
+        );
         assert_eq!(tief_normal.merge(flach_fail).message, "tief");
     }
 

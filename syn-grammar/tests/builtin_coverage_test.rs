@@ -37,19 +37,50 @@ fn ganzzahl_breiten() {
     }
     use inner::ints;
 
-    ints::parse_p_i8.parse_str("-128").test().assert_success_is(-128i8);
-    ints::parse_p_i16.parse_str("-32768").test().assert_success_is(-32768i16);
-    ints::parse_p_i64.parse_str("-9223372036854775808").test().assert_success_is(i64::MIN);
-    ints::parse_p_i128.parse_str("-170141183460469231731687303715884105728")
-        .test().assert_success_is(i128::MIN);
-    ints::parse_p_isize.parse_str("-42").test().assert_success_is(-42isize);
-    ints::parse_p_u8.parse_str("255").test().assert_success_is(255u8);
-    ints::parse_p_u16.parse_str("65535").test().assert_success_is(65535u16);
-    ints::parse_p_u32.parse_str("4294967295").test().assert_success_is(u32::MAX);
-    ints::parse_p_u64.parse_str("18446744073709551615").test().assert_success_is(u64::MAX);
-    ints::parse_p_u128.parse_str("340282366920938463463374607431768211455")
-        .test().assert_success_is(u128::MAX);
-    ints::parse_p_usize.parse_str("7").test().assert_success_is(7usize);
+    ints::parse_p_i8
+        .parse_str("-128")
+        .test()
+        .assert_success_is(-128i8);
+    ints::parse_p_i16
+        .parse_str("-32768")
+        .test()
+        .assert_success_is(-32768i16);
+    ints::parse_p_i64
+        .parse_str("-9223372036854775808")
+        .test()
+        .assert_success_is(i64::MIN);
+    ints::parse_p_i128
+        .parse_str("-170141183460469231731687303715884105728")
+        .test()
+        .assert_success_is(i128::MIN);
+    ints::parse_p_isize
+        .parse_str("-42")
+        .test()
+        .assert_success_is(-42isize);
+    ints::parse_p_u8
+        .parse_str("255")
+        .test()
+        .assert_success_is(255u8);
+    ints::parse_p_u16
+        .parse_str("65535")
+        .test()
+        .assert_success_is(65535u16);
+    ints::parse_p_u32
+        .parse_str("4294967295")
+        .test()
+        .assert_success_is(u32::MAX);
+    ints::parse_p_u64
+        .parse_str("18446744073709551615")
+        .test()
+        .assert_success_is(u64::MAX);
+    ints::parse_p_u128
+        .parse_str("340282366920938463463374607431768211455")
+        .test()
+        .assert_success_is(u128::MAX);
+    ints::parse_p_usize
+        .parse_str("7")
+        .test()
+        .assert_success_is(7usize);
 
     // Ueberlauf muss als Fehler ankommen, nicht still abgeschnitten werden.
     ints::parse_p_u8.parse_str("256").test().assert_failure();
@@ -69,10 +100,22 @@ fn zeichen_und_wahrheitswert() {
     }
     use inner::prim;
 
-    prim::parse_p_char.parse_str("'x'").test().assert_success_is('x');
-    prim::parse_p_bool.parse_str("true").test().assert_success_is(true);
-    prim::parse_p_bool.parse_str("false").test().assert_success_is(false);
-    prim::parse_p_f64.parse_str("2.5").test().assert_success_is(2.5f64);
+    prim::parse_p_char
+        .parse_str("'x'")
+        .test()
+        .assert_success_is('x');
+    prim::parse_p_bool
+        .parse_str("true")
+        .test()
+        .assert_success_is(true);
+    prim::parse_p_bool
+        .parse_str("false")
+        .test()
+        .assert_success_is(false);
+    prim::parse_p_f64
+        .parse_str("2.5")
+        .test()
+        .assert_success_is(2.5f64);
 }
 
 /// Die `spanned_*`-Familie: sie liefert `SpannedValue<T>` mit `value` und `span`.
@@ -105,20 +148,109 @@ fn spanned_familie_liefert_wert_und_span() {
     }
     use inner::sp;
 
-    assert_eq!(sp::parse_s_char.parse_str("'q'").test().assert_success().value, 'q');
-    assert!(sp::parse_s_bool.parse_str("true").test().assert_success().value);
-    assert_eq!(sp::parse_s_i8.parse_str("-8").test().assert_success().value, -8i8);
-    assert_eq!(sp::parse_s_i16.parse_str("-16").test().assert_success().value, -16i16);
-    assert_eq!(sp::parse_s_i32.parse_str("-32").test().assert_success().value, -32i32);
-    assert_eq!(sp::parse_s_i64.parse_str("-64").test().assert_success().value, -64i64);
-    assert_eq!(sp::parse_s_i128.parse_str("-128").test().assert_success().value, -128i128);
-    assert_eq!(sp::parse_s_isize.parse_str("-1").test().assert_success().value, -1isize);
-    assert_eq!(sp::parse_s_u8.parse_str("8").test().assert_success().value, 8u8);
-    assert_eq!(sp::parse_s_u16.parse_str("16").test().assert_success().value, 16u16);
-    assert_eq!(sp::parse_s_u32.parse_str("32").test().assert_success().value, 32u32);
-    assert_eq!(sp::parse_s_u64.parse_str("64").test().assert_success().value, 64u64);
-    assert_eq!(sp::parse_s_u128.parse_str("128").test().assert_success().value, 128u128);
-    assert_eq!(sp::parse_s_usize.parse_str("1").test().assert_success().value, 1usize);
+    assert_eq!(
+        sp::parse_s_char
+            .parse_str("'q'")
+            .test()
+            .assert_success()
+            .value,
+        'q'
+    );
+    assert!(
+        sp::parse_s_bool
+            .parse_str("true")
+            .test()
+            .assert_success()
+            .value
+    );
+    assert_eq!(
+        sp::parse_s_i8.parse_str("-8").test().assert_success().value,
+        -8i8
+    );
+    assert_eq!(
+        sp::parse_s_i16
+            .parse_str("-16")
+            .test()
+            .assert_success()
+            .value,
+        -16i16
+    );
+    assert_eq!(
+        sp::parse_s_i32
+            .parse_str("-32")
+            .test()
+            .assert_success()
+            .value,
+        -32i32
+    );
+    assert_eq!(
+        sp::parse_s_i64
+            .parse_str("-64")
+            .test()
+            .assert_success()
+            .value,
+        -64i64
+    );
+    assert_eq!(
+        sp::parse_s_i128
+            .parse_str("-128")
+            .test()
+            .assert_success()
+            .value,
+        -128i128
+    );
+    assert_eq!(
+        sp::parse_s_isize
+            .parse_str("-1")
+            .test()
+            .assert_success()
+            .value,
+        -1isize
+    );
+    assert_eq!(
+        sp::parse_s_u8.parse_str("8").test().assert_success().value,
+        8u8
+    );
+    assert_eq!(
+        sp::parse_s_u16
+            .parse_str("16")
+            .test()
+            .assert_success()
+            .value,
+        16u16
+    );
+    assert_eq!(
+        sp::parse_s_u32
+            .parse_str("32")
+            .test()
+            .assert_success()
+            .value,
+        32u32
+    );
+    assert_eq!(
+        sp::parse_s_u64
+            .parse_str("64")
+            .test()
+            .assert_success()
+            .value,
+        64u64
+    );
+    assert_eq!(
+        sp::parse_s_u128
+            .parse_str("128")
+            .test()
+            .assert_success()
+            .value,
+        128u128
+    );
+    assert_eq!(
+        sp::parse_s_usize
+            .parse_str("1")
+            .test()
+            .assert_success()
+            .value,
+        1usize
+    );
 
     let f32_wert: SpannedValue<f32> = sp::parse_s_f32.parse_str("1.5").test().assert_success();
     assert!((f32_wert.value - 1.5f32).abs() < f32::EPSILON);
@@ -151,14 +283,32 @@ fn token_filter() {
     }
     use inner::tf;
 
-    tf::parse_p_alpha.parse_str("abc").test().assert_success_is("abc".to_string());
-    tf::parse_p_alnum.parse_str("a1b2").test().assert_success_is("a1b2".to_string());
-    tf::parse_p_digit.parse_str("123").test().assert_success_is("123".to_string());
-    tf::parse_p_hex.parse_str("42").test().assert_success_is("42".to_string());
-    tf::parse_p_oct.parse_str("17").test().assert_success_is("17".to_string());
+    tf::parse_p_alpha
+        .parse_str("abc")
+        .test()
+        .assert_success_is("abc".to_string());
+    tf::parse_p_alnum
+        .parse_str("a1b2")
+        .test()
+        .assert_success_is("a1b2".to_string());
+    tf::parse_p_digit
+        .parse_str("123")
+        .test()
+        .assert_success_is("123".to_string());
+    tf::parse_p_hex
+        .parse_str("42")
+        .test()
+        .assert_success_is("42".to_string());
+    tf::parse_p_oct
+        .parse_str("17")
+        .test()
+        .assert_success_is("17".to_string());
 
     // `alpha` darf keine Ziffern durchlassen.
-    tf::parse_p_alpha.parse_str("a1").test().assert_failure_contains("expected an alphabetic identifier");
+    tf::parse_p_alpha
+        .parse_str("a1")
+        .test()
+        .assert_failure_contains("expected an alphabetic identifier");
 }
 
 /// Die `lit_*`-Familie liefert die rohen syn-Token statt ausgewerteter Werte.
@@ -179,12 +329,30 @@ fn literal_token() {
     }
     use inner::lits;
 
-    lits::parse_p_int.parse_str("1u8").test().assert_success_is("1".to_string());
-    lits::parse_p_char.parse_str("'z'").test().assert_success_is('z');
-    lits::parse_p_bool.parse_str("true").test().assert_success_is(true);
-    lits::parse_p_float.parse_str("3.5").test().assert_success_is(3.5f64);
-    lits::parse_p_str.parse_str("\"hallo\"").test().assert_success_is("hallo".to_string());
-    lits::parse_p_byte.parse_str("b'A'").test().assert_success_is(b'A');
+    lits::parse_p_int
+        .parse_str("1u8")
+        .test()
+        .assert_success_is("1".to_string());
+    lits::parse_p_char
+        .parse_str("'z'")
+        .test()
+        .assert_success_is('z');
+    lits::parse_p_bool
+        .parse_str("true")
+        .test()
+        .assert_success_is(true);
+    lits::parse_p_float
+        .parse_str("3.5")
+        .test()
+        .assert_success_is(3.5f64);
+    lits::parse_p_str
+        .parse_str("\"hallo\"")
+        .test()
+        .assert_success_is("hallo".to_string());
+    lits::parse_p_byte
+        .parse_str("b'A'")
+        .test()
+        .assert_success_is(b'A');
 }
 
 /// Die syn-Interop-Builtins. Sie fehlen ausgerechnet in der README-Tabelle, die
@@ -206,12 +374,30 @@ fn syn_interop_builtins() {
     }
     use inner::interop;
 
-    interop::parse_p_vis.parse_str("pub").test().assert_success_is("pub".to_string());
-    interop::parse_p_named.parse_str("name: i32").test().assert_success_is("name".to_string());
-    interop::parse_p_unnamed.parse_str("i32").test().assert_success_is("i32".to_string());
-    interop::parse_p_stmts.parse_str("let a = 1; let b = 2;").test().assert_success_is(2usize);
-    interop::parse_p_generics.parse_str("<T, U>").test().assert_success_is(2usize);
-    interop::parse_p_ret.parse_str("-> i32").test().assert_success_is("-> i32".to_string());
+    interop::parse_p_vis
+        .parse_str("pub")
+        .test()
+        .assert_success_is("pub".to_string());
+    interop::parse_p_named
+        .parse_str("name: i32")
+        .test()
+        .assert_success_is("name".to_string());
+    interop::parse_p_unnamed
+        .parse_str("i32")
+        .test()
+        .assert_success_is("i32".to_string());
+    interop::parse_p_stmts
+        .parse_str("let a = 1; let b = 2;")
+        .test()
+        .assert_success_is(2usize);
+    interop::parse_p_generics
+        .parse_str("<T, U>")
+        .test()
+        .assert_success_is(2usize);
+    interop::parse_p_ret
+        .parse_str("-> i32")
+        .test()
+        .assert_success_is("-> i32".to_string());
 }
 
 /// `any_ident` akzeptiert seit `201162a` Schluesselwoerter (`Ident::parse_any`)
@@ -231,11 +417,23 @@ fn any_ident_nimmt_schluesselwoerter_ident_nicht() {
     }
     use inner::ids;
 
-    ids::parse_p_any.parse_str("type").test().assert_success_is("type".to_string());
-    ids::parse_p_any.parse_str("fn").test().assert_success_is("fn".to_string());
-    ids::parse_p_any.parse_str("normal").test().assert_success_is("normal".to_string());
+    ids::parse_p_any
+        .parse_str("type")
+        .test()
+        .assert_success_is("type".to_string());
+    ids::parse_p_any
+        .parse_str("fn")
+        .test()
+        .assert_success_is("fn".to_string());
+    ids::parse_p_any
+        .parse_str("normal")
+        .test()
+        .assert_success_is("normal".to_string());
 
-    ids::parse_p_plain.parse_str("normal").test().assert_success_is("normal".to_string());
+    ids::parse_p_plain
+        .parse_str("normal")
+        .test()
+        .assert_success_is("normal".to_string());
     ids::parse_p_plain.parse_str("type").test().assert_failure();
 }
 
@@ -259,14 +457,35 @@ fn neu_ergaenzte_builtins() {
     use inner::luecken;
 
     // Einfaches Bindungsmuster, Tupelmuster und Oder-Muster.
-    luecken::parse_p_pat.parse_str("x").test().assert_success_is("x".to_string());
-    luecken::parse_p_pat.parse_str("(a, b)").test().assert_success_is("(a , b)".to_string());
-    luecken::parse_p_pat.parse_str("Some(v)").test().assert_success_is("Some (v)".to_string());
+    luecken::parse_p_pat
+        .parse_str("x")
+        .test()
+        .assert_success_is("x".to_string());
+    luecken::parse_p_pat
+        .parse_str("(a, b)")
+        .test()
+        .assert_success_is("(a , b)".to_string());
+    luecken::parse_p_pat
+        .parse_str("Some(v)")
+        .test()
+        .assert_success_is("Some (v)".to_string());
     // Oder-Muster - genau der Fall, weshalb syn kein `impl Parse` anbietet.
-    luecken::parse_p_pat.parse_str("A | B").test().assert_success();
+    luecken::parse_p_pat
+        .parse_str("A | B")
+        .test()
+        .assert_success();
 
-    luecken::parse_p_inner.parse_str("#![allow(dead_code)]").test().assert_success_is(1usize);
-    luecken::parse_p_inner.parse_str("").test().assert_success_is(0usize);
+    luecken::parse_p_inner
+        .parse_str("#![allow(dead_code)]")
+        .test()
+        .assert_success_is(1usize);
+    luecken::parse_p_inner
+        .parse_str("")
+        .test()
+        .assert_success_is(0usize);
 
-    luecken::parse_p_byte.parse_str("b'Z'").test().assert_success_is(b'Z');
+    luecken::parse_p_byte
+        .parse_str("b'Z'")
+        .test()
+        .assert_success_is(b'Z');
 }
