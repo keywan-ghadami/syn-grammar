@@ -39,11 +39,18 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         ModelPattern::Lit { binding, lit } => {
             if let Lit::Str(lit) = lit {
                 let token_types = analysis::resolve_token_types(lit, ctx.custom_keywords)?;
+                // Wie viele Quelltokens das Literal umfasst, steht zur Makro-Zeit
+                // fest. `take_fixed` materialisiert genau so viele statt des
+                // gesamten Reststroms - aus O(Rest) wird O(1).
+                let quell_tokens = syn::parse_str::<proc_macro2::TokenStream>(&lit.value())
+                    .map(|ts| ts.into_iter().count())
+                    .unwrap_or(1)
+                    .max(1);
                 if token_types.len() <= 1 {
                     let parses = token_types.iter().map(|ty| {
                         let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _t;) } else { quote!() };
                         quote! {
-                            let (_t, next_cursor) = rt::invoke_syn_parser::<#ty>(cursor)?;
+                            let (_t, next_cursor) = rt::take_fixed::<#ty>(cursor, #quell_tokens)?;
                             ctx.record_span(syn::spanned::Spanned::span(&_t)).map_err(|e| rt::ParseError::new(syn::spanned::Spanned::span(&_t), e.to_string()))?;
                             #bind_stmt
                             let mut cursor = next_cursor;
@@ -354,7 +361,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             if !ctx.check_whitespace(cursor.span()) { return Err(rt::ParseError::at_cursor(cursor, "expected whitespace")); }
                         })
                     }
-                    "any_byte" => quote! { rt::invoke_syn_parser::<syn::LitByte>(cursor)? },
+                    "any_byte" => quote! { rt::take_single::<syn::LitByte>(cursor)? },
                     _ => {
                         let impl_name = format_ident!("parse_{}_impl", rule_name_ident.unwrap());
                         quote! { rt::builtins::#impl_name(cursor, ctx)? }

@@ -9,7 +9,29 @@ pub fn peek_syn<'a, F>(cursor: Cursor<'a>, peek_fn: F) -> bool
 where
     F: FnOnce(syn::parse::ParseStream) -> bool,
 {
-    let stream = cursor.token_stream();
+    // Nur ein kleines Fenster materialisieren statt des gesamten Reststroms.
+    //
+    // `peek_syn` steht unter anderem im Recover-Sync-Scan INNERHALB einer
+    // Schleife (`codegen/pattern.rs`); mit voller Materialisierung war das
+    // quadratisch pro Recover-Punkt.
+    //
+    // Vertrag: `peek_fn` darf hoechstens PEEK_FENSTER Tokens weit schauen.
+    // Alle erzeugten Aufrufstellen benutzen `i.peek(..)`, also ein Token -
+    // bei zusammengesetzten Operatoren wie `::` bis zu drei Punkte. Vier ist
+    // damit grosszuegig. Ein Peek, der weiter schaut, saehe hier ein
+    // vorzeitiges Ende und lieferte `false`.
+    const PEEK_FENSTER: usize = 4;
+    let mut stream = proc_macro2::TokenStream::new();
+    let mut lauf = cursor;
+    for _ in 0..PEEK_FENSTER {
+        match lauf.token_tree() {
+            Some((tt, next)) => {
+                stream.extend(std::iter::once(tt));
+                lauf = next;
+            }
+            None => break,
+        }
+    }
     // `Parser::parse2` verlangt, dass der Parser den GESAMTEN Stream verbraucht.
     // Ein Peek verbraucht nichts, deshalb muss der Rest hier explizit geleert
     // werden - sonst scheitert parse2 bei jedem nicht-leeren Input und die
@@ -49,42 +71,64 @@ impl<T: syn::parse::Parse> SynParsable for T {}
 /// Cursor um so viele Tokens weiter, wie verbraucht wurden. Der Bound ist
 /// [`SynParsable`] statt `Parse`, damit ein `syn::`-Typ ohne `Parse` eine
 /// verstaendliche Meldung erzeugt statt eines rohen Trait-Bound-Fehlers.
-pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
-    let stream = cursor.token_stream();
+pub fn invoke_syn_parser<'a, T: SynParsable>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
+    invoke_parser_fn(cursor, |input| input.parse::<T>())
+}
 
-    // Wir erzeugen einen temporären Syn-Parser
+/// Der gemeinsame Rumpf hinter [`invoke_syn_parser`] und den Builtins, die einen
+/// Sonderparser brauchen (`Attribute::parse_outer`, `Pat::parse_multi_...`,
+/// `Block::parse_within` - Typen ohne `impl Parse`).
+///
+/// Materialisiert den Reststrom bis zum Ende der umschliessenden Delimiter-Gruppe
+/// und laesst `syn` darauf laufen. Das bleibt O(Rest) und ist der strukturelle
+/// Preis des Cursor-first-Designs: `ParseBuffer::new` ist `pub(crate)`, es gibt
+/// keinen Weg vom `Cursor` zu einem `ParseStream`. Fuer Typen mit bekannter
+/// Tokenzahl gibt es [`take_fixed`], fuer Einzeltoken [`take_single`] - beide
+/// ohne diesen Aufwand.
+pub fn invoke_parser_fn<'a, T, F>(cursor: Cursor<'a>, parse_fn: F) -> ParseResult<'a, T>
+where
+    F: FnOnce(syn::parse::ParseStream) -> syn::Result<T>,
+{
+    // Strom und Tokenzahl in EINEM Durchlauf. Vorher waren es drei: einmal
+    // `token_stream()`, einmal `clone()` und einmal `into_iter().count()`.
+    let mut stream = proc_macro2::TokenStream::new();
+    let mut lauf = cursor;
+    let mut gesamt = 0usize;
+    while let Some((tt, next)) = lauf.token_tree() {
+        stream.extend(std::iter::once(tt));
+        lauf = next;
+        gesamt += 1;
+    }
+
     let parser = |input: syn::parse::ParseStream| {
-        let val = input.parse::<T>()?;
-        // Zählen der verbleibenden Tokens im Stream
-        let remaining = input.cursor().token_stream().into_iter().count();
-        // `Parser::parse2` verlangt, dass der GESAMTE Stream verbraucht wird.
-        // Ohne dieses Leeren scheitert jeder Aufruf, bei dem T nicht zufaellig
-        // bis zum Ende reicht - also bei jeder Sequenz mit mehr als einem Token.
+        let val = parse_fn(input)?;
+        // Zaehlen statt materialisieren: `token_tree()` ist O(1) je Schritt und
+        // legt nichts an. Vorher stand hier ein zweites `token_stream()`.
+        let mut rest = 0usize;
+        let mut c = input.cursor();
+        while let Some((_, next)) = c.token_tree() {
+            c = next;
+            rest += 1;
+        }
+        // `Parser::parse2` verlangt, dass der GESAMTE Strom verbraucht wird.
+        // Ohne dieses Leeren scheitert jeder Aufruf, auf den noch Tokens folgen.
         input.parse::<proc_macro2::TokenStream>()?;
-        Ok((val, remaining))
+        Ok((val, rest))
     };
 
-    match Parser::parse2(parser, stream.clone()) {
-        Ok((val, remaining)) => {
-            let total = stream.into_iter().count();
-            let consumed = total - remaining;
-
-            // Original-Cursor exakt um die Anzahl der verbrauchten Tokens vorschieben
-            for _ in 0..consumed {
-                if let Some((_, next)) = cursor.token_tree() {
-                    cursor = next;
+    match syn::parse::Parser::parse2(parser, stream) {
+        Ok((val, rest)) => {
+            let mut c = cursor;
+            for _ in 0..(gesamt - rest) {
+                if let Some((_, next)) = c.token_tree() {
+                    c = next;
                 }
             }
-
-            Ok((val, cursor))
+            Ok((val, c))
         }
-        // Span von syn (praezise fuer die Anzeige), Fortschritt vom Eintrittscursor:
-        // der steht in einer Sequenz `a b c` beim Scheitern von `c` bereits hinter
-        // `a b` und misst die Tiefe damit korrekt.
-        // Am Ende der Eingabe bzw. der Gruppe traegt syns Fehler nur
-        // `Span::call_site()`; der Cursor zeigt dort auf das schliessende Trennzeichen
-        // und ist die bessere Quelle fuer die Anzeige. Sonst ist syns Span praeziser,
-        // weil er auch innerhalb eines mehrtokenigen Typs zeigen kann.
+        // Span von syn (praezise fuer die Anzeige), Fortschritt vom
+        // Eintrittscursor. Am Ende der Eingabe bzw. der Gruppe traegt syns Fehler
+        // nur `Span::call_site()`; dort ist der Cursor die bessere Quelle.
         Err(e) => {
             let span = if cursor.eof() {
                 cursor.span()
@@ -418,4 +462,220 @@ where
     }
 
     Ok((items, cursor))
+}
+
+/// Ein Typ, der aus genau einem Token besteht und deshalb in O(1) direkt vom
+/// `Cursor` gelesen werden kann - ohne den Umweg ueber [`invoke_syn_parser`].
+///
+/// Der Umweg kostet pro Aufruf eine Materialisierung des Reststroms plus einen
+/// kompletten neuen `TokenBuffer` in `Parser::parse2`. Bei einem Aufruf je Token
+/// wird daraus quadratischer Aufwand ueber die umschliessende Delimiter-Gruppe.
+/// Fuer Einzeltoken ist diese Arbeit vollstaendig ueberfluessig.
+///
+/// Die Fehlermeldungen sind wortgleich mit denen von syn - mehrere Tests
+/// pruefen sie per Substring.
+pub trait SingleToken: Sized {
+    /// Liest das Token, falls es passt. `None` heisst: passt nicht.
+    fn take(cursor: Cursor<'_>) -> Option<(Self, Cursor<'_>)>;
+    /// Die Meldung, wenn es nicht passt - wortgleich mit syn.
+    fn erwartet() -> &'static str;
+}
+
+/// O(1)-Ersatz fuer [`invoke_syn_parser`] bei [`SingleToken`]-Typen.
+pub fn take_single<'a, T: SingleToken>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
+    match T::take(cursor) {
+        Some((wert, next)) => Ok((wert, next)),
+        // Am Ende der Eingabe stellt syn seiner Meldung ein
+        // "unexpected end of input, " voran. Der Bruecken-Pfad hat das
+        // durchgereicht; hier wird es nachgebildet, damit sich die Meldung
+        // nicht aendert (`list_dx_test::test_cxx_unexpected_eof`).
+        None if cursor.eof() => Err(ParseError::at_cursor(
+            cursor,
+            format!("unexpected end of input, {}", T::erwartet()),
+        )),
+        None => Err(ParseError::at_cursor(cursor, T::erwartet())),
+    }
+}
+
+impl SingleToken for proc_macro2::Ident {
+    fn take(cursor: Cursor<'_>) -> Option<(Self, Cursor<'_>)> {
+        // `impl Parse for Ident` lehnt Schluesselwoerter ab (`accept_as_ident`).
+        // Der Unterschied zu `any_ident` haengt genau daran.
+        let (id, next) = cursor.ident()?;
+        if akzeptiert_als_ident(&id.to_string()) {
+            Some((id, next))
+        } else {
+            None
+        }
+    }
+    fn erwartet() -> &'static str {
+        "expected identifier"
+    }
+}
+
+/// Die Schluesselwoerter, die `syn` nicht als gewoehnlichen Bezeichner
+/// durchgehen laesst (`syn::ext::IdentExt::parse_any` umgeht das).
+fn akzeptiert_als_ident(s: &str) -> bool {
+    !matches!(
+        s,
+        "abstract"
+            | "as"
+            | "async"
+            | "await"
+            | "become"
+            | "box"
+            | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "do"
+            | "dyn"
+            | "else"
+            | "enum"
+            | "extern"
+            | "false"
+            | "final"
+            | "fn"
+            | "for"
+            | "if"
+            | "impl"
+            | "in"
+            | "let"
+            | "loop"
+            | "macro"
+            | "match"
+            | "mod"
+            | "move"
+            | "mut"
+            | "override"
+            | "priv"
+            | "pub"
+            | "ref"
+            | "return"
+            | "Self"
+            | "self"
+            | "static"
+            | "struct"
+            | "super"
+            | "trait"
+            | "true"
+            | "try"
+            | "type"
+            | "typeof"
+            | "unsafe"
+            | "unsized"
+            | "use"
+            | "virtual"
+            | "where"
+            | "while"
+            | "yield"
+    )
+}
+
+impl SingleToken for syn::LitBool {
+    fn take(cursor: Cursor<'_>) -> Option<(Self, Cursor<'_>)> {
+        // Ein `LitBool` ist kein Literal, sondern ein Ident `true`/`false`.
+        let (id, next) = cursor.ident()?;
+        let s = id.to_string();
+        if s == "true" || s == "false" {
+            Some((
+                syn::LitBool {
+                    value: s == "true",
+                    span: id.span(),
+                },
+                next,
+            ))
+        } else {
+            None
+        }
+    }
+    fn erwartet() -> &'static str {
+        "expected boolean literal"
+    }
+}
+
+/// Liest ein Literal, inklusive eines fuehrenden Minuszeichens.
+///
+/// `-5` ist ein `LitInt` aus ZWEI Cursor-Tokens; syn behandelt das in
+/// `parse_negative_lit`. Ohne diesen Schritt verlieren `i32`, `f64` und
+/// Verwandte die Faehigkeit, negative Werte zu lesen.
+fn lit_mit_vorzeichen(cursor: Cursor<'_>) -> Option<(syn::Lit, Cursor<'_>)> {
+    if let Some((p, nach_minus)) = cursor.punct() {
+        if p.as_char() == '-' {
+            let (lit, next) = nach_minus.literal()?;
+            let mit_minus = format!("-{}", lit);
+            // Nur Zahlen duerfen ein Vorzeichen tragen.
+            return match syn::Lit::new(lit) {
+                syn::Lit::Int(_) | syn::Lit::Float(_) => {
+                    let mut neu: proc_macro2::Literal = mit_minus.parse().ok()?;
+                    neu.set_span(p.span());
+                    Some((syn::Lit::new(neu), next))
+                }
+                _ => None,
+            };
+        }
+    }
+    let (lit, next) = cursor.literal()?;
+    Some((syn::Lit::new(lit), next))
+}
+
+macro_rules! einzeltoken_literal {
+    ($typ:ty, $variante:ident, $msg:literal) => {
+        impl SingleToken for $typ {
+            fn take(cursor: Cursor<'_>) -> Option<(Self, Cursor<'_>)> {
+                match lit_mit_vorzeichen(cursor)? {
+                    (syn::Lit::$variante(l), next) => Some((l, next)),
+                    _ => None,
+                }
+            }
+            fn erwartet() -> &'static str {
+                $msg
+            }
+        }
+    };
+}
+
+einzeltoken_literal!(syn::LitStr, Str, "expected string literal");
+einzeltoken_literal!(syn::LitInt, Int, "expected integer literal");
+einzeltoken_literal!(syn::LitFloat, Float, "expected floating point literal");
+einzeltoken_literal!(syn::LitChar, Char, "expected character literal");
+einzeltoken_literal!(syn::LitByte, Byte, "expected byte literal");
+
+/// Liest genau `anzahl` Tokens vom Cursor und laesst `syn` daraus `T` parsen.
+///
+/// Fuer Typen, deren Tokenzahl zur Makro-Zeit feststeht - jedes Literal-Terminal
+/// einer Grammatik ist so ein Fall. Gegenueber [`invoke_syn_parser`] wird nicht
+/// der gesamte Reststrom materialisiert, sondern nur diese `anzahl` Tokens; der
+/// `TokenBuffer`, den `Parser::parse2` daraus baut, ist entsprechend winzig.
+///
+/// Der Umweg ueber `syn` bleibt bewusst erhalten: die Token-Typen sind versiegelt
+/// und ihre Felder unterschiedlich geformt, ein Nachbau waere fehleranfaellig.
+/// So bleiben Meldungstexte und die `Spacing::Joint`-Pruefung zusammengesetzter
+/// Operatoren exakt syns eigene - der `Punct` traegt sein `Spacing` mit.
+pub fn take_fixed<'a, T: SynParsable>(cursor: Cursor<'a>, anzahl: usize) -> ParseResult<'a, T> {
+    let mut stueck = proc_macro2::TokenStream::new();
+    let mut lauf = cursor;
+    let mut gelesen = 0usize;
+    while gelesen < anzahl {
+        match lauf.token_tree() {
+            Some((tt, next)) => {
+                stueck.extend(std::iter::once(tt));
+                lauf = next;
+                gelesen += 1;
+            }
+            None => break,
+        }
+    }
+
+    match syn::parse::Parser::parse2(T::parse, stueck) {
+        Ok(wert) => Ok((wert, lauf)),
+        Err(e) => {
+            let span = if cursor.eof() {
+                cursor.span()
+            } else {
+                e.span()
+            };
+            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
+        }
+    }
 }

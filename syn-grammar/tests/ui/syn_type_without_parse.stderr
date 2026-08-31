@@ -21,7 +21,7 @@ error[E0277]: `syn::Field` kann in einer Grammatik nicht direkt verwendet werden
 note: required by a bound in `invoke_syn_parser`
   --> $WORKSPACE/core/grammar-kit/src/combinators.rs
    |
-   | pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
+   | pub fn invoke_syn_parser<'a, T: SynParsable>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
    |                                 ^^^^^^^^^^^ required by this bound in `invoke_syn_parser`
 
 error[E0308]: mismatched types

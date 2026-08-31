@@ -1,59 +1,20 @@
-use crate::rt::{invoke_syn_parser, ParseContext, ParseError, ParseResult};
+use crate::rt::{invoke_syn_parser, take_single, ParseContext, ParseError, ParseResult};
 use syn::buffer::Cursor;
-use syn::ext::IdentExt;
-use syn::parse::Parser; // WICHTIG für .parse2()
 use syn::spanned::Spanned;
 use syn::Ident;
 use syn_grammar_model::model::types::{Identifier, SpannedValue, StringLiteral};
 
-// --- Der Retter: Ein Helper für syn-Typen, die nicht das `Parse` Trait nutzen ---
-fn invoke_custom_parser<'a, T, F>(mut cursor: Cursor<'a>, parse_fn: F) -> ParseResult<'a, T>
-where
-    F: FnOnce(syn::parse::ParseStream) -> syn::Result<T>,
-{
-    let stream = cursor.token_stream();
-    let parser = |input: syn::parse::ParseStream| {
-        let val = parse_fn(input)?;
-        let remaining = input.cursor().token_stream().into_iter().count();
-        // `Parser::parse2` verlangt, dass der GESAMTE Stream verbraucht wird. Ohne
-        // dieses Leeren scheitert jeder Aufruf, auf den noch Tokens folgen - und das
-        // ist bei einem Builtin mitten in einer Regel der Normalfall. Dieselbe Zeile
-        // steht aus demselben Grund in `invoke_syn_parser`.
-        input.parse::<proc_macro2::TokenStream>()?;
-        Ok((val, remaining))
-    };
-
-    match Parser::parse2(parser, stream.clone()) {
-        Ok((val, remaining)) => {
-            let total = stream.into_iter().count();
-            let consumed = total - remaining;
-            for _ in 0..consumed {
-                if let Some((_, next)) = cursor.token_tree() {
-                    cursor = next;
-                }
-            }
-            Ok((val, cursor))
-        }
-        // Am Ende der Eingabe bzw. der Gruppe traegt syns Fehler nur
-        // `Span::call_site()`; der Cursor zeigt dort auf das schliessende Trennzeichen
-        // und ist die bessere Quelle fuer die Anzeige. Sonst ist syns Span praeziser,
-        // weil er auch innerhalb eines mehrtokenigen Typs zeigen kann.
-        Err(e) => {
-            let span = if cursor.eof() {
-                cursor.span()
-            } else {
-                e.span()
-            };
-            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
-        }
-    }
-}
+// Builtins fuer Typen ohne `impl Parse` (`Field`, `Attribute`, `Pat`) oder mit
+// Sonderparser (`Block::parse_within`, `Ident::parse_any`) gehen ueber denselben
+// Rumpf wie `invoke_syn_parser`. Frueher stand hier eine textgleiche Kopie der
+// Materialisierungslogik.
+use crate::rt::invoke_parser_fn as invoke_custom_parser;
 
 pub fn parse_ident_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, Identifier> {
-    let (t, next) = invoke_syn_parser::<syn::Ident>(cursor)?;
+    let (t, next) = take_single::<syn::Ident>(cursor)?;
     ctx.record_span(t.span())
         .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
     Ok((Identifier::new(t.to_string(), t.span()), next))
@@ -63,7 +24,7 @@ pub fn parse_string_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, StringLiteral> {
-    let (lit, next) = invoke_syn_parser::<syn::LitStr>(cursor)?;
+    let (lit, next) = take_single::<syn::LitStr>(cursor)?;
     ctx.record_span(lit.span())
         .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
     Ok((StringLiteral::new(lit.value(), lit.span()), next))
@@ -73,7 +34,7 @@ pub fn parse_char_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, char> {
-    let (lit, next) = invoke_syn_parser::<syn::LitChar>(cursor)?;
+    let (lit, next) = take_single::<syn::LitChar>(cursor)?;
     ctx.record_span(lit.span())
         .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
     Ok((lit.value(), next))
@@ -83,7 +44,7 @@ pub fn parse_bool_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, bool> {
-    let (lit, next) = invoke_syn_parser::<syn::LitBool>(cursor)?;
+    let (lit, next) = take_single::<syn::LitBool>(cursor)?;
     ctx.record_span(lit.span())
         .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
     Ok((lit.value, next))
@@ -95,7 +56,7 @@ pub fn parse_spanned_char_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, SpannedValue<char>> {
-    let (lit, next) = invoke_syn_parser::<syn::LitChar>(cursor)?;
+    let (lit, next) = take_single::<syn::LitChar>(cursor)?;
     ctx.record_span(lit.span())
         .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
     Ok((SpannedValue::new(lit.value(), lit.span()), next))
@@ -105,7 +66,7 @@ pub fn parse_spanned_bool_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, SpannedValue<bool>> {
-    let (lit, next) = invoke_syn_parser::<syn::LitBool>(cursor)?;
+    let (lit, next) = take_single::<syn::LitBool>(cursor)?;
     ctx.record_span(lit.span())
         .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
     Ok((SpannedValue::new(lit.value, lit.span()), next))
@@ -114,7 +75,7 @@ pub fn parse_spanned_bool_impl<'a>(
 macro_rules! impl_int_builtin {
     ($name:ident, $spanned_name:ident, $ty:ty) => {
         pub fn $name<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, $ty> {
-            let (lit, next) = invoke_syn_parser::<syn::LitInt>(cursor)?;
+            let (lit, next) = take_single::<syn::LitInt>(cursor)?;
             let val = lit
                 .base10_parse::<$ty>()
                 .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
@@ -127,7 +88,7 @@ macro_rules! impl_int_builtin {
             cursor: Cursor<'a>,
             ctx: &mut ParseContext<'a>,
         ) -> ParseResult<'a, SpannedValue<$ty>> {
-            let (lit, next) = invoke_syn_parser::<syn::LitInt>(cursor)?;
+            let (lit, next) = take_single::<syn::LitInt>(cursor)?;
             let val = lit
                 .base10_parse::<$ty>()
                 .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
@@ -155,7 +116,7 @@ impl_int_builtin!(parse_usize_impl, parse_spanned_usize_impl, usize);
 macro_rules! impl_float_builtin {
     ($name:ident, $spanned_name:ident, $ty:ty) => {
         pub fn $name<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, $ty> {
-            let (lit, next) = invoke_syn_parser::<syn::LitFloat>(cursor)?;
+            let (lit, next) = take_single::<syn::LitFloat>(cursor)?;
             let val = lit
                 .base10_parse::<$ty>()
                 .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
@@ -168,7 +129,7 @@ macro_rules! impl_float_builtin {
             cursor: Cursor<'a>,
             ctx: &mut ParseContext<'a>,
         ) -> ParseResult<'a, SpannedValue<$ty>> {
-            let (lit, next) = invoke_syn_parser::<syn::LitFloat>(cursor)?;
+            let (lit, next) = take_single::<syn::LitFloat>(cursor)?;
             let val = lit
                 .base10_parse::<$ty>()
                 .map_err(|e: syn::Error| ParseError::new(lit.span(), e.to_string()))?;
@@ -204,7 +165,20 @@ pub fn parse_bin_literal_impl<'a>(
     parse_u64_impl(cursor, ctx)
 }
 
-// Syn Specific Built-ins
+// Einzeltoken-Builtins: O(1) ueber den Cursor, ohne den Reststrom anzufassen.
+macro_rules! impl_einzeltoken_builtin {
+    ($name:ident, $ty:ty) => {
+        pub fn $name<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, $ty> {
+            let (t, next) = take_single::<$ty>(cursor)?;
+            ctx.record_span(t.span())
+                .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
+            Ok((t, next))
+        }
+    };
+}
+
+// Echte syn-AST-Typen: die Bruecke bleibt noetig, weil sie mehrere Tokens
+// umspannen und ihre Laenge erst beim Parsen feststeht.
 macro_rules! impl_syn_builtin {
     ($name:ident, $ty:ty) => {
         pub fn $name<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, $ty> {
@@ -218,11 +192,11 @@ macro_rules! impl_syn_builtin {
 
 impl_syn_builtin!(parse_rust_type_impl, syn::Type);
 impl_syn_builtin!(parse_rust_block_impl, syn::Block);
-impl_syn_builtin!(parse_lit_str_impl, syn::LitStr);
-impl_syn_builtin!(parse_lit_int_impl, syn::LitInt);
-impl_syn_builtin!(parse_lit_char_impl, syn::LitChar);
-impl_syn_builtin!(parse_lit_bool_impl, syn::LitBool);
-impl_syn_builtin!(parse_lit_float_impl, syn::LitFloat);
+impl_einzeltoken_builtin!(parse_lit_str_impl, syn::LitStr);
+impl_einzeltoken_builtin!(parse_lit_int_impl, syn::LitInt);
+impl_einzeltoken_builtin!(parse_lit_char_impl, syn::LitChar);
+impl_einzeltoken_builtin!(parse_lit_bool_impl, syn::LitBool);
+impl_einzeltoken_builtin!(parse_lit_float_impl, syn::LitFloat);
 /// `any_ident` akzeptiert - anders als `ident` - auch Schluesselwoerter.
 ///
 /// syns `Ident`-Parser lehnt `self`, `type`, `fn` usw. ab. Bisher benutzte
@@ -233,7 +207,14 @@ pub fn parse_any_ident_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, Ident> {
-    let (t, next) = invoke_custom_parser(cursor, Ident::parse_any)?;
+    // `Ident::parse_any` heisst schlicht: jedes Ident-Token, auch
+    // Schluesselwoerter. Das ist `cursor.ident()` ohne den `accept_as_ident`-
+    // Filter - in O(1), ohne den Reststrom zu materialisieren. Steht in cxx in
+    // jedem Funktionsargument.
+    let (t, next) = match cursor.ident() {
+        Some(x) => x,
+        None => return Err(ParseError::at_cursor(cursor, "expected identifier")),
+    };
     ctx.record_span(t.span())
         .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
     Ok((t, next))
@@ -334,7 +315,7 @@ pub fn parse_lit_byte_impl<'a>(
     cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> ParseResult<'a, syn::LitByte> {
-    let (t, next) = invoke_syn_parser::<syn::LitByte>(cursor)?;
+    let (t, next) = take_single::<syn::LitByte>(cursor)?;
     ctx.record_span(t.span())
         .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
     Ok((t, next))
