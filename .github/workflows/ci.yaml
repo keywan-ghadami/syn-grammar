@@ -2,9 +2,9 @@ name: Rust CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "logic-changes"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "logic-changes"]
   workflow_dispatch:
 
 env:

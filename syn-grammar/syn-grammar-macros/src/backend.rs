@@ -166,7 +166,7 @@ impl Backend for SynBackend {
             },
             BuiltIn {
                 name: "digit",
-                return_type: "syn::Ident",
+                return_type: "syn::LitInt",
             },
             BuiltIn {
                 name: "alphanumeric",
@@ -174,11 +174,11 @@ impl Backend for SynBackend {
             },
             BuiltIn {
                 name: "hex_digit",
-                return_type: "syn::Ident",
+                return_type: "syn::LitInt",
             },
             BuiltIn {
                 name: "oct_digit",
-                return_type: "syn::Ident",
+                return_type: "syn::LitInt",
             },
             BuiltIn {
                 name: "any_byte",
@@ -186,10 +186,6 @@ impl Backend for SynBackend {
             },
             BuiltIn {
                 name: "eof",
-                return_type: "()",
-            },
-            BuiltIn {
-                name: "fail",
                 return_type: "()",
             },
             BuiltIn {

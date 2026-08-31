@@ -227,7 +227,7 @@ pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     bindings
 }
 
-/// Returns the sequence of tokens for syn::parse::<Token>()
+/// Returns the sequence of tokens for `syn::parse::<Token>()`
 pub fn resolve_token_types(
     lit: &syn::LitStr,
     custom_keywords: &HashSet<String>,
