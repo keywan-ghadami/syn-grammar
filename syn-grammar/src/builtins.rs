@@ -1,6 +1,7 @@
 use crate::rt::{invoke_syn_parser, ParseContext, ParseError, ParseResult};
 use syn::buffer::Cursor;
 use syn::parse::Parser; // WICHTIG für .parse2()
+use syn::ext::IdentExt;
 use syn::spanned::Spanned;
 use syn::Ident;
 use syn_grammar_model::model::types::{Identifier, SpannedValue, StringLiteral};
@@ -164,7 +165,17 @@ impl_syn_builtin!(parse_lit_int_impl, syn::LitInt);
 impl_syn_builtin!(parse_lit_char_impl, syn::LitChar);
 impl_syn_builtin!(parse_lit_bool_impl, syn::LitBool);
 impl_syn_builtin!(parse_lit_float_impl, syn::LitFloat);
-impl_syn_builtin!(parse_any_ident_impl, Ident);
+/// `any_ident` akzeptiert - anders als `ident` - auch Schluesselwoerter.
+///
+/// syns `Ident`-Parser lehnt `self`, `type`, `fn` usw. ab. Bisher benutzte
+/// `any_ident` genau diesen Parser und war damit identisch mit `ident`; Grammatiken
+/// wie die von cxx (`fn f(self: Pin<&mut T>)`) scheiterten daran. `Ident::parse_any`
+/// aus `syn::ext::IdentExt` ist der dafuer vorgesehene Weg.
+pub fn parse_any_ident_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, Ident> {
+    let (t, next) = invoke_custom_parser(cursor, Ident::parse_any)?;
+    ctx.record_span(t.span()).map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
+    Ok((t, next))
+}
 impl_syn_builtin!(parse_visibility_impl, syn::Visibility);
 impl_syn_builtin!(parse_generics_impl, syn::Generics);
 impl_syn_builtin!(parse_return_type_impl, syn::ReturnType);
