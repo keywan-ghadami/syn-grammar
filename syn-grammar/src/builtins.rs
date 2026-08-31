@@ -209,3 +209,43 @@ pub fn parse_statements_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>)
     }
     Ok((stmts, next))
 }
+
+/// Ein Rust-Muster (`syn::Pat`).
+///
+/// `syn::Pat` hat bewusst kein `impl Parse` - syn verlangt die Entscheidung
+/// zwischen `parse_single` und `parse_multi`, weil `A | B` je nach Kontext ein
+/// Oder-Muster oder zwei getrennte Muster ist. Damit war `Pat` ueber den
+/// `syn::`-Pfad in `codegen/pattern.rs` nicht erreichbar: dort laeuft alles
+/// ueber `invoke_syn_parser::<T: Parse>`. Jede Grammatik mit Rust-Mustern
+/// (`let`, `match`, Funktionsparameter) hing an dieser Luecke.
+///
+/// Gewaehlt ist `parse_multi_with_leading_vert` - die Form, die `match`-Arme
+/// benutzen und die `parse_single` als Sonderfall einschliesst.
+pub fn parse_pat_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, syn::Pat> {
+    let (pat, next) = invoke_custom_parser(cursor, syn::Pat::parse_multi_with_leading_vert)?;
+    ctx.record_span(pat.span()).map_err(|e: syn::Error| ParseError::new(pat.span(), e.to_string()))?;
+    Ok((pat, next))
+}
+
+/// Innere Attribute (`#![...]`).
+///
+/// Gegenstueck zu `outer_attrs`. Es gab bisher nur `Attribute::parse_outer`,
+/// womit Modul- und Crate-Attribute nicht parsebar waren.
+pub fn parse_inner_attrs_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, Vec<syn::Attribute>> {
+    let (attrs, next) = invoke_custom_parser(cursor, syn::Attribute::parse_inner)?;
+    if let Some(last) = attrs.last() {
+        ctx.record_span(last.span()).map_err(|e: syn::Error| ParseError::new(last.span(), e.to_string()))?;
+    }
+    Ok((attrs, next))
+}
+
+/// Ein Byte-Literal (`b'A'`).
+///
+/// `any_byte` liefert bereits `syn::LitByte`, hiess aber nicht wie die uebrige
+/// `lit_*`-Familie. `lit_byte` schliesst die Luecke im Namensschema, ohne
+/// `any_byte` zu entfernen.
+pub fn parse_lit_byte_impl<'a>(cursor: Cursor<'a>, ctx: &mut ParseContext<'a>) -> ParseResult<'a, syn::LitByte> {
+    let (t, next) = invoke_syn_parser::<syn::LitByte>(cursor)?;
+    ctx.record_span(t.span()).map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
+    Ok((t, next))
+}

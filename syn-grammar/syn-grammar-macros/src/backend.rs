@@ -253,6 +253,18 @@ impl Backend for SynBackend {
                 name: "statements",
                 return_type: "Vec<syn::Stmt>",
             },
+            BuiltIn {
+                name: "pat",
+                return_type: "syn::Pat",
+            },
+            BuiltIn {
+                name: "inner_attrs",
+                return_type: "Vec<syn::Attribute>",
+            },
+            BuiltIn {
+                name: "lit_byte",
+                return_type: "syn::LitByte",
+            },
         ]
     }
 }
@@ -302,7 +314,7 @@ mod tests {
     fn katalogumfang_ist_bewusst_gewaehlt() {
         assert_eq!(
             SynBackend::get_builtins().len(),
-            60,
+            63,
             "Der Builtin-Katalog hat sich geaendert. Bitte Test und Doku mitziehen."
         );
     }

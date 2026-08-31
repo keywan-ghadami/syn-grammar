@@ -25,7 +25,25 @@ where
 /// Der universelle Brücken-Kombinator.
 /// Verwandelt den Cursor in einen TokenStream, lässt syn parsen und rechnet
 /// anschließend exakt aus, um wie viele Schritte der Cursor vorrücken muss.
-pub fn invoke_syn_parser<'a, T: syn::parse::Parse>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
+/// Marker fuer Typen, die in einer Grammatik direkt als `syn::Foo` stehen duerfen.
+///
+/// Fachlich identisch mit `syn::parse::Parse` - der einzige Zweck ist die
+/// Fehlermeldung. Der Codegenerator (`codegen/pattern.rs`) laesst jeden Pfad
+/// durch, dessen erstes Segment `syn` heisst, ohne pruefen zu koennen, ob der
+/// Typ ueberhaupt parsebar ist. Ohne diesen Marker bekam der Nutzer bei
+/// `syn::Field` oder `syn::Attribute` einen rohen Trait-Bound-Fehler, der auf
+/// generierten Code zeigte, den er nie geschrieben hat.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` kann in einer Grammatik nicht direkt verwendet werden",
+    note = "Ein `syn::`-Typ ist in einer Grammatik nur nutzbar, wenn er `syn::parse::Parse` implementiert.",
+    note = "Typen wie `syn::Field`, `syn::Attribute` oder `syn::Pat` tun das nicht - fuer sie gibt es eingebaute Regeln (`named_field`, `outer_attrs`/`inner_attrs`, `pat`).",
+    note = "Fuer alles andere: eine `extern`-Regel mit eigener Parserfunktion."
+)]
+pub trait SynParsable: syn::parse::Parse {}
+
+impl<T: syn::parse::Parse> SynParsable for T {}
+
+pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
     let stream = cursor.token_stream();
     
     // Wir erzeugen einen temporären Syn-Parser

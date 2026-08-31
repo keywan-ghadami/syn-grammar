@@ -238,3 +238,35 @@ fn any_ident_nimmt_schluesselwoerter_ident_nicht() {
     ids::parse_p_plain.parse_str("normal").test().assert_success_is("normal".to_string());
     ids::parse_p_plain.parse_str("type").test().assert_failure();
 }
+
+/// Die drei Builtins, die der Review als echte Luecken identifiziert hat.
+///
+/// `syn::Pat` war ueber den `syn::`-Pfad gar nicht erreichbar, weil es kein
+/// `impl Parse` hat; `inner_attrs` fehlte als Gegenstueck zu `outer_attrs`;
+/// `lit_byte` schliesst das Namensschema der `lit_*`-Familie.
+#[test]
+fn neu_ergaenzte_builtins() {
+    mod inner {
+        use super::*;
+        grammar! {
+            grammar luecken {
+                pub p_pat -> String = v:pat -> { quote::quote!(#v).to_string() }
+                pub p_inner -> usize = v:inner_attrs -> { v.len() }
+                pub p_byte -> u8 = v:lit_byte -> { v.value() }
+            }
+        }
+    }
+    use inner::luecken;
+
+    // Einfaches Bindungsmuster, Tupelmuster und Oder-Muster.
+    luecken::parse_p_pat.parse_str("x").test().assert_success_is("x".to_string());
+    luecken::parse_p_pat.parse_str("(a, b)").test().assert_success_is("(a , b)".to_string());
+    luecken::parse_p_pat.parse_str("Some(v)").test().assert_success_is("Some (v)".to_string());
+    // Oder-Muster - genau der Fall, weshalb syn kein `impl Parse` anbietet.
+    luecken::parse_p_pat.parse_str("A | B").test().assert_success();
+
+    luecken::parse_p_inner.parse_str("#![allow(dead_code)]").test().assert_success_is(1usize);
+    luecken::parse_p_inner.parse_str("").test().assert_success_is(0usize);
+
+    luecken::parse_p_byte.parse_str("b'Z'").test().assert_success_is(b'Z');
+}

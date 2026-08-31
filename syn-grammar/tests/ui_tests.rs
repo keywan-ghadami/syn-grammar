@@ -11,4 +11,5 @@ fn ui() {
     t.compile_fail("tests/ui/tilde_operator.rs");
     t.compile_fail("tests/ui/ampersand_operator.rs");
     t.compile_fail("tests/ui/undefined_rule_with_use.rs");
+    t.compile_fail("tests/ui/syn_type_without_parse.rs");
 }

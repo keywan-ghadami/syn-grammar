@@ -1,0 +1,53 @@
+error[E0277]: `syn::Field` kann in einer Grammatik nicht direkt verwendet werden
+  --> tests/ui/syn_type_without_parse.rs:13:18
+   |
+13 |         main = f:syn::Field
+   |                  ^^^^^^^^^^ the trait `Parse` is not implemented for `syn::Field`
+   |
+   = note: Ein `syn::`-Typ ist in einer Grammatik nur nutzbar, wenn er `syn::parse::Parse` implementiert.
+   = note: Typen wie `syn::Field`, `syn::Attribute` oder `syn::Pat` tun das nicht - fuer sie gibt es eingebaute Regeln (`named_field`, `outer_attrs`/`inner_attrs`, `pat`).
+   = note: Fuer alles andere: eine `extern`-Regel mit eigener Parserfunktion.
+   = help: the following other types implement trait `Parse`:
+             Abstract
+             AndAnd
+             AndEq
+             AngleBracketedGenericArguments
+             Arm
+             As
+             At
+             Auto
+           and $N others
+   = note: required for `syn::Field` to implement `SynParsable`
+note: required by a bound in `invoke_syn_parser`
+  --> $WORKSPACE/core/grammar-kit/src/combinators.rs
+   |
+   | pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
+   |                                 ^^^^^^^^^^^ required by this bound in `invoke_syn_parser`
+
+error[E0308]: mismatched types
+  --> tests/ui/syn_type_without_parse.rs:11:1
+   |
+11 | / grammar! {
+12 | |     grammar Test {
+13 | |         main = f:syn::Field
+14 | |     }
+15 | | }
+   | | ^
+   | | |
+   | |_expected `((), Cursor<'_>)`, found `(Field, Cursor<'_>)`
+   |   arguments to this enum variant are incorrect
+   |
+   = note: expected tuple `((), syn::buffer::Cursor<'_>)`
+              found tuple `(syn::Field, syn::buffer::Cursor<'_>)`
+help: the type constructed contains `(syn::Field, syn::buffer::Cursor<'_>)` due to the type of the argument passed
+  --> tests/ui/syn_type_without_parse.rs:11:1
+   |
+11 | / grammar! {
+12 | |     grammar Test {
+13 | |         main = f:syn::Field
+14 | |     }
+15 | | }
+   | |_^ this argument influences the type of `Ok`
+note: tuple variant defined here
+  --> $RUST/core/src/result.rs
+   = note: this error originates in the macro `grammar` (in Nightly builds, run with -Z macro-backtrace for more info)
