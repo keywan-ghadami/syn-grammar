@@ -60,7 +60,14 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     Ok(quote! {
         #[allow(non_snake_case)]
         pub mod #grammar_name {
+            // `unreachable_code`: `fail(..)` erzeugt ein `return Err(..)`
+            // (`codegen/pattern.rs`, ModelPattern::Fail). Alles dahinter in derselben
+            // Regel ist damit unerreichbar - auch das abschliessende `Ok(..)`, das der
+            // Generator immer anhaengt. Ohne dieses Allow bekommt JEDER Nutzer, der
+            // `fail(..)` in seine Grammatik schreibt, eine Warnung in seinem eigenen
+            // Crate, auf Code, den er nie geschrieben hat.
             #![allow(unused_imports, unused_variables, dead_code, unused_braces, unused_parens)]
+            #![allow(unreachable_code)]
             #![allow(clippy::all)]
 
             pub const GRAMMAR_NAME: &str = stringify!(#grammar_name);

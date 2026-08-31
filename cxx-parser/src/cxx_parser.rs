@@ -168,10 +168,10 @@ mod tests {
 
         assert_eq!(args.len(), 3);
         assert_eq!(args[2].name.to_string(), "filter");
-        assert!(generics.params.iter().any(|p| match p {
-            syn::GenericParam::Lifetime(_) => true,
-            _ => false,
-        }));
+        assert!(generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Lifetime(_))));
 
         let filter_type = &args[2].ty;
         let filter_type_string = quote!(#filter_type).to_string();

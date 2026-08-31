@@ -101,7 +101,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let is_syn_type = rule_path
                 .segments
                 .first()
-                .map_or(false, |seg| seg.ident == "syn");
+                .is_some_and(|seg| seg.ident == "syn");
 
             if is_syn_type {
                 let bind_stmt = if let Some(bind) = binding {
@@ -789,11 +789,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let none_exprs = bindings.iter().map(|_| quote!(Option::<_>::None));
             let some_exprs = bindings.iter().map(|b| quote!(Some(#b)));
 
-            // Bei genau einem Binding wird _val direkt in Some(..) gewickelt; eine
-            // Zwischenzuweisung wuerde den Wert vorher wegbewegen.
-            let some_assign = if bindings.len() == 1 {
-                quote!()
-            } else if bindings.is_empty() {
+            // Kein Binding: nichts zuzuweisen. Genau eines: _val wird direkt in
+            // Some(..) gewickelt, eine Zwischenzuweisung wuerde den Wert vorher
+            // wegbewegen. Erst ab zwei wird destrukturiert.
+            let some_assign = if bindings.len() <= 1 {
                 quote!()
             } else {
                 quote!(let (#(#bindings),*) = _val;)
