@@ -38,6 +38,14 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     let (recursive_refs, base_refs) = analysis::split_left_recursive(name, &rule.variants);
     let where_clause = &generics.where_clause;
 
+    // Eigener Kontext fuer diese Regel, damit tiefere Muster ihren Namen kennen.
+    let rule_ctx = CodegenContext {
+        grammar: ctx.grammar,
+        custom_keywords: ctx.custom_keywords,
+        current_rule: context_name.clone(),
+    };
+    let ctx = &rule_ctx;
+
     let lexical_block_start = if rule.is_lexical { quote! { ctx.enter_lexical(); } } else { quote! {} };
     let lexical_block_end = if rule.is_lexical { quote! { ctx.exit_mode(); } } else { quote! {} };
 

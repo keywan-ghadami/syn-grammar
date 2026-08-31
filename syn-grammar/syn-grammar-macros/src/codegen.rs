@@ -10,6 +10,9 @@ use syn_grammar_model::{analysis, model::*};
 pub struct CodegenContext<'a> {
     pub grammar: &'a GrammarDefinition,
     pub custom_keywords: &'a HashSet<String>,
+    /// Die Regel, deren Rumpf gerade erzeugt wird - in Leerzeichen-Form.
+    /// Manche Meldungen nennen sie (z.B. `not(..)`: "in rule `main`").
+    pub current_rule: String,
 }
 
 pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
@@ -19,6 +22,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     let ctx = CodegenContext {
         grammar: &grammar,
         custom_keywords: &custom_keywords,
+        current_rule: String::new(),
     };
 
     let kw_defs = (!custom_keywords.is_empty()).then(|| {

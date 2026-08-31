@@ -568,13 +568,40 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         }
         ModelPattern::Not(inner, _) => {
             let inner_logic = generate_pattern_step(inner, ctx)?;
+            // Wenn `not(..)` eine Regel abwehrt, gehoert ihr Name in die Meldung -
+            // sonst steht dort nur "unexpected match" ohne jeden Anhaltspunkt.
+            let inner_name = match &**inner {
+                ModelPattern::RuleCall { rule_path, .. } => rule_path
+                    .segments
+                    .last()
+                    .map(|s| s.ident.to_string().replace('_', " ")),
+                _ => None,
+            };
+            let current_rule = ctx.current_rule.clone();
+            let meldung = match inner_name {
+                Some(name) => quote! {
+                    {
+                        let _gefunden = cursor
+                            .token_tree()
+                            .map(|(tt, _)| tt.to_string())
+                            .unwrap_or_default();
+                        format!(
+                            "unexpected match for rule `{}`; found `{}` in rule `{}`",
+                            #name, _gefunden, #current_rule
+                        )
+                    }
+                },
+                None => quote!("unexpected match".to_string()),
+            };
             Ok(quote! {
                 let _not_res = (|| -> rt::ParseResult<'a, _> {
                     let mut cursor = cursor; // copy
                     #inner_logic
                     Ok(((), cursor))
                 })();
-                if _not_res.is_ok() { return Err(rt::ParseError::at_cursor(cursor, "unexpected match").with_priority(50)); }
+                if _not_res.is_ok() {
+                    return Err(rt::ParseError::at_cursor(cursor, #meldung).with_priority(50));
+                }
             })
         }
         ModelPattern::Until { binding, pattern, .. } => {
