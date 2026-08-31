@@ -338,22 +338,16 @@ impl<'a> ParamSubstituter<'a> {
                     *pattern = replacement.clone();
 
                     if let Some(b) = old_binding {
+                        // Das Binding der Aufrufstelle wird auf das eingesetzte
+                        // Muster uebertragen - aber nur, wenn dieses nicht selbst
+                        // schon eines mitbringt. Beide Varianten verhalten sich
+                        // gleich, daher ein gemeinsamer Arm mit Wachbedingung.
                         match pattern {
-                            ModelPattern::RuleCall {
-                                binding: ref mut new_b,
-                                ..
-                            } => {
-                                if new_b.is_none() {
-                                    *new_b = Some(b);
-                                }
-                            }
-                            ModelPattern::Recover {
-                                binding: ref mut new_b,
-                                ..
-                            } => {
-                                if new_b.is_none() {
-                                    *new_b = Some(b);
-                                }
+                            ModelPattern::RuleCall { binding: new_b, .. }
+                            | ModelPattern::Recover { binding: new_b, .. }
+                                if new_b.is_none() =>
+                            {
+                                *new_b = Some(b);
                             }
                             _ => {}
                         }
