@@ -10,7 +10,7 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 
 ## Documentation
 
-- **[Grammar Syntax Reference](../SYNTAX.md)**: Detailed guide to the shared grammar definition language (rules, operators, built-ins).
+- **[Grammar Syntax Reference](SYNTAX.md)**: Detailed guide to the shared grammar definition language (rules, operators, built-ins).
 - **[Extending Guide](../EXTENDING.md)**: Guide for library authors on how to build custom backends.
 
 ## Features
@@ -29,7 +29,7 @@ Use this setup if you want to parse strings **at runtime** inside your applicati
 
 ```toml
 [dependencies]
-syn-grammar = "0.8.0"
+syn-grammar = "0.10.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -97,7 +97,7 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 The generated parser functions take a `syn::parse::ParseStream`.
 
 ### Built-ins
-In addition to the portable built-ins (see [SYNTAX.md](../SYNTAX.md)), `syn-grammar` provides the following `syn`-specific parsers:
+In addition to the portable built-ins (see [SYNTAX.md](SYNTAX.md)), `syn-grammar` provides the following `syn`-specific parsers:
 
 | Parser | Description | Returns |
 |---|---|---|
@@ -105,53 +105,81 @@ In addition to the portable built-ins (see [SYNTAX.md](../SYNTAX.md)), `syn-gram
 | `rust_block` | A block of code (e.g., `{ stmt; }`) | `syn::Block` |
 | `lit_str` | A string literal object | `syn::LitStr` |
 | `lit_int` | A typed integer literal (e.g. `1u8`) | `syn::LitInt` |
-| `outer_attrs` | Parses `#[...]` attributes | `Vec<syn::Attribute>` |
+| `lit_char` | A character literal | `syn::LitChar` |
+| `lit_bool` | `true` or `false` | `syn::LitBool` |
+| `lit_float` | A float literal | `syn::LitFloat` |
+| `lit_byte` / `any_byte` | A byte literal (`b'A'`) | `syn::LitByte` |
+| `outer_attrs` | Outer attributes (`#[...]`) | `Vec<syn::Attribute>` |
+| `inner_attrs` | Inner attributes (`#![...]`) | `Vec<syn::Attribute>` |
+| `any_ident` | An identifier, **keywords included** (`Ident::parse_any`) | `syn::Ident` |
+| `pat` | A Rust pattern (`Some(x)`, `A \| B`) | `syn::Pat` |
+| `visibility` | A visibility (`pub`, `pub(crate)`) | `syn::Visibility` |
+| `generics` | A generic parameter list (`<T, U>`) | `syn::Generics` |
+| `return_type` | A return type (`-> i32`) | `syn::ReturnType` |
+| `named_field` | A named struct field (`name: i32`) | `syn::Field` |
+| `unnamed_field` | A tuple-struct field (`i32`) | `syn::Field` |
+| `statements` | A sequence of statements | `Vec<syn::Stmt>` |
+
+Any other `syn` type that implements `syn::parse::Parse` can be used directly by
+writing its path — `x:syn::Expr`, `t:syn::Type`, `p:syn::Path`. A `syn` type
+*without* `Parse` (such as `syn::Field`) produces a grammar-level error naming
+the built-in to use instead.
+
+Beyond these there is a `spanned_` variant for every numeric and character
+primitive (`spanned_i32`, `spanned_u64`, `spanned_f32`, `spanned_char`,
+`spanned_bool`, …) returning `syn_grammar::types::SpannedValue<T>` with both
+`value` and `span`. See [SYNTAX.md](SYNTAX.md).
 
 ### Return Types
 Portable built-ins map to specific `syn` or `syn-grammar` types:
 
 | Portable Primitive | Return Type | Notes |
 |---|---|---|
-| `ident` | `syn_grammar::Identifier` | Wraps `syn::Ident`, implements `PartialEq`, `Hash`. |
-| `string` | `syn_grammar::StringLiteral` | Wraps `syn::LitStr`. |
+| `ident` | `syn_grammar::types::Identifier` | Wraps `syn::Ident`, implements `PartialEq`, `Hash`. |
+| `string` | `syn_grammar::types::StringLiteral` | Wraps `syn::LitStr`. |
 | `alpha`, `alphanumeric` | `syn::Ident` | |
 | `digit` | `syn::LitInt` | |
 
 ### Span Binding (`@`)
-You can capture the `Span` of a parsed rule or built-in using `name:rule @ span_var`. The rule must return a type that implements `syn::spanned::Spanned` (e.g., `syn::Ident`, `syn::Type`, `syn_grammar::Identifier`).
+You can capture the `Span` of a parsed rule or built-in using `name:rule @ span_var`. The rule must return a type that implements `syn::spanned::Spanned` (e.g., `syn::Ident`, `syn::Type`, `syn_grammar::types::Identifier`).
 
 ## Testing
 
 `syn-grammar` provides a fluent testing API via the `grammar-kit` crate (re-exported as `syn_grammar::testing`).
 
-```rust,no_run
+```rust
+use syn::parse::Parser;
 use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
 grammar! {
     grammar Calc {
-        rule expression -> i32 = 
+        pub rule expression -> i32 =
             l:expression "+" r:term -> { l + r }
           | t:term -> { t }
-        
+
         rule term -> i32 = i:i32 -> { i }
     }
 }
 
-#[test]
-fn test_calc() {
+fn main() {
     Calc::parse_expression
         .parse_str("1 + 2")
         .test()
         .assert_success_is(3);
 
+    // Der Fehler benennt die Erwartung und den Weg dorthin:
+    //
+    //     expected integer literal at column 4 (line 1)
+    //     in term
+    //     in expression
     Calc::parse_expression
         .parse_str("1 + *")
         .test()
-        .assert_failure_contains("expected term");
-        
+        .assert_failure_contains("expected integer literal")
+        .assert_failure_contains("in term")
+        .assert_failure_contains("in expression");
 }
-# fn main() {}
 ```
 
 ## Contributing
@@ -162,7 +190,7 @@ To contribute to `syn-grammar`, please ensure high quality by following these st
 2.  **Lint Code**: Run `cargo clippy --workspace --all-targets -- -D warnings` to catch common mistakes and enforce best practices.
 3.  **Run Tests**: Run `cargo test --workspace` to ensure all functionality works as expected.
 
-See `scripts/pre-commit.sh` for the exact commands used in CI.
+Die genauen Befehle stehen in `.github/workflows/ci.yaml`.
 
 ## License
 

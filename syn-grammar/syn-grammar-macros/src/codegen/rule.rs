@@ -172,6 +172,10 @@ fn generate_recursive_loop_body(variants: &[RuleVariant], ctx: &CodegenContext) 
                 }
                 Err(e) => {
                     if e.priority >= 50 { return Err(e); }
+                    // Die Schleife endet hier regulaer mit dem bisherigen `lhs`.
+                    // Ohne dieses Merken ginge der Grund, warum nicht weiter
+                    // expandiert wurde, ersatzlos verloren.
+                    ctx.record_failure(&e);
                 }
             }
         };
@@ -247,6 +251,17 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                         if e.at == Some(_start_cursor) {
                             if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
                         }
+                        // Nur MIT Fortschritt in den Hochwasserstand: gewinnt eine
+                        // spaetere Alternative, wird `_best_err` verworfen - und mit
+                        // ihm der aussagekraeftigste Grund, falls hinterher noch
+                        // Eingabe uebrig bleibt. Ein Fehler ohne Fortschritt ist
+                        // dagegen keine "weiteste Fehlschlagstelle"; er gehoert in die
+                        // Erwartungsliste oben, nicht in den globalen Mark - sonst
+                        // verdraengt die Aggregation eines optionalen Teilmusters das
+                        // Label des Elements (ADR 13, Punkt 6).
+                        else {
+                            ctx.record_failure(&e);
+                        }
                         _best_err = Some(_best_err.map_or(e.clone(), |b| b.merge(e)));
                     }
                 }
@@ -271,6 +286,17 @@ pub fn generate_variants_internal(variants: &[RuleVariant], is_top_level: bool, 
                         // die interne Meldung nach aussen zu tragen (ADR 13, Punkt 6).
                         if e.at == Some(_start_cursor) {
                             if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
+                        }
+                        // Nur MIT Fortschritt in den Hochwasserstand: gewinnt eine
+                        // spaetere Alternative, wird `_best_err` verworfen - und mit
+                        // ihm der aussagekraeftigste Grund, falls hinterher noch
+                        // Eingabe uebrig bleibt. Ein Fehler ohne Fortschritt ist
+                        // dagegen keine "weiteste Fehlschlagstelle"; er gehoert in die
+                        // Erwartungsliste oben, nicht in den globalen Mark - sonst
+                        // verdraengt die Aggregation eines optionalen Teilmusters das
+                        // Label des Elements (ADR 13, Punkt 6).
+                        else {
+                            ctx.record_failure(&e);
                         }
                         _best_err = Some(_best_err.map_or(e.clone(), |b| b.merge(e)));
                     }

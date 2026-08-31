@@ -4,14 +4,25 @@
 
 ## Features
 
-### 1. Speculative Parsing (Backtracking)
-The `attempt` function allows parsers to try a parsing branch and revert the stream cursor if it fails, without consuming tokens. This enables LL(k) lookahead and backtracking logic.
+### 1. Functional Cursor Parsing
+Generated parsers work on `syn::buffer::Cursor` rather than `ParseStream`. A parse
+step returns `ParseResult<'a, T> = Result<(T, Cursor<'a>), ParseError<'a>>` — the
+new cursor *is* the advance, so backtracking is simply not using the returned
+cursor. No forking, no rollback bookkeeping.
 
 ### 2. Intelligent Error Reporting
-`grammar-kit` implements a "Deepest Error" heuristic. When multiple parsing branches fail, it preserves the error that occurred furthest into the token stream. This prevents generic "unexpected token" errors at the start of a block when a specific syntax error occurred deep inside it.
+When several branches fail, `grammar-kit` keeps the error that got **furthest**
+into the token stream. Progress is measured by comparing cursors (`PartialOrd` on
+`Cursor`, an O(1) pointer comparison), deliberately *not* by line/column: in a
+real proc macro on stable Rust every `Span::start()` is `(0,0)`, which would make
+any positional comparison useless. See [`docs/ERROR_HANDLING.md`](../../docs/ERROR_HANDLING.md).
+
+Errors that a *successful* backtrack would otherwise discard survive in
+`ParseContext::furthest`.
 
 ### 3. Testing Framework
-The `testing` module provides a fluent API for unit testing your parsers.
+The `testing` module provides a fluent API for unit testing your parsers
+(`TestResult`, `Testable`, `assert_success_is`, `assert_failure_contains`, …).
 
 ## Installation
 
@@ -19,14 +30,26 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-grammar-kit = "0.4.0"
+grammar-kit = "0.9.0"
 ```
 
 ### Runtime Helpers
 
 The library exposes several helper functions used by generated parsers:
 
-*   `attempt`: Forks the input, runs a closure, and advances only on success.
-*   `parse_ident`: Parses identifiers, accepting Rust keywords (via `IdentExt`).
-*   `parse_int`: Parses integer literals into typed Rust integers.
-*   `skip_until`: Skips tokens until a specific condition is met (used for error recovery).
+*   `attempt_labeled`: Runs a parser, and on failure records it in the context's
+    high-water mark instead of losing it. Optionally attaches a label.
+*   `invoke_syn_parser::<T>`: Bridges a `Cursor` to a `syn` type implementing
+    `Parse`. The bound is the marker `SynParsable`, which carries a
+    `#[diagnostic::on_unimplemented]` so that a `syn::` type *without* `Parse`
+    produces a grammar-level message instead of a raw trait-bound error.
+*   `peek_syn`: Non-consuming lookahead.
+*   `finish_variants`: Aggregates the expectations of failed alternatives into
+    `expected one of: …`.
+*   `parse_separated` / `parse_repeated`: List combinators. They push
+    `"<item_label> <index>"` and `"separator"` onto the live rule stack, which is
+    what produces `in function parameter 2` in error messages.
+
+> Removed in 0.10.0: `attempt`, `peek`, `not_check`, `attempt_recover`,
+> `parse_ident`, `parse_int`, `skip_until`. They took a `ParseStream` and belong
+> to the pre-cursor engine.
