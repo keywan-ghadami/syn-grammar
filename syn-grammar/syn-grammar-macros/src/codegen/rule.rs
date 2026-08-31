@@ -81,7 +81,19 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
             input.step(|cursor| {
                 let mut ctx = rt::ParseContext::new();
                 match #impl_name(*cursor, &mut ctx #(#param_names)*) {
-                    Ok((res, next_cursor)) => Ok((res, next_cursor)),
+                    Ok((res, next_cursor)) => {
+                        // Die Regel ist aufgegangen, hat aber nicht alles verbraucht.
+                        // Wurde unterwegs ein Grund gemerkt, warum es nicht weiterging,
+                        // ist der die Antwort - sonst meldet syn nur "unexpected token".
+                        if !next_cursor.eof() {
+                            if let Some(f) = ctx.furthest.clone() {
+                                let mut f = f;
+                                f.push_rule(#context_name);
+                                return Err(syn::Error::new(f.span, f.to_string()));
+                            }
+                        }
+                        Ok((res, next_cursor))
+                    }
                     Err(e) => {
                         // Der zurueckgegebene Fehler ist nicht zwingend der
                         // aussagekraeftigste - ein weiter gekommener kann unterwegs

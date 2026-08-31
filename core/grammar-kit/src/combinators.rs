@@ -277,12 +277,21 @@ where
                             ctx.record_failure(&e);
                             break;
                         } else {
-                            // Striktes Scheitern: Der Trenner war da, ein Element ist
-                            // Pflicht. Der echte Fehler wird ANGEREICHERT, nicht gegen
-                            // einen synthetischen ausgetauscht - sonst ginge mit ihm
-                            // sein Regelstapel und, wenn er tiefer lag, die
-                            // aussagekraeftigere Stelle verloren.
-                            return Err(label_missing_item(e, after_sep_cursor, item_name, ctx));
+                            // Weich zuruecksetzen statt hart scheitern: der Cursor
+                            // bleibt VOR dem Trenner, damit eine nachfolgende Regel
+                            // (etwa ein `","?`) ihn noch verarbeiten kann. Genau darauf
+                            // bauen `paren(args:liste? ","?)`-Grammatiken.
+                            //
+                            // Der Grund wird gemerkt - passt danach doch nichts mehr,
+                            // taucht er wieder auf, statt von einer generischen Meldung
+                            // ersetzt zu werden. Angereichert wird der ECHTE Fehler,
+                            // damit sein Regelstapel und, wenn er tiefer lag, seine
+                            // Stelle erhalten bleiben.
+                            let markiert =
+                                label_missing_item(e, after_sep_cursor, item_name, ctx);
+                            ctx.record_failure(&markiert);
+                            ctx.absorb(&item_ctx);
+                            break;
                         }
                     }
                 }

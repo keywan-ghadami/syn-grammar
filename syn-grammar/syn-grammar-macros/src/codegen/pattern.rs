@@ -454,11 +454,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
                 ctx.enter_lexical();
-                let (_res, next_cursor) = (|| -> rt::ParseResult<'a, _> {
+                // Das `?` MUSS hinter `exit_mode()` stehen - sonst bleibt der
+                // Modus bei einem Fehler auf dem Stapel liegen. Der Delimiter-Zweig
+                // macht es mit `exit_group()` genauso.
+                let _mode_res = (|| -> rt::ParseResult<'a, _> {
                     #inner_logic
                     Ok(((), cursor))
-                })()?;
+                })();
                 ctx.exit_mode();
+                let (_res, next_cursor) = _mode_res?;
                 let mut cursor = next_cursor;
             })
         }
@@ -466,11 +470,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
                 ctx.enter_spaced();
-                let (_res, next_cursor) = (|| -> rt::ParseResult<'a, _> {
+                // Das `?` MUSS hinter `exit_mode()` stehen - sonst bleibt der
+                // Modus bei einem Fehler auf dem Stapel liegen. Der Delimiter-Zweig
+                // macht es mit `exit_group()` genauso.
+                let _mode_res = (|| -> rt::ParseResult<'a, _> {
                     #inner_logic
                     Ok(((), cursor))
-                })()?;
+                })();
                 ctx.exit_mode();
+                let (_res, next_cursor) = _mode_res?;
                 let mut cursor = next_cursor;
             })
         }
