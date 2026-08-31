@@ -6,5 +6,20 @@ members = [
     "core/grammar-kit",
     "core/grammar-kit-macros",
     "cxx-parser",
+    # Hilfs-Crate fuer den trybuild-Fall auf dem echten Prozedurmakro-Pfad.
+    # Es MUSS Mitglied sein: cargo macht jede Pfad-Abhaengigkeit eines Mitglieds
+    # automatisch selbst zum Mitglied, und ein eigener `[workspace]` daneben
+    # scheitert mit "multiple workspace roots found in the same workspace".
+    # `exclude` greift dagegen nicht. Ueber `default-members` bleibt es
+    # wenigstens aus dem alltaeglichen `cargo build`/`cargo test` heraus.
+    "syn-grammar/tests/ui-macro",
+]
+default-members = [
+    "syn-grammar",
+    "syn-grammar/syn-grammar-macros",
+    "core/syn-grammar-model",
+    "core/grammar-kit",
+    "core/grammar-kit-macros",
+    "cxx-parser",
 ]
 resolver = "2"
