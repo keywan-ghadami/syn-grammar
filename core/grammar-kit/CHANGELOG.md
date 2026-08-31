@@ -6,7 +6,9 @@ Liste der Aenderungen steht in
 [`syn-grammar/CHANGELOG.md`](../../syn-grammar/CHANGELOG.md); hier stehen nur
 die Punkte, die die API dieser Crate betreffen.
 
-## [0.10.0]
+## [0.9.0] - Entwurf, nicht veroeffentlicht
+
+> Noch nicht auf crates.io; die letzte veroeffentlichte Fassung ist 0.8.0.
 
 ### Breaking Changes
 

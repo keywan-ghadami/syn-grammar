@@ -29,7 +29,7 @@ Use this setup if you want to parse strings **at runtime** inside your applicati
 
 ```toml
 [dependencies]
-syn-grammar = "0.10.0"
+syn-grammar = "0.8.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"

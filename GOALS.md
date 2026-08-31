@@ -73,5 +73,5 @@ Kopplung sofort und erlaubt es winnow, das Modell in Richtung `syn`-Freiheit
 weiterzuentwickeln, was hier strukturell nicht möglich ist (das Modell ist
 `syn`-basiert). Preis: die DSL driftet auseinander.
 
-Fork-Punkt ist Commit `64be1ef` (31.08.2026, Version 0.10.0); er ist in beiden
+Fork-Punkt ist Commit `64be1ef` (31.08.2026, Version 0.9.0-Entwurf); er ist in beiden
 Repositories vermerkt und der Bezugspunkt für einen späteren Abgleich.

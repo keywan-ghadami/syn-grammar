@@ -30,7 +30,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-grammar-kit = "0.10.0"
+grammar-kit = "0.8.0"
 ```
 
 ### Runtime Helpers
@@ -50,6 +50,6 @@ The library exposes several helper functions used by generated parsers:
     `"<item_label> <index>"` and `"separator"` onto the live rule stack, which is
     what produces `in function parameter 2` in error messages.
 
-> Removed in 0.10.0: `attempt`, `peek`, `not_check`, `attempt_recover`,
+> Entfaellt mit 0.9.0: `attempt`, `peek`, `not_check`, `attempt_recover`,
 > `parse_ident`, `parse_int`, `skip_until`. They took a `ParseStream` and belong
 > to the pre-cursor engine.

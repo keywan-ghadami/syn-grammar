@@ -5,7 +5,9 @@ Datenmodell und den Validator. Es wird versionsgleich mit `syn-grammar`
 veroeffentlicht; die vollstaendige Liste steht in
 [`syn-grammar/CHANGELOG.md`](../../syn-grammar/CHANGELOG.md).
 
-## [0.10.0]
+## [0.9.0] - Entwurf, nicht veroeffentlicht
+
+> Noch nicht auf crates.io; die letzte veroeffentlichte Fassung ist 0.8.0.
 
 ### Breaking Changes
 
