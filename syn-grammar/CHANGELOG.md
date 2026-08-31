@@ -149,8 +149,7 @@ was auf konkrete Fehlermeldungstexte prueft.
 - **`with_span`-Ableitungsmakro** und der `WithSpan`-Trait.
 - **`DEBUG_GRAMMAR`**: Umgebungsvariable, die den generierten Code auf stderr
   ausgibt.
-- **`winnow-grammar`** als zweites Backend und **`cxx-parser`** als
-  Abnahme-Benchmark (beide eigene Crates, Version 0.1.0).
+- **`cxx-parser`** als Abnahme-Benchmark (eigene Crate, Version 0.1.0).
 
 ### Fixed
 
@@ -179,6 +178,19 @@ was auf konkrete Fehlermeldungstexte prueft.
   nicht ab (`?` stand vor `exit_mode()`).
 - **Der CI-Doc-Schritt** war rot: `syn::parse::<Token>()` ohne Backticks in
   einem Doc-Kommentar liess rustdoc unter `-D warnings` abbrechen.
+
+### Removed
+
+- **`winnow-grammar` ist ausgezogen** und lebt seit dem 31.08.2026 unter
+  <https://github.com/keywan-ghadami/winnow-grammar>. Es war in diesem Repository
+  entwickelt worden, nachdem es dort begonnen hatte; `GOALS.md` erklärt es zum
+  Nicht-Ziel. Das Frontend `syn-grammar-model` wurde beim Auszug geforkt (nicht
+  als Abhängigkeit bezogen), damit winnow die DSL unabhängig weiterentwickeln
+  kann. Fork-Punkt: Commit `64be1ef`.
+  - **Impact**: Für Nutzer von `syn-grammar` ändert sich nichts. Wer
+    `winnow-grammar` benutzt, findet es unter der neuen Adresse.
+  - Nebeneffekt: die fünf fehlschlagenden Doctests des Workspace waren
+    ausnahmslos winnow-Doctests und sind mit umgezogen.
 
 ### Documentation
 

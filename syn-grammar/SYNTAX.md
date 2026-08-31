@@ -1,6 +1,6 @@
 # Grammar Syntax Reference
 
-This document serves as the reference for the **Grammar Definition Language** shared by all backends (`syn-grammar`, `winnow-grammar`).
+This document serves as the reference for the **Grammar Definition Language** as implemented by `syn-grammar`.
 
 ## Defining Grammars
 

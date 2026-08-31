@@ -48,12 +48,14 @@ Der `Backend`-Trait (`model/backend.rs:13-16`) hat genau eine Methode,
 `get_builtins() -> &'static [BuiltIn]`. Er steuert **ausschließlich die Validierung** der
 Builtin-Namen — er sagt nichts über Codegen. Es gibt keine gemeinsame Codegen-Abstraktion.
 
-**Zum Namen:** Das Crate heißt `syn-grammar-model`, wird aber auch von `winnow-grammar`
-benutzt. Backendunabhängig ist es allerdings nur in der *Nutzung*, nicht in den *Typen*:
-das Modell trägt `syn::Path`, `syn::Lit`, `syn::Type`, `syn::ItemUse`
-(`model.rs:14,20-23,28,65,69-70`), und `analysis::resolve_token_types` /
-`analysis::get_simple_peek` erzeugen `Token![…]`- und `syn::token::*`-Typen — das ist
-syn-Codegen im gemeinsamen Frontend, den winnow nie aufruft.
+**Zum Namen:** Das Crate hieß `syn-grammar-model`, weil es einmal von zwei Backends
+benutzt wurde. Seit dem Auszug von `winnow-grammar` (31.08.2026) hat es nur noch einen
+Nutzer, und der Name passt wieder. Backendunabhängig war es ohnehin nur in der
+*Nutzung*, nicht in den *Typen*: das Modell trägt `syn::Path`, `syn::Lit`, `syn::Type`,
+`syn::ItemUse` (`model.rs:14,20-23,28,65,69-70`), und `analysis::resolve_token_types` /
+`analysis::get_simple_peek` erzeugen `Token![…]`- und `syn::token::*`-Typen. Genau
+deshalb hat winnow das Crate beim Auszug geforkt statt es weiter zu beziehen — nur so
+kann es dort in Richtung `syn`-Freiheit weiterentwickelt werden.
 
 ## Runtime: `core/grammar-kit`
 
@@ -113,19 +115,24 @@ Abnahme-Benchmark auf dem syn-Backend (`cxx-parser/Cargo.toml:8`). 5 Regeln,
 `:` und `->` (`syn::Type`, `syn::ReturnType`, `syn::Generics`, `syn::Macro`) — genau die
 Grenze, an der eine Fremd-DSL in echte Rust-Syntax übergeht.
 
-## `winnow-grammar`
+## `winnow-grammar` — ausgezogen
 
-Zweites Backend auf demselben Frontend, erzeugt winnow-Kombinatoren über
-`Stateful<LocatingSlice<&str>, ParseContext<S>>`. Fehler sind `winnow::error::ContextError`;
-die Diagnostik-Anforderungen aus `GOALS.md` erfüllt es nicht und verspricht es auch nicht.
+War bis zum 31.08.2026 ein zweites Backend auf demselben Frontend. Es lebt jetzt unter
+<https://github.com/keywan-ghadami/winnow-grammar> und ist vollständig unabhängig: keine
+Referenz mehr auf `syn-grammar`, `syn-grammar-model` oder `grammar-kit`.
 
-**Es wird ein eigenes Projekt** (siehe `GOALS.md`, Nicht-Ziele). Für den Auszug relevant:
-Seine syn-Kopplung zur Laufzeit ist weitgehend zufällig — `syn` in
-`winnow-grammar/Cargo.toml:19` und `syn-grammar-model` in `:16` werden in `src/` nirgends
-benutzt, `winnow-grammar-macros/Cargo.toml:13` zieht `syn-grammar`, ohne es je zu
-referenzieren (dadurch baut der winnow-Build heute das komplette syn-Backend mit).
-Aus `grammar-kit` braucht es nur `WithSpan` und `testing`. Nach diesen Schnitten bliebe
-zur Laufzeit `winnow` + `lasso`.
+Beim Auszug aufgelöst: das Frontend wurde als `winnow-grammar-model` geforkt; aus
+`grammar-kit` wanderten nur `WithSpan` (4 Zeilen) und `testing.rs` (341 Zeilen, ohne
+`syn`-Bezug) mit, das Crate selbst wurde nicht geforkt. Der eigentliche Blocker steckte
+nicht in den Manifesten, sondern im erzeugten Code: `codegen/variants.rs` schrieb
+`::grammar_kit::WithSpan` als absoluten Crate-Pfad, womit jedes Nutzer-Crate
+`grammar-kit` direkt brauchte.
+
+Vier Abhängigkeiten waren tot (kein einziger Import): `syn` und `syn-grammar-model` in
+`winnow-grammar`, `syn-grammar` und `grammar-kit` in `winnow-grammar-macros` — wobei
+`syn-grammar` das komplette syn-Backend in jeden winnow-Build zog.
+
+`docs/adr/adr14-shared-context-pattern.md` ist mitgezogen.
 
 ## Veraltete Dokumente
 

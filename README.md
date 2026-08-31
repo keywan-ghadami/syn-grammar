@@ -3,12 +3,17 @@
 
 The **Grammar** ecosystem is a powerful parser generator framework for Rust. It allows you to define EBNF-like grammars directly inside your Rust code using a macro, which are then compiled into efficient parsers at compile time.
 
-## Backends
+## Umfang
 
-The framework supports multiple backends depending on your parsing needs:
+Dieses Repository enthält **[`syn-grammar`](syn-grammar/README.md)**: einen
+Parser-Generator für Rust-TokenStreams, gedacht für prozedurale Makros, in Rust
+eingebettete DSLs und Codegeneratoren.
 
-- **[`syn-grammar`](syn-grammar/README.md)**: Designed for parsing Rust TokenStreams. Ideal for writing procedural macros, DSLs embedded in Rust, and code generation tools.
-- **[`winnow-grammar`](winnow-grammar/README.md)**: Built on top of `winnow`. Designed for general-purpose parsing of text (`&str`) and binary data (`&[u8]`). Ideal for file formats, protocols, and configuration files.
+Das frühere zweite Backend **`winnow-grammar`** (allgemeines Parsen von Text und
+Binärdaten auf Basis von `winnow`) ist seit dem 31.08.2026 ein eigenständiges
+Projekt: <https://github.com/keywan-ghadami/winnow-grammar>. Es hat das Frontend
+(DSL-Parser, Modell, Validator) beim Auszug geforkt; beide Fassungen der
+Grammatik-Sprache entwickeln sich ab Commit `64be1ef` unabhängig weiter.
 
 ## Documentation
 

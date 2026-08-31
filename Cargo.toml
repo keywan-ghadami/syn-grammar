@@ -5,7 +5,6 @@ members = [
     "core/syn-grammar-model",
     "core/grammar-kit",
     "core/grammar-kit-macros",
-    "winnow-grammar",
-    "winnow-grammar/winnow-grammar-macros", "cxx-parser",
+    "cxx-parser",
 ]
 resolver = "2"
