@@ -173,6 +173,53 @@ The following primitives are "portable" and expected to be available in all back
 
 *Note: Backends may provide additional specialized built-ins.*
 
+### Spanned Primitives
+
+Every numeric and character primitive has a `spanned_` variant returning
+`syn_grammar::types::SpannedValue<T>`, which carries both the parsed `value` and
+its `span`:
+
+```rust
+# use syn_grammar::grammar;
+# use syn_grammar::types::SpannedValue;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ versioned -> SpannedValue<u32> = v:spanned_u32 -> { v }
+#         }
+#     }
+# }
+```
+
+Available: `spanned_char`, `spanned_bool`, `spanned_f32`, `spanned_f64`, and
+`spanned_` variants of every integer width (`spanned_i8` … `spanned_i128`,
+`spanned_isize`, `spanned_u8` … `spanned_u128`, `spanned_usize`).
+
+Use these when you need the location of a value for a later diagnostic of your
+own. For a span *without* wrapping the value, see the `@` operator below.
+
+### Span Binding (`@`)
+
+`name:rule @ span_var` binds the parsed value **and** its span at once. The rule
+must return a type implementing `syn::spanned::Spanned`:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ decl -> String = "let" name:any_ident @ pos -> {
+     let _ = pos;
+     name.to_string()
+ }
+#         }
+#     }
+# }
+```
+
+This is the usual way to produce your own `syn::Error` from an action block that
+points at the right token.
+
 ## List Parsing
 
 The grammar provides convenient built-in functions for parsing lists and repetitions.
@@ -275,6 +322,132 @@ rule T  = "bool"
 - **`eof`**: Succeeds only at the end of the input.
 - **`fail("message")`**: Explicitly fails with a custom error message.
 - **`recover(rule, sync)`**: If `rule` fails, skips input until `sync` token is found.
+
+`until` captures everything up to a terminator — useful for unstructured content:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ directive -> proc_macro2::TokenStream = "#" body:until(";") ";" -> { body }
+#         }
+#     }
+# }
+```
+
+`count` yields how often a pattern matched, without collecting the values:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ stars -> usize = n:count("*") -> { n }
+#         }
+#     }
+# }
+```
+
+`fail` reports its message verbatim, without an `expected` prefix. Use it for
+checks the grammar itself cannot express:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ visibility = "pub" | "priv" fail("`priv` was removed in Rust 2018")
+#         }
+#     }
+# }
+```
+
+`recover` keeps parsing after an error instead of aborting at the first one —
+the parser skips to the synchronisation token and continues:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ program -> Vec<Option<String>> = items:recover(statement, ";")* -> { items }
+ statement -> String = "let" name:ident -> { name.to_string() }
+#         }
+#     }
+# }
+```
+
+## Error Messages
+
+Error message quality is the point of this library, and two operators control it
+directly. See [`docs/ERROR_HANDLING.md`](../docs/ERROR_HANDLING.md) for how the
+engine picks a message, and
+[`docs/adr/adr13-error-message-contract.md`](../docs/adr/adr13-error-message-contract.md)
+for the binding contract.
+
+### Alternative Labels (`#`)
+
+By default a failing alternative is described by its first token. `# "..."`
+replaces that with a human-readable name. The label is placed **after the
+pattern and before the action block**.
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ value -> String = i:i32 # "a number" -> { i.to_string() }
+                | s:string # "a string" -> { s.value }
+#         }
+#     }
+# }
+```
+
+Without labels a failure reports ``expected one of: `a`, `b` ``; with them it
+reports `expected one of: a number, a string`. Labels also work inside groups:
+`("a" # "A" | "b" # "B")`.
+
+An alternative that fails **after consuming input** keeps its own detailed
+message — the label only stands in when the alternative failed right at its
+start. That is what keeps a deep, specific error from being replaced by a
+shallow summary.
+
+### List Item Labels (`item_label`)
+
+`separated` and `repeated` name their elements and count them:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ params -> Vec<String> =
+     items:separated(param, ",", item_label="function parameter") -> { items }
+ param -> String = i:ident -> { i.to_string() }
+#         }
+#     }
+# }
+```
+
+A failure in the second element then reads
+`expected function parameter … in function parameter 2` instead of the
+anonymous `expected item … in item 2`.
+
+### Rule Context
+
+Every failure carries the chain of rules it happened in, innermost first, with
+underscores turned into spaces:
+
+```text
+expected integer literal at column 4 (line 1)
+in term
+in expression
+```
+
+The position is only printed when the span actually has line/column data. Inside
+a real proc macro on stable Rust it does not (rustc underlines the span in the
+editor instead) — see [`GOALS.md`](../GOALS.md).
 
 ## Advanced Features
 

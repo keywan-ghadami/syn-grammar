@@ -43,6 +43,12 @@ pub trait SynParsable: syn::parse::Parse {}
 
 impl<T: syn::parse::Parse> SynParsable for T {}
 
+/// Bruecke vom `Cursor` zu einem `syn`-Typ.
+///
+/// Materialisiert den Reststrom, laesst `syn` daraus `T` lesen und setzt den
+/// Cursor um so viele Tokens weiter, wie verbraucht wurden. Der Bound ist
+/// [`SynParsable`] statt `Parse`, damit ein `syn::`-Typ ohne `Parse` eine
+/// verstaendliche Meldung erzeugt statt eines rohen Trait-Bound-Fehlers.
 pub fn invoke_syn_parser<'a, T: SynParsable>(mut cursor: Cursor<'a>) -> ParseResult<'a, T> {
     let stream = cursor.token_stream();
     
@@ -212,6 +218,12 @@ fn label_missing_item<'a>(
     e
 }
 
+/// Liste aus `item_parser`, getrennt durch `sep_parser`.
+///
+/// `min` ist die Mindestanzahl, `trailing` erlaubt einen baumelnden Trenner.
+/// `item_name` benennt die Elemente in Fehlermeldungen und landet als
+/// `"<item_name> <index>"` auf dem lebenden Regelstapel - daher
+/// `in function parameter 2`.
 pub fn parse_separated<'a, T, P, S>(
     mut cursor: Cursor<'a>,
     ctx: &mut ParseContext<'a>,

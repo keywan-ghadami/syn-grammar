@@ -25,6 +25,7 @@ where
     }
 }
 
+/// Ein Bezeichner, der ausschliesslich aus Buchstaben besteht.
 pub fn alpha(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     filtered(
         cursor,
@@ -33,6 +34,7 @@ pub fn alpha(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     )
 }
 
+/// Ein Bezeichner aus Buchstaben und Ziffern.
 pub fn alphanumeric(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     filtered(
         cursor,
@@ -41,6 +43,7 @@ pub fn alphanumeric(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     )
 }
 
+/// Ein Ganzzahlliteral aus reinen Dezimalziffern.
 pub fn digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     filtered(
         cursor,
@@ -49,6 +52,7 @@ pub fn digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     )
 }
 
+/// Ein Ganzzahlliteral, dessen Ziffern hexadezimal gueltig sind.
 pub fn hex_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     filtered(
         cursor,
@@ -57,6 +61,7 @@ pub fn hex_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     )
 }
 
+/// Ein Ganzzahlliteral, dessen Ziffern oktal gueltig sind.
 pub fn oct_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     filtered(
         cursor,

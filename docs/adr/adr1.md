@@ -6,7 +6,24 @@ A Unified Strategy for Portable and Backend-Specific Primitives
 
 ## 2. Status
 
-Supersedes ADR of 2024-10-26. Accepted.
+**Zurueckgezogen (2026-08-31).** Nie umgesetzt, und durch die Zielsetzung ueberholt.
+
+Der hier beschriebene Vertrag existiert im Code nicht: weder `PORTABLE_BUILTINS`
+noch `SYN_SPECIFIC_BUILTINS` sind irgendwo definiert, und `validator.rs` prueft
+ausschliesslich gegen `B::get_builtins()` des jeweiligen Backends - es gibt also
+keine Trennung und keine Portabilitaetspruefung.
+
+Messbar gebrochen ist er ohnehin: das winnow-Backend kennt `alpha1`, `digit1`
+und `multispace1`, aber weder `alpha` noch `digit` noch `whitespace`. Eine
+Grammatik, die sich strikt an die hier geforderte portable Liste haelt,
+kompiliert dort nicht - und `alpha1` ist genau das "Vendor Leaking", das dieses
+ADR unter Alternative B ablehnt.
+
+Laut [`GOALS.md`](../../GOALS.md) wird `winnow-grammar` ein eigenstaendiges
+Projekt; eine Harmonisierung der Backends ist ausdrueckliches Nicht-Ziel. Damit
+entfaellt der Zweck des Vertrags. Der Text bleibt als Entwurfsgeschichte stehen.
+
+*Vorher: Supersedes ADR of 2024-10-26. Accepted.*
 
 ## 3. Context
 

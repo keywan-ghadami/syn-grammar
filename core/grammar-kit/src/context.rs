@@ -2,20 +2,28 @@ use crate::ParseError;
 use proc_macro2::Span;
 use std::collections::HashSet;
 
+/// Geschachtelte Namensraeume fuer Grammatiken, die selbst Bezeichner verwalten
+/// (etwa um bereits deklarierte Namen wiederzuerkennen).
 #[derive(Clone, Default)]
 pub struct ScopeStack {
+    /// Die Ebenen, aeusserste zuerst.
     pub scopes: Vec<HashSet<String>>,
 }
 
 impl ScopeStack {
+    /// Ein Stapel mit einer leeren aeussersten Ebene.
     pub fn new() -> Self { Self { scopes: vec![HashSet::new()] } }
+    /// Oeffnet eine neue innere Ebene.
     pub fn enter_scope(&mut self) { self.scopes.push(HashSet::new()); }
+    /// Schliesst die innerste Ebene; die aeusserste bleibt immer bestehen.
     pub fn exit_scope(&mut self) { if self.scopes.len() > 1 { self.scopes.pop(); } }
-    
+
+    /// Traegt `name` in die innerste Ebene ein.
     pub fn define(&mut self, name: impl Into<String>) {
         if let Some(scope) = self.scopes.last_mut() { scope.insert(name.into()); }
     }
-    
+
+    /// Ist `name` in irgendeiner Ebene bekannt? Sucht von innen nach aussen.
     pub fn is_defined(&self, name: &str) -> bool {
         self.scopes.iter().rev().any(|scope| scope.contains(name))
     }
@@ -34,9 +42,14 @@ pub struct ParseContext<'a> {
     /// Dieses Feld ist der Kanal dafuer - es wird beim Zuruecksetzen NICHT
     /// verworfen, sondern hochgereicht.
     pub furthest: Option<ParseError<'a>>,
+    /// Namensraeume fuer Grammatiken, die selbst Bezeichner verwalten.
     pub scopes: ScopeStack,
+    /// Der Stapel der Whitespace-Modi: `true` = lexikalisch (`lex(..)`, kein
+    /// Zwischenraum erlaubt), `false` = `spaced(..)`.
     pub mode_stack: Vec<bool>,
-    pub last_span: Option<Span>, // Wichtig für den Lexical-Mode!
+    /// Der Span des zuletzt gelesenen Tokens - die Grundlage der
+    /// Adjazenzpruefung im lexikalischen Modus.
+    pub last_span: Option<Span>,
     /// Wie tief stehen wir in Delimiter-Gruppen (`paren(..)`, `{..}`, `[..]`)?
     ///
     /// `Cursor::eof()` bezieht sich auf den *Scope*, meldet am Ende einer Gruppe
@@ -54,6 +67,7 @@ pub struct ParseContext<'a> {
 }
 
 impl<'a> ParseContext<'a> {
+    /// Ein frischer Kontext fuer einen Parselauf.
     pub fn new() -> Self {
         Self {
             scopes: ScopeStack::new(),
@@ -65,10 +79,13 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    /// Legt `name` auf den lebenden Regelstapel. Umschliesst im generierten Code
+    /// den Regelrumpf und ist mit [`exit_rule`](Self::exit_rule) gepaart.
     pub fn enter_rule(&mut self, name: &str) {
         self.rule_stack.push(name.to_string());
     }
 
+    /// Nimmt den innersten Regelnamen wieder vom lebenden Stapel.
     pub fn exit_rule(&mut self) {
         self.rule_stack.pop();
     }
@@ -109,7 +126,9 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    /// Betritt eine Delimiter-Gruppe (`paren(..)`, `{..}`, `[..]`).
     pub fn enter_group(&mut self) { self.group_depth += 1; }
+    /// Verlaesst eine Delimiter-Gruppe.
     pub fn exit_group(&mut self) { self.group_depth = self.group_depth.saturating_sub(1); }
     /// Beschreibt das Ende des aktuellen Scopes so, wie es in einer Meldung stehen soll.
     pub fn end_of_scope_msg(&self) -> &'static str {
@@ -120,9 +139,13 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    /// Betritt einen `lex(..)`-Block: zwischen den Tokens ist kein Zwischenraum erlaubt.
     pub fn enter_lexical(&mut self) { self.mode_stack.push(true); }
+    /// Betritt einen `spaced(..)`-Block: Zwischenraum ist wieder erlaubt.
     pub fn enter_spaced(&mut self) { self.mode_stack.push(false); }
+    /// Verlaesst den innersten Whitespace-Modus.
     pub fn exit_mode(&mut self) { self.mode_stack.pop(); }
+    /// Gilt gerade der lexikalische Modus?
     pub fn is_lexical(&self) -> bool { *self.mode_stack.last().unwrap_or(&false) }
 
     /// Zeichnet den Span auf und wirft einen Fehler, wenn im Lexical-Mode 
@@ -140,6 +163,8 @@ impl<'a> ParseContext<'a> {
         Ok(())
     }
 
+    /// Steht vor `next_span` tatsaechlich ein Zwischenraum? Traegt das
+    /// `whitespace`-Builtin.
     pub fn check_whitespace(&self, next_span: Span) -> bool {
         if let Some(last) = self.last_span { 
             last.end() != next_span.start() 

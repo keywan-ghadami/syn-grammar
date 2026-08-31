@@ -2,6 +2,14 @@
 #![doc = "\n\n"]
 #![doc = include_str!("../SYNTAX.md")]
 
+// Nutzerseitige API: undokumentierte oeffentliche Elemente sind ein Fehler.
+#![warn(missing_docs)]
+
+/// Laufzeitumgebung fuer den generierten Code.
+///
+/// Der Codegenerator schreibt ausschliesslich `rt::…`-Pfade, damit eine
+/// Grammatik keine Annahmen ueber die Modulstruktur des Nutzer-Crates macht.
+/// Nicht als oeffentliche API gedacht.
 pub mod rt {
     pub use super::token_filter;
     pub use super::builtins; // FIX: Das hat gefehlt!
@@ -15,7 +23,11 @@ pub use grammar_kit::testing;
 /// re-exportiert, damit Nutzer dafür nicht `syn-grammar-model` einbinden müssen.
 pub use syn_grammar_model::model::types;
 
+/// Kurzform fuer Tests: eine generierte Parserfunktion direkt auf einen
+/// `&str` anwenden und das Ergebnis als [`testing::TestResult`] erhalten.
 pub trait SynTestExt<O> {
+    /// Parst `input` und verpackt Erfolg wie Fehler in ein `TestResult`,
+    /// samt Quelltext fuer die Fehlerausgabe.
     fn parse_test(self, input: &str) -> testing::TestResult<O, syn::Error>;
 }
 

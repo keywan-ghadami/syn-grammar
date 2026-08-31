@@ -2,6 +2,10 @@ use proc_macro2::Span;
 use std::fmt;
 use syn::buffer::Cursor;
 
+/// Das Ergebnis eines Parseschritts.
+///
+/// Bei Erfolg der Wert **und** der Cursor dahinter - dieser neue Cursor *ist*
+/// der Fortschritt. Zuruecksetzen heisst schlicht, ihn nicht zu benutzen.
 pub type ParseResult<'a, T> = Result<(T, Cursor<'a>), ParseError<'a>>;
 
 // Prioritätsleiter nach ADR 13, Punkt 8. Nur relevant, wenn zwei Fehler an
@@ -16,6 +20,10 @@ pub const PRIO_AGGREGATED: u8 = 20;
 /// `fail(..)` oder hinter einem Cut: schlägt alles andere.
 pub const PRIO_STRUCTURAL: u8 = 50;
 
+/// Ein Parsefehler.
+///
+/// Traegt getrennt, was er zur *Anzeige* (`span`) und was er zur *Auswahl*
+/// (`at`) braucht - siehe `docs/ERROR_HANDLING.md`.
 #[derive(Clone)]
 pub struct ParseError<'a> {
     /// Für die ANZEIGE: rustc unterstreicht diesen Span im Editor.
@@ -32,12 +40,17 @@ pub struct ParseError<'a> {
     /// `None` nur dort, wo beim Erzeugen kein Cursor zur Hand ist (etwa bei der
     /// Übernahme eines fremden `syn::Error`).
     pub at: Option<Cursor<'a>>,
+    /// Der Meldungstext. Waehrend des Parsens nie veraendert; formatiert wird
+    /// genau einmal am Ende.
     pub message: String,
+    /// Rang bei *gleicher* Stelle. Siehe die `PRIO_*`-Konstanten.
     pub priority: u8,
     /// Hinter einem Cut (`=>`): die Ableitung ist festgelegt, Zurücksetzen ist
     /// sinnlos. Bewusst getrennt von `priority` — `fail(..)` ist hochprior, aber
     /// nicht fatal und nimmt deshalb am Fortschrittsvergleich teil.
     pub is_fatal: bool,
+    /// Die Regeln, in denen der Fehler auftrat, innerste zuerst. Nur fuer die
+    /// Anzeige - die Auswahl benutzt ihn nicht.
     pub rule_stack: Vec<String>,
 }
 
@@ -73,6 +86,7 @@ impl<'a> ParseError<'a> {
         self
     }
 
+    /// Setzt die Prioritaet (siehe die `PRIO_*`-Konstanten).
     pub fn with_priority(mut self, prio: u8) -> Self {
         self.priority = prio;
         self
@@ -85,6 +99,8 @@ impl<'a> ParseError<'a> {
         self
     }
 
+    /// Haengt einen Regelnamen an den Stapel an - benutzt auf dem
+    /// Rueckgabepfad, wenn eine aeussere Regel einen Fehler herausreicht.
     pub fn push_rule(&mut self, rule: &str) {
         self.rule_stack.push(rule.to_string());
     }

@@ -8,17 +8,26 @@ use std::fmt::{Debug, Display};
 // Helper for custom error formatting
 type ErrorFormatter<E> = Box<dyn Fn(&E, Option<&str>) -> String>;
 
-// A wrapper around Result to write fluent tests.
-// Keeps ownership of the result to allow chaining assertions.
+/// Ein `Result` mit fluenten Zusicherungen.
+///
+/// Behaelt das Ergebnis in Besitz, damit mehrere Zusicherungen verkettet werden
+/// koennen. `S` ist ein optionaler Zustand, den ein Backend mitgeben kann; der
+/// syn-Pfad benutzt ihn nicht und laesst ihn auf `()`.
 pub struct TestResult<T, E, S = ()> {
+    /// Das gepruefte Ergebnis.
     pub inner: Result<T, E>,
+    /// Backend-spezifischer Zustand, falls einer mitgegeben wurde.
     pub state: Option<S>,
+    /// Freitext, der in jeder Fehlerausgabe mit erscheint.
     pub context: Option<String>,
+    /// Der Quelltext, aus dem geparst wurde - fuer die huebsche Ausgabe.
     pub source: Option<String>,
+    /// Wie ein Fehler in der Panic-Ausgabe gerendert wird.
     pub formatter: Option<ErrorFormatter<E>>,
 }
 
 impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
+    /// Hebt ein `Result` in ein `TestResult` ohne Kontext und ohne Zustand.
     pub fn new(result: Result<T, E>) -> Self {
         Self {
             inner: result,
@@ -56,6 +65,7 @@ impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
         self
     }
 
+    /// Der gesetzte Kontext als Zeile fuer die Fehlerausgabe, sonst leer.
     pub fn format_context(&self) -> String {
         self.context
             .as_ref()
@@ -63,6 +73,10 @@ impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
             .unwrap_or_default()
     }
 
+    /// Rendert `err` mit dem gesetzten Formatter, sonst ueber `Display`.
+    ///
+    /// Nur fuer die Ausgabe. Die `assert_failure_*`-Zusicherungen vergleichen
+    /// bewusst gegen `Display`, nicht gegen die gerenderte Fassung.
     pub fn format_err(&self, err: &E) -> String {
         if let Some(formatter) = &self.formatter {
             formatter(err, self.source.as_deref())
@@ -253,6 +267,7 @@ impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
     #[deprecated(
         note = "this method should not be used, if you see this warning this indicates corruption of the test by ai hallucinations"
     )]
+    /// Veraltet - benutze [`assert_failure`](Self::assert_failure).
     pub fn assert_is_err(self) -> E {
         self.assert_failure()
     }
@@ -260,6 +275,7 @@ impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
     #[deprecated(
         note = "this method should not be used, if you see this warning this indicates corruption of the test by ai hallucinations"
     )]
+    /// Veraltet - benutze [`assert_success`](Self::assert_success).
     pub fn get_success_value(self) -> T {
         self.assert_success()
     }
@@ -267,6 +283,8 @@ impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
     #[deprecated(
         note = "this method should not be used, if you see this warning this indicates corruption of the test by ai hallucinations"
     )]
+    /// Veraltet - benutze [`assert_failure_contains`](Self::assert_failure_contains).
+    /// `_code` wird ignoriert.
     pub fn assert_error_contains(self, _code: usize, expected_msg_part: &str) {
         self.assert_failure_contains(expected_msg_part);
     }
@@ -274,6 +292,10 @@ impl<T: Debug, E: Display + Debug, S> TestResult<T, E, S> {
 
 // Special assertions for float types
 impl<E: Display + Debug, S> TestResult<f64, E, S> {
+    /// Vergleicht gegen `expected` mit `f64::EPSILON` als Toleranz.
+    ///
+    /// Achtung: fuer Betraege deutlich ueber 1.0 ist das praktisch ein exakter
+    /// Vergleich - `EPSILON` ist ein absoluter, kein relativer Abstand.
     pub fn assert_success_approx(self, expected: f64) -> f64 {
         let ctx = self.format_context();
         let val = self.assert_success();
@@ -289,6 +311,9 @@ impl<E: Display + Debug, S> TestResult<f64, E, S> {
 }
 
 impl<E: Display + Debug, S> TestResult<f32, E, S> {
+    /// Vergleicht gegen `expected` mit `f32::EPSILON` als Toleranz.
+    ///
+    /// Dieselbe Einschraenkung wie bei der `f64`-Fassung.
     pub fn assert_success_approx(self, expected: f32) -> f32 {
         let ctx = self.format_context();
         let val = self.assert_success();
@@ -303,7 +328,9 @@ impl<E: Display + Debug, S> TestResult<f32, E, S> {
     }
 }
 
+/// Macht aus jedem `Result` ein [`TestResult`].
 pub trait Testable<T, E> {
+    /// Hebt `self` in ein `TestResult`, um Zusicherungen anzuhaengen.
     fn test(self) -> TestResult<T, E>;
 }
 
