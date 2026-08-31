@@ -256,3 +256,54 @@ impl Backend for SynBackend {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// Jeder Katalogeintrag muss einen Namen haben, der nur einmal vorkommt.
+    /// Ein Duplikat waere still: `iter().any(...)` in `codegen/pattern.rs`
+    /// nimmt den ersten Treffer, der zweite Eintrag bliebe wirkungslos.
+    #[test]
+    fn namen_sind_eindeutig() {
+        let mut gesehen = HashSet::new();
+        for b in SynBackend::get_builtins() {
+            assert!(
+                gesehen.insert(b.name),
+                "Doppelter Builtin-Name im Katalog: '{}'",
+                b.name
+            );
+        }
+    }
+
+    /// Der deklarierte Rueckgabetyp wird in `monomorphize.rs` per
+    /// `syn::parse_str::<Type>` gelesen und fuer die Generics-Inferenz benutzt.
+    /// Ein nicht parsebarer Eintrag faellt dort still unter den Tisch
+    /// (`if let Ok(ty) = ...`) und fuehrt erst spaeter zu einem Fehler im
+    /// generierten Code.
+    #[test]
+    fn rueckgabetypen_sind_parsebar() {
+        for b in SynBackend::get_builtins() {
+            assert!(
+                syn::parse_str::<syn::Type>(b.return_type).is_ok(),
+                "Rueckgabetyp von '{}' ist kein gueltiger Typ: {:?}",
+                b.name,
+                b.return_type
+            );
+        }
+    }
+
+    /// Der Katalog ist die Nutzerschnittstelle: jeder Eintrag ist ein
+    /// Versprechen. Diese Zahl festzuhalten erzwingt, dass ein neues Builtin
+    /// bewusst hinzugefuegt wird - zusammen mit Test und Doku-Eintrag
+    /// (`syn-grammar/tests/builtin_coverage_test.rs`, `SYNTAX.md`).
+    #[test]
+    fn katalogumfang_ist_bewusst_gewaehlt() {
+        assert_eq!(
+            SynBackend::get_builtins().len(),
+            60,
+            "Der Builtin-Katalog hat sich geaendert. Bitte Test und Doku mitziehen."
+        );
+    }
+}

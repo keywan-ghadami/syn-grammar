@@ -69,7 +69,8 @@ grammar! {
                 CxxItem::Macro(mac)
             }
 
-        cxx_arg_list -> Vec<CxxArg> = items:separated(cxx_arg, ",") -> { items }
+        cxx_arg_list -> Vec<CxxArg> =
+            items:separated(cxx_arg, ",", item_label="function argument") -> { items }
 
         cxx_arg -> CxxArg =
             name:any_ident ":" ty:syn::Type -> {
