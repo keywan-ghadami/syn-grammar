@@ -1,0 +1,5 @@
+error: Undefined rule: 'tyop_fehler'
+  --> tests/ui/undefined_rule_with_use.rs:13:16
+   |
+13 |         main = tyop_fehler
+   |                ^^^^^^^^^^^

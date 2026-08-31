@@ -47,3 +47,32 @@ fn test_generic_inference() {
         .test()
         .assert_success_is(expected);
 }
+
+/// Der Builtin-Katalog (`backend.rs`) deklariert fuer jedes Builtin einen
+/// Rueckgabetyp. `monomorphize::infer_type` liest genau diesen Eintrag, um den
+/// Generic-Parameter einer Regel zu bestimmen - ein falscher Eintrag erzeugt
+/// deshalb einen Compilerfehler im *generierten* Code, nicht an der Aufrufstelle.
+///
+/// `digit`, `hex_digit` und `oct_digit` waren als `syn::Ident` deklariert,
+/// liefern aber `syn::LitInt` (`token_filter.rs`). Dieser Test bindet die drei
+/// ueber eine generische Regel ein und schlaegt bei einem falschen Katalogeintrag
+/// fehl, bevor irgendein Nutzer darueber stolpert.
+#[test]
+fn generische_regel_mit_token_filtern() {
+    grammar! {
+        grammar digit_generics {
+            rule liste<T>(item) -> Vec<T> = items:item* -> { items }
+
+            pub rule dezimal -> Vec<syn::LitInt> = l:liste(item=digit) -> { l }
+            pub rule hexadezimal -> Vec<syn::LitInt> = l:liste(item=hex_digit) -> { l }
+            pub rule oktal -> Vec<syn::LitInt> = l:liste(item=oct_digit) -> { l }
+        }
+    }
+
+    let werte = digit_generics::parse_dezimal.parse_str("1 2 3").test().assert_success();
+    let gelesen: Vec<String> = werte.iter().map(|l| l.base10_digits().to_string()).collect();
+    assert_eq!(gelesen, vec!["1", "2", "3"]);
+
+    digit_generics::parse_hexadezimal.parse_str("10 11").test().assert_success();
+    digit_generics::parse_oktal.parse_str("7 5").test().assert_success();
+}

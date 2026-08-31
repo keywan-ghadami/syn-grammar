@@ -33,7 +33,14 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
         .chain(builtin_names.iter().cloned())
         .collect();
 
-    let should_validate_rule_calls = grammar.uses.is_empty();
+    // Nur ein Glob-Import (`use ...::*;`) kann unbekannte Regelnamen in die
+    // Grammatik tragen - insbesondere die Vererbung, die auf
+    // `use super::Base::*;` abgebildet wird (siehe `model.rs`). Ein benannter
+    // Import bringt genau einen bekannten Namen mit und darf die Pruefung nicht
+    // abschalten: sonst verliert jede Grammatik mit einem gewoehnlichen `use`
+    // die "Undefined rule"-Meldung, und ein Tippfehler im Regelnamen schlaegt
+    // erst als Folgefehler im generierten Code durch.
+    let should_validate_rule_calls = !grammar.uses.iter().any(|u| use_tree_has_glob(&u.tree));
 
     if should_validate_rule_calls {
         for rule in &grammar.rules {
@@ -523,5 +530,18 @@ mod tests {
             err.to_string(),
             "Bindings are not allowed inside 'until' patterns."
         );
+    }
+}
+
+/// Traegt dieser `use`-Baum irgendwo einen Glob (`::*`)?
+///
+/// Rekursiv, weil der Glob in einem Pfad (`a::b::*`) oder in einer Gruppe
+/// (`a::{b, c::*}`) stecken kann.
+fn use_tree_has_glob(tree: &syn::UseTree) -> bool {
+    match tree {
+        syn::UseTree::Glob(_) => true,
+        syn::UseTree::Path(p) => use_tree_has_glob(&p.tree),
+        syn::UseTree::Group(g) => g.items.iter().any(use_tree_has_glob),
+        syn::UseTree::Name(_) | syn::UseTree::Rename(_) => false,
     }
 }
