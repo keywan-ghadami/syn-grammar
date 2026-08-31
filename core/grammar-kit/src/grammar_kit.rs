@@ -10,8 +10,6 @@ pub mod combinators;
 #[cfg(feature = "testing")]
 pub mod testing;
 
-pub mod macros;
-
 pub use grammar_kit_macros::with_span;
 
 pub trait WithSpan<ParsedData> {

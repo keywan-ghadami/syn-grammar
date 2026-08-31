@@ -99,10 +99,12 @@ Belegt, nicht vermutet:
 3. **Fehlende Diagnostik-Bausteine.** `expected one of: …`, Label-Bubbling, Item-Index
    im Regel-Stack (`in item 3`) existierten vor dem Umbau und fehlen seither.
 
-4. **Toter Code.** `core/grammar-kit/src/transaction.rs` (147 Z.) ist nicht als Modul
-   deklariert. `macros.rs:21-71` `test_both_backends!` wird nirgends benutzt und ist auf
-   Features gegated, die in keiner `Cargo.toml` existieren. Die Features `rt` und `trace`
-   in `core/grammar-kit/Cargo.toml` schalten nichts.
+4. ~~**Toter Code.**~~ *Erledigt.* `transaction.rs` (147 Z., nie als Modul deklariert),
+   `macros.rs` (`test_both_backends!`, auf nicht existierende Features gegated) und die
+   leeren Features `rt`/`trace` sind entfernt. `test_both_backends!` war zusaetzlich
+   prinzipiell nicht reparierbar: sein Rumpf braucht `syn-grammar` und `winnow-grammar`,
+   die beide von `grammar-kit` abhaengen - ein Zyklus. Sein Doctest galt nur deshalb als
+   gruen, weil das Makro zu nichts expandierte.
 
 ## `cxx-parser`
 

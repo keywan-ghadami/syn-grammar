@@ -10,11 +10,9 @@ repository = "https://github.com/keywan-ghadami/syn-grammar"
 path = "src/grammar_kit.rs"
 
 [features]
-default = ["syn", "rt", "testing"]
+default = ["syn", "testing"]
 syn = ["dep:syn", "dep:proc-macro2"]
-rt = []
 testing = ["dep:termcolor"]
-trace = []
 
 [dependencies]
 syn = { version = "2.0", features = ["full", "extra-traits"], optional = true }
