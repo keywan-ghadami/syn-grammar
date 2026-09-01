@@ -2,46 +2,24 @@ use crate::{
     ParseContext, ParseError, ParseResult, PRIO_AGGREGATED, PRIO_LABELED, PRIO_STRUCTURAL,
 };
 use syn::buffer::Cursor;
-use syn::parse::Parser;
 
 /// Erlaubt das Peeken von spezifischen syn::Tokens auf einem Cursor
-pub fn peek_syn<'a, F>(cursor: Cursor<'a>, peek_fn: F) -> bool
-where
-    F: FnOnce(syn::parse::ParseStream) -> bool,
-{
-    // Nur ein kleines Fenster materialisieren statt des gesamten Reststroms.
+pub fn peek_syn<P: syn::parse::Peek>(cursor: Cursor<'_>, token: P) -> bool {
+    // Reine Zeigerarithmetik, keine Allokation - genau das, was syns eigenes
+    // `ParseStream::peek` tut (`parse.rs`: `T::Token::peek(self.cursor())`).
     //
-    // `peek_syn` steht unter anderem im Recover-Sync-Scan INNERHALB einer
-    // Schleife (`codegen/pattern.rs`); mit voller Materialisierung war das
-    // quadratisch pro Recover-Punkt.
+    // Vorher wurde hier ein Tokenfenster materialisiert und daraus ein
+    // kompletter `TokenBuffer` gebaut. Das war doppelt daneben: der Buffer-Bau
+    // kostet mehr als der Peek selbst, und ein einzelnes Token kann eine
+    // beliebig grosse Delimiter-Gruppe sein - `cursor.token_tree()` liefert
+    // `{ ...1000 Tokens... }` als EINEN Tree. Ein "kleines Fenster" war es also
+    // nur dem Namen nach.
     //
-    // Vertrag: `peek_fn` darf hoechstens PEEK_FENSTER Tokens weit schauen.
-    // Alle erzeugten Aufrufstellen benutzen `i.peek(..)`, also ein Token -
-    // bei zusammengesetzten Operatoren wie `::` bis zu drei Punkte. Vier ist
-    // damit grosszuegig. Ein Peek, der weiter schaut, saehe hier ein
-    // vorzeitiges Ende und lieferte `false`.
-    const PEEK_FENSTER: usize = 4;
-    let mut stream = proc_macro2::TokenStream::new();
-    let mut lauf = cursor;
-    for _ in 0..PEEK_FENSTER {
-        match lauf.token_tree() {
-            Some((tt, next)) => {
-                stream.extend(std::iter::once(tt));
-                lauf = next;
-            }
-            None => break,
-        }
-    }
-    // `Parser::parse2` verlangt, dass der Parser den GESAMTEN Stream verbraucht.
-    // Ein Peek verbraucht nichts, deshalb muss der Rest hier explizit geleert
-    // werden - sonst scheitert parse2 bei jedem nicht-leeren Input und die
-    // Funktion liefert immer `false`.
-    let parser = |input: syn::parse::ParseStream| {
-        let result = peek_fn(input);
-        input.parse::<proc_macro2::TokenStream>()?;
-        Ok(result)
-    };
-    Parser::parse2(parser, stream).unwrap_or(false)
+    // `Peek::Token` und `Token::peek` sind `#[doc(hidden)]`, aber oeffentlich
+    // erreichbar. Kein Semver-Versprechen - deshalb genau an dieser einen
+    // Stelle gekapselt.
+    let _ = token;
+    <P::Token as syn::token::Token>::peek(cursor)
 }
 
 /// Der universelle Brücken-Kombinator.

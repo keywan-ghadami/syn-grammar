@@ -835,7 +835,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         let mut temp_cursor = _start_cursor;
                         loop {
                             if temp_cursor.eof() { break; }
-                            if rt::peek_syn(temp_cursor, |i| i.peek(#sync_peek)) { break; }
+                            if rt::peek_syn(temp_cursor, #sync_peek) { break; }
                             if let Some((_, next)) = temp_cursor.token_tree() { temp_cursor = next; }
                         }
                         (#none_ret, temp_cursor)

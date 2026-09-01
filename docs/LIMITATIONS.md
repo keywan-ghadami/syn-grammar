@@ -48,3 +48,10 @@ tokenizable by Rust's lexer. Languages with different lexical rules (significant
 whitespace, unusual string or comment syntax) and binary formats are out of
 scope. `lex(...)`/`spaced(...)` and the `whitespace` assertion recover
 *adjacency* information within those limits, but they do not change the lexer.
+
+### Quadratisch bei vielen syn-AST-Typen in einer Liste
+Ein `syn::Type` (und Verwandte) wird über eine Brücke geparst, die den Reststrom
+bis zum Ende der umschließenden Delimiter-Gruppe materialisiert. Bei einem
+solchen Typ je Listenelement wächst die Zeit quadratisch in der Länge dieser
+Liste: gemessen 3,4 ms bei 100 Elementen, 1,4 s bei 2000. Alles andere ist
+linear. Ursache und Auswege in [`adr/adr15-linear-parsing.md`](adr/adr15-linear-parsing.md).

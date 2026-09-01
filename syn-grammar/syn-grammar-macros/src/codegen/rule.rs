@@ -200,7 +200,13 @@ fn generate_recursive_loop_body(
 
             match _arm_res {
                 Ok((new_lhs, next_cursor)) => {
-                    if _start_cursor.span().start() == next_cursor.span().start() {
+                    // Cursorvergleich, nicht Positionsvergleich: `Cursor` ist
+                    // `PartialEq` (Zeigergleichheit im gemeinsamen TokenBuffer),
+                    // und genau das ist die Frage - stand der Parser danach an
+                    // derselben Stelle? Ueber `span().start()` waeren bis Rust
+                    // 1.87 im Prozedurmakro ALLE Positionen (0,0) gewesen, womit
+                    // jede linksrekursive Regel sofort abgebrochen haette.
+                    if _start_cursor == next_cursor {
                         return Err(rt::ParseError::at_cursor(_start_cursor, "Left-recursive rule matched empty string").with_priority(50));
                     }
                     lhs = new_lhs;
@@ -218,7 +224,7 @@ fn generate_recursive_loop_body(
         };
 
         if let Some(token_code) = peek_token_obj {
-            Ok(quote! { if rt::peek_syn(cursor, |i| i.peek(#token_code)) { #arm_logic } })
+            Ok(quote! { if rt::peek_syn(cursor, #token_code) { #arm_logic } })
         } else {
             Ok(arm_logic)
         }
@@ -358,7 +364,7 @@ pub fn generate_variants_internal(
         if is_unique {
             let token_code = peek_token_obj.as_ref().unwrap();
             Ok(quote! {
-                if rt::peek_syn(_start_cursor, |i| i.peek(#token_code)) {
+                if rt::peek_syn(_start_cursor, #token_code) {
                     #logic
                     // Das Peek-Token gehoert eindeutig zu dieser Variante: scheitert
                     // sie, brauchen die uebrigen gar nicht mehr versucht zu werden.
@@ -376,7 +382,7 @@ pub fn generate_variants_internal(
             })
         } else if let Some(token_code) = peek_token_obj {
             Ok(quote! {
-                if rt::peek_syn(_start_cursor, |i| i.peek(#token_code)) { #logic }
+                if rt::peek_syn(_start_cursor, #token_code) { #logic }
                 #sonst_erwartet
             })
         } else {
