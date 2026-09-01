@@ -21,6 +21,19 @@ grammar! {
     }
 }
 
+grammar! {
+    // Gleiche Liste, aber mit `min=1` - das ist der HARTE Pfad in
+    // `parse_separated` (Pflichtelement, Fehler wird hochgereicht) statt des
+    // weichen (leere Liste erlaubt, Fehler nur gemerkt). Beide muessen die
+    // Meldung eines gescheiterten Elements gleich behandeln.
+    grammar cxx_min1 {
+        pub signature
+            = "fn" ident paren( separated(param, ",", min=1, item_label="function parameter") ) ";" # "function signature"
+        param = modifier? ident # "function parameter"
+        modifier = ("const" | "constexpr") # "type modifier"
+    }
+}
+
 #[test]
 fn test_cxx_shallow_wrong_token() {
     cxx_dx::parse_signature
@@ -79,4 +92,35 @@ fn test_cxx_garbage_after_item() {
         .parse_str("fn foo( int a garbage );")
         .test()
         .assert_failure_contains("expected `,` at column 14 (line 1)\nin separator\nin signature");
+}
+
+/// Ein Element, das gleich an seiner Anfangsstelle scheitert, darf seine
+/// **eigene** Beschriftung behalten - `finish_variants` nennt darin zusaetzlich,
+/// was tatsaechlich dastand. Die aermere Fassung `expected function parameter`
+/// wuerde das `; found unexpected token `123`` verlieren.
+///
+/// Gilt fuer den harten Pfad (`min=1`) genauso wie fuer den weichen; das war
+/// vorher nicht so.
+#[test]
+fn beschriftetes_element_behaelt_seine_meldung_auch_bei_min1() {
+    cxx_min1::parse_signature
+        .parse_str("fn foo( 123 );")
+        .test()
+        .assert_failure_contains(
+            "expected `function parameter`; found unexpected token `123` at column 8 (line 1)\nin param\nin function parameter 1\nin signature",
+        );
+}
+
+/// Am Ende der Gruppe gilt die Ausnahme: dort ersetzt die Elementerwartung auch
+/// eine beschriftete Innenmeldung. Eine Aufzaehlung dessen, was haette dastehen
+/// koennen, waere dort irrefuehrend - es kommt schlicht nichts mehr
+/// (ADR 13, Punkt 3).
+#[test]
+fn am_gruppenende_gewinnt_die_elementerwartung() {
+    cxx_min1::parse_signature
+        .parse_str("fn foo( );")
+        .test()
+        .assert_failure_contains(
+            "unexpected end of group, expected function parameter at column 8 (line 1)\nin function parameter 1\nin signature",
+        );
 }

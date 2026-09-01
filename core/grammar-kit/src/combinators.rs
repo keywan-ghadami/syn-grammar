@@ -112,17 +112,44 @@ fn label_missing_item<'a>(
     at: Cursor<'a>,
     item_name: &str,
     ctx: &ParseContext<'a>,
+    prio: u8,
 ) -> ParseError<'a> {
-    if e.at == Some(at) {
-        e.message = if at.eof() {
-            format!("{}, expected {}", ctx.end_of_scope_msg(), item_name)
-        } else {
-            format!("expected {}", item_name)
-        };
+    if ersetzt_meldung(&e, at) {
+        e.message = erwartung_item(at, item_name, ctx);
         e.span = at.span();
     }
-    e.priority = PRIO_STRUCTURAL;
+    e.priority = e.priority.max(prio);
     e
+}
+
+/// Tritt die Erwartung des Elements an die Stelle seiner internen Meldung?
+///
+/// Nur wenn das Element gar nicht erst vorankam - sonst ist seine eigene Meldung
+/// die aussagekraeftigere (ADR 13, Punkt 6).
+///
+/// Und selbst dann nicht, wenn der Fehler bereits eine eigene Beschriftung
+/// traegt: `finish_variants` erzeugt daraus `expected `x`; found unexpected
+/// token `y``, was zusaetzlich nennt, was tatsaechlich dastand. Diese Meldung
+/// ist reicher als `expected x` und bleibt.
+///
+/// Ausnahme davon ist das Ende der Eingabe bzw. der Gruppe: dort ist die
+/// Angabe, dass der Geltungsbereich endet, wichtiger als jede Aufzaehlung -
+/// sonst behauptet die Meldung, es haette etwas dastehen koennen, wo gar nichts
+/// mehr kommt (ADR 13, Punkt 3).
+fn ersetzt_meldung(e: &ParseError<'_>, at: Cursor<'_>) -> bool {
+    e.at == Some(at) && (e.priority < PRIO_LABELED || at.eof())
+}
+
+/// Die Erwartung, die an der Stelle eines fehlenden Listenelements gilt.
+///
+/// Am Ende der Eingabe bzw. der Gruppe wird das mitgesagt - "expected function
+/// argument" allein waere dort irrefuehrend (ADR 13, Punkt 3).
+fn erwartung_item(at: Cursor<'_>, item_name: &str, ctx: &ParseContext<'_>) -> String {
+    if at.eof() {
+        format!("{}, expected {}", ctx.end_of_scope_msg(), item_name)
+    } else {
+        format!("expected {}", item_name)
+    }
 }
 
 /// Liste aus `item_parser`, getrennt durch `sep_parser`.
@@ -165,19 +192,39 @@ where
         }
         Err(mut e) => {
             if min > 0 {
-                // Hat das Element nichts verbraucht, sagt sein interner Regelstapel
-                // nichts ueber den Fehler aus - dann zaehlt nur der Listenkontext.
-                if e.at == Some(start) {
+                // Wird die Meldung ersetzt, sagt auch der interne Regelstapel
+                // nichts mehr ueber den Fehler aus - dann zaehlt nur der
+                // Listenkontext. Bleibt sie stehen, bleibt er es auch.
+                if ersetzt_meldung(&e, start) {
                     e.rule_stack.clear();
                 }
                 // Der Fehler gehoert zum ersten Element der Liste (ADR 13, Punkt 11).
                 e.push_rule(&format!("{} 1", item_name));
-                return Err(label_missing_item(e, start, item_name, ctx));
+                return Err(label_missing_item(
+                    e,
+                    start,
+                    item_name,
+                    ctx,
+                    PRIO_STRUCTURAL,
+                ));
             }
             // Leere Liste ist erlaubt - der Grund, warum kein Element kam, wird
             // aber gemerkt. Sonst bleibt spaeter nur eine generische Meldung.
-            // Hier wird die Meldung NICHT ersetzt, also bleibt der interne
-            // Regelstapel des Elements aussagekraeftig und wird behalten.
+            //
+            // Kam das Element NICHT voran, sagt seine interne Meldung nichts
+            // ueber die Liste aus; dann ist "expected <item>" die Antwort, und
+            // sie braucht den Rang einer Beschriftung. Ohne den gewinnt an
+            // derselben Stelle ein spaeter gemerkter Token-Fehler den
+            // Gleichstand - bei `fn f( 123 )` etwa das optionale `","?`, womit
+            // aus "expected function argument" ein nichtssagendes
+            // "expected `,`" wurde. Siehe ADR 13, Punkt 6.
+            //
+            // Kam es voran, bleibt alles unangetastet: seine eigene Meldung ist
+            // dann die aussagekraeftigere, samt ihrem Regelstapel.
+            if ersetzt_meldung(&e, start) {
+                e.rule_stack.clear();
+            }
+            let mut e = label_missing_item(e, start, item_name, ctx, PRIO_LABELED);
             e.push_rule(&format!("{} 1", item_name));
             ctx.record_failure(&e);
             return Ok(items);
@@ -210,8 +257,9 @@ where
                         *ctx = item_ctx;
                     }
                     Err(mut e) => {
-                        // Siehe oben: ohne Fortschritt traegt der interne Stapel nichts bei.
-                        if e.at == Some(nach_sep) {
+                        // Siehe oben: wird die Meldung ersetzt, traegt der interne
+                        // Stapel nichts bei.
+                        if ersetzt_meldung(&e, nach_sep) {
                             e.rule_stack.clear();
                         }
                         // Index des VERSUCHTEN Elements, 1-basiert.
@@ -235,7 +283,8 @@ where
                             // ersetzt zu werden. Angereichert wird der ECHTE Fehler,
                             // damit sein Regelstapel und, wenn er tiefer lag, seine
                             // Stelle erhalten bleiben.
-                            let markiert = label_missing_item(e, nach_sep, item_name, ctx);
+                            let markiert =
+                                label_missing_item(e, nach_sep, item_name, ctx, PRIO_STRUCTURAL);
                             ctx.record_failure(&markiert);
                             ctx.absorb(&item_ctx);
                             break;

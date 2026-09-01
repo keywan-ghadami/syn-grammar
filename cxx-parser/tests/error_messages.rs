@@ -86,24 +86,24 @@ fn syn_typ_fehler_behaelt_grammatik_kontext() {
         .assert_failure_contains("in extern block");
 }
 
-/// OFFEN - dieser Test haelt eine bekannte Schwaeche fest, statt sie zu
-/// verschweigen.
+/// Ein Argument, das gleich an seiner Anfangsstelle scheitert, wird als
+/// fehlendes Listenelement gemeldet - nicht als fehlender Trenner.
 ///
-/// Bei `fn f( 123 )` scheitert das erste Listenelement an `123`. Weil
-/// `separated` mit `min=0` laeuft, ist die leere Liste gueltig, und der
-/// aussagekraeftige Fehler ("expected function argument") wird nur in
+/// `cxx_arg` scheitert an `123`, ohne ein Token zu verbrauchen. Die Liste ist
+/// optional (`cxx_arg_list?`, also `min=0`), der Grund wird deshalb nur in
 /// `ParseContext::furthest` gemerkt. Direkt danach scheitert das optionale
-/// `","?` an derselben Stelle und wird ebenfalls gemerkt. Beide stehen am
-/// gleichen Cursor, `ParseError::merge` gibt bei Gleichstand dem spaeteren den
-/// Vorzug - also gewinnt der nichtssagende Trenner-Fehler.
+/// `","?` an derselben Stelle und wird ebenfalls gemerkt.
 ///
-/// Zugesichert wird deshalb vorerst nur, dass die Meldung ueberhaupt an der
-/// richtigen Stelle steht und den Regelkontext traegt. Sobald ein
-/// Item-Fehler bei Gleichstand Vorrang vor einem blossen Token-Fehler bekommt,
-/// ist hier zusaetzlich "expected function argument" zu erwarten.
+/// Beide stehen am gleichen Cursor, und bei Gleichstand gibt `merge` dem
+/// spaeteren den Vorzug. Damit hier nicht der nichtssagende Trenner-Fehler
+/// gewinnt, bekommt die Elementerwartung den Rang einer Beschriftung
+/// (`PRIO_LABELED`); ein blosser Token-Fehler hat `PRIO_NORMAL`. Vorher stand
+/// hier ``expected `,` ``.
 #[test]
-fn ungueltiges_argument_wird_noch_zu_schwach_gemeldet() {
+fn ungueltiges_argument_wird_als_fehlendes_element_gemeldet() {
     parse(r#"mod ffi { extern "C++" { fn f( 123 ); } }"#)
+        .assert_failure_contains("expected function argument")
+        .assert_failure_contains("in function argument 1")
         .assert_failure_contains("in cxx item")
         .assert_failure_contains("in extern block");
 }

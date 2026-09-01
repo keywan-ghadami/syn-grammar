@@ -34,11 +34,6 @@ procedural macro on stable Rust (proc-macro2, `src/wrapper.rs`). Consequences:
   have positions. A message that looks fine in a test can therefore differ from
   what a macro user sees.
 
-### Item Error vs. Separator Error at the Same Position
-When a list item and the following separator both fail at the same token, the
-separator error currently wins, producing ``expected `,` `` where
-`expected <item>` would be more useful. Tracked in
-`cxx-parser/tests/error_messages.rs::ungueltiges_argument_wird_noch_zu_schwach_gemeldet`.
 
 ## Input Model
 

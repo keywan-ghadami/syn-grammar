@@ -162,10 +162,37 @@ beim Uebergang nach `syn::Error` im Wrapper (`codegen/rule.rs`). Dort entsteht:
 | `=>` (Cut) | legt die Alternative fest; spaetere Alternativen werden nicht mehr probiert |
 | `recover(rule, sync)` | ueberspringt bis zum Synchronisationstoken statt abzubrechen |
 
-## Bekannte Schwaeche
+## Ein gescheitertes Listenelement
 
-Stehen ein Item-Fehler und ein Trenner-Fehler an **derselben** Stelle, gewinnt
-der spaeter gemerkte — also der Trenner. Bei `fn f( 123 )` erscheint deshalb
-`expected \`,\`` statt `expected function argument`. Festgehalten in
-`cxx-parser/tests/error_messages.rs::ungueltiges_argument_wird_noch_zu_schwach_gemeldet`.
-Ein Item-Fehler sollte bei Gleichstand Vorrang bekommen.
+`parse_separated` behandelt einen gescheiterten Elementversuch nach einer Regel,
+die in `ersetzt_meldung` (`core/grammar-kit/src/combinators.rs`) steht:
+
+| Lage | Meldung | Rang |
+|---|---|---|
+| Element kam **voran** | seine eigene, samt Regelstapel | unveraendert |
+| Element kam **nicht voran**, Meldung schon beschriftet | seine eigene (`expected \`x\`; found unexpected token \`y\``) | mind. `PRIO_LABELED` |
+| Element kam **nicht voran**, Meldung unbeschriftet | `expected <item_label>` | mind. `PRIO_LABELED` |
+| Am Ende der Eingabe bzw. der Gruppe | `<Ende>, expected <item_label>` | mind. `PRIO_LABELED` |
+
+Die Regel gilt fuer den harten Pfad (`min > 0`, Fehler wird hochgereicht) und den
+weichen (leere Liste erlaubt, Fehler nur gemerkt) gleich; der harte hebt
+zusaetzlich auf `PRIO_STRUCTURAL`.
+
+**Warum der Rang noetig ist.** Bei `fn f( 123 )` scheitert das Element an seiner
+Anfangsstelle, die Liste ist optional, und direkt danach scheitert ein
+optionales `","?` an *derselben* Stelle. Ohne den Rang einer Beschriftung
+gewinnt der spaeter gemerkte Trenner-Fehler den Gleichstand, und aus
+`expected function argument` wird das nichtssagende ``expected `,` ``.
+`PRIO_LABELED` (10) schlaegt `PRIO_NORMAL` (0), also gewinnt das Element.
+
+**Warum eine vorhandene Beschriftung stehenbleibt.** `finish_variants` erzeugt
+`expected \`function parameter\`; found unexpected token \`123\`` — das nennt
+zusaetzlich, was tatsaechlich dastand, und ist damit reicher als
+`expected function parameter`. Am Ende der Gruppe gilt das Gegenteil: dort
+waere eine Aufzaehlung irrefuehrend, weil gar nichts mehr kommt, und die
+Angabe des Geltungsbereich-Endes ist die wichtigere (ADR 13, Punkt 3).
+
+Belegt in `cxx-parser/tests/error_messages.rs::ungueltiges_argument_wird_als_fehlendes_element_gemeldet`
+und `syn-grammar/tests/list_dx_test.rs`
+(`beschriftetes_element_behaelt_seine_meldung_auch_bei_min1`,
+`am_gruppenende_gewinnt_die_elementerwartung`).
