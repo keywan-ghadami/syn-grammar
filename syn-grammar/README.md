@@ -10,8 +10,11 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 
 ## Documentation
 
-- **[Grammar Syntax Reference](SYNTAX.md)**: Detailed guide to the shared grammar definition language (rules, operators, built-ins).
-- **[Extending Guide](../EXTENDING.md)**: Guide for library authors on how to build custom backends.
+- **[Grammar Syntax Reference](SYNTAX.md)**: Detailed guide to the grammar definition language (rules, operators, built-ins).
+
+If you need to parse plain text or binary data rather than Rust tokens, see the
+sibling project [`winnow-grammar`](https://github.com/keywan-ghadami/winnow-grammar),
+which shares this DSL but targets [`winnow`](https://docs.rs/winnow).
 
 ## Features
 
@@ -168,7 +171,7 @@ fn main() {
         .test()
         .assert_success_is(3);
 
-    // Der Fehler benennt die Erwartung und den Weg dorthin:
+    // The error names both the expectation and the path that led there:
     //
     //     expected integer literal at column 4 (line 1)
     //     in term
@@ -190,7 +193,7 @@ To contribute to `syn-grammar`, please ensure high quality by following these st
 2.  **Lint Code**: Run `cargo clippy --workspace --all-targets -- -D warnings` to catch common mistakes and enforce best practices.
 3.  **Run Tests**: Run `cargo test --workspace` to ensure all functionality works as expected.
 
-Die genauen Befehle stehen in `.github/workflows/ci.yaml`.
+The exact commands the CI runs are in `.github/workflows/ci.yaml`.
 
 ## License
 
