@@ -119,9 +119,9 @@ Deshalb fuehrt `ParseContext` die **weiteste Fehlschlagstelle**:
 
 - `record_failure(&err)` merged einen verworfenen Fehler in `furthest` — nach
   derselben Rangfolge wie `merge`.
-- Aufgerufen an jeder Stelle, die einen Fehler verwirft: `attempt_labeled`,
-  `parse_separated` (min=0-Pfad und Separator-Abbruch), `parse_repeated`, sowie
-  `Optional`/`Repeat`/`Plus` im Codegenerator.
+- Aufgerufen an jeder Stelle, die einen Fehler verwirft: `parse_separated`
+  (min=0-Pfad und Separator-Abbruch), `parse_repeated`, sowie
+  `Optional`/`Repeat`/`Plus` und die Alternativenzweige im Codegenerator.
 - `absorb(&other_ctx)` laesst den Mark aus einem verworfenen Kontext-Klon
   zurueckfliessen.
 - `best_error(err)` waehlt am Ende den besseren aus zurueckgegebenem Fehler und

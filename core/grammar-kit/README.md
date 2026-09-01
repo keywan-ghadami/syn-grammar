@@ -37,13 +37,19 @@ grammar-kit = "0.8.0"
 
 The library exposes several helper functions used by generated parsers:
 
-*   `attempt_labeled`: Runs a parser, and on failure records it in the context's
-    high-water mark instead of losing it. Optionally attaches a label.
-*   `invoke_syn_parser::<T>`: Bridges a `Cursor` to a `syn` type implementing
-    `Parse`. The bound is the marker `SynParsable`, which carries a
-    `#[diagnostic::on_unimplemented]` so that a `syn::` type *without* `Parse`
-    produces a grammar-level message instead of a raw trait-bound error.
-*   `peek_syn`: Non-consuming lookahead.
+*   `parse_syn::<T>`: Reads a `syn` type implementing `Parse` from the stream —
+    a plain `input.parse::<T>()`, so O(length of the type). The bound is the
+    marker `SynParsable`, which carries a `#[diagnostic::on_unimplemented]` so
+    that a `syn::` type *without* `Parse` produces a grammar-level message
+    instead of a raw trait-bound error. `parse_mit` is the variant for types
+    that need a custom parser (`Attribute::parse_outer`, `Pat::parse_multi_…`).
+*   `gabel` / `uebernehmen`: The backtracking pair (`fork` / `advance_to`). An
+    attempt runs on the fork; only success is played back into the stream.
+*   `gruppe`: Descends into a delimiter group, returning the group's span and a
+    stream over its contents.
+*   `schritt`: Runs a cursor primitive (`take_single`, the character filters) in
+    a `ParseBuffer::step` episode and advances the stream by exactly its result.
+*   `peek_syn`: Non-consuming lookahead, pure pointer arithmetic.
 *   `finish_variants`: Aggregates the expectations of failed alternatives into
     `expected one of: …`.
 *   `parse_separated` / `parse_repeated`: List combinators. They push
@@ -51,5 +57,5 @@ The library exposes several helper functions used by generated parsers:
     what produces `in function parameter 2` in error messages.
 
 > Entfaellt mit 0.9.0: `attempt`, `peek`, `not_check`, `attempt_recover`,
-> `parse_ident`, `parse_int`, `skip_until`. They took a `ParseStream` and belong
-> to the pre-cursor engine.
+> `parse_ident`, `parse_int`, `skip_until`, `attempt_labeled`,
+> `invoke_syn_parser`, `invoke_parser_fn`, `take_fixed`.

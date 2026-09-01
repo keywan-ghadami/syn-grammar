@@ -7,9 +7,12 @@ All notable changes to this project will be documented in this file.
 > Diese Version ist **noch nicht auf crates.io**. Die letzte veroeffentlichte
 > Fassung ist 0.8.0; alles hier Aufgefuehrte ist gegenueber 0.8.0 zu lesen.
 
-Die Engine wurde vom `ParseStream`-Modell auf funktionales Cursor-Parsing
-umgebaut und die Fehlerdiagnose neu aufgebaut. Der Abschnitt fasst rund 270
-Commits zusammen, die zwischenzeitlich nicht im Changelog gelandet waren.
+Die Fehlerdiagnose wurde neu aufgebaut. Die Engine ging dabei zwischenzeitlich
+vom `ParseStream`-Modell auf funktionales Cursor-Parsing und ist mit ADR 15,
+Stufe 3 wieder auf einen Strom umgestellt - diesmal mit der neuen Diagnostik und
+ohne die Materialisierungs-Bruecke. Netto gegenueber 0.8.0: derselbe Stromtyp,
+neue Fehlerauswahl, lineare Laufzeit. Der Abschnitt fasst rund 280 Commits
+zusammen, die zwischenzeitlich nicht im Changelog gelandet waren.
 
 Fuer Endnutzer, die nur `grammar! { … }` schreiben und die generierte
 `parse_X(ParseStream) -> syn::Result<T>` aufrufen, ist der Umstieg klein: die
@@ -44,21 +47,34 @@ was auf konkrete Fehlermeldungstexte prueft.
 - **Alle Kombinatoren aus `grammar-kit` sind ersatzlos entfernt**: `attempt`,
   `peek`, `not_check`, `attempt_recover`, `parse_ident`, `parse_int`,
   `skip_until`. Sie nahmen einen `ParseStream`.
-  - **Migration**: Die cursorbasierten Entsprechungen heissen `attempt_labeled`,
-    `peek_syn`, `invoke_syn_parser`, `finish_variants`, `parse_separated`,
-    `parse_repeated`.
+  - **Migration**: Die Entsprechungen heissen
+    `peek_syn`, `finish_variants`, `parse_separated`, `parse_repeated`, sowie
+    das neue Modul `stream` (`Strom`, `StreamResult`, `parse_syn`, `parse_mit`,
+    `gabel`, `uebernehmen`, `gruppe`, `schritt`, `token_nehmen`).
 
 - **Alle `builtins::parse_*_impl` haben eine neue Signatur**: statt
   `<T: CommonBuiltins>(&mut T, &mut ParseContext) -> syn::Result<X>` jetzt
-  `<'a>(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, X>`. Das Trait
-  `CommonBuiltins` samt seiner `impl for ParseStream` ist geloescht. Dasselbe
-  gilt fuer `token_filter::{alpha, alphanumeric, digit, hex_digit, oct_digit}`.
+  `<'a>(&rt::Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, X>`. Das Trait
+  `CommonBuiltins` samt seiner `impl for ParseStream` ist geloescht.
+  `token_filter::{alpha, alphanumeric, digit, hex_digit, oct_digit}` bleiben
+  Cursor-Primitiven (`Cursor<'a> -> ParseResult<'a, X>`) und werden ueber
+  `rt::schritt` auf dem Strom ausgefuehrt.
 
-- **Die generierte `parse_X_impl` nimmt einen `Cursor`** statt eines
-  `ParseStream` und liefert `rt::ParseResult<'a, T>`.
+- **Die generierte `parse_X_impl` nimmt einen `&rt::Strom<'a>`** (also einen
+  `&syn::parse::ParseBuffer<'a>`) und liefert `rt::StreamResult<'a, T>`, das
+  heisst `Result<T, ParseError<'a>>` ohne Cursor im Erfolgsfall.
   - **Impact**: Das ist der Einhaengepunkt fuer handgeschriebene Parser
-    (`extern`-Regeln). Der oeffentliche Wrapper `parse_X(ParseStream) ->
-    syn::Result<T>` ist unveraendert - **Endnutzer sind nicht betroffen**.
+    (`extern`-Regeln); deren Signatur aendert sich entsprechend. Der oeffentliche
+    Wrapper `parse_X(ParseStream) -> syn::Result<T>` ist unveraendert -
+    **Endnutzer sind nicht betroffen**.
+  - Bewusst `&ParseBuffer<'a>` und nicht syns Alias
+    `ParseStream<'a> = &'a ParseBuffer<'a>`: der Alias wuerde `'a` beim Forken auf
+    den Stapelrahmen verkuerzen, womit Fehler aus einer Gabel den Aufruf nicht
+    mehr verlassen koennten.
+  - **Zurueckgesetzt wird jetzt ueber `rt::gabel`/`rt::uebernehmen`**
+    (`fork`/`advance_to`) statt ueber einen Cursor-Copy. Nach einem Fehler ist der
+    Strom moeglicherweise vorgerueckt; wer zuruecksetzen will, muss auf einer Gabel
+    arbeiten. Der Codegenerator tut das an jeder Ruecksetzstelle.
 
 - **`syn_grammar::Identifier` und `syn_grammar::StringLiteral` als
   Wurzel-Re-Exports entfallen.**
@@ -123,6 +139,14 @@ was auf konkrete Fehlermeldungstexte prueft.
 
 ### Added
 
+- **Lineares Parsen (ADR 15).** Kein Parseschritt materialisiert mehr den
+  Reststrom. Ein `syn::Type` kostet `input.parse::<T>()` statt eines neuen
+  `TokenBuffer` ueber den gesamten Rest der umschliessenden Delimiter-Gruppe.
+  Gemessen an einer Argumentliste mit 2000 Eintraegen: 1,174 s -> 5,33 ms, und
+  aus quadratischem wurde lineares Verhalten (zwanzigfache Eingabe kostete
+  vorher 356x, jetzt 16x). Einzeltoken laufen ueber `take_single` in O(1),
+  `peek_syn` ohne jede Allokation.
+
 - **Cursor-basierte Diagnose-Engine.** Fortschritt wird ueber
   `syn::buffer::Cursor` verglichen (`PartialOrd`, O(1)) statt ueber Zeile/Spalte.
   Grund: der Cursor-Vergleich ist ein Zeigervergleich in O(1) und haengt an
@@ -172,9 +196,9 @@ was auf konkrete Fehlermeldungstexte prueft.
 - **Ein `syn::`-Typ ohne `Parse`** (z. B. `syn::Field`) erzeugte einen rohen
   Trait-Bound-Fehler auf generiertem Code. Jetzt kommt eine Meldung auf der
   Zeile des Nutzers, die das passende Builtin nennt.
-- **`peek_syn`, `invoke_syn_parser` und `invoke_custom_parser`** scheiterten,
-  sobald auf den Aufruf noch Tokens folgten - `Parser::parse2` verlangt, dass
-  der gesamte Stream verbraucht wird.
+- **`peek_syn` und die Bruecken-Kombinatoren** scheiterten, sobald auf den
+  Aufruf noch Tokens folgten - `Parser::parse2` verlangt, dass der gesamte
+  Stream verbraucht wird. Die Bruecke ist mit ADR 15, Stufe 3 ganz entfallen.
 - **Zero-Progress-Schutz** in den Wiederholungsschleifen: `*`, `+` und die
   Listen-Kombinatoren konnten bei einem Muster, das nichts verbraucht, endlos
   laufen.

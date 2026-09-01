@@ -1,5 +1,6 @@
 use crate::{
-    ParseContext, ParseError, ParseResult, PRIO_AGGREGATED, PRIO_LABELED, PRIO_STRUCTURAL,
+    gabel, uebernehmen, ParseContext, ParseError, ParseResult, StreamResult, Strom,
+    PRIO_AGGREGATED, PRIO_LABELED, PRIO_STRUCTURAL,
 };
 use syn::buffer::Cursor;
 
@@ -42,81 +43,6 @@ pub fn peek_syn<P: syn::parse::Peek>(cursor: Cursor<'_>, token: P) -> bool {
 pub trait SynParsable: syn::parse::Parse {}
 
 impl<T: syn::parse::Parse> SynParsable for T {}
-
-/// Bruecke vom `Cursor` zu einem `syn`-Typ.
-///
-/// Materialisiert den Reststrom, laesst `syn` daraus `T` lesen und setzt den
-/// Cursor um so viele Tokens weiter, wie verbraucht wurden. Der Bound ist
-/// [`SynParsable`] statt `Parse`, damit ein `syn::`-Typ ohne `Parse` eine
-/// verstaendliche Meldung erzeugt statt eines rohen Trait-Bound-Fehlers.
-pub fn invoke_syn_parser<'a, T: SynParsable>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
-    invoke_parser_fn(cursor, |input| input.parse::<T>())
-}
-
-/// Der gemeinsame Rumpf hinter [`invoke_syn_parser`] und den Builtins, die einen
-/// Sonderparser brauchen (`Attribute::parse_outer`, `Pat::parse_multi_...`,
-/// `Block::parse_within` - Typen ohne `impl Parse`).
-///
-/// Materialisiert den Reststrom bis zum Ende der umschliessenden Delimiter-Gruppe
-/// und laesst `syn` darauf laufen. Das bleibt O(Rest) und ist der strukturelle
-/// Preis des Cursor-first-Designs: `ParseBuffer::new` ist `pub(crate)`, es gibt
-/// keinen Weg vom `Cursor` zu einem `ParseStream`. Fuer Typen mit bekannter
-/// Tokenzahl gibt es [`take_fixed`], fuer Einzeltoken [`take_single`] - beide
-/// ohne diesen Aufwand.
-pub fn invoke_parser_fn<'a, T, F>(cursor: Cursor<'a>, parse_fn: F) -> ParseResult<'a, T>
-where
-    F: FnOnce(syn::parse::ParseStream) -> syn::Result<T>,
-{
-    // Strom und Tokenzahl in EINEM Durchlauf. Vorher waren es drei: einmal
-    // `token_stream()`, einmal `clone()` und einmal `into_iter().count()`.
-    let mut stream = proc_macro2::TokenStream::new();
-    let mut lauf = cursor;
-    let mut gesamt = 0usize;
-    while let Some((tt, next)) = lauf.token_tree() {
-        stream.extend(std::iter::once(tt));
-        lauf = next;
-        gesamt += 1;
-    }
-
-    let parser = |input: syn::parse::ParseStream| {
-        let val = parse_fn(input)?;
-        // Zaehlen statt materialisieren: `token_tree()` ist O(1) je Schritt und
-        // legt nichts an. Vorher stand hier ein zweites `token_stream()`.
-        let mut rest = 0usize;
-        let mut c = input.cursor();
-        while let Some((_, next)) = c.token_tree() {
-            c = next;
-            rest += 1;
-        }
-        // `Parser::parse2` verlangt, dass der GESAMTE Strom verbraucht wird.
-        // Ohne dieses Leeren scheitert jeder Aufruf, auf den noch Tokens folgen.
-        input.parse::<proc_macro2::TokenStream>()?;
-        Ok((val, rest))
-    };
-
-    match syn::parse::Parser::parse2(parser, stream) {
-        Ok((val, rest)) => {
-            let mut c = cursor;
-            for _ in 0..(gesamt - rest) {
-                if let Some((_, next)) = c.token_tree() {
-                    c = next;
-                }
-            }
-            Ok((val, c))
-        }
-        // Span von syn (praezise fuer die Anzeige), Fortschritt vom
-        // Eintrittscursor. Am Ende der Eingabe bzw. der Gruppe traegt syns Fehler
-        // nur `Span::call_site()`; dort ist der Cursor die bessere Quelle.
-        Err(e) => {
-            let span = if cursor.eof() {
-                cursor.span()
-            } else {
-                e.span()
-            };
-            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
-        }
-    }
-}
 
 /// Schliesst eine Alternativenkette ab und waehlt die Meldung, die nach aussen geht.
 ///
@@ -171,53 +97,6 @@ pub fn finish_variants<'a>(
     }
 }
 
-/// Optionaler Parse-Versuch. Er fängt sanfte Fehler ab und reicht strukturelle Fehler hoch.
-pub fn attempt_labeled<'a, T, F>(
-    cursor: Cursor<'a>,
-    ctx: &mut ParseContext<'a>,
-    label: Option<&str>,
-    parser: F,
-) -> ParseResult<'a, Option<T>>
-where
-    F: FnOnce(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
-{
-    let mut fork_ctx = ctx.clone();
-
-    match parser(cursor, &mut fork_ctx) {
-        Ok((val, next_cursor)) => {
-            *ctx = fork_ctx; // Zustand nach erfolgreichem Parse übernehmen
-            Ok((Some(val), next_cursor))
-        }
-        Err(mut e) => {
-            // Label applizieren, falls der Fehler exakt am Startpunkt passierte.
-            // Verglichen wird ueber den Cursor, nicht ueber span.start(): das ist
-            // ein Zeigervergleich in O(1) und haengt an keiner Compilerversion.
-            // (Bis Rust 1.87 war span.start() im Prozedurmakro ausserdem immer
-            // (0,0) und haette das Label auf JEDEN Fehler angewandt.)
-            // Siehe ADR 13, Punkt 8.
-            if let Some(lbl) = label {
-                if e.at == Some(cursor) {
-                    e.message = format!("expected {}", lbl);
-                    e.priority = std::cmp::max(e.priority, PRIO_LABELED);
-                }
-            }
-
-            // Merkstelle des verworfenen Klons uebernehmen, dann den eigenen
-            // Fehler merken - sonst geht er beim Zuruecksetzen verloren.
-            ctx.absorb(&fork_ctx);
-
-            // Fatale / Strukturelle Fehler werden ge-bubbled
-            if e.priority >= PRIO_STRUCTURAL {
-                Err(e)
-            } else {
-                ctx.record_failure(&e);
-                // Reguläres Backtracking: Wir geben den UNVERÄNDERTEN Cursor zurück
-                Ok((None, cursor))
-            }
-        }
-    }
-}
-
 /// Beschriftet einen gescheiterten Listen-Elementversuch.
 ///
 /// Scheiterte das Element gleich an seiner Anfangsstelle, sagt seine interne Meldung
@@ -252,41 +131,48 @@ fn label_missing_item<'a>(
 /// `item_name` benennt die Elemente in Fehlermeldungen und landet als
 /// `"<item_name> <index>"` auf dem lebenden Regelstapel - daher
 /// `in function parameter 2`.
+///
+/// Jeder Versuch laeuft auf einer [`gabel`]; erst der Erfolg wird per
+/// [`uebernehmen`] eingespielt. Beim Cursor-Design war Zuruecksetzen gratis
+/// (den neuen Cursor einfach nicht benutzen), auf dem Strom kostet es die Gabel
+/// - dafuer entfaellt der `TokenBuffer`-Bau je AST-Typ (ADR 15, Stufe 3).
 pub fn parse_separated<'a, T, P, S>(
-    mut cursor: Cursor<'a>,
+    input: &Strom<'a>,
     ctx: &mut ParseContext<'a>,
     mut item_parser: P,
     mut sep_parser: S,
     min: usize,
     trailing: bool,
     item_name: &str,
-) -> ParseResult<'a, Vec<T>>
+) -> StreamResult<'a, Vec<T>>
 where
-    P: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
-    S: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, ()>,
+    P: FnMut(&Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, T>,
+    S: FnMut(&Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, ()>,
 {
     let mut items = Vec::new();
 
     // Erstes Element. Der Elementname liegt waehrend des Versuchs auf dem lebenden
     // Stapel - nur so traegt ein TIEF im Element gemerkter Fehler den Listenindex.
+    let start = input.cursor();
+    let erste_gabel = gabel(input);
     ctx.enter_rule(&format!("{} 1", item_name));
-    let erstes = item_parser(cursor, ctx);
+    let erstes = item_parser(&erste_gabel, ctx);
     ctx.exit_rule();
     match erstes {
-        Ok((item, next_cursor)) => {
+        Ok(item) => {
+            uebernehmen(input, &erste_gabel);
             items.push(item);
-            cursor = next_cursor;
         }
         Err(mut e) => {
             if min > 0 {
                 // Hat das Element nichts verbraucht, sagt sein interner Regelstapel
                 // nichts ueber den Fehler aus - dann zaehlt nur der Listenkontext.
-                if e.at == Some(cursor) {
+                if e.at == Some(start) {
                     e.rule_stack.clear();
                 }
                 // Der Fehler gehoert zum ersten Element der Liste (ADR 13, Punkt 11).
                 e.push_rule(&format!("{} 1", item_name));
-                return Err(label_missing_item(e, cursor, item_name, ctx));
+                return Err(label_missing_item(e, start, item_name, ctx));
             }
             // Leere Liste ist erlaubt - der Grund, warum kein Element kam, wird
             // aber gemerkt. Sonst bleibt spaeter nur eine generische Meldung.
@@ -294,34 +180,38 @@ where
             // Regelstapel des Elements aussagekraeftig und wird behalten.
             e.push_rule(&format!("{} 1", item_name));
             ctx.record_failure(&e);
-            return Ok((items, cursor));
+            return Ok(items);
         }
     }
 
     loop {
         let mut sep_ctx = ctx.clone();
 
-        // Separator versuchen
+        // Separator versuchen - auf einer Gabel, damit der Strom bei Misserfolg
+        // VOR dem Trenner stehen bleibt.
+        let sep_gabel = gabel(input);
         sep_ctx.enter_rule("separator");
-        let sep_res = sep_parser(cursor, &mut sep_ctx);
+        let sep_res = sep_parser(&sep_gabel, &mut sep_ctx);
         sep_ctx.exit_rule();
         match sep_res {
-            Ok((_, after_sep_cursor)) => {
+            Ok(()) => {
+                let nach_sep = sep_gabel.cursor();
                 let mut item_ctx = sep_ctx.clone();
 
-                // Item NACH Separator versuchen
+                // Item NACH Separator versuchen, wieder auf einer eigenen Gabel.
+                let item_gabel = gabel(&sep_gabel);
                 item_ctx.enter_rule(&format!("{} {}", item_name, items.len() + 1));
-                let item_res = item_parser(after_sep_cursor, &mut item_ctx);
+                let item_res = item_parser(&item_gabel, &mut item_ctx);
                 item_ctx.exit_rule();
                 match item_res {
-                    Ok((item, after_item_cursor)) => {
+                    Ok(item) => {
+                        uebernehmen(input, &item_gabel);
                         items.push(item);
-                        cursor = after_item_cursor;
                         *ctx = item_ctx;
                     }
                     Err(mut e) => {
                         // Siehe oben: ohne Fortschritt traegt der interne Stapel nichts bei.
-                        if e.at == Some(after_sep_cursor) {
+                        if e.at == Some(nach_sep) {
                             e.rule_stack.clear();
                         }
                         // Index des VERSUCHTEN Elements, 1-basiert.
@@ -330,12 +220,12 @@ where
                             // Baumelnder Trenner ist erlaubt: er GEHOERT zur Liste und
                             // wird verbraucht. Ohne das blieb er im Strom stehen und
                             // die umgebende Regel scheiterte an ihm.
-                            cursor = after_sep_cursor;
+                            uebernehmen(input, &sep_gabel);
                             *ctx = sep_ctx;
                             ctx.record_failure(&e);
                             break;
                         } else {
-                            // Weich zuruecksetzen statt hart scheitern: der Cursor
+                            // Weich zuruecksetzen statt hart scheitern: der Strom
                             // bleibt VOR dem Trenner, damit eine nachfolgende Regel
                             // (etwa ein `","?`) ihn noch verarbeiten kann. Genau darauf
                             // bauen `paren(args:liste? ","?)`-Grammatiken.
@@ -345,7 +235,7 @@ where
                             // ersetzt zu werden. Angereichert wird der ECHTE Fehler,
                             // damit sein Regelstapel und, wenn er tiefer lag, seine
                             // Stelle erhalten bleiben.
-                            let markiert = label_missing_item(e, after_sep_cursor, item_name, ctx);
+                            let markiert = label_missing_item(e, nach_sep, item_name, ctx);
                             ctx.record_failure(&markiert);
                             ctx.absorb(&item_ctx);
                             break;
@@ -367,7 +257,7 @@ where
 
     if items.len() < min {
         return Err(ParseError::at_cursor(
-            cursor,
+            input.cursor(),
             format!(
                 "expected at least {} {}s, found {}",
                 min,
@@ -378,45 +268,45 @@ where
         .with_priority(PRIO_STRUCTURAL));
     }
 
-    Ok((items, cursor))
+    Ok(items)
 }
 
-/// Kombinator für Wiederholungen ohne Separator.
+/// Kombinator fuer Wiederholungen ohne Separator.
 ///
-/// Gegenstück zu `parse_separated`, im selben funktionalen Stil: der Cursor wird
-/// per Wert weitergereicht, Backtracking heißt schlicht, den Cursor von vor dem
-/// gescheiterten Versuch weiterzubenutzen. Ein struktureller Fehler (Priorität
+/// Gegenstueck zu [`parse_separated`]. Ein struktureller Fehler (Prioritaet
 /// >= 50) bricht die Schleife hart ab, statt sie nur zu beenden.
 pub fn parse_repeated<'a, T, P>(
-    mut cursor: Cursor<'a>,
+    input: &Strom<'a>,
     ctx: &mut ParseContext<'a>,
     mut item_parser: P,
     min: usize,
     item_name: &str,
-) -> ParseResult<'a, Vec<T>>
+) -> StreamResult<'a, Vec<T>>
 where
-    P: FnMut(Cursor<'a>, &mut ParseContext<'a>) -> ParseResult<'a, T>,
+    P: FnMut(&Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, T>,
 {
     let mut items = Vec::new();
 
     loop {
+        let vorher = input.cursor();
+        let item_gabel = gabel(input);
         let mut item_ctx = ctx.clone();
         item_ctx.enter_rule(&format!("{} {}", item_name, items.len() + 1));
-        let item_res = item_parser(cursor, &mut item_ctx);
+        let item_res = item_parser(&item_gabel, &mut item_ctx);
         item_ctx.exit_rule();
         match item_res {
-            Ok((item, next_cursor)) => {
+            Ok(item) => {
                 // Kein Fortschritt trotz Erfolg -> sonst Endlosschleife.
-                if next_cursor == cursor {
+                if item_gabel.cursor() == vorher {
                     break;
                 }
+                uebernehmen(input, &item_gabel);
                 items.push(item);
-                cursor = next_cursor;
                 *ctx = item_ctx;
             }
             Err(e) => {
                 // Strukturelle/fatale Fehler durchreichen, alles andere beendet
-                // die Wiederholung regulär.
+                // die Wiederholung regulaer.
                 if e.priority >= PRIO_STRUCTURAL {
                     return Err(e);
                 }
@@ -430,7 +320,7 @@ where
 
     if items.len() < min {
         return Err(ParseError::at_cursor(
-            cursor,
+            input.cursor(),
             format!(
                 "expected at least {} {}s, found {}",
                 min,
@@ -441,16 +331,16 @@ where
         .with_priority(PRIO_STRUCTURAL));
     }
 
-    Ok((items, cursor))
+    Ok(items)
 }
 
 /// Ein Typ, der aus genau einem Token besteht und deshalb in O(1) direkt vom
-/// `Cursor` gelesen werden kann - ohne den Umweg ueber [`invoke_syn_parser`].
+/// `Cursor` gelesen werden kann.
 ///
-/// Der Umweg kostet pro Aufruf eine Materialisierung des Reststroms plus einen
-/// kompletten neuen `TokenBuffer` in `Parser::parse2`. Bei einem Aufruf je Token
-/// wird daraus quadratischer Aufwand ueber die umschliessende Delimiter-Gruppe.
-/// Fuer Einzeltoken ist diese Arbeit vollstaendig ueberfluessig.
+/// Auch mit [`crate::parse_syn`] (ADR 15, Stufe 3) lohnt das: ein
+/// `input.parse::<T>()` laeuft ueber syns Erwartungs- und Fehlermaschinerie,
+/// waehrend hier ein Zeigervergleich genuegt. [`crate::schritt`] laesst diese
+/// Primitiven auf dem Strom laufen.
 ///
 /// Die Fehlermeldungen sind wortgleich mit denen von syn - mehrere Tests
 /// pruefen sie per Substring.
@@ -461,13 +351,13 @@ pub trait SingleToken: Sized {
     fn erwartet() -> &'static str;
 }
 
-/// O(1)-Ersatz fuer [`invoke_syn_parser`] bei [`SingleToken`]-Typen.
+/// Liest einen [`SingleToken`]-Typ in O(1) vom Cursor.
 pub fn take_single<'a, T: SingleToken>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
     match T::take(cursor) {
         Some((wert, next)) => Ok((wert, next)),
         // Am Ende der Eingabe stellt syn seiner Meldung ein
-        // "unexpected end of input, " voran. Der Bruecken-Pfad hat das
-        // durchgereicht; hier wird es nachgebildet, damit sich die Meldung
+        // "unexpected end of input, " voran. Hier wird das nachgebildet,
+        // damit sich die Meldung
         // nicht aendert (`list_dx_test::test_cxx_unexpected_eof`).
         None if cursor.eof() => Err(ParseError::at_cursor(
             cursor,
@@ -620,108 +510,3 @@ einzeltoken_literal!(syn::LitInt, Int, "expected integer literal");
 einzeltoken_literal!(syn::LitFloat, Float, "expected floating point literal");
 einzeltoken_literal!(syn::LitChar, Char, "expected character literal");
 einzeltoken_literal!(syn::LitByte, Byte, "expected byte literal");
-
-/// Liest genau `anzahl` Tokens vom Cursor und laesst `syn` daraus `T` parsen.
-///
-/// Fuer Typen, deren Tokenzahl zur Makro-Zeit feststeht - jedes Literal-Terminal
-/// einer Grammatik ist so ein Fall. Gegenueber [`invoke_syn_parser`] wird nicht
-/// der gesamte Reststrom materialisiert, sondern nur diese `anzahl` Tokens; der
-/// `TokenBuffer`, den `Parser::parse2` daraus baut, ist entsprechend winzig.
-///
-/// Der Umweg ueber `syn` bleibt bewusst erhalten: die Token-Typen sind versiegelt
-/// und ihre Felder unterschiedlich geformt, ein Nachbau waere fehleranfaellig.
-/// So bleiben Meldungstexte und die `Spacing::Joint`-Pruefung zusammengesetzter
-/// Operatoren exakt syns eigene - der `Punct` traegt sein `Spacing` mit.
-pub fn take_fixed<'a, T: SynParsable>(cursor: Cursor<'a>, anzahl: usize) -> ParseResult<'a, T> {
-    let mut stueck = proc_macro2::TokenStream::new();
-    let mut lauf = cursor;
-    let mut gelesen = 0usize;
-    while gelesen < anzahl {
-        match lauf.token_tree() {
-            Some((tt, next)) => {
-                stueck.extend(std::iter::once(tt));
-                lauf = next;
-                gelesen += 1;
-            }
-            None => break,
-        }
-    }
-
-    match syn::parse::Parser::parse2(T::parse, stueck) {
-        Ok(wert) => Ok((wert, lauf)),
-        Err(e) => {
-            let span = if cursor.eof() {
-                cursor.span()
-            } else {
-                e.span()
-            };
-            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
-        }
-    }
-}
-
-/// Liest einen `syn::Block`, ohne den Reststrom anzufassen.
-///
-/// Ein Block **ist** genau ein `{}`-Token-Tree. `Cursor::group` springt in O(1)
-/// per Zeigerarithmetik hinein und liefert zugleich den Cursor dahinter -
-/// materialisiert werden muss nur der Inhalt des Blocks, also genau das, was
-/// auch geparst wird.
-///
-/// Ueber [`invoke_parser_fn`] kostete derselbe Block den gesamten Rest der
-/// umschliessenden Gruppe. Bei mehreren Bloecken in einer Liste war das
-/// quadratisch; siehe `docs/adr/adr15-linear-parsing.md`, Stufe 1.
-///
-/// `syn::Block::parse` tut inhaltlich dasselbe (`braced!` plus
-/// `Block::parse_within`), nur eben ueber einen `ParseStream`. Die
-/// Fehlermeldung ist wortgleich mit syns eigener.
-pub fn take_braced_block<'a>(cursor: Cursor<'a>) -> ParseResult<'a, syn::Block> {
-    let (inner, span, danach) = match cursor.group(proc_macro2::Delimiter::Brace) {
-        Some(x) => x,
-        None => return Err(ParseError::at_cursor(cursor, "expected curly braces")),
-    };
-
-    match syn::parse::Parser::parse2(syn::Block::parse_within, inner.token_stream()) {
-        Ok(stmts) => Ok((
-            syn::Block {
-                brace_token: syn::token::Brace { span },
-                stmts,
-            },
-            danach,
-        )),
-        Err(e) => Err(ParseError::new(e.span(), e.to_string()).with_cursor(inner)),
-    }
-}
-
-/// Liest einen Typ, dessen Tokens mit der ersten Delimiter-Gruppe enden.
-///
-/// Gedacht fuer `syn::Macro`: ein Makroaufruf ist `pfad ! (…)`, `[…]` oder `{…}`,
-/// und der Pfad davor besteht nur aus Bezeichnern und `::` - er kann keine
-/// Gruppe enthalten. Materialisiert wird deshalb nur bis einschliesslich der
-/// ersten Gruppe statt bis zum Ende der umschliessenden Gruppe.
-///
-/// Faellt auf das Ende zurueck, wenn gar keine Gruppe kommt - dann ist der
-/// Aufwand derselbe wie zuvor, aber nie hoeher. Siehe ADR 15, Stufe 1.
-pub fn take_upto_group<'a, T: SynParsable>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
-    let mut stueck = proc_macro2::TokenStream::new();
-    let mut lauf = cursor;
-    while let Some((tt, next)) = lauf.token_tree() {
-        let war_gruppe = matches!(tt, proc_macro2::TokenTree::Group(_));
-        stueck.extend(std::iter::once(tt));
-        lauf = next;
-        if war_gruppe {
-            break;
-        }
-    }
-
-    match syn::parse::Parser::parse2(T::parse, stueck) {
-        Ok(wert) => Ok((wert, lauf)),
-        Err(e) => {
-            let span = if cursor.eof() {
-                cursor.span()
-            } else {
-                e.span()
-            };
-            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
-        }
-    }
-}

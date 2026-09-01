@@ -23,8 +23,12 @@ die Punkte, die die API dieser Crate betreffen.
   `end_of_scope_msg`. `record_span` gibt `syn::Result<()>` zurueck.
 - **Alle bisherigen Kombinatoren sind entfernt** (`attempt`, `peek`,
   `not_check`, `attempt_recover`, `parse_ident`, `parse_int`, `skip_until`) und
-  durch cursorbasierte ersetzt: `attempt_labeled`, `peek_syn`,
-  `invoke_syn_parser`, `finish_variants`, `parse_separated`, `parse_repeated`.
+  ersetzt durch `peek_syn`, `take_single`, `finish_variants`, `parse_separated`,
+  `parse_repeated` sowie das Modul `stream` (`Strom`, `StreamResult`,
+  `parse_syn`, `parse_mit`, `gabel`, `uebernehmen`, `gruppe`, `schritt`,
+  `token_nehmen`). Die Listen-Kombinatoren nehmen einen `&Strom<'a>` statt eines
+  `Cursor<'a>`; Zuruecksetzen laeuft ueber `gabel`/`uebernehmen` (ADR 15,
+  Stufe 3).
 - **`testing::TestResult<T, E>`** hat einen dritten Parameter `S = ()`; der
   `'static`-Bound auf `E` entfaellt; `assert_failure_contains` und
   `assert_failure_not_contains` liefern `Self`; `Testable` ist von

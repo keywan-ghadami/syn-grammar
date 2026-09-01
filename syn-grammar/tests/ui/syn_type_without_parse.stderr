@@ -18,11 +18,11 @@ error[E0277]: `syn::Field` kann in einer Grammatik nicht direkt verwendet werden
              Auto
            and $N others
    = note: required for `syn::Field` to implement `SynParsable`
-note: required by a bound in `invoke_syn_parser`
-  --> $WORKSPACE/core/grammar-kit/src/combinators.rs
+note: required by a bound in `parse_syn`
+  --> $WORKSPACE/core/grammar-kit/src/stream.rs
    |
-   | pub fn invoke_syn_parser<'a, T: SynParsable>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
-   |                                 ^^^^^^^^^^^ required by this bound in `invoke_syn_parser`
+   | pub fn parse_syn<'a, T: crate::SynParsable>(input: &Strom<'a>) -> StreamResult<'a, T> {
+   |                         ^^^^^^^^^^^^^^^^^^ required by this bound in `parse_syn`
 
 error[E0308]: mismatched types
   --> tests/ui/syn_type_without_parse.rs:11:1
@@ -34,12 +34,10 @@ error[E0308]: mismatched types
 15 | | }
    | | ^
    | | |
-   | |_expected `((), Cursor<'_>)`, found `(Field, Cursor<'_>)`
+   | |_expected `()`, found `Field`
    |   arguments to this enum variant are incorrect
    |
-   = note: expected tuple `((), syn::buffer::Cursor<'_>)`
-              found tuple `(syn::Field, syn::buffer::Cursor<'_>)`
-help: the type constructed contains `(syn::Field, syn::buffer::Cursor<'_>)` due to the type of the argument passed
+help: the type constructed contains `syn::Field` due to the type of the argument passed
   --> tests/ui/syn_type_without_parse.rs:11:1
    |
 11 | / grammar! {

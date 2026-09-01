@@ -49,15 +49,16 @@ whitespace, unusual string or comment syntax) and binary formats are out of
 scope. `lex(...)`/`spaced(...)` and the `whitespace` assertion recover
 *adjacency* information within those limits, but they do not change the lexer.
 
-### Quadratisch bei vielen syn-AST-Typen in einer Liste
-`syn::Type` und Verwandte (`Generics`, `ReturnType`, `Visibility`) werden über
-eine Brücke geparst, die den Reststrom bis zum Ende der umschließenden
-Delimiter-Gruppe materialisiert. Bei einem solchen Typ je Listenelement wächst
-die Zeit quadratisch in der Länge dieser Liste: gemessen 3,4 ms bei 100
-Elementen, 1,4 s bei 2000.
+### Rücksetzen kostet eine Allokation
+Der Rumpf einer Regel läuft auf einem `ParseBuffer`. Jeder Rücksetzpunkt
+(Alternative, `?`, `*`, `+`, `peek`, `not`, `recover`, jedes Listenelement)
+arbeitet auf einer Gabel (`fork`) und spielt sie bei Erfolg ein (`advance_to`,
+laut syn O(1)). Eine Gabel ist eine kleine `Rc`-Allokation; im Cursor-Design
+davor war Zurücksetzen allokationsfrei.
 
-**Nicht betroffen:** `syn::Block` und `syn::Macro` — sie enden an einer
-Delimiter-Gruppe und werden daran begrenzt (linear, gemessen 11 ms bzw. 3,6 ms
-bei 2000 Elementen). Ebenso alle Einzeltoken und Literale.
+Der Tausch lohnt sich deutlich: dafür wird der `TokenBuffer` genau einmal gebaut
+statt einmal je syn-AST-Typ. Eine Argumentliste mit 2000 `syn::Type`-Einträgen
+ging damit von 1,17 s auf 5,3 ms, und aus quadratischem wurde lineares Verhalten
+(vgl. `any_ident` ohne jeden AST-Typ: 3,1 ms).
 
-Ursache und Auswege in [`adr/adr15-linear-parsing.md`](adr/adr15-linear-parsing.md).
+Hintergrund in [`adr/adr15-linear-parsing.md`](adr/adr15-linear-parsing.md).

@@ -1,17 +1,21 @@
 # ADR 15: Der Weg zu linearem Parsen
 
-**Status:** Proposed. Stufen 0 und 1 sind umgesetzt, Stufen 2–4 sind zu entscheiden.
-**Datum:** 2026-08-31
+**Status:** Accepted. Stufen 0, 1 und 3 sind umgesetzt; Stufe 1 ist von Stufe 3
+wieder abgelöst worden. Stufe 2 entfällt, Stufe 4 bleibt offen.
+**Datum:** 2026-08-31, fortgeschrieben 2026-09-01
 
 ## Context
 
-Der erzeugte Parser arbeitet auf `syn::buffer::Cursor`. Für echte syn-AST-Typen
-(`syn::Type`, `Generics`, `ReturnType`, `Macro`, `Block`, `Visibility`) gibt es
-keinen Weg vom `Cursor` zu einem `ParseStream`, also materialisiert
-`invoke_parser_fn` (`core/grammar-kit/src/combinators.rs`) pro Aufruf den
-Reststrom und lässt `Parser::parse2` daraus einen **neuen `TokenBuffer`** bauen.
+> Der Abschnitt beschreibt den Stand **vor** der Entscheidung. Seit Stufe 3
+> arbeitet der Regelrumpf auf einem `ParseBuffer`; die Brücke gibt es nicht mehr.
 
-Bei einem AST-Typ je Listenelement ergibt das quadratisches Verhalten in der
+Der erzeugte Parser arbeitete auf `syn::buffer::Cursor`. Für echte syn-AST-Typen
+(`syn::Type`, `Generics`, `ReturnType`, `Macro`, `Block`, `Visibility`) gibt es
+keinen Weg vom `Cursor` zu einem `ParseStream`, also materialisierte
+`invoke_parser_fn` (`core/grammar-kit/src/combinators.rs`) pro Aufruf den
+Reststrom und ließ `Parser::parse2` daraus einen **neuen `TokenBuffer`** bauen.
+
+Bei einem AST-Typ je Listenelement ergab das quadratisches Verhalten in der
 Länge dieser Liste.
 
 ### Gemessen
@@ -93,7 +97,7 @@ Semver-Versprechen; deshalb an genau einer Stelle gekapselt.
 
 Wirkt vor allem im Recover-Sync-Scan, der in einer Schleife steht.
 
-### Stufe 1 — an der Delimiter-Gruppe begrenzen (**umgesetzt**)
+### Stufe 1 — an der Delimiter-Gruppe begrenzen (**umgesetzt, dann abgelöst**)
 
 Ein `syn::Block` **ist** genau ein `{}`-Token-Tree. `cursor.group(Delimiter::Brace)`
 liefert Inhalt und Folgecursor in O(1); materialisiert wird nur der Inhalt, also
@@ -120,11 +124,17 @@ Faktor 92 bzw. 319 bei n=2000, und in beiden Fällen **quadratisch → linear**
 Der Effekt ist größer als erwartet, weil nicht nur die Materialisierung entfällt,
 sondern auch der `TokenBuffer`-Bau über den Rest — und der dominiert.
 
-**Was Stufe 1 nicht löst:** `syn::Type`, `Generics`, `ReturnType`, `Visibility`.
+**Was Stufe 1 nicht löste:** `syn::Type`, `Generics`, `ReturnType`, `Visibility`.
 Die haben keine Gruppe als Grenze. Genau sie stehen im cxx-Benchmark in jedem
-Funktionsargument, und dort bleibt das quadratische Verhalten.
+Funktionsargument, und dort blieb das quadratische Verhalten.
 
-### Stufe 2 — Winkelklammer-Fenster für `syn::Type`
+**Nachtrag.** Stufe 3 hat `take_braced_block` und `take_upto_group` gegenstandslos
+gemacht und beide sind wieder entfernt: sie umgingen die Materialisierung, die es
+seither gar nicht mehr gibt. Verloren ist dadurch nichts — die Messung oben hat
+den Weg zu Stufe 3 gewiesen, weil sie zeigte, dass nicht die Materialisierung
+dominiert, sondern der `TokenBuffer`-Bau.
+
+### Stufe 2 — Winkelklammer-Fenster für `syn::Type` (**entfällt**)
 
 Der Codegen kennt die Folgemenge nicht, aber die Struktur von Typen ist
 scannbar. Delimiter-Gruppen sind je **ein** Token-Tree und damit automatisch
@@ -140,32 +150,73 @@ Typebene nicht vor.
 über Stufe 1 abgedeckt.
 
 Bringt O(n), lässt die Architektur intakt, kostet einen sorgfältig getesteten
-Scanner.
+Scanner. **Nicht umgesetzt und nicht mehr nötig** — Stufe 3 löst dasselbe Problem
+für alle Typen und ohne eigenen Scanner.
 
-### Stufe 3 — ParseStream-first (der eigentliche Fix)
+### Stufe 3 — ParseStream-first (**umgesetzt**)
 
-Der Rumpf arbeitet auf `ParseStream` statt `Cursor`; Cursor-Primitiven laufen in
-kurzen `step`-Episoden. Ein `syn::Type` kostet dann `input.parse::<T>()` —
-O(Länge des Typs) statt O(Rest).
+Der Rumpf arbeitet auf einem `ParseBuffer` statt auf dem `Cursor`; die
+Blatt-Primitiven laufen in kurzen `step`-Episoden. Ein `syn::Type` kostet
+`input.parse::<T>()`, also O(Länge des Typs) statt O(Rest). Der `TokenBuffer`
+wird genau einmal gebaut.
 
-**Die Fehlerauswahl bleibt unverändert.** Das war die größte Sorge und sie löst
-sich auf: `ParseBuffer::cursor()` ist öffentlich und liefert `Cursor<'a>`. Damit
-funktioniert `ParseError.at` samt `progress_cmp` über `PartialOrd` genau wie
-heute — auch für Cursor aus `fork()`, `parenthesized!` und
-`parse_any_delimiter`, denn alle zeigen in denselben `TokenBuffer`.
+**Die Signatur ist der Angelpunkt.** Eine Regel heißt
 
-Kosten: Backtracking läuft über `fork()` + `advance_to`. Ein `fork()` ist eine
-kleine Rc-Allokation plus ein paar Wortkopien; `advance_to` ist laut
-syn-Dokumentation O(1) unabhängig vom Abstand. Wo heute ein `Cursor`-Copy
-(0 Allokationen) reicht, kostet ein Alternativenversuch künftig eine Allokation.
+```rust
+fn parse_x_impl<'a>(input: &Strom<'a>, ctx: &mut ParseContext<'a>) -> StreamResult<'a, T>
+```
 
-Milderung: Alternativen, deren Zweig **rein cursorbasiert** ist (Einzeltoken,
-Literale), brauchen keinen Fork und können in einer `step`-Episode mit
-Cursor-Copies backtracken. Der Codegen unterscheidet diese Fälle bereits — er
-entscheidet heute zwischen `take_single`, `take_fixed` und `invoke_parser_fn`.
+mit `Strom<'a> = ParseBuffer<'a>` — bewusst **nicht** syns Alias
+`ParseStream<'a> = &'a ParseBuffer<'a>`. Der Alias setzt die Lebensdauer der
+Referenz mit der der Tokens gleich; ein `input.fork()` lebt aber nur bis zum Ende
+des Stapelrahmens, womit `'a` auf diesen Rahmen verkürzt würde und ein
+`ParseError<'a>` aus einer Gabel den Aufruf nicht mehr verlassen könnte. Mit
+`&Strom<'a>` bleibt die Referenz-Lebensdauer frei. Das war vorab am lauffähigen
+Spike geprüft, nicht erschlossen.
 
-Das ist die einzige Variante, bei der der `TokenBuffer` wirklich **genau einmal**
-gebaut wird.
+**Die Fehlerauswahl bleibt unverändert.** `ParseBuffer::cursor()` ist öffentlich
+und liefert `Cursor<'a>`; `fork()` klont nur die Cursor-Zelle, der `TokenBuffer`
+bleibt derselbe. Damit greift `same_buffer` und `PartialOrd` vergleicht Cursor
+aus Gabel und Elternstrom wie bisher. Am Quelltext geprüft und im Spike belegt.
+
+**Zwei syn-APIs mussten gekapselt werden**, beide `#[doc(hidden)]` und damit ohne
+Semver-Versprechen — wie schon `Token::peek` in `peek_syn`, deshalb an je einer
+Stelle:
+
+* `syn::__private::parse_{parens,braces,brackets}` für den Abstieg in eine
+  Delimiter-Gruppe. Die Makros `parenthesized!` & Co. gehen nicht: ihr Fehlerpfad
+  ist ein nacktes `return Err(syn::Error)`. `AnyDelimiter::parse_any_delimiter`
+  geht ebenfalls nicht — seine Rückgabe ist auf die Lebensdauer von `&self`
+  verkürzt, womit kein Fehler aus der Gruppe nach außen trüge.
+* `ParseBuffer::step` in `schritt`, um Cursor-Primitiven auf dem Strom laufen zu
+  lassen. Da `step` eine Closure für **jede** Lebensdauer verlangt, kann ein
+  `ParseError<'c>` sie nicht verlassen; `schritt` trägt ihn ohne seinen Cursor
+  hindurch und hängt ihn draußen an die Eintrittsstelle. Diese Primitiven melden
+  ihren Fehler ohnehin dort.
+
+**Kosten.** Wo ein Cursor-Copy genügte, kostet ein Rücksetzpunkt jetzt eine
+`fork()`-Allokation. Betroffen ist jede Alternative, jedes `?`/`*`/`+`, `peek`,
+`not`, `recover` und jedes Listenelement. Ein weiterer Unterschied: nach einem
+Fehler ist der Strom möglicherweise vorgerückt — Zurücksetzen ist nicht mehr
+gratis, sondern muss über eine Gabel laufen. Der Codegenerator tut das an jeder
+Rücksetzstelle.
+
+**Gemessen**, dasselbe Testprogramm vorher und nachher, zwei Grammatiken, die
+sich nur im Argumenttyp unterscheiden, `--release`:
+
+| n | `syn::Type` vorher | nachher | `any_ident` vorher | nachher |
+|---|---|---|---|---|
+| 100 | 3,30 ms | 326 µs | 230 µs | 184 µs |
+| 500 | 75,80 ms | 1,43 ms | 822 µs | 819 µs |
+| 2000 | **1,174 s** | **5,33 ms** | 4,01 ms | 3,11 ms |
+
+Faktor 220 bei n=2000. Entscheidender ist die Form: zwanzigfache Eingabe kostete
+vorher 356×, jetzt 16× — sauber linear. Und `syn::Type` liegt jetzt innerhalb von
+1,7× von `any_ident`, das gar keinen AST-Typ enthält; der Aufwand der Brücke ist
+damit nicht verkleinert, sondern verschwunden.
+
+Die Allokationskosten des Backtrackings sind in diesen Zahlen enthalten und
+gehen unter — `any_ident` wurde sogar schneller.
 
 ### Stufe 4 — Upstream
 
@@ -175,24 +226,21 @@ ADR gegenstandslos.
 
 ## Empfehlung
 
-Stufe 1 ist erledigt und hat mehr gebracht als gedacht. Als Nächstes **Stufe 3**,
-nicht Stufe 2: Stufe 2
-löst nur `syn::Type` und hinterlässt einen selbstgebauten Scanner, den niemand
-mehr anfassen will; Stufe 3 löst das Problem an der Wurzel und für alle Typen.
+Stufe 3 ist umgesetzt und beseitigt die letzte quadratische Quelle. Offen bleibt
+allein **Stufe 4**: sie kostet fast nichts und würde den `schritt`-Umweg für die
+Cursor-Primitiven überflüssig machen.
 
-Stufe 3 ist allerdings ein Umbau des Codegens und gehört als eigenes Vorhaben
-geplant — mit derselben Messung als Abnahme. Der Umbau ist die Umkehrung dessen,
-was im Mai 2026 geschah; die damalige Begründung (Backtracking wird trivial) ist
-weiterhin richtig und muss durch die selektive Fork-Strategie erhalten bleiben.
-
-Stufe 4 parallel versuchen — sie kostet fast nichts und macht im Erfolgsfall
-Stufe 3 überflüssig.
+Der Umbau ist die Umkehrung dessen, was im Mai 2026 geschah. Die damalige
+Begründung — Backtracking wird trivial — war richtig und ist durch die
+Gabel-Strategie erhalten: der Codegenerator setzt an denselben Stellen zurück wie
+zuvor, nur eben über `fork`/`advance_to` statt über einen Cursor-Copy.
 
 ## Consequences
 
 * Die Messung ist Teil der Abnahme jeder Stufe. Reproduzierbar über zwei
   Grammatiken, die sich nur im Argumenttyp unterscheiden.
-* Bis Stufe 3 bleibt die Zusage: linear in allem außer der Zahl der
-  AST-Typ-Vorkommen je Delimiter-Gruppe.
-* Wer eine Grammatik mit vielen `syn::Type` in einer langen Liste schreibt,
-  sollte das bis dahin wissen. Gehört nach `docs/LIMITATIONS.md`.
+* Die Zusage lautet jetzt: linear in der Eingabelänge. Kein Parseschritt
+  materialisiert mehr den Reststrom.
+* Der Preis steht in `docs/LIMITATIONS.md`: jeder Rücksetzpunkt kostet eine
+  `Rc`-Allokation.
+* `extern`-Regeln ändern ihre Signatur — siehe CHANGELOG.

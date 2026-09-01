@@ -95,18 +95,16 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
         quote! {
             let mut lhs = {
-                let base_parser = |cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext<'a>| -> rt::ParseResult<'a, #ret_type> {
+                let base_parser = |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| -> rt::StreamResult<'a, #ret_type> {
                     #base_logic
                 };
-                let (val, next_cursor) = base_parser(cursor, ctx)?;
-                cursor = next_cursor;
-                val
+                base_parser(input, ctx)?
             };
             loop {
                 #loop_logic
                 break;
             }
-            Ok((lhs, cursor))
+            Ok(lhs)
         }
     } else {
         generate_variants_internal(&rule.variants, true, ctx)?
@@ -116,41 +114,39 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         #(#attrs)*
         #default_doc
         #vis fn #fn_name(input: syn::parse::ParseStream #(#params)*) -> syn::Result<#ret_type> #where_clause {
-            // input.step uebergibt einen Cursor mit der exakten Lebensdauer, die
-            // zurueckgegeben werden muss. Der ParseContext wird INNERHALB der Closure
-            // erzeugt: nur hier ist die Cursor-Lifetime benennbar, und er traegt mit
-            // `furthest` einen Fehler, der einen Cursor enthaelt.
-            input.step(|cursor| {
-                let mut ctx = rt::ParseContext::new();
-                match #impl_name(*cursor, &mut ctx #(#param_names)*) {
-                    Ok((res, next_cursor)) => {
-                        // Die Regel ist aufgegangen, hat aber nicht alles verbraucht.
-                        // Wurde unterwegs ein Grund gemerkt, warum es nicht weiterging,
-                        // ist der die Antwort - sonst meldet syn nur "unexpected token".
-                        if !next_cursor.eof() {
-                            if let Some(f) = ctx.furthest.clone() {
-                                let mut f = f;
-                                f.push_rule(#context_name);
-                                return Err(syn::Error::new(f.span, f.to_string()));
-                            }
+            // `ParseStream<'z>` ist `&'z ParseBuffer<'z>` und passt damit direkt
+            // auf `&rt::Strom<'a>` mit `'a = 'z`. Der Strom wird von der Regel
+            // selbst vorgerueckt - der frueher noetige `input.step`-Umweg (nur
+            // dort war die Cursor-Lebensdauer benennbar) entfaellt.
+            let mut ctx = rt::ParseContext::new();
+            match #impl_name(input, &mut ctx #(#param_names)*) {
+                Ok(res) => {
+                    // Die Regel ist aufgegangen, hat aber nicht alles verbraucht.
+                    // Wurde unterwegs ein Grund gemerkt, warum es nicht weiterging,
+                    // ist der die Antwort - sonst meldet syn nur "unexpected token".
+                    if !input.is_empty() {
+                        if let Some(f) = ctx.furthest.clone() {
+                            let mut f = f;
+                            f.push_rule(#context_name);
+                            return Err(syn::Error::new(f.span, f.to_string()));
                         }
-                        Ok((res, next_cursor))
                     }
-                    Err(e) => {
-                        // Der zurueckgegebene Fehler ist nicht zwingend der
-                        // aussagekraeftigste - ein weiter gekommener kann unterwegs
-                        // von einem erfolgreichen Zuruecksetzen ueberdeckt worden sein.
-                        let mut e = ctx.best_error(e);
-                        e.push_rule(#context_name);
-                        Err(syn::Error::new(e.span, e.to_string()))
-                    }
+                    Ok(res)
                 }
-            })
+                Err(e) => {
+                    // Der zurueckgegebene Fehler ist nicht zwingend der
+                    // aussagekraeftigste - ein weiter gekommener kann unterwegs
+                    // von einem erfolgreichen Zuruecksetzen ueberdeckt worden sein.
+                    let mut e = ctx.best_error(e);
+                    e.push_rule(#context_name);
+                    Err(syn::Error::new(e.span, e.to_string()))
+                }
+            }
         }
 
         #[doc(hidden)]
         #(#impl_attrs)*
-        pub fn #impl_name<'a>(mut cursor: syn::buffer::Cursor<'a>, ctx: &mut rt::ParseContext<'a> #(#params)*) -> rt::ParseResult<'a, #ret_type> #where_clause {
+        pub fn #impl_name<'a>(input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a> #(#params)*) -> rt::StreamResult<'a, #ret_type> #where_clause {
             // Der Regelname liegt waehrend des Rumpfs auf dem lebenden Stapel, damit
             // ein hier gemerkter (statt herausgereichter) Fehler ihn mitbekommt.
             // enter/exit umschliessen die Rumpf-Closure - alle frueh zurueckkehrenden
@@ -158,7 +154,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
             // Paar bleibt also automatisch balanciert.
             ctx.enter_rule(#context_name);
             #lexical_block_start
-            let _res = (|| -> rt::ParseResult<'a, #ret_type> {
+            let _res = (|| -> rt::StreamResult<'a, #ret_type> {
                 #body
             })();
             #lexical_block_end
@@ -191,15 +187,20 @@ fn generate_recursive_loop_body(
         let peek_token_obj = tail_pattern.first().and_then(|f| analysis::get_simple_peek(f, ctx.custom_keywords).ok().flatten());
 
         let arm_logic = quote! {
-            let _start_cursor = cursor;
-            let _arm_res = (|| -> rt::ParseResult<'a, _> {
-                let mut cursor = _start_cursor;
+            let _start_cursor = input.cursor();
+            // Auf einer Gabel versuchen: schlaegt der Arm fehl, bleibt der Strom
+            // stehen, wo er war. Beim Cursor-Design war das gratis (den neuen
+            // Cursor einfach nicht benutzen), hier kostet es die Gabel.
+            let _gabel = rt::gabel(input);
+            let _arm_res = (|| -> rt::StreamResult<'a, _> {
+                let input = &_gabel;
                 #bind_stmt
                 #logic
             })();
 
             match _arm_res {
-                Ok((new_lhs, next_cursor)) => {
+                Ok(new_lhs) => {
+                    let next_cursor = _gabel.cursor();
                     // Cursorvergleich, nicht Positionsvergleich: `Cursor` ist
                     // `PartialEq` (Zeigergleichheit im gemeinsamen TokenBuffer),
                     // und genau das ist die Frage - stand der Parser danach an
@@ -209,8 +210,8 @@ fn generate_recursive_loop_body(
                     if _start_cursor == next_cursor {
                         return Err(rt::ParseError::at_cursor(_start_cursor, "Left-recursive rule matched empty string").with_priority(50));
                     }
+                    rt::uebernehmen(input, &_gabel);
                     lhs = new_lhs;
-                    cursor = next_cursor;
                     continue;
                 }
                 Err(e) => {
@@ -224,7 +225,7 @@ fn generate_recursive_loop_body(
         };
 
         if let Some(token_code) = peek_token_obj {
-            Ok(quote! { if rt::peek_syn(cursor, #token_code) { #arm_logic } })
+            Ok(quote! { if rt::peek_syn(input.cursor(), #token_code) { #arm_logic } })
         } else {
             Ok(arm_logic)
         }
@@ -238,7 +239,9 @@ pub fn generate_variants_internal(
     ctx: &CodegenContext,
 ) -> Result<TokenStream> {
     if variants.is_empty() {
-        return Ok(quote! { Err(rt::ParseError::at_cursor(cursor, "No variants defined")) });
+        return Ok(
+            quote! { Err(rt::ParseError::at_cursor(input.cursor(), "No variants defined")) },
+        );
     }
 
     let mut token_counts = HashMap::new();
@@ -271,20 +274,28 @@ pub fn generate_variants_internal(
             let pre_bindings = analysis::collect_bindings(cut.pre_cut);
 
             let cut_block = quote! {
-                let pre_res = (|| -> rt::ParseResult<'a, _> {
-                    let mut cursor = _start_cursor;
+                let _gabel = rt::gabel(input);
+                let pre_res = (|| -> rt::StreamResult<'a, _> {
+                    let input = &_gabel;
                     #pre_logic
-                    Ok(((#(#pre_bindings),*), cursor))
+                    Ok((#(#pre_bindings),*))
                 })();
 
                 match pre_res {
-                    Ok(((#(#pre_bindings),*), mut cursor)) => {
-                        let post_res = (|| -> rt::ParseResult<'a, _> {
+                    Ok((#(#pre_bindings),*)) => {
+                        // Der Teil vor dem Cut ist aufgegangen. Ab hier laeuft
+                        // alles auf derselben Gabel weiter; ein Fehler danach ist
+                        // fatal, also wird ohnehin nicht zurueckgesetzt.
+                        let post_res = (|| -> rt::StreamResult<'a, _> {
+                            let input = &_gabel;
                             #post_logic
-                            Ok(( (|| -> syn::Result<_> { Ok({ #action }) })().map_err(rt::ParseError::from)?, cursor ))
+                            Ok((|| -> syn::Result<_> { Ok({ #action }) })().map_err(rt::ParseError::from)?)
                         })();
                         match post_res {
-                            Ok(res) => return Ok(res),
+                            Ok(res) => {
+                                rt::uebernehmen(input, &_gabel);
+                                return Ok(res);
+                            }
                             // CUT: die Ableitung ist festgelegt, Zuruecksetzen sinnlos.
                             Err(e) => return Err(e.as_fatal()),
                         }
@@ -319,12 +330,16 @@ pub fn generate_variants_internal(
         } else {
             let inner_logic = pattern::generate_sequence(&variant.pattern, &variant.action, ctx)?;
             quote! {
-                let _arm_res = (|| -> rt::ParseResult<'a, _> {
-                    let mut cursor = _start_cursor;
+                let _gabel = rt::gabel(input);
+                let _arm_res = (|| -> rt::StreamResult<'a, _> {
+                    let input = &_gabel;
                     #inner_logic
                 })();
                 match _arm_res {
-                    Ok(res) => return Ok(res),
+                    Ok(res) => {
+                        rt::uebernehmen(input, &_gabel);
+                        return Ok(res);
+                    }
                     Err(e) => {
                         // Nur ein Cut schliesst kurz. Ein `fail(..)` ist hochprior,
                         // aber nicht fatal - es muss in den Vergleich, sonst gewinnt
@@ -399,7 +414,7 @@ pub fn generate_variants_internal(
     Ok(quote! {
         let mut _best_err: Option<rt::ParseError> = None;
         let mut _expected: Vec<String> = Vec::new();
-        let _start_cursor = cursor;
+        let _start_cursor = input.cursor();
 
         #(#arms)*
 
