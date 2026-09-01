@@ -1,7 +1,11 @@
 # Upstream-Anfrage an `syn`: `StepCursor::advance_to`
 
-**Status:** Entwurf. Noch **nicht** eingereicht — das geht an ein fremdes Projekt
-und braucht die Freigabe des Eigentuemers dieses Repos.
+**Status:** Entwurf, bewusst **zurueckgestellt** (Entscheidung vom 2026-09-01).
+Der Nutzen ist nachweislich null an beobachtbarem Verhalten (siehe „Nachweis"),
+und syn ist bei API-Erweiterungen zurueckhaltend — ein PR ohne Druck bindet vor
+allem fremde Aufmerksamkeit. Der Entwurf bleibt einreichbar, falls sich das
+aendert: etwa wenn eine Primitive gebraucht wird, die nicht an ihrer
+Eintrittsstelle scheitert.
 **Bezug:** ADR 15, Stufe 4.
 
 ## Worum es geht

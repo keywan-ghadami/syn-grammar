@@ -1,8 +1,8 @@
 # ADR 15: Der Weg zu linearem Parsen
 
 **Status:** Accepted. Stufen 0, 1 und 3 sind umgesetzt; Stufe 1 ist von Stufe 3
-wieder abgelöst worden. Stufe 2 entfällt. Stufe 4 ist vorbereitet, aber nicht
-eingereicht — sie liegt bei einem fremden Projekt.
+wieder abgelöst worden. Stufe 2 entfällt. Stufe 4 ist vorbereitet und
+zurückgestellt. Der ADR ist damit abgeschlossen.
 **Datum:** 2026-08-31, fortgeschrieben 2026-09-01
 
 ## Context
@@ -219,7 +219,7 @@ damit nicht verkleinert, sondern verschwunden.
 Die Allokationskosten des Backtrackings sind in diesen Zahlen enthalten und
 gehen unter — `any_ident` wurde sogar schneller.
 
-### Stufe 4 — Upstream (**vorbereitet, nicht eingereicht**)
+### Stufe 4 — Upstream (**vorbereitet, zurückgestellt**)
 
 `syn::parse::advance_step_cursor` ist `pub(crate)`. Der Quelltext von
 `ParseBuffer::step` sagt selbst, eine oeffentliche Fassung als Methode auf
@@ -243,8 +243,9 @@ Bedingung, dass eine Primitive nur an ihrer Eintrittsstelle scheitern darf.
 
 Der Entwurf der Anfrage liegt in
 [`docs/upstream/syn-stepcursor-advance-to.md`](../upstream/syn-stepcursor-advance-to.md).
-Eingereicht ist er nicht — das geht an ein fremdes Projekt und braucht eine
-Entscheidung des Eigentuemers.
+**Zurueckgestellt** (Entscheidung vom 2026-09-01): kein beobachtbarer Nutzen,
+und ein PR ohne Druck bindet vor allem fremde Aufmerksamkeit. Einreichbar, falls
+eine Primitive gebraucht wird, die nicht an ihrer Eintrittsstelle scheitert.
 
 ## Empfehlung
 
@@ -253,8 +254,7 @@ das Ziel des ADR erreicht: der Parser ist linear in der Eingabelänge.
 
 **Stufe 4 ist kein Leistungsthema mehr**, sondern Aufräumen an einer
 Schnittstelle — sechs Zeilen bei syn, kein beobachtbarer Unterschied hier. Der
-Entwurf liegt bereit; ob er eingereicht wird, ist eine Entscheidung, keine
-technische Frage.
+Entwurf liegt bereit und ist zurückgestellt. Damit ist dieser ADR abgeschlossen.
 
 Der Umbau ist die Umkehrung dessen, was im Mai 2026 geschah. Die damalige
 Begründung — Backtracking wird trivial — war richtig und ist durch die
