@@ -116,8 +116,25 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 } else {
                     quote!()
                 };
+                // `syn::Block` ist genau ein `{}`-Token-Tree und braucht die
+                // Bruecke nicht - `rt::take_braced_block` springt per
+                // Zeigerarithmetik hinein und materialisiert nur den Inhalt.
+                // Siehe ADR 15, Stufe 1.
+                // Nur der exakte Pfad `syn::X`, nicht irgendein Pfad, der auf
+                // `Block` endet.
+                let letztes = if rule_path.segments.len() == 2 {
+                    rule_path.segments.last().map(|seg| seg.ident.to_string())
+                } else {
+                    None
+                };
+                let leser = match letztes.as_deref() {
+                    Some("Block") => quote!(rt::take_braced_block(cursor)?),
+                    // Ein Makroaufruf endet mit seiner Delimiter-Gruppe.
+                    Some("Macro") => quote!(rt::take_upto_group::<#rule_path>(cursor)?),
+                    _ => quote!(rt::invoke_syn_parser::<#rule_path>(cursor)?),
+                };
                 Ok(quote! {
-                    let (_val, next_cursor) = rt::invoke_syn_parser::<#rule_path>(cursor)?;
+                    let (_val, next_cursor) = #leser;
                     #bind_stmt
                     let mut cursor = next_cursor;
                 })

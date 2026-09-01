@@ -659,3 +659,69 @@ pub fn take_fixed<'a, T: SynParsable>(cursor: Cursor<'a>, anzahl: usize) -> Pars
         }
     }
 }
+
+/// Liest einen `syn::Block`, ohne den Reststrom anzufassen.
+///
+/// Ein Block **ist** genau ein `{}`-Token-Tree. `Cursor::group` springt in O(1)
+/// per Zeigerarithmetik hinein und liefert zugleich den Cursor dahinter -
+/// materialisiert werden muss nur der Inhalt des Blocks, also genau das, was
+/// auch geparst wird.
+///
+/// Ueber [`invoke_parser_fn`] kostete derselbe Block den gesamten Rest der
+/// umschliessenden Gruppe. Bei mehreren Bloecken in einer Liste war das
+/// quadratisch; siehe `docs/adr/adr15-linear-parsing.md`, Stufe 1.
+///
+/// `syn::Block::parse` tut inhaltlich dasselbe (`braced!` plus
+/// `Block::parse_within`), nur eben ueber einen `ParseStream`. Die
+/// Fehlermeldung ist wortgleich mit syns eigener.
+pub fn take_braced_block<'a>(cursor: Cursor<'a>) -> ParseResult<'a, syn::Block> {
+    let (inner, span, danach) = match cursor.group(proc_macro2::Delimiter::Brace) {
+        Some(x) => x,
+        None => return Err(ParseError::at_cursor(cursor, "expected curly braces")),
+    };
+
+    match syn::parse::Parser::parse2(syn::Block::parse_within, inner.token_stream()) {
+        Ok(stmts) => Ok((
+            syn::Block {
+                brace_token: syn::token::Brace { span },
+                stmts,
+            },
+            danach,
+        )),
+        Err(e) => Err(ParseError::new(e.span(), e.to_string()).with_cursor(inner)),
+    }
+}
+
+/// Liest einen Typ, dessen Tokens mit der ersten Delimiter-Gruppe enden.
+///
+/// Gedacht fuer `syn::Macro`: ein Makroaufruf ist `pfad ! (…)`, `[…]` oder `{…}`,
+/// und der Pfad davor besteht nur aus Bezeichnern und `::` - er kann keine
+/// Gruppe enthalten. Materialisiert wird deshalb nur bis einschliesslich der
+/// ersten Gruppe statt bis zum Ende der umschliessenden Gruppe.
+///
+/// Faellt auf das Ende zurueck, wenn gar keine Gruppe kommt - dann ist der
+/// Aufwand derselbe wie zuvor, aber nie hoeher. Siehe ADR 15, Stufe 1.
+pub fn take_upto_group<'a, T: SynParsable>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
+    let mut stueck = proc_macro2::TokenStream::new();
+    let mut lauf = cursor;
+    while let Some((tt, next)) = lauf.token_tree() {
+        let war_gruppe = matches!(tt, proc_macro2::TokenTree::Group(_));
+        stueck.extend(std::iter::once(tt));
+        lauf = next;
+        if war_gruppe {
+            break;
+        }
+    }
+
+    match syn::parse::Parser::parse2(T::parse, stueck) {
+        Ok(wert) => Ok((wert, lauf)),
+        Err(e) => {
+            let span = if cursor.eof() {
+                cursor.span()
+            } else {
+                e.span()
+            };
+            Err(ParseError::new(span, e.to_string()).with_cursor(cursor))
+        }
+    }
+}

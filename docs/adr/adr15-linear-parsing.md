@@ -1,6 +1,6 @@
 # ADR 15: Der Weg zu linearem Parsen
 
-**Status:** Proposed. Stufe 0 ist umgesetzt, Stufen 1–3 sind zu entscheiden.
+**Status:** Proposed. Stufen 0 und 1 sind umgesetzt, Stufen 2–4 sind zu entscheiden.
 **Datum:** 2026-08-31
 
 ## Context
@@ -93,14 +93,36 @@ Semver-Versprechen; deshalb an genau einer Stelle gekapselt.
 
 Wirkt vor allem im Recover-Sync-Scan, der in einer Schleife steht.
 
-### Stufe 1 — `syn::Block` über die Gruppe begrenzen
+### Stufe 1 — an der Delimiter-Gruppe begrenzen (**umgesetzt**)
 
 Ein `syn::Block` **ist** genau ein `{}`-Token-Tree. `cursor.group(Delimiter::Brace)`
-liefert Inhalt und Folgecursor in O(1), ohne den Rest anzufassen. Nur der
-Gruppeninhalt muss dann noch materialisiert werden.
+liefert Inhalt und Folgecursor in O(1); materialisiert wird nur der Inhalt, also
+genau das, was auch geparst wird. `take_braced_block` baut den `Block` daraus
+zusammen — inhaltlich dasselbe wie syns `impl Parse for Block`
+(`braced!` + `Block::parse_within`), nur ohne ParseStream.
 
-Klein, risikoarm, unabhängig vom Rest. Gilt sinngemäß für den Delimiter-Teil von
-`syn::Macro`.
+Für `syn::Macro` gilt es sinngemäß: ein Makroaufruf ist `pfad ! (…)`, und der
+Pfad davor besteht nur aus Bezeichnern und `::` — er kann keine Gruppe enthalten.
+`take_upto_group` materialisiert deshalb bis **einschließlich der ersten Gruppe**.
+Kommt keine, fällt es auf das bisherige Verhalten zurück; teurer wird es nie.
+
+**Gemessen**, n Einträge in einer Liste:
+
+| n | `syn::Block` vorher | nachher | `syn::Macro` vorher | nachher |
+|---|---|---|---|---|
+| 100 | 3,37 ms | 665 µs | 3,06 ms | 219 µs |
+| 500 | 82,52 ms | 2,80 ms | 73,17 ms | 890 µs |
+| 2000 | **1,06 s** | **11,46 ms** | **1,15 s** | **3,60 ms** |
+
+Faktor 92 bzw. 319 bei n=2000, und in beiden Fällen **quadratisch → linear**
+(zwanzigfache Eingabe: 315× bzw. 376× vorher, 17× bzw. 16× nachher).
+
+Der Effekt ist größer als erwartet, weil nicht nur die Materialisierung entfällt,
+sondern auch der `TokenBuffer`-Bau über den Rest — und der dominiert.
+
+**Was Stufe 1 nicht löst:** `syn::Type`, `Generics`, `ReturnType`, `Visibility`.
+Die haben keine Gruppe als Grenze. Genau sie stehen im cxx-Benchmark in jedem
+Funktionsargument, und dort bleibt das quadratische Verhalten.
 
 ### Stufe 2 — Winkelklammer-Fenster für `syn::Type`
 
@@ -153,7 +175,8 @@ ADR gegenstandslos.
 
 ## Empfehlung
 
-**Stufe 1 sofort** (klein, risikoarm). Danach **Stufe 3**, nicht Stufe 2: Stufe 2
+Stufe 1 ist erledigt und hat mehr gebracht als gedacht. Als Nächstes **Stufe 3**,
+nicht Stufe 2: Stufe 2
 löst nur `syn::Type` und hinterlässt einen selbstgebauten Scanner, den niemand
 mehr anfassen will; Stufe 3 löst das Problem an der Wurzel und für alle Typen.
 

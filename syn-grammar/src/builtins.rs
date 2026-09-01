@@ -191,7 +191,17 @@ macro_rules! impl_syn_builtin {
 }
 
 impl_syn_builtin!(parse_rust_type_impl, syn::Type);
-impl_syn_builtin!(parse_rust_block_impl, syn::Block);
+/// `rust_block` geht ueber den gruppenbegrenzten Weg statt ueber die Bruecke:
+/// ein Block ist genau ein `{}`-Token-Tree, der Rest muss nicht angefasst werden.
+pub fn parse_rust_block_impl<'a>(
+    cursor: Cursor<'a>,
+    ctx: &mut ParseContext<'a>,
+) -> ParseResult<'a, syn::Block> {
+    let (t, next) = crate::rt::take_braced_block(cursor)?;
+    ctx.record_span(t.span())
+        .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
+    Ok((t, next))
+}
 impl_einzeltoken_builtin!(parse_lit_str_impl, syn::LitStr);
 impl_einzeltoken_builtin!(parse_lit_int_impl, syn::LitInt);
 impl_einzeltoken_builtin!(parse_lit_char_impl, syn::LitChar);
