@@ -5,13 +5,21 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use syn::visit::{self, Visit};
 use syn::{parse_quote, Lit, Result};
 
+/// Grobklassifikation des Rueckgabetyps einer Regel.
+///
+/// Der Codegenerator braucht sie, weil ein geliehener Typ die Lebensdauer der
+/// Eingabe mitfuehren muss, ein primitiver dagegen nicht.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReturnTypeKind {
+    /// `()` - die Regel liefert keinen Wert.
     Empty,
+    /// Ein Typ ohne Lebensdauer, etwa `u64` oder `String`.
     Primitive,
+    /// Ein Typ, der die Lebensdauer `'a` der Eingabe traegt.
     Borrowed,
 }
 
+/// Bestimmt, welcher [`ReturnTypeKind`] auf einen Rueckgabetyp zutrifft.
 pub fn determine_return_type_kind(ty: &syn::Type) -> ReturnTypeKind {
     // 1. Check for borrowed
     struct LifetimeVisitor {
@@ -60,7 +68,10 @@ pub fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {
 
 /// Result of analyzing a pattern sequence for a Cut operator (`=>`)
 pub struct CutAnalysis<'a> {
+    /// Die Muster **vor** dem Cut. Scheitern sie, darf noch zurueckgesetzt werden.
     pub pre_cut: &'a [ModelPattern],
+    /// Die Muster **hinter** dem Cut. Ein Fehler hier ist fatal - die Ableitung
+    /// ist festgelegt, eine andere Alternative kommt nicht mehr in Frage.
     pub post_cut: &'a [ModelPattern],
 }
 
@@ -159,6 +170,9 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
     }
 }
 
+/// Sammelt alle Bindungsnamen einer Mustersequenz, in Reihenfolge.
+///
+/// Das sind die Namen, die der Aktionsblock der Regel sehen muss.
 pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     let mut bindings = Vec::new();
     for p in patterns {
@@ -451,6 +465,11 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     }
 }
 
+/// Kann das Muster erfolgreich sein, ohne ein Token zu verbrauchen?
+///
+/// Wichtig fuer zwei Dinge: ein nullbares Anfangsmuster verbietet die
+/// Peek-Optimierung (der Peek wuerde die Alternative faelschlich ausschliessen),
+/// und eine nullbare Regel in einem Zyklus ist eine Endlosschleife.
 pub fn is_nullable(pattern: &ModelPattern) -> bool {
     match pattern {
         ModelPattern::Cut(_) => true,
@@ -481,14 +500,25 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
 //  Graph Analysis & Diagnostics (Infinite Recursion, Ambiguity, Unused Rules)
 // ==============================================================================
 
+/// Das Ergebnis der Graphanalyse ueber eine ganze Grammatik.
 pub struct GrammarAnalysis {
+    /// Regeln, die ohne Tokenverbrauch erfolgreich sein koennen.
     pub nullable_rules: HashSet<String>,
+    /// Gefundene Zyklen im Regelgraphen, je als Pfad von Regelnamen.
     pub cycles: Vec<Vec<String>>,
+    /// Regeln, die von keiner oeffentlichen Regel aus erreichbar sind.
     pub unused_rules: HashSet<String>,
+    /// Je Regel die Menge der Tokens, mit denen sie beginnen kann.
     pub first_sets: HashMap<String, HashSet<String>>,
+    /// Befunde, die als Fehler gemeldet werden - etwa ein Zyklus ueber lauter
+    /// nullbare Regeln, der zur Laufzeit nicht terminieren wuerde.
     pub errors: Vec<syn::Error>,
 }
 
+/// Fuehrt die Graphanalyse ueber eine Grammatik aus.
+///
+/// Berechnet Nullbarkeit als Fixpunkt, sucht Zyklen und unerreichbare Regeln
+/// und bestimmt die First-Mengen.
 pub fn analyze_grammar(grammar: &GrammarDefinition) -> GrammarAnalysis {
     let mut nullable_rules = HashSet::new();
 

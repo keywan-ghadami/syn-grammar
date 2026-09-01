@@ -2,113 +2,208 @@ use crate::{analysis, parser};
 use proc_macro2::{Ident, TokenStream};
 use syn::spanned::Spanned;
 
+/// Was ein Backend an eingebauten Regeln mitbringt.
 pub mod backend;
+/// Backend-unabhaengige Werttypen fuer Aktionsbloecke.
 pub mod types;
 
+/// Eine ganze Grammatik, so wie `grammar! { … }` sie meint.
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
+    /// Der Name aus `grammar Name { … }`; zugleich der Name des erzeugten Moduls.
     pub name: Ident,
+    /// Die erzeugten Regeln, in Quellreihenfolge.
     pub rules: Vec<Rule>,
+    /// Regeln aus `extern rule …;` - sie werden **nicht** erzeugt, sondern von
+    /// Hand geschrieben und nur aufgerufen.
     pub extern_rules: Vec<ExternRule>,
+    /// Grammatiken aus `import … as alias;`, deren Regeln als `alias::regel`
+    /// aufrufbar sind.
     pub imports: Vec<ImportedGrammar>,
+    /// `use`-Anweisungen, die unveraendert in das erzeugte Modul uebernommen
+    /// werden. Ein Glob darunter schaltet die "Undefined rule"-Pruefung ab -
+    /// dann ist die Menge der sichtbaren Namen zur Makro-Zeit nicht bekannt.
     pub uses: Vec<syn::ItemUse>,
 }
 
+/// Eine von Hand geschriebene Regel, die die Grammatik nur aufruft.
+///
+/// Aus `extern rule name(p: T) -> R;`. Die Funktion muss am Definitionsort der
+/// Grammatik sichtbar sein und
+/// `fn name<'a>(input: &Strom<'a>, p: T) -> StreamResult<'a, R>` heissen.
 #[derive(Debug, Clone)]
 pub struct ExternRule {
+    /// Name der Regel und damit der aufzurufenden Funktion.
     pub name: Ident,
+    /// Generische Parameter der Deklaration.
     pub generics: syn::Generics,
+    /// Deklarierte Parameter; sie werden hinter `input` durchgereicht.
     pub params: Vec<RuleParameter>,
+    /// Der Typ, den die Funktion liefert.
     pub return_type: syn::Type,
+    /// Attribute an der Deklaration.
     pub attrs: Vec<syn::Attribute>,
 }
 
+/// Eine per `import … as …;` eingebundene fremde Grammatik.
 #[derive(Debug, Clone)]
 pub struct ImportedGrammar {
+    /// Pfad zum Modul der fremden Grammatik.
     pub path: syn::Path,
+    /// Der Aliasname, unter dem ihre Regeln aufgerufen werden.
     pub alias: Ident,
 }
 
+/// Eine Regel der Grammatik.
 #[derive(Debug, Clone)]
 pub struct Rule {
+    /// Der Regelname. Daraus werden `parse_<name>` und `parse_<name>_impl`.
     pub name: Ident,
+    /// Generische Parameter, etwa `list<T>`.
     pub generics: syn::Generics,
+    /// Laufzeitparameter, etwa `value(offset: i32)`.
     pub params: Vec<RuleParameter>,
+    /// Der Typ hinter `->`.
     pub return_type: syn::Type,
+    /// Vorab bestimmte Klassifikation von [`Rule::return_type`].
     pub return_type_kind: analysis::ReturnTypeKind,
+    /// Die durch `|` getrennten Alternativen, in Quellreihenfolge.
     pub variants: Vec<RuleVariant>,
+    /// Steht `pub` davor? Die Regel `main` gilt immer als oeffentlich.
     pub is_pub: bool,
+    /// Lexikalische Regel: innerhalb gilt Zeichen-, nicht Tokengenauigkeit.
     pub is_lexical: bool,
+    /// Attribute an der Regel; `#[doc]`, `#[cfg]` und die Lint-Attribute
+    /// wandern in den erzeugten Code.
     pub attrs: Vec<syn::Attribute>,
 }
 
+/// Ein Parameter einer Regel.
 #[derive(Debug, Clone)]
 pub struct RuleParameter {
+    /// Der Name, unter dem er im Rumpf sichtbar ist.
     pub name: Ident,
+    /// Der Typ. `None` heisst: ein **Parser**-Parameter (etwa `list<T>(item)`),
+    /// kein Wert - er wird zur Makro-Zeit eingesetzt, nicht zur Laufzeit
+    /// uebergeben.
     pub ty: Option<syn::Type>,
 }
 
+/// Eine Alternative einer Regel.
 #[derive(Debug, Clone)]
 pub struct RuleVariant {
+    /// Die Mustersequenz, die passen muss.
     pub pattern: Vec<ModelPattern>,
+    /// Der Aktionsblock hinter `->`, der den Wert baut.
     pub action: TokenStream,
+    /// Der Klartextname aus `# "…"`. Scheitert die Alternative an ihrer
+    /// Anfangsstelle, tritt er als Erwartung an die Stelle der internen Meldung.
     pub label: Option<String>,
+    /// Soll die Spanne der Alternative mitgeliefert werden?
     pub with_span: bool,
+    /// Wurde der Aktionsblock ausgeschrieben, oder hat der Generator ihn
+    /// ergaenzt? Nur Ersteres darf eine Typpruefung ausloesen.
     pub is_explicit: bool,
 }
 
+/// Ein Muster der Grammatik-DSL.
+///
+/// Jede Variante entspricht einer Schreibweise in `SYNTAX.md`.
 #[derive(Debug, Clone)]
 pub enum ModelPattern {
+    /// `=>` - Cut. Ab hier ist die Ableitung festgelegt; ein Fehler dahinter
+    /// ist fatal und laesst keine andere Alternative mehr zu.
     Cut(proc_macro2::Span),
+    /// Ein Literalterminal, etwa `"fn"` oder `"::"`.
     Lit {
+        /// Bindungsname aus `name:"fn"`.
         binding: Option<Ident>,
+        /// Das Literal selbst.
         lit: syn::Lit,
     },
+    /// Der Aufruf einer Regel, eines Builtins oder eines `syn::`-Typs.
     RuleCall {
+        /// Bindungsname aus `name:regel`.
         binding: Option<Ident>,
+        /// Der Pfad: `regel`, `alias::regel` oder `syn::Type`.
         rule_path: syn::Path,
+        /// Generische Argumente, etwa `list<Vec<T>>`.
         generics: Vec<syn::Type>,
+        /// Argumente in Klammern, etwa `separated(item, ",")`.
         args: Vec<Argument>,
     },
+    /// Eine geklammerte Alternativenmenge, `( a | b )`.
     Group {
+        /// Bindungsname der ganzen Gruppe.
         binding: Option<Ident>,
+        /// Die Alternativen als Tripel aus Mustern, Aktionsblock und Label.
         alts: Vec<(Vec<ModelPattern>, Option<TokenStream>, Option<String>)>,
+        /// Quellstelle der Gruppe.
         span: proc_macro2::Span,
     },
+    /// `bracket( … )` - Inhalt echter eckiger Klammern.
     Bracketed(Vec<ModelPattern>, proc_macro2::Span),
+    /// `brace( … )` bzw. `{ … }` - Inhalt echter geschweifter Klammern.
     Braced(Vec<ModelPattern>, proc_macro2::Span),
+    /// `paren( … )` - Inhalt echter runder Klammern.
     Parenthesized(Vec<ModelPattern>, proc_macro2::Span),
+    /// `x?` - hoechstens einmal.
     Optional(Box<ModelPattern>, proc_macro2::Span),
+    /// `x*` - beliebig oft, auch nullmal.
     Repeat(Box<ModelPattern>, proc_macro2::Span),
+    /// `x+` - mindestens einmal.
     Plus(Box<ModelPattern>, proc_macro2::Span),
+    /// `x @ name` - bindet die Spanne des Musters an `name`.
     SpanBinding(Box<ModelPattern>, Ident, proc_macro2::Span),
+    /// `recover(body, sync)` - scheitert `body`, wird bis `sync` uebersprungen,
+    /// statt die ganze Regel scheitern zu lassen.
     Recover {
+        /// Bindungsname; das Ergebnis ist ein `Option`.
         binding: Option<Ident>,
+        /// Das eigentliche Muster.
         body: Box<ModelPattern>,
+        /// Die Synchronisationsmarke, bis zu der uebersprungen wird.
         sync: Box<ModelPattern>,
+        /// Quellstelle.
         span: proc_macro2::Span,
     },
+    /// `peek(x)` - prueft, ohne zu verbrauchen.
     Peek(Box<ModelPattern>, proc_macro2::Span),
+    /// `not(x)` - schlaegt fehl, wenn `x` passen wuerde. Verbraucht nichts.
     Not(Box<ModelPattern>, proc_macro2::Span),
+    /// `until(x)` - sammelt rohe Tokens bis `x` passen wuerde.
     Until {
+        /// Bindungsname; das Ergebnis ist ein `TokenStream`.
         binding: Option<Ident>,
+        /// Das Abbruchmuster. Es wird nicht verbraucht.
         pattern: Box<ModelPattern>,
+        /// Quellstelle.
         span: proc_macro2::Span,
     },
+    /// `count(x)` - zaehlt, wie oft das **Element** passte.
     Count {
+        /// Bindungsname; das Ergebnis ist ein `usize`.
         binding: Option<Ident>,
+        /// Das gezaehlte Muster, samt seinem Wiederholungsoperator.
         pattern: Box<ModelPattern>,
+        /// Quellstelle.
         span: proc_macro2::Span,
     },
+    /// `lex( … )` - zeichengenaue Betrachtung innerhalb des Bereichs.
     LexicalScope(Box<ModelPattern>, proc_macro2::Span),
+    /// `spaced( … )` - Leerraum zwischen Tokens wird bedeutsam.
     SpacedScope(Box<ModelPattern>, proc_macro2::Span),
+    /// `fail("…")` - bricht mit dieser Meldung ab, wortwoertlich und hochprior.
     Fail {
+        /// Die Meldung. Ohne sie steht dort "Explicit failure".
         message: Option<syn::Lit>,
+        /// Quellstelle.
         span: proc_macro2::Span,
     },
 }
 
 impl ModelPattern {
+    /// Die Quellstelle des Musters - fuer Fehlermeldungen des Generators.
     pub fn span(&self) -> proc_macro2::Span {
         match self {
             ModelPattern::Cut(s) => *s,
@@ -137,9 +232,12 @@ impl ModelPattern {
     }
 }
 
+/// Ein Argument eines Regelaufrufs.
 #[derive(Debug, Clone)]
 pub enum Argument {
+    /// Nach Position, etwa `separated(item, ",")`.
     Positional(ModelPattern),
+    /// Nach Name, etwa `separated(item, ",", min=1)`.
     Named(Ident, ModelPattern),
 }
 

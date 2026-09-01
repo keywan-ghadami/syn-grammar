@@ -5,6 +5,12 @@ use crate::model::*;
 use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;
 
+/// Prueft die Grammatik semantisch gegen die Faehigkeiten eines Backends.
+///
+/// Meldet doppelte Regelnamen, Aufrufe unbekannter Regeln (nur ohne
+/// Glob-Import - sonst ist die Menge der sichtbaren Namen nicht bekannt),
+/// unpassende Argumentzahlen und die Befunde aus
+/// [`crate::analysis::analyze_grammar`].
 pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
     let builtins = B::get_builtins();
     let builtin_names: HashSet<String> = builtins.iter().map(|b| b.name.to_string()).collect();

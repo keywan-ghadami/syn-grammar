@@ -11,12 +11,19 @@
 //! 3. **[validator]**: Validate the model for semantic correctness.
 //! 4. **[analysis]**: Extract information (keywords, recursion) for code generation.
 
+#![warn(missing_docs)]
+
 use proc_macro2::TokenStream;
 use syn::Result;
 
+/// Auswertungen ueber eine fertige Grammatik: Nullbarkeit, Zyklen,
+/// First-Mengen, Linksrekursion, Cut-Zerlegung.
 pub mod analysis;
+/// Das semantische Modell - was die Grammatik *bedeutet*.
 pub mod model;
+/// Der syntaktische AST und sein `Parse`-Impl - was dasteht.
 pub mod parser;
+/// Semantische Pruefung des Modells gegen ein Backend.
 pub mod validator;
 
 pub use model::backend::{Backend, BuiltIn};
