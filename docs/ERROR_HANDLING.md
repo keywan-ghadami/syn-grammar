@@ -14,19 +14,25 @@ Dokument.
 
 ## Die zentrale Randbedingung
 
-In einem echten Prozedurmakro auf **stable** Rust liefert `Span::start()` fuer
-jeden Span `LineColumn { line: 0, column: 0 }` — nachlesbar in proc-macro2,
-`src/wrapper.rs`:
+Bis Rust 1.87 lieferte `Span::start()` in einem echten Prozedurmakro fuer jeden
+Span `LineColumn { line: 0, column: 0 }`:
 
 ```rust
 #[cfg(not(proc_macro_span_location))]
 Span::Compiler(_) => LineColumn { line: 0, column: 0 },
 ```
 
-Jede Heuristik, die Fehler ueber Zeile/Spalte vergleicht, ist dort also
-wirkungslos. Dass die Tests trotzdem plausibel aussehen, liegt allein daran,
-dass sie ueber `parse_str` den proc-macro2-*Fallback* nehmen, der echte
-Positionen hat.
+**Seit Rust 1.88 gilt das nicht mehr** — proc-macro2 setzt dieses `cfg` dort auch
+auf stable (`build.rs`: `rustc >= 88 && compile_probe_stable(..)`). Das Projekt
+verlangt `rust-version = "1.88"`, Positionen sind also verfuegbar. Belegt durch
+`syn-grammar/tests/ui/runtime_error_real_macro.stderr`, einen Schnappschuss aus
+einem echten Makro.
+
+**Die Trennung von Vergleich und Anzeige bleibt trotzdem.** Nicht aus Not,
+sondern weil sie besser ist: der Cursor-Vergleich ist ein Zeigervergleich in
+O(1), ein Positionsvergleich waere teurer und haengt an einer
+Compiler-Eigenschaft. Ein Verhalten, das erst ab einer bestimmten
+Rust-Version korrekt wird, taugt nicht als Fundament fuer die Fehlerqualitaet.
 
 Konsequenz: **Vergleich und Anzeige sind getrennt.**
 

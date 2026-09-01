@@ -445,9 +445,11 @@ in term
 in expression
 ```
 
-The position is only printed when the span actually has line/column data. Inside
-a real proc macro on stable Rust it does not (rustc underlines the span in the
-editor instead) — see [`GOALS.md`](../GOALS.md).
+The position is only printed when the span actually has line/column data. That is
+the case inside a real proc macro from Rust 1.88 onwards, which this project
+requires (`rust-version = "1.88"`); a span without position data — `Span::call_site()`,
+for instance — prints without it. Either way rustc underlines the span in the editor.
+See [`GOALS.md`](../GOALS.md).
 
 ## Advanced Features
 

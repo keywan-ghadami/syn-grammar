@@ -125,8 +125,9 @@ was auf konkrete Fehlermeldungstexte prueft.
 
 - **Cursor-basierte Diagnose-Engine.** Fortschritt wird ueber
   `syn::buffer::Cursor` verglichen (`PartialOrd`, O(1)) statt ueber Zeile/Spalte.
-  Grund: in einem Prozedurmakro auf stable Rust liefert `Span::start()` fuer
-  *jeden* Span `(0,0)`, womit jeder Positionsvergleich wirkungslos waere.
+  Grund: der Cursor-Vergleich ist ein Zeigervergleich in O(1) und haengt an
+  keiner Compilerversion. (Bis Rust 1.87 lieferte `Span::start()` im
+  Prozedurmakro zudem fuer *jeden* Span `(0,0)`; seit 1.88 nicht mehr.)
 - **Hochwasserstand fuer verdeckte Fehler** (`ParseContext::furthest`). Ein
   Fehler, den ein *erfolgreiches* Zuruecksetzen ueberdeckt (`?`, `*`,
   `separated(min=0)`), ueberlebt und wird gemeldet, wenn sonst nur eine

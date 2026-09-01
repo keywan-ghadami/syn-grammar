@@ -2,10 +2,10 @@
 //!
 //! Zweck: der einzige Pfad, auf dem sich das Verhalten im *realen* Makro pruefen
 //! laesst. Die gesamte uebrige Testsuite laeuft ueber `Parser::parse_str` und
-//! damit ueber den proc-macro2-**Fallback**, der echte Zeilen und Spalten hat.
-//! In einem echten Prozedurmakro auf stable liefert `Span::start()` dagegen fuer
-//! jeden Span `(0,0)` - alles, was daran haengt, ist ueber `parse_str`
-//! unsichtbar. Siehe `GOALS.md` und ADR 13, Punkt 14.
+//! damit ueber den proc-macro2-**Fallback**. Alles, was sich zwischen Fallback
+//! und echtem Makro unterscheidet, ist dort unsichtbar - allen voran die Frage,
+//! ob Spans Positionen tragen (erst ab Rust 1.88, siehe `GOALS.md`).
+//! ADR 13, Punkt 14.
 
 use proc_macro::TokenStream;
 

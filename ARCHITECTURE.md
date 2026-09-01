@@ -87,16 +87,19 @@ einem `ParseStream`, deshalb ist dieser Umweg für echte syn-AST-Typen unvermeid
 
 Belegt, nicht vermutet:
 
-1. **Diagnostik greift im Produkteinsatz nicht.** `merge` (`error.rs:38-46`) und die
-   Anzeige (`error.rs:61-62`) vergleichen `span.start().line/.column`. Auf stable Rust
-   sind das im Prozedurmakro immer `(0,0)`
-   (`proc-macro2-1.0.106/src/wrapper.rs:449-450`). Siehe `GOALS.md`. Ersatzmetrik:
-   `PartialOrd for Cursor` (syn 2.0.114, `src/buffer.rs:401-409`), O(1).
+1. ~~**Diagnostik greift im Produkteinsatz nicht.**~~ *Erledigt.* `merge` vergleicht
+   `Cursor` per `PartialOrd` (O(1), `src/buffer.rs`) statt `span.start()`. Die
+   ursprüngliche Begründung — `(0,0)` im Prozedurmakro — gilt seit Rust 1.88 ohnehin
+   nicht mehr; das Projekt verlangt diese Version. Die Cursor-Metrik bleibt, weil sie
+   billiger und toolchain-unabhängig ist. Siehe `GOALS.md`.
 
-2. **`invoke_syn_parser` ist O(n²).** Sie ruft pro Token `cursor.token_stream()` auf,
-   materialisiert also den gesamten Reststrom, klont und zählt ihn. Für Einzeltoken ist
-   das vermeidbar — `Cursor` hat O(1)-Zugriffe (`ident()`, `punct()`, `literal()`,
-   `group()`).
+2. **Der Brückenaufruf für syn-AST-Typen bleibt O(n).** Einzeltoken laufen inzwischen
+   über `take_single`/`take_fixed` in O(1); gemessen brachte das Faktor 6,2 an einer
+   generierten cxx-Bridge. Was bleibt: `invoke_parser_fn` materialisiert für echte
+   AST-Typen (`syn::Type` und Verwandte) den Reststrom bis zum Ende der umschließenden
+   Delimiter-Gruppe, weil `ParseBuffer::new` `pub(crate)` ist. Bei einem AST-Typ je
+   Listenelement ergibt das quadratisches Verhalten in der Länge dieser Liste. Wege
+   heraus stehen in `docs/adr/adr15-linear-parsing.md`.
 
 3. **Fehlende Diagnostik-Bausteine.** `expected one of: …`, Label-Bubbling, Item-Index
    im Regel-Stack (`in item 3`) existierten vor dem Umbau und fehlen seither.

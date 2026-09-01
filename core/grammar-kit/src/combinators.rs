@@ -212,9 +212,11 @@ where
         }
         Err(mut e) => {
             // Label applizieren, falls der Fehler exakt am Startpunkt passierte.
-            // Verglichen wird ueber den Cursor, nicht ueber span.start() - letzteres
-            // ist im Prozedurmakro auf stable immer (0,0) und wuerde das Label dort
-            // faelschlich auf JEDEN Fehler anwenden. Siehe ADR 13, Punkt 8.
+            // Verglichen wird ueber den Cursor, nicht ueber span.start(): das ist
+            // ein Zeigervergleich in O(1) und haengt an keiner Compilerversion.
+            // (Bis Rust 1.87 war span.start() im Prozedurmakro ausserdem immer
+            // (0,0) und haette das Label auf JEDEN Fehler angewandt.)
+            // Siehe ADR 13, Punkt 8.
             if let Some(lbl) = label {
                 if e.at == Some(cursor) {
                     e.message = format!("expected {}", lbl);

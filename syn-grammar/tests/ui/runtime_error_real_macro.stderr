@@ -1,7 +1,7 @@
-error: expected integer literal at column 29 (line 9)
+error: expected integer literal at column 29 (line 11)
        in wert
        in zuweisung
- --> tests/ui/runtime_error_real_macro.rs:9:30
-  |
-9 | ui_macro::zuweisung!(let x = ;);
-  |                              ^
+  --> tests/ui/runtime_error_real_macro.rs:11:30
+   |
+11 | ui_macro::zuweisung!(let x = ;);
+   |                              ^

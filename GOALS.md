@@ -26,19 +26,29 @@ Was dort nicht steht, ist keine Anforderung; was dort steht, ist durch Tests bel
 
 ## Randbedingung, die die Architektur bestimmt
 
-Auf **stable Rust** liefert `proc_macro2::Span::start()` innerhalb eines Prozedurmakros
-keine Positionsdaten. Nachgewiesen in `proc-macro2-1.0.106/src/wrapper.rs:449-450`:
+**Stand 31.08.2026: teilweise entschärft — die Folgerungen gelten weiterhin.**
+
+Bis Rust 1.87 lieferte `proc_macro2::Span::start()` innerhalb eines Prozedurmakros
+keine Positionsdaten:
 
 ```rust
 #[cfg(not(proc_macro_span_location))]
 Span::Compiler(_) => LineColumn { line: 0, column: 0 },
 ```
 
-Jede Diagnostik, die zur **Auswahl** des besten Fehlers Zeilen- oder Spaltenangaben
-vergleicht, ist im echten Produkteinsatz wirkungslos — auch wenn die Tests grün sind,
-weil `parse_str` den Fallback-Pfad von proc-macro2 benutzt.
+Seit **Rust 1.88** setzt proc-macro2 dieses `cfg` auch auf stable
+(`proc-macro2/build.rs`: `rustc >= 88 && compile_probe_stable("proc_macro_span_location")`),
+und `Span::start()` liefert echte Zeilen und Spalten. Belegt durch
+`syn-grammar/tests/ui/runtime_error_real_macro.stderr` — ein Schnappschuss aus einem
+echten Makro, mit Positionsangabe.
 
-Daraus folgt bindend:
+Das Projekt setzt deshalb `rust-version = "1.88"`; ältere Toolchains weist cargo mit
+klarer Meldung ab, und ein eigener CI-Job baut gegen genau diese Version.
+
+**Die Folgerungen bleiben trotzdem bindend**, aus zwei Gründen: die Cursor-Metrik ist
+mit O(1) ohnehin billiger als ein Positionsvergleich, und sie hängt an gar keiner
+Toolchain-Eigenschaft. Ein Verhalten, das erst ab einer bestimmten Compilerversion
+korrekt wird, ist kein gutes Fundament für das Qualitätsmerkmal dieses Projekts.
 
 * **Auswahl** (welcher Fehler gewinnt) benutzt eine toolchain-unabhängige
   Fortschrittsmetrik. `syn::buffer::Cursor` implementiert `PartialOrd` (Zeigervergleich
