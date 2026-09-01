@@ -59,44 +59,68 @@ kann es dort in Richtung `syn`-Freiheit weiterentwickelt werden.
 
 ## Runtime: `core/grammar-kit`
 
-Seit dem Umbau vom Mai 2026 parst das syn-Backend **funktional über Cursor** statt über
-`ParseStream`:
+Der Rumpf einer Regel arbeitet auf einem **Strom** (`ParseBuffer`), die
+Blatt-Primitiven weiterhin auf dem **Cursor**:
 
 ```rust
-pub type ParseResult<'a, T> = Result<(T, Cursor<'a>), ParseError>;   // error.rs:5
+pub type Strom<'a>            = syn::parse::ParseBuffer<'a>;          // stream.rs
+pub type StreamResult<'a, T>  = Result<T, ParseError<'a>>;            // stream.rs
+pub type ParseResult<'a, T>   = Result<(T, Cursor<'a>), ParseError<'a>>; // error.rs
 ```
 
-Der Cursor wird per Wert durchgereicht; Backtracking heißt, den Cursor von vor dem
-Versuch weiterzubenutzen (`Cursor` ist `Copy`). Fehler sind Rückgabewerte und werden per
-`ParseError::merge` (`error.rs:34-48`) kombiniert — es gibt **keinen** globalen
-Fehlerzustand mehr.
+Eine Regel heißt `fn parse_x_impl<'a>(input: &Strom<'a>, ctx: &mut ParseContext<'a>)
+-> StreamResult<'a, T>`. Bewusst `&Strom<'a>` und **nicht** syns Alias
+`ParseStream<'a> = &'a ParseBuffer<'a>`: der Alias setzt die Lebensdauer der Referenz
+mit der der Tokens gleich, womit ein `input.fork()` `'a` auf den Stapelrahmen verkürzen
+würde — Fehler aus einer Gabel könnten den Aufruf dann nicht mehr verlassen. Genau die
+braucht die Fehlerauswahl.
 
-| Datei | Z. | Inhalt |
-|---|---|---|
-| `error.rs` | 80 | `ParseError` (span, message, priority, rule_stack), `merge`, `Display` |
-| `context.rs` | 72 | `ParseContext`: Scopes, Lexical-Mode, `last_span` — **ohne** Fehlerzustand |
-| `combinators.rs` | 221 | `peek_syn`, `invoke_syn_parser`, `attempt_labeled`, `parse_separated`, `parse_repeated` |
-| `testing.rs` | 314 | `Testable`/`TestResult`, `assert_failure_contains` (Substring-Vergleich, :199-212) |
+Zurücksetzen läuft über `gabel` (`fork`) und `uebernehmen` (`advance_to`, laut syn O(1)):
+ein Versuch läuft auf der Gabel, erst der Erfolg wird eingespielt. Fehler sind
+Rückgabewerte und werden per `ParseError::merge` (`error.rs`) kombiniert — es gibt
+**keinen** globalen Fehlerzustand.
 
-`invoke_syn_parser` (`combinators.rs:18`) ist die Brücke zu syns `Parse`-Impls: sie baut
-aus dem Cursor einen `TokenStream`, lässt syn parsen und rückt den Cursor um die
-verbrauchte Tokenzahl vor. syn bietet **keinen** öffentlichen Weg von einem `Cursor` zu
-einem `ParseStream`, deshalb ist dieser Umweg für echte syn-AST-Typen unvermeidbar.
+| Datei | Inhalt |
+|---|---|
+| `error.rs` | `ParseError` (span, `at`-Cursor, message, priority, `is_fatal`, rule_stack), `merge`, `Display` |
+| `context.rs` | `ParseContext`: Scopes, Lexical-Mode, `last_span`, `furthest` — **ohne** Fehlerzustand |
+| `stream.rs` | `Strom`, `parse_syn`, `parse_mit`, `gabel`/`uebernehmen`, `gruppe`, `schritt`, `token_nehmen` |
+| `combinators.rs` | `peek_syn`, `take_single`/`SingleToken`, `parse_separated`, `parse_repeated`, `finish_variants` |
+| `testing.rs` | `Testable`/`TestResult`, `assert_failure_contains` (Substring-Vergleich) |
+
+`parse_syn` (`stream.rs`) ist der Zugang zu syns `Parse`-Impls und schlicht ein
+`input.parse::<T>()` — O(Länge des Typs). Bis August 2026 lief das über eine Brücke, die
+den Reststrom materialisierte und `Parser::parse2` daraus einen neuen `TokenBuffer` bauen
+ließ; das war O(Rest) je Aufruf und damit quadratisch in der Länge einer Liste. Siehe
+`docs/adr/adr15-linear-parsing.md`.
+
+Umgekehrt bleiben Einzeltoken auf dem Cursor: `schritt` lässt eine Cursor-Primitive in
+einer `ParseBuffer::step`-Episode laufen und rückt den Strom um genau ihr Ergebnis vor.
+`step` verlangt eine Closure, die für **jede** Lebensdauer funktioniert, weshalb ein
+`ParseError<'c>` sie nicht verlassen kann; `schritt` trägt den Fehler ohne seinen Cursor
+hindurch und hängt ihn draußen an die Eintrittsstelle. Das ist keine Näherung — diese
+Primitiven melden ihren Fehler ohnehin dort.
+
+In Delimiter-Gruppen steigt `gruppe` über `syn::__private::parse_{parens,braces,brackets}`
+ab. `AnyDelimiter::parse_any_delimiter` geht nicht: seine Rückgabe ist auf die Lebensdauer
+von `&self` verkürzt, womit kein Fehler aus der Gruppe nach außen tragen würde.
 
 ## Bekannte Schwachstellen
 
 Belegt, nicht vermutet:
 
-1. **Diagnostik greift im Produkteinsatz nicht.** `merge` (`error.rs:38-46`) und die
-   Anzeige (`error.rs:61-62`) vergleichen `span.start().line/.column`. Auf stable Rust
-   sind das im Prozedurmakro immer `(0,0)`
-   (`proc-macro2-1.0.106/src/wrapper.rs:449-450`). Siehe `GOALS.md`. Ersatzmetrik:
-   `PartialOrd for Cursor` (syn 2.0.114, `src/buffer.rs:401-409`), O(1).
+1. ~~**Diagnostik greift im Produkteinsatz nicht.**~~ *Erledigt.* `merge` vergleicht
+   `Cursor` per `PartialOrd` (O(1), `src/buffer.rs`) statt `span.start()`. Die
+   ursprüngliche Begründung — `(0,0)` im Prozedurmakro — gilt seit Rust 1.88 ohnehin
+   nicht mehr; das Projekt verlangt diese Version. Die Cursor-Metrik bleibt, weil sie
+   billiger und toolchain-unabhängig ist. Siehe `GOALS.md`.
 
-2. **`invoke_syn_parser` ist O(n²).** Sie ruft pro Token `cursor.token_stream()` auf,
-   materialisiert also den gesamten Reststrom, klont und zählt ihn. Für Einzeltoken ist
-   das vermeidbar — `Cursor` hat O(1)-Zugriffe (`ident()`, `punct()`, `literal()`,
-   `group()`).
+2. ~~**Der Brückenaufruf für syn-AST-Typen bleibt O(n).**~~ *Erledigt* (ADR 15,
+   Stufe 3). Der Rumpf läuft auf einem `ParseBuffer`, der genau einmal gebaut wird;
+   ein `syn::Type` kostet `input.parse::<T>()`. Gemessen an einer generierten
+   Argumentliste mit 2000 Einträgen: 1,17 s → 5,3 ms, und aus quadratisch wurde
+   linear. Der Preis ist eine `Rc`-Allokation je Rücksetzpunkt statt eines
+   Cursor-Copies.
 
 3. **Fehlende Diagnostik-Bausteine.** `expected one of: …`, Label-Bubbling, Item-Index
    im Regel-Stack (`in item 3`) existierten vor dem Umbau und fehlen seither.

@@ -74,7 +74,7 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
             pub const GENERATED_SOURCE: &str = #rules_str;
 
             use super::*;
-            use syn::buffer::Cursor; // DIE WICHTIGSTE ÄNDERUNG
+            use syn::buffer::Cursor;
             use syn::Result;
             use syn::Token;
             use syn::ext::IdentExt;

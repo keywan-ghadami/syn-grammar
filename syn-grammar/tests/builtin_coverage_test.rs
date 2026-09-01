@@ -259,7 +259,7 @@ fn spanned_familie_liefert_wert_und_span() {
 
     // Der Span muss echte Positionsdaten tragen - sonst waere die ganze Familie
     // sinnlos. Ueber `parse_str` laeuft proc-macro2 im Fallback, dort gibt es
-    // Zeile/Spalte (im echten Prozedurmakro auf stable dagegen nicht, siehe
+    // Zeile/Spalte (im echten Prozedurmakro erst ab Rust 1.88, siehe
     // GOALS.md).
     let mit_span = sp::parse_s_u32.parse_str("77").test().assert_success();
     assert_eq!(mit_span.span.start().line, 1);

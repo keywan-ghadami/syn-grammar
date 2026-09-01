@@ -18,7 +18,7 @@ pub fn generate_sequence(
         // auf syn-Ergebnisse verwenden kann.
         let _action_res = (|| -> syn::Result<_> { Ok({ #action }) })()
             .map_err(rt::ParseError::from)?;
-        Ok((_action_res, cursor))
+        Ok(_action_res)
     })
 }
 
@@ -39,14 +39,16 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         ModelPattern::Lit { binding, lit } => {
             if let Lit::Str(lit) = lit {
                 let token_types = analysis::resolve_token_types(lit, ctx.custom_keywords)?;
+                // Auf dem Strom prueft der Token-Parser die Joint-Spacing selbst
+                // und kostet O(1) - die frueher noetige Vorab-Zaehlung der
+                // Quelltokens (`take_fixed`) entfaellt.
                 if token_types.len() <= 1 {
                     let parses = token_types.iter().map(|ty| {
                         let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _t;) } else { quote!() };
                         quote! {
-                            let (_t, next_cursor) = rt::invoke_syn_parser::<#ty>(cursor)?;
+                            let _t = rt::parse_syn::<#ty>(input)?;
                             ctx.record_span(syn::spanned::Spanned::span(&_t)).map_err(|e| rt::ParseError::new(syn::spanned::Spanned::span(&_t), e.to_string()))?;
                             #bind_stmt
-                            let mut cursor = next_cursor;
                         }
                     });
                     Ok(quote! { #(#parses)* })
@@ -57,8 +59,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     for (i, ty) in token_types.iter().enumerate() {
                         let var = format_ident!("_t{}", i);
                         steps.push(quote! {
-                            let (#var, next_cursor) = rt::invoke_syn_parser::<#ty>(cursor)?;
-                            let mut cursor = next_cursor;
+                            let #var = rt::parse_syn::<#ty>(input)?;
                         });
                         results.push(var.clone());
                         if i == token_types.len() - 1 {
@@ -109,10 +110,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 } else {
                     quote!()
                 };
+                // Seit ADR 15, Stufe 3 ist das ein gewoehnlicher `parse`-Aufruf
+                // auf dem bestehenden Strom: O(Laenge des Typs). Die Sonderwege
+                // aus Stufe 1 (`take_braced_block`, `take_upto_group`) sind damit
+                // gegenstandslos - sie umgingen genau die Materialisierung, die
+                // es jetzt gar nicht mehr gibt.
                 Ok(quote! {
-                    let (_val, next_cursor) = rt::invoke_syn_parser::<#rule_path>(cursor)?;
+                    let _val = rt::parse_syn::<#rule_path>(input)?;
                     #bind_stmt
-                    let mut cursor = next_cursor;
                 })
             } else if rule_path.is_ident("separated") {
                 let rule_arg = match &args[0] {
@@ -223,14 +228,13 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 };
 
                 Ok(quote! {
-                    let (_items_vec, next_cursor) = rt::parse_separated(
-                        cursor, ctx,
-                        |mut cursor, ctx| { #rule_parser Ok((#item_return_expr, cursor)) },
-                        |mut cursor, ctx| { #sep_parser Ok(((), cursor)) },
+                    let _items_vec = rt::parse_separated(
+                        input, ctx,
+                        |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| { #rule_parser Ok(#item_return_expr) },
+                        |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| { #sep_parser Ok(()) },
                         #min, #trailing, #label_tokens
                     )?;
                     #bind_stmt
-                    let mut cursor = next_cursor;
                 })
             } else if rule_path.is_ident("repeated") {
                 let rule_arg = match &args[0] {
@@ -329,35 +333,37 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 };
 
                 Ok(quote! {
-                    let (_items_vec, next_cursor) = rt::parse_repeated(
-                        cursor, ctx,
-                        |mut cursor, ctx| { #rule_parser Ok((#item_return_expr, cursor)) },
+                    let _items_vec = rt::parse_repeated(
+                        input, ctx,
+                        |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| { #rule_parser Ok(#item_return_expr) },
                         #min, #item_label_expr
                     )?;
                     #bind_stmt
-                    let mut cursor = next_cursor;
                 })
             } else if is_builtin {
                 let rule_name_str = rule_name_ident.unwrap().to_string();
                 let expr = match rule_name_str.as_str() {
+                    // Die Zeichenfilter und `any_byte` bleiben Cursor-Primitiven
+                    // (O(1), kein Strom noetig); `rt::schritt` laesst sie in einer
+                    // `step`-Episode laufen und rueckt den Strom entsprechend vor.
                     "alpha" | "digit" | "alphanumeric" | "hex_digit" | "oct_digit" => {
                         let func = format_ident!("{}", rule_name_str);
-                        quote! { rt::token_filter::#func(cursor)? }
+                        quote! { rt::schritt(input, rt::token_filter::#func)? }
                     }
                     "eof" => {
                         return Ok(quote! {
-                            if !cursor.eof() { return Err(rt::ParseError::at_cursor(cursor, "expected end of input")); }
+                            if !input.cursor().eof() { return Err(rt::ParseError::at_cursor(input.cursor(), "expected end of input")); }
                         })
                     }
                     "whitespace" => {
                         return Ok(quote! {
-                            if !ctx.check_whitespace(cursor.span()) { return Err(rt::ParseError::at_cursor(cursor, "expected whitespace")); }
+                            if !ctx.check_whitespace(input.cursor().span()) { return Err(rt::ParseError::at_cursor(input.cursor(), "expected whitespace")); }
                         })
                     }
-                    "any_byte" => quote! { rt::invoke_syn_parser::<syn::LitByte>(cursor)? },
+                    "any_byte" => quote! { rt::schritt(input, rt::take_single::<syn::LitByte>)? },
                     _ => {
                         let impl_name = format_ident!("parse_{}_impl", rule_name_ident.unwrap());
-                        quote! { rt::builtins::#impl_name(cursor, ctx)? }
+                        quote! { rt::builtins::#impl_name(input, ctx)? }
                     }
                 };
 
@@ -367,9 +373,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     quote!()
                 };
                 Ok(quote! {
-                    let (_val, next_cursor) = #expr;
+                    let _val = #expr;
                     #bind_stmt
-                    let mut cursor = next_cursor;
                 })
             } else {
                 let func_call = generate_rule_call_expr(rule_path, args, ctx)?;
@@ -379,9 +384,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     quote!()
                 };
                 Ok(quote! {
-                    let (_val, next_cursor) = #func_call;
+                    let _val = #func_call;
                     #bind_stmt
-                    let mut cursor = next_cursor;
                 })
             }
         }
@@ -414,18 +418,20 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 Ok(quote! {
                     #(#init_vecs)*
                     loop {
-                        let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<'a, _> {
+                        let _start_cursor = input.cursor();
+                        let _gabel = rt::gabel(input);
+                        let _res = (|| -> rt::StreamResult<'a, _> {
+                            let input = &_gabel;
                             #inner_logic
-                            Ok((#return_tuple, cursor))
+                            Ok(#return_tuple)
                         })();
                         match _res {
-                            Ok((vals, next_cursor)) => {
+                            Ok(vals) => {
                                 // Zero-Progress-Schutz (siehe oben).
-                                if next_cursor == _start_cursor { break; }
+                                if _gabel.cursor() == _start_cursor { break; }
+                                rt::uebernehmen(input, &_gabel);
                                 let #tuple_pat = vals;
                                 #(#push_vecs)*
-                                cursor = next_cursor;
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
@@ -441,17 +447,19 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             } else {
                 Ok(quote! {
                     loop {
-                        let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<'a, _> {
+                        let _start_cursor = input.cursor();
+                        let _gabel = rt::gabel(input);
+                        let _res = (|| -> rt::StreamResult<'a, _> {
+                            let input = &_gabel;
                             #inner_logic
-                            Ok(((), cursor))
+                            Ok(())
                         })();
                         match _res {
-                            Ok((_, next_cursor)) => {
+                            Ok(()) => {
                                 // Zero-Progress-Schutz: sonst dreht sich die Schleife ewig,
                                 // wenn das innere Muster ohne Tokenverbrauch matcht.
-                                if next_cursor == _start_cursor { break; }
-                                cursor = next_cursor;
+                                if _gabel.cursor() == _start_cursor { break; }
+                                rt::uebernehmen(input, &_gabel);
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
@@ -500,18 +508,20 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     let #tuple_pat = #return_tuple;
                     #(#push_vecs)*
                     loop {
-                        let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<'a, _> {
+                        let _start_cursor = input.cursor();
+                        let _gabel = rt::gabel(input);
+                        let _res = (|| -> rt::StreamResult<'a, _> {
+                            let input = &_gabel;
                             #inner_logic
-                            Ok((#return_tuple, cursor))
+                            Ok(#return_tuple)
                         })();
                         match _res {
-                            Ok((vals, next_cursor)) => {
+                            Ok(vals) => {
                                 // Zero-Progress-Schutz (siehe oben).
-                                if next_cursor == _start_cursor { break; }
+                                if _gabel.cursor() == _start_cursor { break; }
+                                rt::uebernehmen(input, &_gabel);
                                 let #tuple_pat = vals;
                                 #(#push_vecs)*
-                                cursor = next_cursor;
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
@@ -528,17 +538,19 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 Ok(quote! {
                     #inner_logic
                     loop {
-                        let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<'a, _> {
+                        let _start_cursor = input.cursor();
+                        let _gabel = rt::gabel(input);
+                        let _res = (|| -> rt::StreamResult<'a, _> {
+                            let input = &_gabel;
                             #inner_logic
-                            Ok(((), cursor))
+                            Ok(())
                         })();
                         match _res {
-                            Ok((_, next_cursor)) => {
+                            Ok(()) => {
                                 // Zero-Progress-Schutz: sonst dreht sich die Schleife ewig,
                                 // wenn das innere Muster ohne Tokenverbrauch matcht.
-                                if next_cursor == _start_cursor { break; }
-                                cursor = next_cursor;
+                                if _gabel.cursor() == _start_cursor { break; }
+                                rt::uebernehmen(input, &_gabel);
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
@@ -558,13 +570,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
             if bindings.is_empty() {
                 Ok(quote! {
-                    let _start_cursor = cursor;
-                    let _opt_res = (|| -> rt::ParseResult<'a, _> {
+                    let _gabel = rt::gabel(input);
+                    let _opt_res = (|| -> rt::StreamResult<'a, _> {
+                        let input = &_gabel;
                         #inner_logic
-                        Ok(((), cursor))
+                        Ok(())
                     })();
                     match _opt_res {
-                        Ok((_, next_cursor)) => { cursor = next_cursor; }
+                        Ok(()) => { rt::uebernehmen(input, &_gabel); }
                         Err(e) => {
                             if e.priority >= 50 { return Err(e); }
                             ctx.record_failure(&e);
@@ -576,14 +589,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let some_vars: Vec<_> = bindings.iter().map(|b| quote!(Some(#b))).collect();
                 let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
                 Ok(quote! {
-                    let _start_cursor = cursor;
-                    let _opt_res = (|| -> rt::ParseResult<'a, _> {
+                    let _gabel = rt::gabel(input);
+                    let _opt_res = (|| -> rt::StreamResult<'a, _> {
+                        let input = &_gabel;
                         #inner_logic
-                        Ok(( (#(#vars),*) , cursor))
+                        Ok((#(#vars),*))
                     })();
                     let (#(#vars),*) = match _opt_res {
-                        Ok((vals, next_cursor)) => {
-                            cursor = next_cursor;
+                        Ok(vals) => {
+                            rt::uebernehmen(input, &_gabel);
                             let (#(#vars),*) = vals;
                             (#(#some_vars),*)
                         }
@@ -635,9 +649,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             };
 
             Ok(quote! {
-                let (_val, next_cursor) = (|| -> rt::ParseResult<'a, _> { #variant_logic })()?;
+                let _val = (|| -> rt::StreamResult<'a, _> { #variant_logic })()?;
                 #bind_stmt
-                let mut cursor = next_cursor;
             })
         }
         ModelPattern::Bracketed(s, _)
@@ -670,33 +683,32 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             // Die Bindings der Gruppe muessen im UMGEBENDEN Scope landen, sonst
             // sieht der Action-Block sie nicht (sie starben frueher mit dem if-let-Block).
             Ok(quote! {
-                let (_val, _after_group) = if let Some((inner_cursor, _span, _next_cursor)) = cursor.group(proc_macro2::Delimiter::#delimiter) {
-                    // Innerhalb der Gruppe meldet Cursor::eof() das Gruppenende, nicht
-                    // das Eingabeende. Die Tiefe merken, damit Meldungen den
-                    // Unterschied benennen koennen.
-                    ctx.enter_group();
-                    let _grp_res = (|| -> rt::ParseResult<'a, _> {
-                        let mut cursor = inner_cursor;
-                        #inner_logic
-                        Ok((#return_expr, cursor))
-                    })();
-                    ctx.exit_group();
-                    let (_val, _inner_end) = _grp_res?;
-                    // "unexpected token in delimited group" ist nur ein Platzhalter fuer
-                    // "der Inhalt wurde nicht vollstaendig verbraucht". Wurde unterwegs
-                    // ein Grund gemerkt, ist der strikt aussagekraeftiger - deshalb
-                    // nicht strukturell, damit er nicht gewinnt.
-                    if !_inner_end.eof() {
-                        return Err(ctx.best_error(
-                            rt::ParseError::at_cursor(_inner_end, "unexpected token in delimited group")
-                        ));
-                    }
-                    (_val, _next_cursor)
-                } else {
-                    return Err(rt::ParseError::at_cursor(cursor, "expected delimited group").with_priority(50));
-                };
+                // `rt::gruppe` steigt in die Klammern ab und rueckt den aeusseren
+                // Strom hinter die Gruppe. Der Inhalt ist ein eigener Strom mit
+                // derselben Token-Lebensdauer - nur deshalb koennen Fehler aus der
+                // Gruppe nach aussen getragen werden.
+                let (_span, _inhalt) = rt::gruppe(input, proc_macro2::Delimiter::#delimiter)?;
+                // Innerhalb der Gruppe meldet Cursor::eof() das Gruppenende, nicht
+                // das Eingabeende. Die Tiefe merken, damit Meldungen den
+                // Unterschied benennen koennen.
+                ctx.enter_group();
+                let _grp_res = (|| -> rt::StreamResult<'a, _> {
+                    let input = &_inhalt;
+                    #inner_logic
+                    Ok(#return_expr)
+                })();
+                ctx.exit_group();
+                let _val = _grp_res?;
+                // "unexpected token in delimited group" ist nur ein Platzhalter fuer
+                // "der Inhalt wurde nicht vollstaendig verbraucht". Wurde unterwegs
+                // ein Grund gemerkt, ist der strikt aussagekraeftiger - deshalb
+                // nicht strukturell, damit er nicht gewinnt.
+                if !_inhalt.cursor().eof() {
+                    return Err(ctx.best_error(
+                        rt::ParseError::at_cursor(_inhalt.cursor(), "unexpected token in delimited group")
+                    ));
+                }
                 #bind_stmt
-                let mut cursor = _after_group;
             })
         }
         ModelPattern::LexicalScope(inner, _) => {
@@ -706,13 +718,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 // Das `?` MUSS hinter `exit_mode()` stehen - sonst bleibt der
                 // Modus bei einem Fehler auf dem Stapel liegen. Der Delimiter-Zweig
                 // macht es mit `exit_group()` genauso.
-                let _mode_res = (|| -> rt::ParseResult<'a, _> {
+                let _mode_res = (|| -> rt::StreamResult<'a, _> {
                     #inner_logic
-                    Ok(((), cursor))
+                    Ok(())
                 })();
                 ctx.exit_mode();
-                let (_res, next_cursor) = _mode_res?;
-                let mut cursor = next_cursor;
+                _mode_res?;
             })
         }
         ModelPattern::SpacedScope(inner, _) => {
@@ -722,21 +733,20 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 // Das `?` MUSS hinter `exit_mode()` stehen - sonst bleibt der
                 // Modus bei einem Fehler auf dem Stapel liegen. Der Delimiter-Zweig
                 // macht es mit `exit_group()` genauso.
-                let _mode_res = (|| -> rt::ParseResult<'a, _> {
+                let _mode_res = (|| -> rt::StreamResult<'a, _> {
                     #inner_logic
-                    Ok(((), cursor))
+                    Ok(())
                 })();
                 ctx.exit_mode();
-                let (_res, next_cursor) = _mode_res?;
-                let mut cursor = next_cursor;
+                _mode_res?;
             })
         }
         ModelPattern::SpanBinding(inner, span_var, _) => {
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
-                let _span_start = cursor.span();
+                let _span_start = input.cursor().span();
                 #inner_logic
-                let _span_end = cursor.span();
+                let _span_end = input.cursor().span();
                 let #span_var = _span_start.join(_span_end).unwrap_or(_span_start);
             })
         }
@@ -813,29 +823,32 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             };
 
             Ok(quote! {
-                let _start_cursor = cursor;
-                let _rec_res = (|| -> rt::ParseResult<'a, _> {
+                let _gabel = rt::gabel(input);
+                let _rec_res = (|| -> rt::StreamResult<'a, _> {
+                    let input = &_gabel;
                     #inner_logic
-                    Ok((#return_expr, cursor))
+                    Ok(#return_expr)
                 })();
-                let (_val, next_cursor) = match _rec_res {
-                    Ok((_val, c)) => {
+                let _val = match _rec_res {
+                    Ok(_val) => {
+                        rt::uebernehmen(input, &_gabel);
                         #some_assign
-                        (#option_ret, c)
+                        #option_ret
                     }
                     Err(e) => {
                         if e.priority >= 50 { return Err(e); }
-                        let mut temp_cursor = _start_cursor;
+                        // Die Gabel wurde NICHT uebernommen - der Strom steht noch
+                        // am Anfang des Rumpfs. Von dort bis zur naechsten
+                        // Synchronisationsmarke ueberspringen.
                         loop {
-                            if temp_cursor.eof() { break; }
-                            if rt::peek_syn(temp_cursor, |i| i.peek(#sync_peek)) { break; }
-                            if let Some((_, next)) = temp_cursor.token_tree() { temp_cursor = next; }
+                            if input.cursor().eof() { break; }
+                            if rt::peek_syn(input.cursor(), #sync_peek) { break; }
+                            if rt::token_nehmen(input).is_err() { break; }
                         }
-                        (#none_ret, temp_cursor)
+                        #none_ret
                     }
                 };
                 #bind_stmt
-                let mut cursor = next_cursor;
             })
         }
         ModelPattern::Peek(inner, _) => {
@@ -859,10 +872,13 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             };
 
             Ok(quote! {
-                let (_val, _) = (|| -> rt::ParseResult<'a, _> {
-                    let mut cursor = cursor; // copy
+                // Vorausschau: laeuft auf einer Gabel, die nie uebernommen wird -
+                // der Strom bleibt also stehen.
+                let _val = (|| -> rt::StreamResult<'a, _> {
+                    let _gabel = rt::gabel(input);
+                    let input = &_gabel;
                     #inner_logic
-                    Ok((#return_expr, cursor))
+                    Ok(#return_expr)
                 })()?;
                 #bind_stmt
             })
@@ -882,7 +898,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let meldung = match inner_name {
                 Some(name) => quote! {
                     {
-                        let _gefunden = cursor
+                        let _gefunden = input.cursor()
                             .token_tree()
                             .map(|(tt, _)| tt.to_string())
                             .unwrap_or_default();
@@ -895,13 +911,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 None => quote!("unexpected match".to_string()),
             };
             Ok(quote! {
-                let _not_res = (|| -> rt::ParseResult<'a, _> {
-                    let mut cursor = cursor; // copy
+                // Wie bei der Vorausschau: Gabel, die nie uebernommen wird.
+                let _not_res = (|| -> rt::StreamResult<'a, _> {
+                    let _gabel = rt::gabel(input);
+                    let input = &_gabel;
                     #inner_logic
-                    Ok(((), cursor))
+                    Ok(())
                 })();
                 if _not_res.is_ok() {
-                    return Err(rt::ParseError::at_cursor(cursor, #meldung).with_priority(50));
+                    return Err(rt::ParseError::at_cursor(input.cursor(), #meldung).with_priority(50));
                 }
             })
         }
@@ -917,16 +935,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             Ok(quote! {
                 let mut _tokens = Vec::new();
                 loop {
-                    if cursor.eof() { break; }
-                    let _is_match = (|| -> rt::ParseResult<'a, _> {
-                        let mut cursor = cursor; // copy
+                    if input.cursor().eof() { break; }
+                    let _is_match = (|| -> rt::StreamResult<'a, _> {
+                        let _gabel = rt::gabel(input);
+                        let input = &_gabel;
                         #inner_logic
-                        Ok(((), cursor))
+                        Ok(())
                     })().is_ok();
                     if _is_match { break; }
-                    if let Some((tt, next)) = cursor.token_tree() {
-                        _tokens.push(tt);
-                        cursor = next;
+                    match rt::token_nehmen(input) {
+                        Ok(tt) => _tokens.push(tt),
+                        Err(_) => break,
                     }
                 }
                 let _tokens_stream = proc_macro2::TokenStream::from_iter(_tokens);
@@ -953,15 +972,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let loop_over = |elem_logic: &proc_macro2::TokenStream| {
                 quote! {
                     loop {
-                        let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<'a, _> {
+                        let _start_cursor = input.cursor();
+                        let _gabel = rt::gabel(input);
+                        let _res = (|| -> rt::StreamResult<'a, _> {
+                            let input = &_gabel;
                             #elem_logic
-                            Ok(((), cursor))
+                            Ok(())
                         })();
                         match _res {
-                            Ok((_, next_cursor)) => {
-                                if next_cursor == _start_cursor { break; }
-                                cursor = next_cursor;
+                            Ok(()) => {
+                                if _gabel.cursor() == _start_cursor { break; }
+                                rt::uebernehmen(input, &_gabel);
                                 _count += 1;
                             }
                             Err(e) => {
@@ -998,13 +1019,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     let elem_logic = generate_pattern_step(elem, ctx)?;
                     quote! {
                         let mut _count: usize = 0;
-                        let _start_cursor = cursor;
-                        let _res = (|| -> rt::ParseResult<'a, _> {
+                        let _gabel = rt::gabel(input);
+                        let _res = (|| -> rt::StreamResult<'a, _> {
+                            let input = &_gabel;
                             #elem_logic
-                            Ok(((), cursor))
+                            Ok(())
                         })();
                         match _res {
-                            Ok((_, next_cursor)) => { cursor = next_cursor; _count += 1; }
+                            Ok(()) => { rt::uebernehmen(input, &_gabel); _count += 1; }
                             Err(e) => {
                             if e.priority >= 50 { return Err(e); }
                             ctx.record_failure(&e);
@@ -1034,7 +1056,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 "Explicit failure".to_string()
             };
             Ok(
-                quote! { return Err(rt::ParseError::at_cursor(cursor, #arg_expr).with_priority(50)); },
+                quote! { return Err(rt::ParseError::at_cursor(input.cursor(), #arg_expr).with_priority(50)); },
             )
         }
     }
@@ -1068,22 +1090,22 @@ fn generate_rule_call_expr(
     if let Some(ident) = rule_path.get_ident() {
         if ctx.grammar.extern_rules.iter().any(|er| er.name == *ident) {
             Ok(if arg_exprs.is_empty() {
-                quote!(#rule_path(cursor)?)
+                quote!(#rule_path(input)?)
             } else {
-                quote!(#rule_path(cursor, #(#arg_exprs),*)?)
+                quote!(#rule_path(input, #(#arg_exprs),*)?)
             })
         } else if ctx.grammar.rules.iter().any(|r| r.name == *ident) {
             let impl_name = format_ident!("parse_{}_impl", ident);
             Ok(if arg_exprs.is_empty() {
-                quote!(#impl_name(cursor, ctx)?)
+                quote!(#impl_name(input, ctx)?)
             } else {
-                quote!(#impl_name(cursor, ctx, #(#arg_exprs),*)?)
+                quote!(#impl_name(input, ctx, #(#arg_exprs),*)?)
             })
         } else {
             Ok(if arg_exprs.is_empty() {
-                quote!(#rule_path(cursor)?)
+                quote!(#rule_path(input)?)
             } else {
-                quote!(#rule_path(cursor, #(#arg_exprs),*)?)
+                quote!(#rule_path(input, #(#arg_exprs),*)?)
             })
         }
     } else {
@@ -1098,15 +1120,15 @@ fn generate_rule_call_expr(
             let last_seg = new_path.segments.last_mut().unwrap();
             last_seg.ident = format_ident!("parse_{}_impl", last_seg.ident);
             Ok(if arg_exprs.is_empty() {
-                quote!(#new_path(cursor, ctx)?)
+                quote!(#new_path(input, ctx)?)
             } else {
-                quote!(#new_path(cursor, ctx, #(#arg_exprs),*)?)
+                quote!(#new_path(input, ctx, #(#arg_exprs),*)?)
             })
         } else {
             Ok(if arg_exprs.is_empty() {
-                quote!(#rule_path(cursor)?)
+                quote!(#rule_path(input)?)
             } else {
-                quote!(#rule_path(cursor, #(#arg_exprs),*)?)
+                quote!(#rule_path(input, #(#arg_exprs),*)?)
             })
         }
     }

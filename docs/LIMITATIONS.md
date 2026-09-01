@@ -34,11 +34,6 @@ procedural macro on stable Rust (proc-macro2, `src/wrapper.rs`). Consequences:
   have positions. A message that looks fine in a test can therefore differ from
   what a macro user sees.
 
-### Item Error vs. Separator Error at the Same Position
-When a list item and the following separator both fail at the same token, the
-separator error currently wins, producing ``expected `,` `` where
-`expected <item>` would be more useful. Tracked in
-`cxx-parser/tests/error_messages.rs::ungueltiges_argument_wird_noch_zu_schwach_gemeldet`.
 
 ## Input Model
 
@@ -48,3 +43,17 @@ tokenizable by Rust's lexer. Languages with different lexical rules (significant
 whitespace, unusual string or comment syntax) and binary formats are out of
 scope. `lex(...)`/`spaced(...)` and the `whitespace` assertion recover
 *adjacency* information within those limits, but they do not change the lexer.
+
+### Rücksetzen kostet eine Allokation
+Der Rumpf einer Regel läuft auf einem `ParseBuffer`. Jeder Rücksetzpunkt
+(Alternative, `?`, `*`, `+`, `peek`, `not`, `recover`, jedes Listenelement)
+arbeitet auf einer Gabel (`fork`) und spielt sie bei Erfolg ein (`advance_to`,
+laut syn O(1)). Eine Gabel ist eine kleine `Rc`-Allokation; im Cursor-Design
+davor war Zurücksetzen allokationsfrei.
+
+Der Tausch lohnt sich deutlich: dafür wird der `TokenBuffer` genau einmal gebaut
+statt einmal je syn-AST-Typ. Eine Argumentliste mit 2000 `syn::Type`-Einträgen
+ging damit von 1,17 s auf 5,3 ms, und aus quadratischem wurde lineares Verhalten
+(vgl. `any_ident` ohne jeden AST-Typ: 3,1 ms).
+
+Hintergrund in [`adr/adr15-linear-parsing.md`](adr/adr15-linear-parsing.md).

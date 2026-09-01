@@ -1,0 +1,25 @@
+# Hilfs-Crate fuer den trybuild-Fall auf dem ECHTEN Prozedurmakro-Pfad.
+#
+# Es steht bewusst ausserhalb des Workspace (`[workspace] exclude` im
+# Wurzel-Cargo.toml) und wird nur als Pfad-dev-dependency von `syn-grammar`
+# eingebunden. So baut `cargo build --workspace` keine Testartefakte mit,
+# trybuild findet es aber trotzdem: es uebernimmt die dev-dependencies des
+# gepruften Crates in sein Scratch-Projekt.
+[package]
+name = "ui-macro"
+version = "0.0.0"
+edition = "2021"
+# Mindest-Toolchain. Ab 1.88 liefert `Span::start()` auch im Prozedurmakro auf
+# stable echte Positionen (proc-macro2 setzt dort `proc_macro_span_location`).
+# Darunter sind alle Spans (0,0), und die Adjazenzpruefung mehrzeichiger
+# Operatoren im erzeugten Code waere wirkungslos.
+rust-version = "1.88"
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn-grammar = { path = "../.." }
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+proc-macro2 = "1.0"

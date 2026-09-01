@@ -445,9 +445,11 @@ in term
 in expression
 ```
 
-The position is only printed when the span actually has line/column data. Inside
-a real proc macro on stable Rust it does not (rustc underlines the span in the
-editor instead) — see [`GOALS.md`](../GOALS.md).
+The position is only printed when the span actually has line/column data. That is
+the case inside a real proc macro from Rust 1.88 onwards, which this project
+requires (`rust-version = "1.88"`); a span without position data — `Span::call_site()`,
+for instance — prints without it. Either way rustc underlines the span in the editor.
+See [`GOALS.md`](../GOALS.md).
 
 ## Advanced Features
 
@@ -501,3 +503,91 @@ term -> i32 = i:i32 -> {i}
 
 ### Shadowing Detection
 The compiler checks for unreachable alternatives (e.g., if a prefix shadows a longer rule) and emits warnings or errors.
+
+### External Rules
+
+`extern rule` declares a rule that the generator must **not** generate: you
+write the parser by hand and the grammar just calls it. Useful for anything the
+DSL cannot express — a hand-rolled lexer hack, a parser from another crate, or
+a type without a usable `impl Parse`.
+
+```text
+extern rule name -> ReturnType;
+extern rule name(param: Type) -> ReturnType;
+```
+
+The function must be in scope where the grammar is defined (the generated module
+does `use super::*`) and have this signature:
+
+```rust
+use syn_grammar::rt::{ParseError, StreamResult, Strom};
+
+fn even_int<'a>(input: &Strom<'a>) -> StreamResult<'a, u64> {
+    let lit = syn_grammar::rt::schritt(input, syn_grammar::rt::take_single::<syn::LitInt>)?;
+    let v: u64 = lit.base10_parse().map_err(ParseError::from)?;
+    if v % 2 == 0 {
+        Ok(v)
+    } else {
+        // `input.cursor()` is the position the rule started at.
+        Err(ParseError::at_cursor(input.cursor(), "expected an even number"))
+    }
+}
+
+use syn_grammar::grammar;
+grammar! {
+    grammar Test {
+        extern rule even_int -> u64;
+
+        pub main -> u64 = "n" "=" v:even_int -> { v }
+    }
+}
+
+# fn main() {
+use syn::parse::Parser;
+assert_eq!(Test::parse_main.parse_str("n = 4").unwrap(), 4);
+assert!(Test::parse_main.parse_str("n = 5").unwrap_err().to_string().contains("expected an even number"));
+# }
+```
+
+Declared parameters are passed through positionally after `input`, so
+`extern rule f(offset: u64) -> u64;` called as `f(offset=3)` invokes
+`f(input, 3)`.
+
+> The `&Strom<'a>` signature is deliberate — `Strom<'a>` is `syn::parse::ParseBuffer<'a>`,
+> **not** syn's `ParseStream<'a>` alias. See `docs/adr/adr15-linear-parsing.md`.
+> Note that after an error the stream may have advanced; callers that backtrack
+> run your rule on a fork, so you do not need to restore it yourself.
+
+### Importing Another Grammar
+
+`import` brings the rules of another grammar module into scope under an alias.
+Rules are then called as `alias::rule_name`.
+
+```text
+import path::to::other_grammar as alias;
+```
+
+```rust
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Base {
+        pub number -> u64 = v:u64 -> { v }
+    }
+}
+
+grammar! {
+    import Base as base;
+
+    grammar Outer {
+        pub pair -> (u64, u64) = a:base::number "," b:base::number -> { (a, b) }
+    }
+}
+
+# fn main() {
+use syn::parse::Parser;
+assert_eq!(Outer::parse_pair.parse_str("1, 2").unwrap(), (1, 2));
+# }
+```
+
+The `import` may stand before the `grammar` block (as above) or inside it.

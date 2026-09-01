@@ -1,10 +1,11 @@
 name: Rust CI
 
 on:
+  # Bewusst ohne Branch-Filter: die Liste stand vorher auf ["main",
+  # "logic-changes"], womit auf jedem anderen Arbeitsbranch gar keine CI lief -
+  # Fehler fielen erst im Pull Request auf.
   push:
-    branches: ["main", "logic-changes"]
   pull_request:
-    branches: ["main", "logic-changes"]
   workflow_dispatch:
 
 env:
@@ -18,8 +19,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Gepinnt, nicht `stable`. `-D warnings` auf einer gleitenden Toolchain
+      # heisst: die CI kann rot werden, ohne dass sich eine Zeile aendert -
+      # sobald eine Rust-Veroeffentlichung einen Lint ergaenzt. Genau das ist
+      # schon einmal passiert (clippy::collapsible_match).
+      #
+      # Neue Lints gehen dadurch nicht verloren: der Job `lint-vorschau` unten
+      # laeuft auf `stable` und meldet sie, ohne zu blockieren. Diese Version
+      # darf jederzeit angehoben werden, wenn die Vorschau gruen ist.
       - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.98.0
         with:
           components: clippy, rustfmt
 
@@ -40,6 +49,66 @@ jobs:
       - name: Run Tests
         # Runs doc tests and integration tests as well
         run: cargo test --workspace --verbose
+
+      - name: Check Documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --document-private-items
+
+  msrv:
+    name: Mindest-Toolchain (MSRV)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Die in den Cargo.toml deklarierte `rust-version` ist eine Zusage an
+      # Nutzer: cargo bricht darunter mit klarer Meldung ab. Damit die Zusage
+      # auch stimmt, wird sie hier gegen genau diese Toolchain gebaut - sonst
+      # rutscht unbemerkt ein neueres Sprachmittel hinein.
+      #
+      # 1.88 ist nicht frei gewaehlt: ab dort liefert `Span::start()` auch im
+      # Prozedurmakro auf stable echte Positionen (proc-macro2 setzt dann
+      # `proc_macro_span_location`). Darunter sind alle Spans (0,0).
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@1.88.0
+
+      - name: Cache Cargo Registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+
+      - name: Build
+        run: cargo build --workspace --verbose
+
+      - name: Run Tests
+        run: cargo test --workspace --verbose
+
+  lint-vorschau:
+    name: Lint-Vorschau (stable, nicht blockierend)
+    runs-on: ubuntu-latest
+    # Meldet Lints einer neueren Toolchain, bevor das Anheben der gepinnten
+    # Version faellig wird. Ein Fehlschlag hier ist eine Vorwarnung, kein Stopp.
+    continue-on-error: true
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo Registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: lint-vorschau
+
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Linting (Clippy)
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Check Documentation
         env:

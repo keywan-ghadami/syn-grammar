@@ -30,12 +30,15 @@ pub struct ParseError<'a> {
     pub span: Span,
     /// Für die AUSWAHL: wie weit kam der Parser, als es schiefging.
     ///
-    /// Bewusst nicht über `span.start()` gemessen. Auf stable Rust liefert
-    /// `Span::start()` in einem Prozedurmakro immer `(0,0)`
-    /// (proc-macro2 `src/wrapper.rs`, `Span::Compiler` ohne `proc_macro_span_location`),
-    /// womit jeder Positionsvergleich wirkungslos wäre. `Cursor` implementiert dagegen
+    /// Bewusst nicht über `span.start()` gemessen: `Cursor` implementiert
     /// `PartialOrd` als Zeigervergleich im gemeinsamen `TokenBuffer` — O(1) und
-    /// unabhängig von der Toolchain.
+    /// unabhängig von der Compilerversion.
+    ///
+    /// Bis Rust 1.87 lieferte `Span::start()` im Prozedurmakro zudem für jeden
+    /// Span `(0,0)` (proc-macro2, `Span::Compiler` ohne
+    /// `proc_macro_span_location`), womit ein Positionsvergleich dort wirkungslos
+    /// gewesen wäre. Seit 1.88 ist das behoben — die Cursor-Metrik bleibt
+    /// trotzdem, weil sie billiger ist und an nichts hängt.
     ///
     /// `None` nur dort, wo beim Erzeugen kein Cursor zur Hand ist (etwa bei der
     /// Übernahme eines fremden `syn::Error`).
@@ -182,9 +185,9 @@ impl<'a> fmt::Display for ParseError<'a> {
         let mut msg = self.message.clone();
         let start = self.span.start();
 
-        // Position nur anhängen, wenn sie etwas aussagt. In einem Prozedurmakro auf
-        // stable Rust ist sie (0,0) und damit irreführend statt hilfreich; dort
-        // unterstreicht rustc den Span ohnehin selbst. Siehe ADR 13, Punkt 4.
+        // Position nur anhängen, wenn sie etwas aussagt. Ein Span ohne
+        // Positionsdaten meldet Zeile 0 — das wäre irreführend statt hilfreich,
+        // und rustc unterstreicht den Span ohnehin selbst. Siehe ADR 13, Punkt 4.
         if start.line != 0 && !msg.contains("at column ") {
             msg = format!("{} at column {} (line {})", msg, start.column, start.line);
         }
@@ -208,10 +211,11 @@ mod tests {
 
     /// Der Kerntest zu ADR 13, Punkt 8.
     ///
-    /// In einem Prozedurmakro auf stable Rust tragen ALLE Spans dieselbe Position
-    /// `(0,0)`. Die Auswahl des besten Fehlers muss trotzdem funktionieren — sie darf
-    /// deshalb nicht am Span hängen. Hier bekommen beide Fehler bewusst denselben
-    /// Span; unterscheidbar sind sie allein über den Cursor.
+    /// Die Auswahl des besten Fehlers darf nicht am Span hängen — Spans können
+    /// gleich sein, ohne dass die Fehler es sind (bis Rust 1.87 trugen im
+    /// Prozedurmakro sogar ALLE dieselbe Position `(0,0)`). Hier bekommen beide
+    /// Fehler bewusst denselben Span; unterscheidbar sind sie allein über den
+    /// Cursor.
     #[test]
     fn auswahl_funktioniert_bei_identischen_spans() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
@@ -278,8 +282,8 @@ mod tests {
     /// Anzeige der Position (ADR 13, Punkt 4).
     ///
     /// Ausserhalb eines Prozedurmakros benutzt proc-macro2 seinen Fallback und liefert
-    /// echte Zeilen (ab 1) — die Position gehoert dann in die Meldung. Im Prozedurmakro
-    /// auf stable ist sie `(0,0)` und wird von `Display` unterdrueckt; dieser Fall
+    /// echte Zeilen (ab 1) — die Position gehoert dann in die Meldung. Ein Span ohne
+    /// Positionsdaten meldet Zeile 0 und wird von `Display` unterdrueckt; dieser Fall
     /// laesst sich hier nicht nachstellen, weil sich ein `Span::Compiler` ausserhalb
     /// eines echten Makros nicht erzeugen laesst. Der Test haelt deshalb fest, dass die
     /// Angabe im Normalfall erscheint — die Unterdrueckung selbst sichert die

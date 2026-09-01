@@ -16,6 +16,8 @@ pub mod error;
 
 /// Fluente Zusicherungen zum Testen generierter Parser.
 #[cfg(feature = "testing")]
+pub mod stream;
+
 pub mod testing;
 
 pub use grammar_kit_macros::with_span;
@@ -35,3 +37,5 @@ pub use combinators::*;
 pub use context::*;
 #[cfg(feature = "syn")]
 pub use error::*;
+
+pub use stream::*;

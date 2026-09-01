@@ -9,10 +9,10 @@ Der hier beschriebene `ErrorState` existierte bis Commit `0aace8a` in
 ersatzlos gelöscht. „Proposed" war dadurch irreführend.
 
 **Eine Festlegung dieses ADR ist überholt:** Punkt 2 der Auswahlhierarchie („Location
-(Progress)") stützt sich auf `start_span` und damit auf `Span::start()`. Auf stable Rust
-liefert das im Prozedurmakro immer `(0,0)`
-(`proc-macro2-1.0.106/src/wrapper.rs:449-450`), die Heuristik ist dort also wirkungslos.
-Ersatz ist `PartialOrd for Cursor` (syn 2.0.114, `src/buffer.rs:401-409`).
+(Progress)") stützt sich auf `start_span` und damit auf `Span::start()`. Bis Rust 1.87
+lieferte das im Prozedurmakro immer `(0,0)` und war dort wirkungslos; seit 1.88 sind
+Positionen verfügbar. Ersetzt wurde es dennoch durch `PartialOrd for Cursor`
+(`src/buffer.rs`) — ein Zeigervergleich in O(1), der an keiner Compilerversion hängt.
 Siehe [ADR 13](adr13-error-message-contract.md), Punkt 8.
 
 Das beobachtbare Ergebnis regelt [ADR 13](adr13-error-message-contract.md); dieses

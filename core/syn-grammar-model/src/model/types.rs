@@ -6,11 +6,14 @@ use std::hash::{Hash, Hasher};
 /// A backend-agnostic representation of an identifier.
 #[derive(Debug, Clone)]
 pub struct Identifier {
+    /// Der Text des Bezeichners.
     pub text: String,
+    /// Die Quellstelle, an der er stand - fuer Fehlermeldungen und `quote!`.
     pub span: Span,
 }
 
 impl Identifier {
+    /// Baut einen Bezeichner aus Text und Quellstelle.
     pub fn new(text: impl Into<String>, span: Span) -> Self {
         Self {
             text: text.into(),
@@ -55,11 +58,15 @@ impl From<Identifier> for syn::Ident {
 /// A backend-agnostic representation of a string literal.
 #[derive(Debug, Clone)]
 pub struct StringLiteral {
+    /// Der Inhalt des Literals, bereits ohne Anfuehrungszeichen und mit
+    /// aufgeloesten Escapes.
     pub value: String,
+    /// Die Quellstelle des Literals.
     pub span: Span,
 }
 
 impl StringLiteral {
+    /// Baut ein Stringliteral aus Wert und Quellstelle.
     pub fn new(value: impl Into<String>, span: Span) -> Self {
         Self {
             value: value.into(),
@@ -98,11 +105,17 @@ impl ToTokens for StringLiteral {
 /// A generic wrapper that attaches a source span to a value.
 #[derive(Clone, Copy)]
 pub struct SpannedValue<T> {
+    /// Der eigentliche Wert.
     pub value: T,
+    /// Die Quellstelle, aus der er gelesen wurde.
+    ///
+    /// Vergleich und Hash ignorieren sie bewusst - zwei gleiche Werte an
+    /// verschiedenen Stellen sind gleich.
     pub span: Span,
 }
 
 impl<T> SpannedValue<T> {
+    /// Verbindet einen Wert mit seiner Quellstelle.
     pub fn new(value: T, span: Span) -> Self {
         Self { value, span }
     }

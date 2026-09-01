@@ -171,6 +171,7 @@ dependencies = [
  "syn-grammar-macros",
  "syn-grammar-model",
  "trybuild",
+ "ui-macro",
 ]
 
 [[package]]
@@ -259,6 +260,15 @@ dependencies = [
  "target-triple",
  "termcolor",
  "toml",
+]
+
+[[package]]
+name = "ui-macro"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "syn",
+ "syn-grammar",
 ]
 
 [[package]]

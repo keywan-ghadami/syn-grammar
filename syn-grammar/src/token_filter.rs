@@ -5,7 +5,7 @@
 //! Cursor-Parsing nahmen sie noch einen `ParseStream` und waren dadurch aus dem
 //! generierten Code gar nicht mehr aufrufbar.
 
-use crate::rt::{invoke_syn_parser, ParseError, ParseResult};
+use crate::rt::{take_single, ParseError, ParseResult};
 use syn::buffer::Cursor;
 use syn::spanned::Spanned;
 use syn::{Ident, LitInt};
@@ -14,10 +14,10 @@ use syn::{Ident, LitInt};
 /// an der Stelle, an der der Parser stand.
 fn filtered<'a, T, F>(cursor: Cursor<'a>, pruefung: F, erwartet: &str) -> ParseResult<'a, T>
 where
-    T: syn::parse::Parse + Spanned,
+    T: crate::rt::SingleToken + Spanned,
     F: FnOnce(&T) -> bool,
 {
-    let (wert, next) = invoke_syn_parser::<T>(cursor)?;
+    let (wert, next) = take_single::<T>(cursor)?;
     if pruefung(&wert) {
         Ok((wert, next))
     } else {

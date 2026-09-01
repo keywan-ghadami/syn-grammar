@@ -1,2 +1,8 @@
 target/
 .aider*
+
+# Einmalige Dumps, die frueher versehentlich eingecheckt wurden:
+# Makro-Expansionen, Compilerausgaben, Testprotokolle.
+/expanded.rs
+/output
+/testresults.txt

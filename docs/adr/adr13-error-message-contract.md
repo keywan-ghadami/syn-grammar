@@ -54,9 +54,11 @@ Stelle der internen Token-Erwartung.
 Format `at column N (line M)`, genau einmal in der Meldung.
 
 **Einschränkung, bindend:** Diese Angabe wird nur ausgegeben, wenn der Span echte
-Positionsdaten trägt. Auf stable Rust liefert ein Prozedurmakro `(0,0)`
-(`proc-macro2-1.0.106/src/wrapper.rs:449-450`); dort wird die Angabe **weggelassen**
-statt als `0` gedruckt — rustc unterstreicht den Span ohnehin selbst.
+Positionsdaten trägt. Bis Rust 1.87 lieferte ein Prozedurmakro `(0,0)`; seit 1.88
+setzt proc-macro2 `proc_macro_span_location` auch auf stable, und das Projekt
+verlangt diese Version (`rust-version = "1.88"`). Die Prüfung bleibt trotzdem: ein
+Span ohne Positionsdaten wird **weggelassen** statt als `0` gedruckt — etwa bei
+`Span::call_site()`, das nach wie vor keine trägt.
 
 Die Positionsangabe dient allein der **Anzeige**. Für die **Auswahl** des besten Fehlers
 ist sie unbrauchbar; dafür gilt Punkt 8.
@@ -164,9 +166,14 @@ Punkt 8 von der Textgestalt unabhängig und macht Ergebnisse deterministisch.
 ### 14. Nachweis auf dem echten Makro-Pfad
 
 Mindestens ein Test muss die Meldung über den **Prozedurmakro-Pfad** prüfen, nicht über
-`parse_str`. Sonst bleibt Punkt 4 unbemerkt verletzt: `parse_str` benutzt den Fallback von
-proc-macro2 und liefert echte Positionen, ein reales Makro auf stable nicht.
-Vorgesehen als `trybuild`-Fall unter `syn-grammar/tests/ui/`.
+`parse_str`. Der Fallback von proc-macro2, den `parse_str` benutzt, verhält sich an
+mehreren Stellen anders als ein reales Makro — was dort passiert, sieht man sonst nie.
+
+**Erfüllt** durch die `trybuild`-Fälle `runtime_error_real_macro`,
+`runtime_ok_real_macro` und `joint_operator_real_macro` in `syn-grammar/tests/ui/`,
+gespeist aus dem Hilfs-Crate `syn-grammar/tests/ui-macro/`. Genau dieser Test hat
+gezeigt, dass die früher hier festgehaltene Annahme — im Makro trage kein Span
+Positionen — seit Rust 1.88 nicht mehr stimmt.
 
 ## Consequences
 
