@@ -1,7 +1,8 @@
 # ADR 15: Der Weg zu linearem Parsen
 
 **Status:** Accepted. Stufen 0, 1 und 3 sind umgesetzt; Stufe 1 ist von Stufe 3
-wieder abgelöst worden. Stufe 2 entfällt, Stufe 4 bleibt offen.
+wieder abgelöst worden. Stufe 2 entfällt. Stufe 4 ist vorbereitet, aber nicht
+eingereicht — sie liegt bei einem fremden Projekt.
 **Datum:** 2026-08-31, fortgeschrieben 2026-09-01
 
 ## Context
@@ -218,17 +219,42 @@ damit nicht verkleinert, sondern verschwunden.
 Die Allokationskosten des Backtrackings sind in diesen Zahlen enthalten und
 gehen unter — `any_ident` wurde sogar schneller.
 
-### Stufe 4 — Upstream
+### Stufe 4 — Upstream (**vorbereitet, nicht eingereicht**)
 
-`StepCursor::advance_to` bei syn anfragen. Der Quelltext erklärt selbst, dass es
-sound wäre. Damit wäre Cursor-first ohne jeden Umweg möglich und dieser ganze
-ADR gegenstandslos.
+`syn::parse::advance_step_cursor` ist `pub(crate)`. Der Quelltext von
+`ParseBuffer::step` sagt selbst, eine oeffentliche Fassung als Methode auf
+`StepCursor` waere sicher.
+
+**Die Begruendung hat sich mit Stufe 3 geaendert.** Urspruenglich stand hier:
+„damit waere Cursor-first ohne Umweg moeglich und dieser ADR gegenstandslos".
+Das ist ueberholt — Cursor-first ist nicht mehr das Ziel. Was bleibt, ist
+kleiner und konkreter: `schritt` muss den Fehler einer Cursor-Primitive **ohne**
+seinen Cursor durch die `step`-Schranke tragen, weil die Closure fuer jede
+Lebensdauer `'c` funktionieren muss und ein `ParseError<'c>` sie nicht verlassen
+kann. Mit `StepCursor::advance_to` liesse sich der Cursor von `'c` auf `'a`
+heben und der Fehler bliebe unangetastet.
+
+**Gemessen am Nutzen: klein.** Alle heutigen Primitiven melden ihren Fehler an
+der Eintrittsstelle, die Rekonstruktion in `schritt` ist also exakt. Lokal gegen
+ein gepatchtes syn 2.0.117 gebaut und `schritt` umgestellt: 153 Tests gruen,
+identisch zum ungepatchten Stand — **kein beobachtbarer Verhaltensunterschied**.
+Der Gewinn ist der entfallende Umweg und die entfallende stillschweigende
+Bedingung, dass eine Primitive nur an ihrer Eintrittsstelle scheitern darf.
+
+Der Entwurf der Anfrage liegt in
+[`docs/upstream/syn-stepcursor-advance-to.md`](../upstream/syn-stepcursor-advance-to.md).
+Eingereicht ist er nicht — das geht an ein fremdes Projekt und braucht eine
+Entscheidung des Eigentuemers.
 
 ## Empfehlung
 
-Stufe 3 ist umgesetzt und beseitigt die letzte quadratische Quelle. Offen bleibt
-allein **Stufe 4**: sie kostet fast nichts und würde den `schritt`-Umweg für die
-Cursor-Primitiven überflüssig machen.
+Stufe 3 ist umgesetzt und beseitigt die letzte quadratische Quelle. Damit ist
+das Ziel des ADR erreicht: der Parser ist linear in der Eingabelänge.
+
+**Stufe 4 ist kein Leistungsthema mehr**, sondern Aufräumen an einer
+Schnittstelle — sechs Zeilen bei syn, kein beobachtbarer Unterschied hier. Der
+Entwurf liegt bereit; ob er eingereicht wird, ist eine Entscheidung, keine
+technische Frage.
 
 Der Umbau ist die Umkehrung dessen, was im Mai 2026 geschah. Die damalige
 Begründung — Backtracking wird trivial — war richtig und ist durch die

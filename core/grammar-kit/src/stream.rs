@@ -50,6 +50,12 @@ pub type StreamResult<'a, T> = Result<T, ParseError<'a>>;
 /// draussen neu an die Eintrittsstelle gehaengt. Das ist keine Naeherung: die
 /// Primitiven ([`crate::take_single`], die Zeichenfilter) melden ihren Fehler
 /// ohnehin an der Eintrittsstelle.
+///
+/// Der Umweg entfiele mit einem oeffentlichen `StepCursor::advance_to`, das
+/// syns Quelltext selbst als sicher bezeichnet. Anfrage vorbereitet unter
+/// `docs/upstream/syn-stepcursor-advance-to.md` (ADR 15, Stufe 4); solange sie
+/// nicht durch ist, gilt: **eine Primitive darf hier nur an ihrer
+/// Eintrittsstelle scheitern**, sonst verschiebt sich ihre Fehlerstelle.
 pub fn schritt<'a, T, F>(input: &Strom<'a>, f: F) -> StreamResult<'a, T>
 where
     F: for<'c> FnOnce(Cursor<'c>) -> ParseResult<'c, T>,
