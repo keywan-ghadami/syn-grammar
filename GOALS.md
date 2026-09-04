@@ -68,20 +68,11 @@ funktionieren und erstklassige Fehlermeldungen liefern.
 
 ## Nicht-Ziele
 
-* **Keine Harmonisierung mit `winnow-grammar`.** Erledigt: `winnow-grammar` ist seit
-  dem 31.08.2026 ein eigenständiges Projekt unter
-  <https://github.com/keywan-ghadami/winnow-grammar>. Dieses Repository enthält nur
-  noch das syn-Backend.
+* **Keine Harmonisierung mit `winnow-grammar`.** Das ist ein eigenständiges
+  Projekt unter <https://github.com/keywan-ghadami/winnow-grammar>. Es hat das
+  Frontend (DSL-Parser, Modell, Validator) geforkt statt es zu beziehen — das
+  Modell hier ist `syn`-basiert (`syn::Path`, `syn::Lit`, `syn::Type`) und lässt
+  sich nicht backendneutral weiterentwickeln. Die beiden Fassungen der DSL
+  driften also auseinander. Dieses Repository enthält nur das syn-Backend.
 * **Keine gemeinsame Codegen-Abstraktion** über mehrere Backends.
 
-## Entschieden: das Frontend wurde geforkt
-
-`winnow-grammar` benutzte das gemeinsame Frontend `core/syn-grammar-model` (DSL-Parser,
-Modell, Validator). Zur Wahl standen eine eigenständige Veröffentlichung unter
-backend-neutralem Namen und ein Fork. **Entschieden wurde der Fork** — er löst die
-Kopplung sofort und erlaubt es winnow, das Modell in Richtung `syn`-Freiheit
-weiterzuentwickeln, was hier strukturell nicht möglich ist (das Modell ist
-`syn`-basiert). Preis: die DSL driftet auseinander.
-
-Fork-Punkt ist Commit `64be1ef` (31.08.2026, Version 0.9.0-Entwurf); er ist in beiden
-Repositories vermerkt und der Bezugspunkt für einen späteren Abgleich.
