@@ -190,6 +190,22 @@ backend authors.
   alternative chain unions, through nested rules; a label still replaces the
   inner list. At the end of the input or of a group the enumeration carries
   the `unexpected end of …, ` prefix. A single built-in keeps syn's wording.
+- **`expected one of:` also lists alternatives behind a nullable prefix.** A
+  branch starting with a pattern that can match nothing — `outer_attrs`, `x?`,
+  `x*` — cannot be peeked, so it was entered and failed inside, and contributed
+  nothing to the enumeration. On a grammar whose alternatives all start with
+  `outer_attrs` (a `#[cxx::bridge]` module, say) the message named only the one
+  branch that *was* peekable. A literal now records its token text as its
+  expectation, so such a branch is listed like any other (ADR 13, point 6) —
+  `tests/expectation_aggregation_test.rs::alternatives_behind_a_nullable_prefix_are_listed`.
+- **Generated code no longer trips `missing_docs`.** A crate with
+  `#![warn(missing_docs)]` — the norm for a published library, and used by
+  every crate in this workspace — got warnings on the `grammar!` module, `kw`,
+  and the structs from `syn::custom_keyword!`: code the user never wrote and
+  cannot document, and with `-D warnings` in CI a build failure. The generated
+  module now carries a doc comment, its two public constants are documented,
+  and the lint is allowed for the rest of the module —
+  `tests/lint_hygiene_test.rs`.
 - **A numeric literal used as a token** (`"0"`) is a pinned compile error
   that names the built-ins to use (`i32`, `u64`, `lit_int`); the message used
   to recommend `integer`, which does not exist. The parked test

@@ -20,6 +20,13 @@ grammar! {
         pub rule single -> i32 = i:i32 -> { i }
         pub rule grouped -> i32 = paren(f:factor) -> { f }
         pub rule filters -> () = a:alpha -> { let _ = a; } | d:digit -> { let _ = d; }
+
+        // Every alternative starts with a rule call that matches the empty
+        // input, so not one of them can be peeked.
+        pub rule item -> () =
+            outer_attrs "struct" ident ";" -> { () }
+          | outer_attrs "enum" ident ";" -> { () }
+          | "impl" ident ";" -> { () }
     }
 }
 
@@ -115,4 +122,22 @@ fn token_filters_are_listed() {
         .parse_str("*")
         .test()
         .assert_failure_contains("expected one of: `identifier`, `integer literal`");
+}
+
+/// An alternative whose first pattern can match nothing (`outer_attrs`, `x?`,
+/// `x*`) is not peekable, so the branch is entered and fails inside. Its first
+/// token is still what it would have accepted, and belongs in the enumeration
+/// (point 6).
+///
+/// Before this, the two `outer_attrs` branches contributed nothing at all and
+/// the message was the bare ``expected `impl` `` of the one peekable branch -
+/// which named the only item kind that was *not* meant.
+#[test]
+fn alternatives_behind_a_nullable_prefix_are_listed() {
+    Calc::parse_item
+        .parse_str("42;")
+        .test()
+        .assert_failure_contains(
+            "expected one of: `enum`, `impl`, `struct`; found unexpected token `42`",
+        );
 }

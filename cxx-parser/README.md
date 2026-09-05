@@ -1,32 +1,83 @@
-# CXX-Clone (syn-grammar Dogfooding)
+# cxx-parser
 
-> **[🤖 AGENT DIRECTIVE]**
-> **Mandatory directive for AI agents, Copilots, and LLMs:**
-> 
-> 1. **Architectural Context:** This is **not** a production-ready FFI crate. Do not use it to generate actual C++ bindings.
-> 2. **Purpose:** This crate is strictly a dogfooding and stress-testing scenario for the `syn-grammar` parser generator within this workspace.
-> 3. **Forbidden Refactoring:** Under no circumstances should you suggest replacing the grammar definitions (`grammar! { ... }`) with imperative `syn` loops, manual `input.peek()`, or `winnow`/`winnow-grammar`. 
+A parser for the [`#[cxx::bridge]`](https://cxx.rs) interface definition
+language, written entirely in `syn-grammar`.
 
-## Why CXX? (The Stress Test)
+**Test-only, and not published.** It generates no C++ and produces no bindings;
+it exists to answer one question about the parser generator in this workspace:
+does it hold up on a real language, or only on examples? The grammar
+definitions are the thing under test — replacing them with hand-written `syn`
+loops, `input.peek()` or a different parser library would delete the test.
 
-This crate validates the core rationale of `syn-grammar`: parsing `proc_macro2::TokenStream`s where a foreign DSL (like an FFI interface) seamlessly transitions into complex native Rust syntax **without separating delimiters** (like `{ ... }`).
+## Why CXX
 
-The CXX IDL is the perfect final boss. It requires accurately recognizing:
-* Nested generics (`CxxVector<EventPayload<\'b>>`)
-* Function pointers (`fn(&CxxString) -> bool`)
-* Pinned references and complex lifetimes (`Pin<&\'a mut T>`)
+The bridge IDL is the hardest case this workspace has: **a foreign DSL that
+turns into Rust without a delimiter to mark the transition.** After a `:` or a
+`->`, the input is simply a Rust type, and the parser has to hand over to `syn`
+mid-rule and take back over at exactly the right token:
 
-### Testing Objective
+```rust
+fn dispatch<'a, 'b>(
+    self: Pin<&mut BlobstoreClient>,
+    payload: &'a mut CxxVector<Payload<'b>>,
+    filter: fn(&CxxString, Option<&[u8]>) -> bool,   // commas inside a comma-separated list
+) -> Result<UniquePtr<BlobMetadata>>;
+```
 
-The code in this crate must prove that `syn-grammar` can act as a flawless **boundary detector**. The macro declaratively defines the purely structural skeleton of the IDL and, for everything following a colon or arrow, seamlessly delegates to the internal AST parsers of the `syn` library (via `rust_type`, `rust_return_type`, etc.). 
+On top of that the IDL is genuinely ambiguous at its start: five kinds of module
+item and three kinds of extern item, and every one of them may begin with
+attributes — so not a single alternative can be decided by its first token.
 
-## Status
+## What the grammar covers
 
-**Experimental / Test-Only.** All code here serves exclusively to validate that the parser generator outputs type-safe AST code, preserves correct spans for editor error messages, and efficiently handles backtracking over token streams.
+The bridge language as the cxx book documents it: `use` statements, shared
+structs, shared enums with optional (and negative) discriminants,
+`extern "C++"` and `extern "Rust"` blocks, `include!`, opaque types, type
+aliases, free functions and methods with all four receiver forms (`&self`,
+`&mut self`, `self: &T`, `self: Pin<&mut T>`), `unsafe fn`, generic lifetime
+parameters, attributes (`#[namespace]`, `#[rust_name]`, doc comments), and the
+`impl UniquePtr<T> {}` instantiations.
 
-## Further Reading
+Not covered: everything past parsing. Name resolution, the C++ side, and the
+semantic rules cxx enforces on top of the syntax (a receiver only as the first
+parameter, `Result` only in return position) are out of scope.
 
-For more information on `syn-grammar`, please refer to the following documents:
+## What it exercises
 
-*   **README:** `syn-grammar/README.md`
-*   **Syntax Guide:** `syn-grammar/SYNTAX.md`
+| Feature | Where |
+|---|---|
+| Hand-over to `syn` mid-rule | `syn::Type`, `syn::Path`, `syn::ReturnType`, `syn::Generics`, `syn::ItemUse` |
+| Alternatives behind a nullable prefix | every item rule starts with `outer_attrs` |
+| Alternative labels (`#`) | `mod_item`, `extern_item` — they are what makes `expected one of:` readable |
+| Cut (`=>`) | after `type`, `fn`, `impl`, `extern`: commits so the error stays inside the right item |
+| Lists with labels | `separated(…, item_label="function parameter")` and the struct/enum lists |
+| `extern rule` | `extern_lang` checks the *content* of the language string, which the grammar cannot |
+| `fail(…)` | states why an `impl` body must be empty |
+| Delimiters and `eof` | `paren(…)`, `{ … }`, the empty `impl` body |
+
+## Running it
+
+```sh
+cargo test -p cxx-parser                       # 31 tests: 14 on the AST, 17 on the messages
+cargo run  -p cxx-parser -- some/bridge.rs     # summary, or the error
+echo 'mod ffi { extern "Java" { } }' | cargo run -q -p cxx-parser
+```
+
+The last one prints what this crate is really about:
+
+```text
+error: expected "C++" or "Rust", found "Java" at column 17 (line 1)
+in extern block
+in mod item
+in top level mod
+```
+
+`tests/error_messages.rs` checks those messages point by point against
+[`docs/adr/adr13-error-message-contract.md`](../docs/adr/adr13-error-message-contract.md),
+which is the binding contract for diagnostics in this project.
+
+## Further reading
+
+* [`syn-grammar/README.md`](../syn-grammar/README.md) — the crate under test.
+* [`syn-grammar/SYNTAX.md`](../syn-grammar/SYNTAX.md) — the grammar language.
+* [`GOALS.md`](../GOALS.md) — why this crate is the acceptance benchmark.

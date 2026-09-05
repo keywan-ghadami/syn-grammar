@@ -43,10 +43,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 // and costs O(1) - the previously needed advance counting of the
                 // source tokens (`take_fixed`) is gone.
                 if token_types.len() <= 1 {
+                    // The token text is recorded as the expectation, so an
+                    // enclosing alternative chain can list this branch in
+                    // `expected one of:` even when it could not be peeked -
+                    // which is the case for every alternative starting with a
+                    // rule call, `outer_attrs` for instance (ADR 13, point 6).
+                    let lit_text = lit.value();
                     let parses = token_types.iter().map(|ty| {
                         let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _t;) } else { quote!() };
                         quote! {
-                            let _t = rt::parse_syn::<#ty>(input)?;
+                            let _t = rt::parse_syn::<#ty>(input)
+                                .map_err(|e| e.with_expected(#lit_text))?;
                             ctx.record_span(syn::spanned::Spanned::span(&_t)).map_err(|e| rt::ParseError::new(syn::spanned::Spanned::span(&_t), e.to_string()))?;
                             #bind_stmt
                         }
