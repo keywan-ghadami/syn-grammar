@@ -56,6 +56,6 @@ The library exposes several helper functions used by generated parsers:
     `"<item_label> <index>"` and `"separator"` onto the live rule stack, which is
     what produces `in function parameter 2` in error messages.
 
-> Entfaellt mit 0.9.0: `attempt`, `peek`, `not_check`, `attempt_recover`,
+> Removed in 0.9.0: `attempt`, `peek`, `not_check`, `attempt_recover`,
 > `parse_ident`, `parse_int`, `skip_until`, `attempt_labeled`,
 > `invoke_syn_parser`, `invoke_parser_fn`, `take_fixed`.

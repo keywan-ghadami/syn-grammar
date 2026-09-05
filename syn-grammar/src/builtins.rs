@@ -5,9 +5,9 @@ use syn::spanned::Spanned;
 use syn::Ident;
 use syn_grammar_model::model::types::{Identifier, SpannedValue, StringLiteral};
 
-// Die Einzeltoken-Builtins lesen weiter ueber den Cursor - das ist O(1) und
-// braucht keinen Strom. `schritt` laesst sie in einer `step`-Episode laufen und
-// rueckt den Strom um genau ihr Ergebnis vor.
+// The single-token builtins keep reading via the cursor - that is O(1) and
+// needs no stream. `schritt` runs them inside a `step` episode and advances
+// the stream by exactly their result.
 
 pub fn parse_ident_impl<'a>(
     input: &Strom<'a>,
@@ -164,7 +164,7 @@ pub fn parse_bin_literal_impl<'a>(
     parse_u64_impl(input, ctx)
 }
 
-// Einzeltoken-Builtins: O(1) direkt ueber den Cursor.
+// Single-token builtins: O(1) directly via the cursor.
 macro_rules! impl_einzeltoken_builtin {
     ($name:ident, $ty:ty) => {
         pub fn $name<'a>(input: &Strom<'a>, ctx: &mut ParseContext<'a>) -> StreamResult<'a, $ty> {
@@ -176,8 +176,8 @@ macro_rules! impl_einzeltoken_builtin {
     };
 }
 
-// Echte syn-AST-Typen. Seit ADR 15, Stufe 3 ist das ein gewoehnlicher
-// `parse`-Aufruf auf dem bestehenden Strom - O(Laenge des Typs) statt O(Rest).
+// Real syn AST types. Since ADR 15, stage 3 this is an ordinary `parse`
+// call on the existing stream - O(length of the type) instead of O(rest).
 macro_rules! impl_syn_builtin {
     ($name:ident, $ty:ty) => {
         pub fn $name<'a>(input: &Strom<'a>, ctx: &mut ParseContext<'a>) -> StreamResult<'a, $ty> {
@@ -196,19 +196,19 @@ impl_einzeltoken_builtin!(parse_lit_int_impl, syn::LitInt);
 impl_einzeltoken_builtin!(parse_lit_char_impl, syn::LitChar);
 impl_einzeltoken_builtin!(parse_lit_bool_impl, syn::LitBool);
 impl_einzeltoken_builtin!(parse_lit_float_impl, syn::LitFloat);
-/// `any_ident` akzeptiert - anders als `ident` - auch Schluesselwoerter.
+/// `any_ident` accepts - unlike `ident` - keywords as well.
 ///
-/// syns `Ident`-Parser lehnt `self`, `type`, `fn` usw. ab. Bisher benutzte
-/// `any_ident` genau diesen Parser und war damit identisch mit `ident`; Grammatiken
-/// wie die von cxx (`fn f(self: Pin<&mut T>)`) scheiterten daran. `Ident::parse_any`
-/// aus `syn::ext::IdentExt` ist der dafuer vorgesehene Weg.
+/// syn's `Ident` parser rejects `self`, `type`, `fn` etc. Previously `any_ident`
+/// used exactly that parser and was thus identical to `ident`; grammars such as
+/// the cxx one (`fn f(self: Pin<&mut T>)`) failed because of that. `Ident::parse_any`
+/// from `syn::ext::IdentExt` is the intended way.
 pub fn parse_any_ident_impl<'a>(
     input: &Strom<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> StreamResult<'a, Ident> {
-    // `Ident::parse_any` heisst schlicht: jedes Ident-Token, auch
-    // Schluesselwoerter. Das ist `cursor.ident()` ohne den `accept_as_ident`-
-    // Filter, in O(1). Steht in cxx in jedem Funktionsargument.
+    // `Ident::parse_any` simply means: any ident token, keywords included.
+    // That is `cursor.ident()` without the `accept_as_ident` filter, in O(1).
+    // Appears in every function argument in cxx.
     let t = schritt(input, |cursor| match cursor.ident() {
         Some(x) => Ok(x),
         None => Err(ParseError::at_cursor(cursor, "expected identifier")),
@@ -267,17 +267,17 @@ pub fn parse_statements_impl<'a>(
     Ok(stmts)
 }
 
-/// Ein Rust-Muster (`syn::Pat`).
+/// A Rust pattern (`syn::Pat`).
 ///
-/// `syn::Pat` hat bewusst kein `impl Parse` - syn verlangt die Entscheidung
-/// zwischen `parse_single` und `parse_multi`, weil `A | B` je nach Kontext ein
-/// Oder-Muster oder zwei getrennte Muster ist. Damit war `Pat` ueber den
-/// `syn::`-Pfad in `codegen/pattern.rs` nicht erreichbar: dort laeuft alles
-/// ueber `rt::parse_syn::<T: Parse>`. Jede Grammatik mit Rust-Mustern
-/// (`let`, `match`, Funktionsparameter) hing an dieser Luecke.
+/// `syn::Pat` deliberately has no `impl Parse` - syn demands the decision
+/// between `parse_single` and `parse_multi`, because `A | B` is, depending on
+/// context, an or-pattern or two separate patterns. So `Pat` was not reachable
+/// via the `syn::` path in `codegen/pattern.rs`: everything there goes through
+/// `rt::parse_syn::<T: Parse>`. Every grammar with Rust patterns
+/// (`let`, `match`, function parameters) was stuck on this gap.
 ///
-/// Gewaehlt ist `parse_multi_with_leading_vert` - die Form, die `match`-Arme
-/// benutzen und die `parse_single` als Sonderfall einschliesst.
+/// The choice is `parse_multi_with_leading_vert` - the form that `match` arms
+/// use and that includes `parse_single` as a special case.
 pub fn parse_pat_impl<'a>(
     input: &Strom<'a>,
     ctx: &mut ParseContext<'a>,
@@ -288,10 +288,10 @@ pub fn parse_pat_impl<'a>(
     Ok(pat)
 }
 
-/// Innere Attribute (`#![...]`).
+/// Inner attributes (`#![...]`).
 ///
-/// Gegenstueck zu `outer_attrs`. Es gab bisher nur `Attribute::parse_outer`,
-/// womit Modul- und Crate-Attribute nicht parsebar waren.
+/// Counterpart of `outer_attrs`. Previously there was only `Attribute::parse_outer`,
+/// so module and crate attributes were not parseable.
 pub fn parse_inner_attrs_impl<'a>(
     input: &Strom<'a>,
     ctx: &mut ParseContext<'a>,
@@ -304,11 +304,11 @@ pub fn parse_inner_attrs_impl<'a>(
     Ok(attrs)
 }
 
-/// Ein Byte-Literal (`b'A'`).
+/// A byte literal (`b'A'`).
 ///
-/// `any_byte` liefert bereits `syn::LitByte`, hiess aber nicht wie die uebrige
-/// `lit_*`-Familie. `lit_byte` schliesst die Luecke im Namensschema, ohne
-/// `any_byte` zu entfernen.
+/// `any_byte` already returns `syn::LitByte`, but was not named like the rest of
+/// the `lit_*` family. `lit_byte` closes the gap in the naming scheme without
+/// removing `any_byte`.
 pub fn parse_lit_byte_impl<'a>(
     input: &Strom<'a>,
     ctx: &mut ParseContext<'a>,

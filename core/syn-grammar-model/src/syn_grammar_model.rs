@@ -16,14 +16,14 @@
 use proc_macro2::TokenStream;
 use syn::Result;
 
-/// Auswertungen ueber eine fertige Grammatik: Nullbarkeit, Zyklen,
-/// First-Mengen, Linksrekursion, Cut-Zerlegung.
+/// Evaluations over a finished grammar: nullability, cycles,
+/// first sets, left recursion, cut decomposition.
 pub mod analysis;
-/// Das semantische Modell - was die Grammatik *bedeutet*.
+/// The semantic model - what the grammar *means*.
 pub mod model;
-/// Der syntaktische AST und sein `Parse`-Impl - was dasteht.
+/// The syntactic AST and its `Parse` impl - what is written there.
 pub mod parser;
-/// Semantische Pruefung des Modells gegen ein Backend.
+/// Semantic check of the model against a backend.
 pub mod validator;
 
 pub use model::backend::{Backend, BuiltIn};

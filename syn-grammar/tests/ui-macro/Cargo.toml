@@ -1,18 +1,18 @@
-# Hilfs-Crate fuer den trybuild-Fall auf dem ECHTEN Prozedurmakro-Pfad.
+# Helper crate for the trybuild case on the REAL procedural-macro path.
 #
-# Es steht bewusst ausserhalb des Workspace (`[workspace] exclude` im
-# Wurzel-Cargo.toml) und wird nur als Pfad-dev-dependency von `syn-grammar`
-# eingebunden. So baut `cargo build --workspace` keine Testartefakte mit,
-# trybuild findet es aber trotzdem: es uebernimmt die dev-dependencies des
-# gepruften Crates in sein Scratch-Projekt.
+# It is a workspace member but deliberately not a default member (see the
+# root Cargo.toml for why `exclude` does not work) and is pulled in only as a
+# path dev-dependency of `syn-grammar`. So the everyday `cargo build`/`cargo
+# test` does not build test artifacts, yet trybuild still finds it: it adopts
+# the dev-dependencies of the crate under test into its scratch project.
 [package]
 name = "ui-macro"
 version = "0.0.0"
 edition = "2021"
-# Mindest-Toolchain. Ab 1.88 liefert `Span::start()` auch im Prozedurmakro auf
-# stable echte Positionen (proc-macro2 setzt dort `proc_macro_span_location`).
-# Darunter sind alle Spans (0,0), und die Adjazenzpruefung mehrzeichiger
-# Operatoren im erzeugten Code waere wirkungslos.
+# Minimum toolchain. From 1.88 on, `Span::start()` returns real positions even
+# inside a procedural macro on stable (proc-macro2 sets `proc_macro_span_location`
+# there). Below that, all spans are (0,0) and the adjacency check for
+# multi-character operators in the generated code would be ineffective.
 rust-version = "1.88"
 publish = false
 

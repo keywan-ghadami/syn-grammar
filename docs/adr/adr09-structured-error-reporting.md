@@ -2,21 +2,21 @@
 
 ## Status
 
-Accepted — umgesetzt, dann verloren, wird neu gebaut.
+Accepted — implemented, then lost, being rebuilt.
 
-Der hier beschriebene `ErrorState` existierte bis Commit `0aace8a` in
-`core/grammar-kit/src/lib.rs` und wurde beim Umbau auf Cursor-Parsing (Mai 2026)
-ersatzlos gelöscht. „Proposed" war dadurch irreführend.
+The `ErrorState` described here existed in `core/grammar-kit/src/lib.rs` until commit
+`0aace8a` and was deleted without replacement during the move to cursor parsing
+(May 2026). "Proposed" had therefore become misleading.
 
-**Eine Festlegung dieses ADR ist überholt:** Punkt 2 der Auswahlhierarchie („Location
-(Progress)") stützt sich auf `start_span` und damit auf `Span::start()`. Bis Rust 1.87
-lieferte das im Prozedurmakro immer `(0,0)` und war dort wirkungslos; seit 1.88 sind
-Positionen verfügbar. Ersetzt wurde es dennoch durch `PartialOrd for Cursor`
-(`src/buffer.rs`) — ein Zeigervergleich in O(1), der an keiner Compilerversion hängt.
-Siehe [ADR 13](adr13-error-message-contract.md), Punkt 8.
+**One decision of this ADR is superseded:** point 2 of the selection hierarchy
+("Location (Progress)") relies on `start_span` and thus on `Span::start()`. Up to
+Rust 1.87 that always returned `(0,0)` inside a procedural macro and was ineffective
+there; since 1.88 positions are available. It was nevertheless replaced by
+`PartialOrd for Cursor` (`src/buffer.rs`) — an O(1) pointer comparison that does not
+depend on any compiler version. See [ADR 13](adr13-error-message-contract.md), point 8.
 
-Das beobachtbare Ergebnis regelt [ADR 13](adr13-error-message-contract.md); dieses
-Dokument beschreibt die Mechanik dahinter.
+The observable outcome is governed by [ADR 13](adr13-error-message-contract.md); this
+document describes the mechanics behind it.
 
 ## Context
 The current error reporting in `syn-grammar` struggles with precision and consistency, particularly in complex grammars involving labeled alternatives, deep nesting, and manual failure points (`fail` built-in).

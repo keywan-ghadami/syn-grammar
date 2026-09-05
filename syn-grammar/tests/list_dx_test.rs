@@ -22,10 +22,10 @@ grammar! {
 }
 
 grammar! {
-    // Gleiche Liste, aber mit `min=1` - das ist der HARTE Pfad in
-    // `parse_separated` (Pflichtelement, Fehler wird hochgereicht) statt des
-    // weichen (leere Liste erlaubt, Fehler nur gemerkt). Beide muessen die
-    // Meldung eines gescheiterten Elements gleich behandeln.
+    // The same list, but with `min=1` - that is the HARD path in
+    // `parse_separated` (mandatory item, error is passed upward) instead of
+    // the soft one (empty list allowed, error only recorded). Both must treat
+    // the message of a failed item the same way.
     grammar cxx_min1 {
         pub signature
             = "fn" ident paren( separated(param, ",", min=1, item_label="function parameter") ) ";" # "function signature"
@@ -77,8 +77,8 @@ fn test_cxx_dangling_comma() {
 #[test]
 fn test_cxx_unexpected_eof() {
     cxx_dx::parse_signature
-        // Wir schließen die Klammer und den Ausdruck ab, um Syn's Lexer zu befriedigen.
-        // Der Parser sollte beim Lesen von ":: )" fehlschlagen und "expected identifier" melden.
+        // We close the parenthesis and the expression to satisfy syn's lexer.
+        // The parser should fail when reading ":: )" and report "expected identifier".
         .parse_str("fn foo( const std:: );")
         .test()
         .assert_failure_contains(
@@ -94,13 +94,13 @@ fn test_cxx_garbage_after_item() {
         .assert_failure_contains("expected `,` at column 14 (line 1)\nin separator\nin signature");
 }
 
-/// Ein Element, das gleich an seiner Anfangsstelle scheitert, darf seine
-/// **eigene** Beschriftung behalten - `finish_variants` nennt darin zusaetzlich,
-/// was tatsaechlich dastand. Die aermere Fassung `expected function parameter`
-/// wuerde das `; found unexpected token `123`` verlieren.
+/// An item that fails right at its start position may keep its **own** label -
+/// `finish_variants` additionally names in it what was actually there. The
+/// poorer version `expected function parameter` would lose the
+/// `; found unexpected token `123``.
 ///
-/// Gilt fuer den harten Pfad (`min=1`) genauso wie fuer den weichen; das war
-/// vorher nicht so.
+/// Applies to the hard path (`min=1`) just as to the soft one; that was not the
+/// case before.
 #[test]
 fn beschriftetes_element_behaelt_seine_meldung_auch_bei_min1() {
     cxx_min1::parse_signature
@@ -111,10 +111,10 @@ fn beschriftetes_element_behaelt_seine_meldung_auch_bei_min1() {
         );
 }
 
-/// Am Ende der Gruppe gilt die Ausnahme: dort ersetzt die Elementerwartung auch
-/// eine beschriftete Innenmeldung. Eine Aufzaehlung dessen, was haette dastehen
-/// koennen, waere dort irrefuehrend - es kommt schlicht nichts mehr
-/// (ADR 13, Punkt 3).
+/// At the end of the group the exception applies: there the item expectation
+/// replaces even a labelled inner message. An enumeration of what could have
+/// been there would be misleading - simply nothing follows any more
+/// (ADR 13, point 3).
 #[test]
 fn am_gruppenende_gewinnt_die_elementerwartung() {
     cxx_min1::parse_signature

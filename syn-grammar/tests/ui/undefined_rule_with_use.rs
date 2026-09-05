@@ -1,7 +1,7 @@
-// Ein gewoehnlicher (nicht-Glob) `use` darf die "Undefined rule"-Pruefung nicht
-// abschalten. Vorher galt `should_validate_rule_calls = grammar.uses.is_empty()`,
-// wodurch dieser Tippfehler unbemerkt durchging und erst als Folgefehler im
-// generierten Code auftauchte.
+// An ordinary (non-glob) `use` must not switch off the "Undefined rule" check.
+// Previously `should_validate_rule_calls = grammar.uses.is_empty()` applied,
+// so this typo passed unnoticed and only showed up as a follow-up error in the
+// generated code.
 use syn_grammar::grammar;
 
 pub struct Stmt;

@@ -274,9 +274,9 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    /// Jeder Katalogeintrag muss einen Namen haben, der nur einmal vorkommt.
-    /// Ein Duplikat waere still: `iter().any(...)` in `codegen/pattern.rs`
-    /// nimmt den ersten Treffer, der zweite Eintrag bliebe wirkungslos.
+    /// Every catalog entry must have a name that occurs only once.
+    /// A duplicate would be silent: `iter().any(...)` in `codegen/pattern.rs`
+    /// takes the first hit, the second entry would remain ineffective.
     #[test]
     fn namen_sind_eindeutig() {
         let mut gesehen = HashSet::new();
@@ -289,33 +289,33 @@ mod tests {
         }
     }
 
-    /// Der deklarierte Rueckgabetyp wird in `monomorphize.rs` per
-    /// `syn::parse_str::<Type>` gelesen und fuer die Generics-Inferenz benutzt.
-    /// Ein nicht parsebarer Eintrag faellt dort still unter den Tisch
-    /// (`if let Ok(ty) = ...`) und fuehrt erst spaeter zu einem Fehler im
-    /// generierten Code.
+    /// The declared return type is read in `monomorphize.rs` via
+    /// `syn::parse_str::<Type>` and used for generics inference.
+    /// An unparsable entry silently falls through the cracks there
+    /// (`if let Ok(ty) = ...`) and only leads to an error later in the
+    /// generated code.
     #[test]
     fn rueckgabetypen_sind_parsebar() {
         for b in SynBackend::get_builtins() {
             assert!(
                 syn::parse_str::<syn::Type>(b.return_type).is_ok(),
-                "Rueckgabetyp von '{}' ist kein gueltiger Typ: {:?}",
+                "return type of '{}' is not a valid type: {:?}",
                 b.name,
                 b.return_type
             );
         }
     }
 
-    /// Der Katalog ist die Nutzerschnittstelle: jeder Eintrag ist ein
-    /// Versprechen. Diese Zahl festzuhalten erzwingt, dass ein neues Builtin
-    /// bewusst hinzugefuegt wird - zusammen mit Test und Doku-Eintrag
+    /// The catalog is the user interface: every entry is a
+    /// promise. Pinning this number forces a new builtin to be
+    /// added deliberately - together with a test and a docs entry
     /// (`syn-grammar/tests/builtin_coverage_test.rs`, `SYNTAX.md`).
     #[test]
     fn katalogumfang_ist_bewusst_gewaehlt() {
         assert_eq!(
             SynBackend::get_builtins().len(),
             63,
-            "Der Builtin-Katalog hat sich geaendert. Bitte Test und Doku mitziehen."
+            "The builtin catalogue has changed. Please update test and docs accordingly."
         );
     }
 }

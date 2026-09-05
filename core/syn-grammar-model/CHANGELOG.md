@@ -1,40 +1,39 @@
 # Changelog
 
-`syn-grammar-model` enthaelt den Frontend-Parser der Grammatik-DSL, das
-Datenmodell und den Validator. Es wird versionsgleich mit `syn-grammar`
-veroeffentlicht; die vollstaendige Liste steht in
-[`syn-grammar/CHANGELOG.md`](../../syn-grammar/CHANGELOG.md).
+`syn-grammar-model` contains the front-end parser of the grammar DSL, the data
+model and the validator. It is released in lockstep with `syn-grammar`; the
+complete list is in [`syn-grammar/CHANGELOG.md`](../../syn-grammar/CHANGELOG.md).
 
-## [0.9.0] - Entwurf, nicht veroeffentlicht
+## [0.9.0] - Draft, unreleased
 
-> Noch nicht auf crates.io; die letzte veroeffentlichte Fassung ist 0.8.0.
+> Not on crates.io yet; the last published release is 0.8.0.
 
 ### Breaking Changes
 
-- **`parse_grammar_with_builtins` existiert nicht mehr.** Einstieg fuer
-  Backend-Autoren ist `parse_grammar::<B: Backend>`.
-- **`model` re-exportiert `backend::*` und `types::*` nicht mehr flach.**
-  `syn_grammar_model::model::Identifier` loest nicht mehr auf; korrekt ist
-  `model::types::Identifier`.
-- **`GrammarDefinition`** verliert `inherits` und gewinnt `extern_rules` und
-  `imports`. `grammar Foo : Base` wird auf `use super::Base::*;` abgebildet.
-- **`Rule`** gewinnt `return_type_kind` und `is_lexical`; `params` ist
-  `Vec<RuleParameter>` statt `Vec<(Ident, Option<Type>)>`.
-- **`ModelPattern::RuleCall`** traegt `rule_path: syn::Path` statt
-  `rule_name: Ident`. Neu sind die Varianten `LexicalScope` und `SpacedScope`
-  (insgesamt 19).
-- **Grossgeschriebene Regelnamen sind automatisch lexikalisch** (`is_lexical`).
+- **`parse_grammar_with_builtins` no longer exists.** The entry point for
+  backend authors is `parse_grammar::<B: Backend>`.
+- **`model` no longer re-exports `backend::*` and `types::*` flatly.**
+  `syn_grammar_model::model::Identifier` no longer resolves; the correct path
+  is `model::types::Identifier`.
+- **`GrammarDefinition`** loses `inherits` and gains `extern_rules` and
+  `imports`. `grammar Foo : Base` is mapped to `use super::Base::*;`.
+- **`Rule`** gains `return_type_kind` and `is_lexical`; `params` is
+  `Vec<RuleParameter>` instead of `Vec<(Ident, Option<Type>)>`.
+- **`ModelPattern::RuleCall`** carries `rule_path: syn::Path` instead of
+  `rule_name: Ident`. New variants are `LexicalScope` and `SpacedScope`
+  (19 in total).
+- **Uppercase rule names are automatically lexical** (`is_lexical`).
 
 ### Fixed
 
-- **Die "Undefined rule"-Pruefung** wurde von jedem `use`-Statement
-  abgeschaltet; sie haengt jetzt am Glob-Import, der als einziger unbekannte
-  Regelnamen mitbringen kann.
-- Ein Doc-Kommentar mit `syn::parse::<Token>()` ohne Backticks liess
-  `cargo doc` unter `-D warnings` abbrechen.
+- **The "Undefined rule" check** was switched off by any `use` statement; it now
+  hangs on the glob import, the only thing that can bring in unknown rule
+  names.
+- A doc comment with `syn::parse::<Token>()` without backticks made
+  `cargo doc` abort under `-D warnings`.
 
 ### Note
 
-`docs/adr/adr1.md` (Portable/Backend-spezifische Primitive) ist zurueckgezogen:
-`PORTABLE_BUILTINS`/`SYN_SPECIFIC_BUILTINS` wurden nie implementiert, und die
-Validierung laeuft ausschliesslich gegen `B::get_builtins()`.
+`docs/adr/adr1.md` (portable/backend-specific primitives) is withdrawn:
+`PORTABLE_BUILTINS`/`SYN_SPECIFIC_BUILTINS` were never implemented, and
+validation runs exclusively against `B::get_builtins()`.

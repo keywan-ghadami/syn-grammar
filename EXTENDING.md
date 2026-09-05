@@ -1,16 +1,17 @@
 # Building a Custom Parser Backend
 
-> **⚠️ VERALTET (Stand 2026-08-30).** Dieses Dokument beschreibt eine API, die es im Code
-> nicht mehr gibt. Konkret: `parse_grammar_with_builtins(…)` existiert nicht — der Einstieg
-> ist `parse_grammar::<B: Backend>` (`core/syn-grammar-model/src/syn_grammar_model.rs:30`);
-> Builtins sind `&'static [BuiltIn]` mit `name` und `return_type`, nicht `&[&str]`; der
-> `Backend`-Trait, der der eigentliche Erweiterungspunkt ist, wird unten gar nicht erwähnt;
-> die Mustertabelle listet 6 von 19 `ModelPattern`-Varianten, und `ModelPattern::Lit` hat
-> die Form `Lit { binding, lit: syn::Lit }`, nicht `Lit(LitStr)`. Der Beispielcode würde
-> nicht kompilieren.
+> **⚠️ OUTDATED (as of 2026-08-30).** This document describes an API that no
+> longer exists in the code. Specifically: `parse_grammar_with_builtins(…)` does
+> not exist — the entry point is `parse_grammar::<B: Backend>`
+> (`core/syn-grammar-model/src/syn_grammar_model.rs:30`); built-ins are
+> `&'static [BuiltIn]` with `name` and `return_type`, not `&[&str]`; the
+> `Backend` trait, which is the actual extension point, is not mentioned below
+> at all; the pattern table lists 6 of 19 `ModelPattern` variants, and
+> `ModelPattern::Lit` has the form `Lit { binding, lit: syn::Lit }`, not
+> `Lit(LitStr)`. The example code would not compile.
 >
-> Verlässlich sind stattdessen [`ARCHITECTURE.md`](ARCHITECTURE.md) und der Code selbst.
-> Dieses Dokument wird überarbeitet oder zurückgezogen.
+> Rely on [`ARCHITECTURE.md`](ARCHITECTURE.md) and the code itself instead.
+> This document will be revised or withdrawn.
 
 This guide is for developers who want to create their own parser generator backend using `syn-grammar` as the frontend (DSL). The primary use case is building a library like `winnow-grammar` that targets a specific parsing library (e.g., `winnow`, `chumsky`) but offers the ergonomic `grammar! { ... }` syntax.
 

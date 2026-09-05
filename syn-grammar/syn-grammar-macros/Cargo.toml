@@ -2,10 +2,10 @@
 name = "syn-grammar-macros"
 version = "0.9.0"
 edition = "2021"
-# Mindest-Toolchain. Ab 1.88 liefert `Span::start()` auch im Prozedurmakro auf
-# stable echte Positionen (proc-macro2 setzt dort `proc_macro_span_location`).
-# Darunter sind alle Spans (0,0), und die Adjazenzpruefung mehrzeichiger
-# Operatoren im erzeugten Code waere wirkungslos.
+# Minimum toolchain. From 1.88 on, `Span::start()` returns real positions even
+# inside a procedural macro on stable (proc-macro2 sets `proc_macro_span_location`
+# there). Below that, all spans are (0,0) and the adjacency check for
+# multi-character operators in the generated code would be ineffective.
 rust-version = "1.88"
 description = "Internal macros for syn-grammar."
 license = "MIT OR Apache-2.0"

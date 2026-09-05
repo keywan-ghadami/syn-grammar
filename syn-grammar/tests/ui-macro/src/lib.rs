@@ -1,22 +1,22 @@
-//! Ein echtes Prozedurmakro auf Basis einer `syn-grammar`-Grammatik.
+//! A real procedural macro based on a `syn-grammar` grammar.
 //!
-//! Zweck: der einzige Pfad, auf dem sich das Verhalten im *realen* Makro pruefen
-//! laesst. Die gesamte uebrige Testsuite laeuft ueber `Parser::parse_str` und
-//! damit ueber den proc-macro2-**Fallback**. Alles, was sich zwischen Fallback
-//! und echtem Makro unterscheidet, ist dort unsichtbar - allen voran die Frage,
-//! ob Spans Positionen tragen (erst ab Rust 1.88, siehe `GOALS.md`).
-//! ADR 13, Punkt 14.
+//! Purpose: the only path on which the behaviour in the *real* macro can be
+//! checked. The entire rest of the test suite runs through `Parser::parse_str`
+//! and thus through the proc-macro2 **fallback**. Everything that differs
+//! between fallback and real macro is invisible there - first and foremost the
+//! question whether spans carry positions (only from Rust 1.88 on, see `GOALS.md`).
+//! ADR 13, point 14.
 
 use proc_macro::TokenStream;
 
-// Ein proc-macro-Crate darf ausser den Makros selbst nichts exportieren.
-// `grammar!` erzeugt ein `pub mod Demo` - eingewickelt in ein privates Modul ist
-// es aus dem Crate-Wurzelmodul heraus nicht sichtbar und damit zulaessig.
+// A proc-macro crate must not export anything except the macros themselves.
+// `grammar!` generates a `pub mod Demo` - wrapped in a private module it is
+// not visible from the crate root and therefore permitted.
 mod grammatik {
     syn_grammar::grammar! {
     grammar Demo {
-        /// `let <name> = <zahl>;` - klein genug, um die Meldung lesbar zu halten,
-        /// und mit genug Struktur fuer einen mehrstufigen Regelstapel.
+        /// `let <name> = <number>;` - small enough to keep the message readable,
+        /// and with enough structure for a multi-level rule stack.
         pub rule zuweisung -> i32 = "let" name:ident "=" v:wert ";" -> {
             let _ = name;
             v
@@ -24,8 +24,8 @@ mod grammatik {
 
         rule wert -> i32 = i:i32 -> { i }
 
-        /// Nur fuer den Adjazenz-Fall: `::` muss ein zusammenhaengender Operator
-        /// sein. `a : : b` darf NICHT passen.
+        /// Only for the adjacency case: `::` must be a joint operator.
+        /// `a : : b` must NOT match.
         pub rule pfad -> String = a:ident "::" b:ident -> {
             format!("{}::{}", a, b)
         }
@@ -35,21 +35,21 @@ mod grammatik {
 
 use grammatik::Demo;
 
-/// Parst `let x = 1;` und gibt die Zahl als Ausdruck zurueck.
+/// Parses `let x = 1;` and returns the number as an expression.
 #[proc_macro]
 pub fn zuweisung(input: TokenStream) -> TokenStream {
     ausfuehren(input, Demo::parse_zuweisung)
 }
 
-/// Parst `a::b` und gibt den Pfad als String-Literal zurueck.
+/// Parses `a::b` and returns the path as a string literal.
 #[proc_macro]
 pub fn pfad(input: TokenStream) -> TokenStream {
     ausfuehren(input, |s| Demo::parse_pfad(s).map(|p| p.len() as i32))
 }
 
-/// Gemeinsamer Rumpf: Erfolg wird zu einem harmlosen Ausdruck, ein Fehler zu
-/// `compile_error!`. Genau so, wie ein echtes Makro es taete - und genau so
-/// landet die Meldung in der `.stderr`-Datei von trybuild.
+/// Shared body: success becomes a harmless expression, an error becomes
+/// `compile_error!`. Exactly as a real macro would do it - and exactly so the
+/// message ends up in trybuild's `.stderr` file.
 fn ausfuehren<F>(input: TokenStream, parser: F) -> TokenStream
 where
     F: FnOnce(syn::parse::ParseStream) -> syn::Result<i32>,

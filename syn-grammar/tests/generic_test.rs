@@ -48,15 +48,15 @@ fn test_generic_inference() {
         .assert_success_is(expected);
 }
 
-/// Der Builtin-Katalog (`backend.rs`) deklariert fuer jedes Builtin einen
-/// Rueckgabetyp. `monomorphize::infer_type` liest genau diesen Eintrag, um den
-/// Generic-Parameter einer Regel zu bestimmen - ein falscher Eintrag erzeugt
-/// deshalb einen Compilerfehler im *generierten* Code, nicht an der Aufrufstelle.
+/// The builtin catalogue (`backend.rs`) declares a return type for every
+/// builtin. `monomorphize::infer_type` reads exactly that entry to determine the
+/// generic parameter of a rule - a wrong entry therefore produces a compiler
+/// error in the *generated* code, not at the call site.
 ///
-/// `digit`, `hex_digit` und `oct_digit` waren als `syn::Ident` deklariert,
-/// liefern aber `syn::LitInt` (`token_filter.rs`). Dieser Test bindet die drei
-/// ueber eine generische Regel ein und schlaegt bei einem falschen Katalogeintrag
-/// fehl, bevor irgendein Nutzer darueber stolpert.
+/// `digit`, `hex_digit` and `oct_digit` were declared as `syn::Ident` but
+/// return `syn::LitInt` (`token_filter.rs`). This test binds the three via a
+/// generic rule and fails on a wrong catalogue entry before any user stumbles
+/// over it.
 #[test]
 fn generische_regel_mit_token_filtern() {
     grammar! {

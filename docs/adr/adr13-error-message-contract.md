@@ -1,48 +1,48 @@
-# ADR 13: Fehlermeldungs-Vertrag
+# ADR 13: The Error Message Contract
 
 ## Status
 
-Accepted. Dies ist der verbindliche Anforderungskatalog aus [`GOALS.md`](../../GOALS.md).
+Accepted. This is the binding catalogue of requirements from [`GOALS.md`](../../GOALS.md).
 
-Verhältnis zu den bestehenden ADRs: ADR-09, ADR-11 und ADR-12 beschreiben **Mechanik**
-(strukturierter Fehlerzustand, Abstraktion der Fehlerauslösung, Aggregation). Dieses ADR
-beschreibt das **beobachtbare Ergebnis**. Bei Widerspruch gilt dieses ADR, denn es ist
-durch Tests belegt.
+Relation to the existing ADRs: ADR-09, ADR-11 and ADR-12 describe **mechanics**
+(structured error state, abstraction of error raising, aggregation). This ADR
+describes the **observable result**. Where they disagree this ADR wins, because
+it is backed by tests.
 
 ## Context
 
-Die Anforderungen an Fehlermeldungen standen bisher implizit in neun Testdateien.
-Dadurch war „Enterprise-Niveau" nicht überprüfbar: Es gab keinen Ort, an dem stand, was
-eine gute Meldung ausmacht, und keinen Weg zu entscheiden, ob eine Änderung eine
-Verbesserung oder eine Regression ist.
+The requirements on error messages used to live implicitly in nine test files.
+That made "enterprise level" unverifiable: there was no place stating what makes
+a good message, and no way to decide whether a change is an improvement or a
+regression.
 
-Alle Anforderungen unten sind aus vorhandenen Assertions abgeleitet und mit Fundstelle
-belegt. Was hier nicht steht, ist keine Anforderung.
+All requirements below are derived from existing assertions and referenced by
+location. What is not listed here is not a requirement.
 
-Verglichen wird per **Substring** (`core/grammar-kit/src/testing.rs:199-212`,
-`assert_failure_contains`). Mehrzeilige Erwartungen sind zusammenhängende Substrings
-inklusive `\n` — die Reihenfolge der `in …`-Zeilen ist damit Vertragsbestandteil, das
-Ende der Meldung nicht.
+Comparison is by **substring** (`core/grammar-kit/src/testing.rs:199-212`,
+`assert_failure_contains`). Multi-line expectations are contiguous substrings
+including `\n` — the order of the `in …` lines is therefore part of the
+contract, the end of the message is not.
 
 ## Decision
 
-### 1. Erwartung benennen
+### 1. Name the expectation
 
-Jede Meldung sagt, was erwartet wurde. Tokens in Backticks, Primitive ohne.
+Every message says what was expected. Tokens in backticks, primitives without.
 
 * `expected \`c\`` — `error_reporting_test.rs:65`
 * `expected identifier` — `list_dx_test.rs:50`
 * `expected \`,\`` — `list_dx_test.rs:82`
 
-### 2. Labels ersetzen die Token-Ebene
+### 2. Labels replace the token level
 
-Ein explizites Label (`# "…"` an einer Variante, `item_label=` bei Listen) tritt an die
-Stelle der internen Token-Erwartung.
+An explicit label (`# "…"` on a variant, `item_label=` on lists) takes the place
+of the internal token expectation.
 
-* `expected \`type name\`` statt `expected \`::\`` — `list_dx_test.rs:40`
+* `expected \`type name\`` instead of `expected \`::\`` — `list_dx_test.rs:40`
 * `expected one of: \`Letter A\`, \`Letter B\`` — `labeled_alternatives_test.rs:47`
 
-### 3. Gefundenes benennen
+### 3. Name what was found
 
 * `; found unexpected token \`123\`` — `list_dx_test.rs:30`
 * `unexpected end of input, …` — `list_dx_test.rs:72`, `trailing_comma_test.rs:41`
@@ -51,21 +51,21 @@ Stelle der internen Token-Erwartung.
 
 ### 4. Position
 
-Format `at column N (line M)`, genau einmal in der Meldung.
+Format `at column N (line M)`, exactly once per message.
 
-**Einschränkung, bindend:** Diese Angabe wird nur ausgegeben, wenn der Span echte
-Positionsdaten trägt. Bis Rust 1.87 lieferte ein Prozedurmakro `(0,0)`; seit 1.88
-setzt proc-macro2 `proc_macro_span_location` auch auf stable, und das Projekt
-verlangt diese Version (`rust-version = "1.88"`). Die Prüfung bleibt trotzdem: ein
-Span ohne Positionsdaten wird **weggelassen** statt als `0` gedruckt — etwa bei
-`Span::call_site()`, das nach wie vor keine trägt.
+**Restriction, binding:** this is only printed when the span carries real
+position data. Up to Rust 1.87 a procedural macro returned `(0,0)`; since 1.88
+proc-macro2 sets `proc_macro_span_location` on stable too, and the project
+requires that version (`rust-version = "1.88"`). The check stays regardless: a
+span without position data is **omitted** rather than printed as `0` — e.g.
+`Span::call_site()`, which still carries none.
 
-Die Positionsangabe dient allein der **Anzeige**. Für die **Auswahl** des besten Fehlers
-ist sie unbrauchbar; dafür gilt Punkt 8.
+The position serves **display** only. For **selecting** the best error it is
+useless; point 8 applies there.
 
-### 5. Regel-Stack
+### 5. Rule stack
 
-Mehrzeilig, von innen nach außen, dedupliziert, Regelnamen in Leerzeichen-Form
+Multi-line, from inside out, deduplicated, rule names in space-separated form
 (`deepest_err` → `deepest err`).
 
 ```
@@ -73,111 +73,118 @@ expected `c` at column 4 (line 1)
 in deepest err
 in main
 ```
-— `error_reporting_test.rs:65`, ebenso `:97` (`in inner rule`).
+— `error_reporting_test.rs:65`, likewise `:97` (`in inner rule`).
 
-Verschachtelung über mehrere Ebenen: `list_dx_test.rs:40`
+Nesting over several levels: `list_dx_test.rs:40`
 (`in type name` → `in param` → `in function parameter 1` → `in signature`).
 
-### 6. Alternativen-Aggregation
+### 6. Aggregation of alternatives
 
-Scheitern mehrere Alternativen an derselben Stelle, entsteht **eine** Meldung:
-`expected one of: …`, sortiert und dedupliziert.
+If several alternatives fail at the same position, **one** message results:
+`expected one of: …`, sorted and deduplicated.
 
 * `expected one of: \`a\`, \`b\`` — `labeled_alternatives_test.rs:39`
-* `expected one of: \`one\`, \`two\`, \`zero\`` (alphabetisch) — `error_reporting_test.rs:81`
-* auch innerhalb von Gruppen — `labeled_alternatives_test.rs:66`
+* `expected one of: \`one\`, \`two\`, \`zero\`` (alphabetical) — `error_reporting_test.rs:81`
+* also inside groups — `labeled_alternatives_test.rs:66`
 
-### 7. Tiefe schlägt Aggregation
+### 7. Depth beats aggregation
 
-Kam der Parser in einer Alternative weiter, verdrängt dieser Fehler die Aufzählung —
-`expected one of:` darf dann **nicht** erscheinen.
-— `labeled_alternatives_test.rs:57-58` (prüft beides, Positiv- und Negativfall)
+If the parser got further in one alternative, that error displaces the
+enumeration — `expected one of:` must then **not** appear.
+— `labeled_alternatives_test.rs:57-58` (checks both, the positive and the negative case)
 
-### 8. Auswahlreihenfolge
+### 8. Selection order
 
-Bei konkurrierenden Fehlern entscheidet, in dieser Reihenfolge:
+Between competing errors, in this order:
 
-1. **Fortschritt** — wer weiter im Input kam, gewinnt.
-   Gemessen am Cursor über `PartialOrd for Cursor` (syn 2.0.114, `src/buffer.rs:401-409`),
-   **nicht** an Zeile/Spalte (siehe Punkt 4)
-2. **Fatalität** — hinter einem Cut (`=>`)
-3. **Priorität** — `fail` > Label > Standard
+1. **Progress** — whoever got further in the input wins.
+   Measured on the cursor via `PartialOrd for Cursor` (syn 2.0.114,
+   `src/buffer.rs:401-409`), **not** on line/column (see point 4)
+2. **Fatality** — behind a cut (`=>`)
+3. **Priority** — `fail` > label > default
 
-**Fortschritt kommt vor Fatalität und Priorität**, auch vor einem `fail(..)`. Wer mehr
-Tokens erfolgreich verarbeitet hat, war näher an der gemeinten Ableitung; ein früher
-stehendes `fail` beschreibt dann einen Zweig, den der Parser gar nicht meinte. Belegt in
-`error_abstraction_test.rs:124` (`a b d` → `expected \`c\`` schlägt das `fail` bei
-Spalte 2) gegen `:136` (`a d` → bei gleicher Stelle gewinnt `hard fail`).
+**Progress comes before fatality and priority**, even before a `fail(..)`.
+Whoever consumed more tokens successfully was closer to the intended
+derivation; an earlier `fail` then describes a branch the parser did not mean.
+Evidenced in `error_abstraction_test.rs:124` (`a b d` → `expected \`c\`` beats
+the `fail` at column 2) against `:136` (`a d` → at the same position `hard fail`
+wins).
 
-Daraus folgt, dass **Fatalität und Priorität getrennte Felder** sein müssen: ein Cut legt
-die Ableitung fest und schließt die Alternativenkette kurz; ein `fail(..)` ist nur
-hochprior und muss am Fortschrittsvergleich teilnehmen. Werden beide über `priority`
-ausgedrückt, schließt `fail` die Kette kurz und gewinnt fälschlich gegen den tieferen
-Fehler.
+It follows that **fatality and priority must be separate fields**: a cut fixes
+the derivation and short-circuits the alternative chain; a `fail(..)` is merely
+high-priority and must take part in the progress comparison. If both are
+expressed through `priority`, `fail` short-circuits the chain and wrongly wins
+against the deeper error.
 
-*Frühere Fassungen dieses ADR nannten Fatalität an erster Stelle. Das widersprach den
-Tests und ist korrigiert — die Tests sind die Spezifikation.*
+*Earlier versions of this ADR listed fatality first. That contradicted the tests
+and is corrected — the tests are the specification.*
 
-Die Länge der Nachricht ist **kein** Kriterium (ADR-09 nennt sie als Instabilitätsquelle).
+The length of the message is **not** a criterion (ADR-09 names it as a source of
+instability).
 
-Belegt in `error_abstraction_test.rs:124` (Tiefe schlägt `fail`-Priorität) und `:136`
-(bei gleicher Stelle gewinnt `fail`).
+Evidenced in `error_abstraction_test.rs:124` (depth beats `fail` priority) and
+`:136` (at the same position `fail` wins).
 
 ### 9. Cut
 
-`=>` unterdrückt Fehler aller späteren Alternativen vollständig.
+`=>` suppresses the errors of all later alternatives completely.
 — `error_abstraction_test.rs:30,88,95`, `fail_test.rs:38`
 
 ### 10. `fail("msg")`
 
-Der Text erscheint wortwörtlich, ohne `expected`-Präfix und ohne Auto-Label.
+The text appears verbatim, without an `expected` prefix and without an
+auto-label.
 
 * `zero is not allowed` — `error_abstraction_test.rs:57`
 * `hard fail` — `error_abstraction_test.rs:136`
 * `foo cannot be followed by bar` — `fail_test.rs:38`
 
-### 11. Listen-Diagnostik
+### 11. List diagnostics
 
-* Item-Index im Stack: `in function parameter 2` (`list_dx_test.rs:50`),
+* Item index in the stack: `in function parameter 2` (`list_dx_test.rs:50`),
   `in item 3` (`trailing_comma_test.rs:41`), `in function argument 3` (`list_test.rs:159-161`)
-* Separator-Kontext: `in separator` — `list_dx_test.rs:82`
-* Mindestanzahl mit Ist-Wert: `expected at least 2 items, found 1` — `list_test.rs:112`
+* Separator context: `in separator` — `list_dx_test.rs:82`
+* Minimum count with actual value: `expected at least 2 items, found 1` — `list_test.rs:112`
 
-### 12. Fehler aus Action-Blöcken
+### 12. Errors from action blocks
 
-Ein vom Nutzer im Action-Block erzeugter `syn::Error` wird unverfälscht weitergereicht und
-nur um Position und Regel-Stack angereichert — nicht mit `expected …` überschrieben.
+A `syn::Error` raised by the user in an action block is passed on unaltered and
+only enriched with position and rule stack — not overwritten with `expected …`.
 
 ```
 expected 'a' at column 4 (line 1)
 in inner
 in outer
 ```
-— `error_reporting_test.rs:152`. **Heute nicht erfüllt**; im Test explizit als Sollzustand
-markiert (`:149-151`).
+— `error_reporting_test.rs:152`. **Not met today**; marked explicitly as the
+target state in the test (`:149-151`).
 
-### 13. Lazy Formatting
+### 13. Lazy formatting
 
-Die Nachricht wird während des Parsens **nie** verändert. Regelnamen, Labels und Position
-werden erst beim Übergang nach `syn::Error` zusammengesetzt. Das hält die Auswahl aus
-Punkt 8 von der Textgestalt unabhängig und macht Ergebnisse deterministisch.
+The message is **never** modified during parsing. Rule names, labels and
+position are assembled only at the transition to `syn::Error`. That keeps the
+selection of point 8 independent of the textual form and makes results
+deterministic.
 — ADR-09
 
-### 14. Nachweis auf dem echten Makro-Pfad
+### 14. Evidence on the real macro path
 
-Mindestens ein Test muss die Meldung über den **Prozedurmakro-Pfad** prüfen, nicht über
-`parse_str`. Der Fallback von proc-macro2, den `parse_str` benutzt, verhält sich an
-mehreren Stellen anders als ein reales Makro — was dort passiert, sieht man sonst nie.
+At least one test must check the message through the **procedural macro path**,
+not via `parse_str`. The proc-macro2 fallback that `parse_str` uses behaves
+differently from a real macro in several places — what happens there is
+otherwise never seen.
 
-**Erfüllt** durch die `trybuild`-Fälle `runtime_error_real_macro`,
-`runtime_ok_real_macro` und `joint_operator_real_macro` in `syn-grammar/tests/ui/`,
-gespeist aus dem Hilfs-Crate `syn-grammar/tests/ui-macro/`. Genau dieser Test hat
-gezeigt, dass die früher hier festgehaltene Annahme — im Makro trage kein Span
-Positionen — seit Rust 1.88 nicht mehr stimmt.
+**Met** by the `trybuild` cases `runtime_error_real_macro`,
+`runtime_ok_real_macro` and `joint_operator_real_macro` in `syn-grammar/tests/ui/`,
+fed by the helper crate `syn-grammar/tests/ui-macro/`. Exactly this test showed
+that the assumption previously recorded here — that no span inside a macro
+carries a position — no longer holds since Rust 1.88.
 
 ## Consequences
 
-* „Enterprise-Niveau" ist ab hier messbar: Punkte 1-14 sind erfüllt oder nicht.
-* Punkte 12 und 14 sind heute offen und damit benannte Lücken statt unsichtbarer Mängel.
-* Punkt 8 verlangt, die Auswahl von `span.start()` auf den Cursor umzustellen. Das ist eine
-  Verhaltensänderung im Kern und der Grund, warum die Diagnostik überhaupt neu gebaut wird.
+* "Enterprise level" is measurable from here on: points 1-14 are met or not.
+* Points 12 and 14 are open today and thus named gaps instead of invisible
+  defects.
+* Point 8 requires moving the selection from `span.start()` to the cursor.
+  That is a behavioural change at the core and the reason the diagnostics are
+  being rebuilt at all.

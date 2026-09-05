@@ -1,56 +1,56 @@
-# Fehlerbehandlung — Arbeitsweise der Engine
+# Error Handling — How the Engine Works
 
-Dieses Dokument erklaert, **wie** die Engine einen Fehler auswaehlt und rendert.
+This document explains **how** the engine selects and renders an error.
 
-**Was** eine Meldung enthalten muss, steht in
+**What** a message must contain is specified in
 [`adr/adr13-error-message-contract.md`](adr/adr13-error-message-contract.md).
-Das ADR ist der verbindliche Katalog; bei Widerspruch gilt das ADR, nicht dieses
-Dokument.
+The ADR is the binding catalogue; where the two disagree, the ADR wins, not
+this document.
 
-> Die frueheren Fassungen dieses Dokuments beschrieben eine Engine, die es nicht
-> mehr gibt (Positionsvergleich ueber Zeile/Spalte, Prioritaeten 0/1/2,
-> Nachrichtenlaenge als Tiebreak, `!` als Fatal-Marker). Der Text ist gegen
-> `core/grammar-kit/src/error.rs` und `context.rs` neu geschrieben.
+> Earlier versions of this document described an engine that no longer exists
+> (position comparison via line/column, priorities 0/1/2, message length as
+> tie-break, `!` as a fatal marker). The text was rewritten against
+> `core/grammar-kit/src/error.rs` and `context.rs`.
 
-## Die zentrale Randbedingung
+## The central constraint
 
-Bis Rust 1.87 lieferte `Span::start()` in einem echten Prozedurmakro fuer jeden
-Span `LineColumn { line: 0, column: 0 }`:
+Up to Rust 1.87, `Span::start()` inside a real procedural macro returned
+`LineColumn { line: 0, column: 0 }` for every span:
 
 ```rust
 #[cfg(not(proc_macro_span_location))]
 Span::Compiler(_) => LineColumn { line: 0, column: 0 },
 ```
 
-**Seit Rust 1.88 gilt das nicht mehr** — proc-macro2 setzt dieses `cfg` dort auch
-auf stable (`build.rs`: `rustc >= 88 && compile_probe_stable(..)`). Das Projekt
-verlangt `rust-version = "1.88"`, Positionen sind also verfuegbar. Belegt durch
-`syn-grammar/tests/ui/runtime_error_real_macro.stderr`, einen Schnappschuss aus
-einem echten Makro.
+**Since Rust 1.88 this no longer holds** — proc-macro2 sets this `cfg` on
+stable too (`build.rs`: `rustc >= 88 && compile_probe_stable(..)`). The project
+requires `rust-version = "1.88"`, so positions are available. Evidenced by
+`syn-grammar/tests/ui/runtime_error_real_macro.stderr`, a snapshot from a real
+macro.
 
-**Die Trennung von Vergleich und Anzeige bleibt trotzdem.** Nicht aus Not,
-sondern weil sie besser ist: der Cursor-Vergleich ist ein Zeigervergleich in
-O(1), ein Positionsvergleich waere teurer und haengt an einer
-Compiler-Eigenschaft. Ein Verhalten, das erst ab einer bestimmten
-Rust-Version korrekt wird, taugt nicht als Fundament fuer die Fehlerqualitaet.
+**The separation of comparison and display stays anyway.** Not out of
+necessity but because it is better: the cursor comparison is a pointer
+comparison in O(1); a position comparison would be more expensive and hangs on
+a compiler property. Behaviour that only becomes correct from a certain Rust
+version on is no foundation for this project's quality criterion.
 
-Konsequenz: **Vergleich und Anzeige sind getrennt.**
+Consequence: **comparison and display are separate.**
 
-- **Vergleich** benutzt den `Cursor`. `syn::buffer::Cursor` implementiert
-  `PartialOrd` als Zeigervergleich im gemeinsamen `TokenBuffer` — O(1) und
-  unabhaengig von Toolchain und Span-Verfuegbarkeit.
-- **Anzeige** benutzt den `Span`. Im Prozedurmakro unterstreicht rustc ihn
-  selbst im Editor; die Textform `at column N (line M)` wird nur ausgegeben,
-  wenn der Span echte Positionsdaten traegt.
+- **Comparison** uses the `Cursor`. `syn::buffer::Cursor` implements
+  `PartialOrd` as a pointer comparison within the shared `TokenBuffer` — O(1)
+  and independent of toolchain and span availability.
+- **Display** uses the `Span`. Inside a procedural macro rustc underlines it in
+  the editor itself; the textual form `at column N (line M)` is only printed
+  when the span carries real position data.
 
-## Der Fehlertyp
+## The error type
 
 `core/grammar-kit/src/error.rs`:
 
 ```rust
 pub struct ParseError<'a> {
-    pub span: Span,              // Anzeige
-    pub at: Option<Cursor<'a>>,  // Auswahl
+    pub span: Span,              // display
+    pub at: Option<Cursor<'a>>,  // selection
     pub message: String,
     pub priority: u8,
     pub is_fatal: bool,
@@ -58,141 +58,136 @@ pub struct ParseError<'a> {
 }
 ```
 
-`at` ist `None` nur dort, wo beim Erzeugen kein Cursor zur Hand ist — etwa bei
-der Uebernahme eines fremden `syn::Error`. Solche Fehler verlieren jeden
-Fortschrittsvergleich gegen einen mit Cursor.
+`at` is `None` only where no cursor is at hand when the error is created — for
+instance when adopting a foreign `syn::Error`. Such errors lose every progress
+comparison against one with a cursor.
 
-## Welcher Fehler gewinnt — `ParseError::merge`
+## Which error wins — `ParseError::merge`
 
-In genau dieser Reihenfolge:
+In exactly this order:
 
-| Rang | Kriterium | Bemerkung |
+| Rank | Criterion | Note |
 |---|---|---|
-| 1 | **Fortschritt** (`Cursor`-Vergleich) | Wer weiter kam, gewinnt |
-| 1b | Fehler *mit* Cursor schlaegt Fehler *ohne* | nur wenn 1 nicht entscheidbar |
-| 2 | **Fatalitaet** (`is_fatal`) | nur bei *gleicher* Stelle |
-| 3 | **Prioritaet** | bei Gleichstand gewinnt der spaetere |
+| 1 | **Progress** (`Cursor` comparison) | whoever got further wins |
+| 1b | an error *with* a cursor beats one *without* | only if 1 cannot decide |
+| 2 | **Fatality** (`is_fatal`) | only at the *same* position |
+| 3 | **Priority** | on a tie the later one wins |
 
-**Fortschritt kommt bewusst zuerst — auch vor einem `fail(..)`.** Wer mehr
-Tokens erfolgreich verarbeitet hat, war naeher an der gemeinten Ableitung; ein
-frueher stehendes `fail` beschreibt dann einen Zweig, den der Parser gar nicht
-meinte. Belegt durch `error_abstraction_test::test_fail_vs_deep_error` (ein
-tieferer Fehler schlaegt `fail`) gegen `:136` (bei *gleicher* Stelle gewinnt
-`fail`).
+**Progress deliberately comes first — even before a `fail(..)`.** Whoever
+consumed more tokens successfully was closer to the intended derivation; an
+earlier `fail` then describes a branch the parser did not mean at all.
+Evidenced by `error_abstraction_test::test_fail_vs_deep_error` (a deeper error
+beats `fail`) against `:136` (at the *same* position `fail` wins).
 
-Die Prioritaetsleiter (`error.rs`):
+The priority ladder (`error.rs`):
 
-| Konstante | Wert | Wann |
+| Constant | Value | When |
 |---|---|---|
-| `PRIO_NORMAL` | 0 | gewoehnlicher Parsefehler |
-| `PRIO_LABELED` | 10 | benannte Alternative (`# "…"`) an ihrer Grenze gescheitert |
-| `PRIO_AGGREGATED` | 20 | zusammengefasste Erwartungen (`expected one of: …`) |
-| `PRIO_STRUCTURAL` | 50 | `fail(..)` oder hinter einem Cut |
+| `PRIO_NORMAL` | 0 | ordinary parse error |
+| `PRIO_LABELED` | 10 | a labelled alternative (`# "…"`) failed at its boundary |
+| `PRIO_AGGREGATED` | 20 | merged expectations (`expected one of: …`) |
+| `PRIO_STRUCTURAL` | 50 | `fail(..)` or behind a cut |
 
-Nicht mehr Teil der Auswahl: **Stapeltiefe** und **Nachrichtenlaenge**. ADR-09
-nennt die Laenge ausdruecklich als Instabilitaetsquelle; der Regelstapel dient
-heute nur noch der Anzeige.
+No longer part of the selection: **stack depth** and **message length**.
+ADR-09 explicitly names the length as a source of instability; the rule stack
+today serves display only.
 
-## Fatalitaet und Prioritaet sind getrennt
+## Fatality and priority are separate
 
-Frueher teilten sich beide einen Kanal (`priority = 50` bedeutete „fatal"). Das
-war falsch: `fail(..)` soll hochprior sein, aber am Fortschrittsvergleich
-teilnehmen. Fatal ist allein der **Cut** (`=>`). Deshalb gibt es das eigene Feld
+They used to share one channel (`priority = 50` meant "fatal"). That was
+wrong: `fail(..)` should be high-priority but take part in the progress
+comparison. Fatal is only the **cut** (`=>`). Hence the dedicated field
 `is_fatal`.
 
-Der Cut legt die Ableitung fest: scheitert etwas hinter ihm, ist Zuruecksetzen
-auf eine andere Alternative sinnlos, und der Fehler wird sofort durchgereicht.
+The cut fixes the derivation: if something fails behind it, backtracking to
+another alternative is pointless, and the error is passed through immediately.
 
-## Der Kanal fuer verdeckte Fehler — `ParseContext::furthest`
+## The channel for hidden errors — `ParseContext::furthest`
 
-Der wichtigste Mechanismus der heutigen Engine, und der am wenigsten
-offensichtliche.
+The most important mechanism of today's engine, and the least obvious.
 
-Ein rein funktionales Modell verliert jeden Fehler, den ein **erfolgreiches**
-Zuruecksetzen ueberdeckt: ein `Ok` transportiert keinen Fehler. Beispiel —
-`fn foo( 123 )` gegen `paren(separated(param, ",", min=0))`: das erste Element
-scheitert an `123`, aber eine leere Liste ist gueltig, also liefert `separated`
-ein `Ok` und wirft die aussagekraeftige Meldung weg. Uebrig bleibt eine
-nichtssagende Meldung von weiter aussen.
+A purely functional model loses every error that a **successful** backtrack
+covers up: an `Ok` carries no error. Example — `fn foo( 123 )` against
+`paren(separated(param, ",", min=0))`: the first item fails at `123`, but an
+empty list is valid, so `separated` returns `Ok` and throws the informative
+message away. What is left is a meaningless message from further out.
 
-Deshalb fuehrt `ParseContext` die **weiteste Fehlschlagstelle**:
+That is why `ParseContext` tracks the **furthest failure position**:
 
-- `record_failure(&err)` merged einen verworfenen Fehler in `furthest` — nach
-  derselben Rangfolge wie `merge`.
-- Aufgerufen an jeder Stelle, die einen Fehler verwirft: `parse_separated`
-  (min=0-Pfad und Separator-Abbruch), `parse_repeated`, sowie
-  `Optional`/`Repeat`/`Plus` und die Alternativenzweige im Codegenerator.
-- `absorb(&other_ctx)` laesst den Mark aus einem verworfenen Kontext-Klon
-  zurueckfliessen.
-- `best_error(err)` waehlt am Ende den besseren aus zurueckgegebenem Fehler und
-  Mark.
+- `record_failure(&err)` merges a discarded error into `furthest` — by the same
+  ranking as `merge`.
+- Called at every place that discards an error: `parse_separated` (the min=0
+  path and the separator break), `parse_repeated`, plus
+  `Optional`/`Repeat`/`Plus` and the alternative branches in the code generator.
+- `absorb(&other_ctx)` lets the mark flow back from a discarded context clone.
+- `best_error(err)` picks the better of returned error and mark at the end.
 
-## Regelstapel — zwei Wege, die sich ergaenzen
+## Rule stack — two paths that complement each other
 
-Der Stapel wird **nur zur Anzeige** gefuehrt, nie zur Auswahl.
+The stack is kept **for display only**, never for selection.
 
-1. **Lebender Stapel im Kontext.** `enter_rule`/`exit_rule` umschliessen den
-   Regelrumpf im generierten Code. `record_failure` haengt eine
-   **Momentaufnahme** an den gemerkten Fehler. Nur so traegt ein *verdeckter*
-   Fehler ueberhaupt Kontext.
-2. **`push_rule` auf dem Rueckgabepfad.** Ein *zurueckgegebener* Fehler bekommt
-   keine Momentaufnahme; die aeusseren Regeln haengen ihre Namen beim
-   Herausreichen an.
+1. **Live stack in the context.** `enter_rule`/`exit_rule` bracket the rule
+   body in the generated code. `record_failure` attaches a **snapshot** to the
+   remembered error. Only this way does a *hidden* error carry any context at
+   all.
+2. **`push_rule` on the return path.** A *returned* error gets no snapshot; the
+   outer rules append their names as they pass it outward.
 
-Die Listen-Kombinatoren legen den Elementnamen ebenfalls auf den lebenden Stapel
-(`"<item_label> <index>"`, `"separator"`) — daher `in function parameter 2` und
+The list combinators also put the item name on the live stack
+(`"<item_label> <index>"`, `"separator"`) — hence `in function parameter 2` and
 `in separator`.
 
-## Rendern — einmal, ganz am Ende
+## Rendering — once, at the very end
 
-Waehrend des Parsens wird `message` nie angefasst. Formatiert wird genau einmal
-beim Uebergang nach `syn::Error` im Wrapper (`codegen/rule.rs`). Dort entsteht:
+During parsing, `message` is never touched. Formatting happens exactly once at
+the transition to `syn::Error` in the wrapper (`codegen/rule.rs`). That is
+where these arise:
 
-- die De-Snake-Case-Form (`deepest_err` → `deepest err`),
-- die Kette `\nin X\nin Y` von innen nach aussen, dedupliziert,
-- die Positionsangabe — nur wenn der Span echte Daten hat.
+- the de-snake-cased form (`deepest_err` → `deepest err`),
+- the chain `\nin X\nin Y` from inside out, deduplicated,
+- the position — only if the span carries real data.
 
-## Was der Grammatikautor davon sieht
+## What the grammar author sees
 
-| Werkzeug | Wirkung |
+| Tool | Effect |
 |---|---|
-| `# "Label"` | ersetzt die Token-Ebene durch einen Klartextnamen; fliesst in `expected one of: …` |
-| `item_label="…"` | benennt Listenelemente: `expected function argument`, `in function argument 2` |
-| `fail("…")` | Meldung wortwoertlich, ohne `expected`-Praefix, hochprior |
-| `=>` (Cut) | legt die Alternative fest; spaetere Alternativen werden nicht mehr probiert |
-| `recover(rule, sync)` | ueberspringt bis zum Synchronisationstoken statt abzubrechen |
+| `# "Label"` | replaces the token level with a plain-text name; flows into `expected one of: …` |
+| `item_label="…"` | names list items: `expected function argument`, `in function argument 2` |
+| `fail("…")` | message verbatim, no `expected` prefix, high priority |
+| `=>` (cut) | fixes the alternative; later alternatives are not tried |
+| `recover(rule, sync)` | skips to the synchronisation token instead of aborting |
 
-## Ein gescheitertes Listenelement
+## A failed list item
 
-`parse_separated` behandelt einen gescheiterten Elementversuch nach einer Regel,
-die in `ersetzt_meldung` (`core/grammar-kit/src/combinators.rs`) steht:
+`parse_separated` handles a failed item attempt by a rule that lives in
+`ersetzt_meldung` (`core/grammar-kit/src/combinators.rs`):
 
-| Lage | Meldung | Rang |
+| Situation | Message | Rank |
 |---|---|---|
-| Element kam **voran** | seine eigene, samt Regelstapel | unveraendert |
-| Element kam **nicht voran**, Meldung schon beschriftet | seine eigene (`expected \`x\`; found unexpected token \`y\``) | mind. `PRIO_LABELED` |
-| Element kam **nicht voran**, Meldung unbeschriftet | `expected <item_label>` | mind. `PRIO_LABELED` |
-| Am Ende der Eingabe bzw. der Gruppe | `<Ende>, expected <item_label>` | mind. `PRIO_LABELED` |
+| The item **made progress** | its own, including rule stack | unchanged |
+| The item **made no progress**, message already labelled | its own (`expected \`x\`; found unexpected token \`y\``) | at least `PRIO_LABELED` |
+| The item **made no progress**, message unlabelled | `expected <item_label>` | at least `PRIO_LABELED` |
+| At the end of the input or the group | `<end>, expected <item_label>` | at least `PRIO_LABELED` |
 
-Die Regel gilt fuer den harten Pfad (`min > 0`, Fehler wird hochgereicht) und den
-weichen (leere Liste erlaubt, Fehler nur gemerkt) gleich; der harte hebt
-zusaetzlich auf `PRIO_STRUCTURAL`.
+The rule applies equally to the hard path (`min > 0`, error is propagated) and
+the soft path (empty list allowed, error only remembered); the hard path
+additionally raises to `PRIO_STRUCTURAL`.
 
-**Warum der Rang noetig ist.** Bei `fn f( 123 )` scheitert das Element an seiner
-Anfangsstelle, die Liste ist optional, und direkt danach scheitert ein
-optionales `","?` an *derselben* Stelle. Ohne den Rang einer Beschriftung
-gewinnt der spaeter gemerkte Trenner-Fehler den Gleichstand, und aus
-`expected function argument` wird das nichtssagende ``expected `,` ``.
-`PRIO_LABELED` (10) schlaegt `PRIO_NORMAL` (0), also gewinnt das Element.
+**Why the rank is needed.** In `fn f( 123 )` the item fails at its start, the
+list is optional, and right after that an optional `","?` fails at the *same*
+position. Without the rank of a label, the later-remembered separator error
+wins the tie and `expected function argument` turns into the meaningless
+``expected `,` ``. `PRIO_LABELED` (10) beats `PRIO_NORMAL` (0), so the item
+wins.
 
-**Warum eine vorhandene Beschriftung stehenbleibt.** `finish_variants` erzeugt
-`expected \`function parameter\`; found unexpected token \`123\`` — das nennt
-zusaetzlich, was tatsaechlich dastand, und ist damit reicher als
-`expected function parameter`. Am Ende der Gruppe gilt das Gegenteil: dort
-waere eine Aufzaehlung irrefuehrend, weil gar nichts mehr kommt, und die
-Angabe des Geltungsbereich-Endes ist die wichtigere (ADR 13, Punkt 3).
+**Why an existing label stays.** `finish_variants` produces
+`expected \`function parameter\`; found unexpected token \`123\`` — that
+additionally names what was actually there, and is therefore richer than
+`expected function parameter`. At the end of the group the opposite holds: an
+enumeration would be misleading there, since nothing more is coming, and
+naming the end of the scope is what matters (ADR 13, point 3).
 
-Belegt in `cxx-parser/tests/error_messages.rs::ungueltiges_argument_wird_als_fehlendes_element_gemeldet`
-und `syn-grammar/tests/list_dx_test.rs`
+Evidenced in `cxx-parser/tests/error_messages.rs::ungueltiges_argument_wird_als_fehlendes_element_gemeldet`
+and `syn-grammar/tests/list_dx_test.rs`
 (`beschriftetes_element_behaelt_seine_meldung_auch_bei_min1`,
 `am_gruppenende_gewinnt_die_elementerwartung`).

@@ -1,13 +1,13 @@
-// Fehlermeldung auf dem ECHTEN Prozedurmakro-Pfad.
+// Error message on the REAL procedural-macro path.
 //
-// Die uebrige Testsuite laeuft ueber `Parser::parse_str` und damit ueber den
-// proc-macro2-Fallback. Hier laeuft ein wirkliches Makro - der einzige Pfad, auf
-// dem sich das Verhalten im Produkteinsatz pruefen laesst. ADR 13, Punkt 14.
+// The rest of the test suite runs through `Parser::parse_str` and thus through
+// the proc-macro2 fallback. Here a real macro runs - the only path on which the
+// behaviour in production use can be checked. ADR 13, point 14.
 //
-// Der Schnappschuss zeigt, dass die Meldung dort Positionen traegt. Das ist erst
-// ab Rust 1.88 so (proc-macro2 setzt `proc_macro_span_location` dann auch auf
-// stable); darunter waeren alle Spans (0,0). Das Projekt verlangt 1.88, dieser
-// Test haelt die Zusage fest.
+// The snapshot shows that the message carries positions there. That is only
+// the case from Rust 1.88 on (proc-macro2 then sets `proc_macro_span_location`
+// on stable too); below that all spans would be (0,0). The project requires
+// 1.88; this test pins that promise.
 ui_macro::zuweisung!(let x = ;);
 
 fn main() {}

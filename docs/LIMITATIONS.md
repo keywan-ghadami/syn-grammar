@@ -44,16 +44,16 @@ whitespace, unusual string or comment syntax) and binary formats are out of
 scope. `lex(...)`/`spaced(...)` and the `whitespace` assertion recover
 *adjacency* information within those limits, but they do not change the lexer.
 
-### Rücksetzen kostet eine Allokation
-Der Rumpf einer Regel läuft auf einem `ParseBuffer`. Jeder Rücksetzpunkt
-(Alternative, `?`, `*`, `+`, `peek`, `not`, `recover`, jedes Listenelement)
-arbeitet auf einer Gabel (`fork`) und spielt sie bei Erfolg ein (`advance_to`,
-laut syn O(1)). Eine Gabel ist eine kleine `Rc`-Allokation; im Cursor-Design
-davor war Zurücksetzen allokationsfrei.
+### Backtracking costs an allocation
+The body of a rule runs on a `ParseBuffer`. Every backtracking point
+(alternative, `?`, `*`, `+`, `peek`, `not`, `recover`, every list item) works on
+a fork (`fork`) and plays it back on success (`advance_to`, O(1) according to
+syn). A fork is a small `Rc` allocation; in the cursor design before,
+backtracking was allocation-free.
 
-Der Tausch lohnt sich deutlich: dafür wird der `TokenBuffer` genau einmal gebaut
-statt einmal je syn-AST-Typ. Eine Argumentliste mit 2000 `syn::Type`-Einträgen
-ging damit von 1,17 s auf 5,3 ms, und aus quadratischem wurde lineares Verhalten
-(vgl. `any_ident` ohne jeden AST-Typ: 3,1 ms).
+The trade is clearly worth it: in return the `TokenBuffer` is built exactly
+once instead of once per syn AST type. An argument list with 2000 `syn::Type`
+entries went from 1.17 s to 5.3 ms, and quadratic became linear (compare
+`any_ident` without any AST type: 3.1 ms).
 
-Hintergrund in [`adr/adr15-linear-parsing.md`](adr/adr15-linear-parsing.md).
+Background in [`adr/adr15-linear-parsing.md`](adr/adr15-linear-parsing.md).

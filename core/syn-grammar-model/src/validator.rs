@@ -5,11 +5,11 @@ use crate::model::*;
 use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;
 
-/// Prueft die Grammatik semantisch gegen die Faehigkeiten eines Backends.
+/// Checks the grammar semantically against the capabilities of a backend.
 ///
-/// Meldet doppelte Regelnamen, Aufrufe unbekannter Regeln (nur ohne
-/// Glob-Import - sonst ist die Menge der sichtbaren Namen nicht bekannt),
-/// unpassende Argumentzahlen und die Befunde aus
+/// Reports duplicate rule names, calls of unknown rules (only without a
+/// glob import - otherwise the set of visible names is not known),
+/// mismatched argument counts and the findings from
 /// [`crate::analysis::analyze_grammar`].
 pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
     let builtins = B::get_builtins();
@@ -39,13 +39,13 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
         .chain(builtin_names.iter().cloned())
         .collect();
 
-    // Nur ein Glob-Import (`use ...::*;`) kann unbekannte Regelnamen in die
-    // Grammatik tragen - insbesondere die Vererbung, die auf
-    // `use super::Base::*;` abgebildet wird (siehe `model.rs`). Ein benannter
-    // Import bringt genau einen bekannten Namen mit und darf die Pruefung nicht
-    // abschalten: sonst verliert jede Grammatik mit einem gewoehnlichen `use`
-    // die "Undefined rule"-Meldung, und ein Tippfehler im Regelnamen schlaegt
-    // erst als Folgefehler im generierten Code durch.
+    // Only a glob import (`use ...::*;`) can bring unknown rule names into the
+    // grammar - in particular inheritance, which is mapped to
+    // `use super::Base::*;` (see `model.rs`). A named import brings along
+    // exactly one known name and must not switch off the check: otherwise
+    // every grammar with an ordinary `use` would lose the "Undefined rule"
+    // message, and a typo in a rule name would only surface as a follow-up
+    // error in the generated code.
     let should_validate_rule_calls = !grammar.uses.iter().any(|u| use_tree_has_glob(&u.tree));
 
     if should_validate_rule_calls {
@@ -391,10 +391,10 @@ fn validate_args_recursive(
     Ok(())
 }
 
-/// Traegt dieser `use`-Baum irgendwo einen Glob (`::*`)?
+/// Does this `use` tree carry a glob (`::*`) anywhere?
 ///
-/// Rekursiv, weil der Glob in einem Pfad (`a::b::*`) oder in einer Gruppe
-/// (`a::{b, c::*}`) stecken kann.
+/// Recursive, because the glob can sit in a path (`a::b::*`) or in a group
+/// (`a::{b, c::*}`).
 fn use_tree_has_glob(tree: &syn::UseTree) -> bool {
     match tree {
         syn::UseTree::Glob(_) => true,

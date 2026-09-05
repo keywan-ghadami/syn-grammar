@@ -5,21 +5,21 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use syn::visit::{self, Visit};
 use syn::{parse_quote, Lit, Result};
 
-/// Grobklassifikation des Rueckgabetyps einer Regel.
+/// Coarse classification of a rule's return type.
 ///
-/// Der Codegenerator braucht sie, weil ein geliehener Typ die Lebensdauer der
-/// Eingabe mitfuehren muss, ein primitiver dagegen nicht.
+/// The code generator needs it because a borrowed type must carry along the
+/// lifetime of the input, whereas a primitive one does not.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReturnTypeKind {
-    /// `()` - die Regel liefert keinen Wert.
+    /// `()` - the rule yields no value.
     Empty,
-    /// Ein Typ ohne Lebensdauer, etwa `u64` oder `String`.
+    /// A type without a lifetime, e.g. `u64` or `String`.
     Primitive,
-    /// Ein Typ, der die Lebensdauer `'a` der Eingabe traegt.
+    /// A type that carries the lifetime `'a` of the input.
     Borrowed,
 }
 
-/// Bestimmt, welcher [`ReturnTypeKind`] auf einen Rueckgabetyp zutrifft.
+/// Determines which [`ReturnTypeKind`] applies to a return type.
 pub fn determine_return_type_kind(ty: &syn::Type) -> ReturnTypeKind {
     // 1. Check for borrowed
     struct LifetimeVisitor {
@@ -68,10 +68,10 @@ pub fn collect_custom_keywords(grammar: &GrammarDefinition) -> HashSet<String> {
 
 /// Result of analyzing a pattern sequence for a Cut operator (`=>`)
 pub struct CutAnalysis<'a> {
-    /// Die Muster **vor** dem Cut. Scheitern sie, darf noch zurueckgesetzt werden.
+    /// The patterns **before** the cut. If they fail, backtracking is still allowed.
     pub pre_cut: &'a [ModelPattern],
-    /// Die Muster **hinter** dem Cut. Ein Fehler hier ist fatal - die Ableitung
-    /// ist festgelegt, eine andere Alternative kommt nicht mehr in Frage.
+    /// The patterns **after** the cut. An error here is fatal - the derivation
+    /// is fixed, no other alternative comes into question anymore.
     pub post_cut: &'a [ModelPattern],
 }
 
@@ -170,9 +170,9 @@ fn collect_from_patterns(patterns: &[ModelPattern], kws: &mut HashSet<String>) {
     }
 }
 
-/// Sammelt alle Bindungsnamen einer Mustersequenz, in Reihenfolge.
+/// Collects all binding names of a pattern sequence, in order.
 ///
-/// Das sind die Namen, die der Aktionsblock der Regel sehen muss.
+/// These are the names the rule's action block must see.
 pub fn collect_bindings(patterns: &[ModelPattern]) -> Vec<Ident> {
     let mut bindings = Vec::new();
     for p in patterns {
@@ -298,20 +298,20 @@ pub fn resolve_token_types(
             format!("Numeric literal '{}' cannot be used as a token. Use `integer` or `lit_int` parsers instead.", s)));
     }
 
-    // Zusammengesetzte Operatoren bleiben EIN Token.
+    // Compound operators remain ONE token.
     //
-    // Ohne diese Abkuerzung zerlegt die Schleife unten `"::"` in
-    // `[Token![:], Token![:]]` und ueberlaesst die Frage, ob die beiden
-    // wirklich zusammengehoeren, einem Span-Adjazenztest im Codegen
-    // (`Spanned::span(&a).end() != Spanned::span(&b).start()`). Der haengt
-    // daran, dass Spans ueberhaupt Positionen tragen - was im Prozedurmakro
-    // erst ab Rust 1.88 der Fall ist (proc-macro2 `build.rs`, cfg
-    // `proc_macro_span_location`). Auf aelteren Toolchains ist die Pruefung
-    // wirkungslos und `a : : b` wuerde als `::` durchgehen.
+    // Without this shortcut, the loop below splits `"::"` into
+    // `[Token![:], Token![:]]` and leaves the question of whether the two
+    // really belong together to a span adjacency test in the codegen
+    // (`Spanned::span(&a).end() != Spanned::span(&b).start()`). That depends
+    // on spans carrying positions at all - which in a procedural macro is
+    // only the case from Rust 1.88 on (proc-macro2 `build.rs`, cfg
+    // `proc_macro_span_location`). On older toolchains the check is
+    // ineffective and `a : : b` would pass as `::`.
     //
-    // syns eigene Token-Typen pruefen `Spacing::Joint` selbst und auf jeder
-    // Toolchain korrekt. Ein Eintrag hier spart ausserdem einen kompletten
-    // Bridge-Aufruf pro Operator.
+    // syn's own token types check `Spacing::Joint` themselves and correctly on
+    // every toolchain. An entry here also saves a complete bridge call
+    // per operator.
     if let Some(ty) = zusammengesetzter_operator(&s) {
         return Ok(vec![ty]);
     }
@@ -465,11 +465,11 @@ pub fn get_peek_token_string(patterns: &[ModelPattern]) -> Option<String> {
     }
 }
 
-/// Kann das Muster erfolgreich sein, ohne ein Token zu verbrauchen?
+/// Can the pattern succeed without consuming a token?
 ///
-/// Wichtig fuer zwei Dinge: ein nullbares Anfangsmuster verbietet die
-/// Peek-Optimierung (der Peek wuerde die Alternative faelschlich ausschliessen),
-/// und eine nullbare Regel in einem Zyklus ist eine Endlosschleife.
+/// Important for two things: a nullable initial pattern forbids the
+/// peek optimization (the peek would wrongly exclude the alternative),
+/// and a nullable rule in a cycle is an infinite loop.
 pub fn is_nullable(pattern: &ModelPattern) -> bool {
     match pattern {
         ModelPattern::Cut(_) => true,
@@ -500,25 +500,25 @@ pub fn is_nullable(pattern: &ModelPattern) -> bool {
 //  Graph Analysis & Diagnostics (Infinite Recursion, Ambiguity, Unused Rules)
 // ==============================================================================
 
-/// Das Ergebnis der Graphanalyse ueber eine ganze Grammatik.
+/// The result of the graph analysis over a whole grammar.
 pub struct GrammarAnalysis {
-    /// Regeln, die ohne Tokenverbrauch erfolgreich sein koennen.
+    /// Rules that can succeed without consuming tokens.
     pub nullable_rules: HashSet<String>,
-    /// Gefundene Zyklen im Regelgraphen, je als Pfad von Regelnamen.
+    /// Cycles found in the rule graph, each as a path of rule names.
     pub cycles: Vec<Vec<String>>,
-    /// Regeln, die von keiner oeffentlichen Regel aus erreichbar sind.
+    /// Rules that are not reachable from any public rule.
     pub unused_rules: HashSet<String>,
-    /// Je Regel die Menge der Tokens, mit denen sie beginnen kann.
+    /// Per rule, the set of tokens it can start with.
     pub first_sets: HashMap<String, HashSet<String>>,
-    /// Befunde, die als Fehler gemeldet werden - etwa ein Zyklus ueber lauter
-    /// nullbare Regeln, der zur Laufzeit nicht terminieren wuerde.
+    /// Findings that are reported as errors - e.g. a cycle consisting solely of
+    /// nullable rules, which would not terminate at runtime.
     pub errors: Vec<syn::Error>,
 }
 
-/// Fuehrt die Graphanalyse ueber eine Grammatik aus.
+/// Runs the graph analysis over a grammar.
 ///
-/// Berechnet Nullbarkeit als Fixpunkt, sucht Zyklen und unerreichbare Regeln
-/// und bestimmt die First-Mengen.
+/// Computes nullability as a fixpoint, looks for cycles and unreachable rules
+/// and determines the first sets.
 pub fn analyze_grammar(grammar: &GrammarDefinition) -> GrammarAnalysis {
     let mut nullable_rules = HashSet::new();
 
@@ -1186,14 +1186,14 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
     }
 }
 
-/// Bildet einen mehrzeichigen Rust-Operator auf seinen `syn`-Token-Typ ab.
+/// Maps a multi-character Rust operator to its `syn` token type.
 ///
-/// `None` fuer alles, was kein bekannter Operator ist - dann greift die
-/// zeichenweise Zerlegung in [`resolve_token_types`].
+/// `None` for anything that is not a known operator - then the
+/// character-by-character decomposition in [`resolve_token_types`] applies.
 fn zusammengesetzter_operator(s: &str) -> Option<syn::Type> {
-    // Nur Operatoren, die `Token![..]` als eigenen Typ kennt. Bewusst als
-    // Liste statt per Heuristik: ein falsch geratener Operator wuerde still
-    // ein anderes Token akzeptieren.
+    // Only operators that `Token![..]` knows as a type of their own. Deliberately as
+    // a list rather than a heuristic: a wrongly guessed operator would silently
+    // accept a different token.
     let bekannt = [
         "::", "->", "=>", "==", "!=", "<=", ">=", "&&", "||", "..", "..=", "...", "+=", "-=", "*=",
         "/=", "%=", "^=", "&=", "|=", "<<", ">>", "<<=", ">>=",

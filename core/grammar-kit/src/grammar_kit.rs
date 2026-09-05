@@ -1,20 +1,20 @@
 #![doc = include_str!("../README.md")]
-// Die oeffentliche API dieses Crates ist die Laufzeit generierter Parser -
-// undokumentierte Elemente darin sind ein Fehler, kein Schoenheitsmakel.
+// The public API of this crate is the runtime of generated parsers -
+// undocumented items in it are a bug, not a blemish.
 #![warn(missing_docs)]
 
-/// Die Bausteine, aus denen der generierte Code besteht.
+/// The building blocks the generated code consists of.
 #[cfg(feature = "syn")]
 pub mod combinators;
-/// Der waehrend eines Parselaufs mitgefuehrte Zustand: Regelstapel,
-/// Hochwasserstand der Fehler, Gruppentiefe, lexikalischer Modus.
+/// The state carried along during a parse run: rule stack, error
+/// high-water mark, group depth, lexical mode.
 #[cfg(feature = "syn")]
 pub mod context;
-/// Der Fehlertyp der Laufzeit und seine Auswahlregeln.
+/// The runtime's error type and its selection rules.
 #[cfg(feature = "syn")]
 pub mod error;
 
-/// Fluente Zusicherungen zum Testen generierter Parser.
+/// The stream-driven runtime: `Strom`, `schritt`, `parse_syn`, forks.
 #[cfg(feature = "testing")]
 pub mod stream;
 
@@ -22,15 +22,15 @@ pub mod testing;
 
 pub use grammar_kit_macros::with_span;
 
-/// Konstruiert einen Wert aus geparsten Daten und der Stelle, an der sie standen.
+/// Constructs a value from parsed data and the position where it was found.
 ///
-/// Wird vom Ableitungsmakro [`with_span`] implementiert.
+/// Implemented by the derive macro [`with_span`].
 pub trait WithSpan<ParsedData> {
-    /// Baut `Self` aus `parsed_data` und dem Byte-Bereich `span`.
+    /// Builds `Self` from `parsed_data` and the byte range `span`.
     fn with_span(parsed_data: ParsedData, span: std::ops::Range<usize>) -> Self;
 }
 
-// Exportiere die gekapselten Module flach für den Codegenerator
+// Re-export the encapsulated modules flat for the code generator
 #[cfg(feature = "syn")]
 pub use combinators::*;
 #[cfg(feature = "syn")]

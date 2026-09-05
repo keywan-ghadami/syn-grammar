@@ -13,9 +13,9 @@ pub fn generate_sequence(
     let steps = generate_sequence_steps(patterns, ctx)?;
     Ok(quote! {
         #steps
-        // Der Action-Block laeuft in einer eigenen syn::Result-Closure, damit
-        // Nutzercode darin weiterhin `return Err(syn::Error::new(..))` und `?`
-        // auf syn-Ergebnisse verwenden kann.
+        // The action block runs in its own syn::Result closure so that
+        // user code inside it can still use `return Err(syn::Error::new(..))` and `?`
+        // on syn results.
         let _action_res = (|| -> syn::Result<_> { Ok({ #action }) })()
             .map_err(rt::ParseError::from)?;
         Ok(_action_res)
@@ -39,9 +39,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         ModelPattern::Lit { binding, lit } => {
             if let Lit::Str(lit) = lit {
                 let token_types = analysis::resolve_token_types(lit, ctx.custom_keywords)?;
-                // Auf dem Strom prueft der Token-Parser die Joint-Spacing selbst
-                // und kostet O(1) - die frueher noetige Vorab-Zaehlung der
-                // Quelltokens (`take_fixed`) entfaellt.
+                // On the stream, the token parser checks the joint spacing itself
+                // and costs O(1) - the previously needed advance counting of the
+                // source tokens (`take_fixed`) is gone.
                 if token_types.len() <= 1 {
                     let parses = token_types.iter().map(|ty| {
                         let bind_stmt = if let Some(bind) = binding { quote!(let #bind = _t;) } else { quote!() };
@@ -110,11 +110,11 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 } else {
                     quote!()
                 };
-                // Seit ADR 15, Stufe 3 ist das ein gewoehnlicher `parse`-Aufruf
-                // auf dem bestehenden Strom: O(Laenge des Typs). Die Sonderwege
-                // aus Stufe 1 (`take_braced_block`, `take_upto_group`) sind damit
-                // gegenstandslos - sie umgingen genau die Materialisierung, die
-                // es jetzt gar nicht mehr gibt.
+                // Since ADR 15, stage 3, this is an ordinary `parse` call
+                // on the existing stream: O(length of the type). The special paths
+                // from stage 1 (`take_braced_block`, `take_upto_group`) are thus
+                // moot - they bypassed exactly the materialization that
+                // no longer exists at all.
                 Ok(quote! {
                     let _val = rt::parse_syn::<#rule_path>(input)?;
                     #bind_stmt
@@ -343,9 +343,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             } else if is_builtin {
                 let rule_name_str = rule_name_ident.unwrap().to_string();
                 let expr = match rule_name_str.as_str() {
-                    // Die Zeichenfilter und `any_byte` bleiben Cursor-Primitiven
-                    // (O(1), kein Strom noetig); `rt::schritt` laesst sie in einer
-                    // `step`-Episode laufen und rueckt den Strom entsprechend vor.
+                    // The character filters and `any_byte` remain cursor primitives
+                    // (O(1), no stream needed); `rt::schritt` lets them run in a
+                    // `step` episode and advances the stream accordingly.
                     "alpha" | "digit" | "alphanumeric" | "hex_digit" | "oct_digit" => {
                         let func = format_ident!("{}", rule_name_str);
                         quote! { rt::schritt(input, rt::token_filter::#func)? }
@@ -427,7 +427,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         })();
                         match _res {
                             Ok(vals) => {
-                                // Zero-Progress-Schutz (siehe oben).
+                                // Zero-progress guard (see above).
                                 if _gabel.cursor() == _start_cursor { break; }
                                 rt::uebernehmen(input, &_gabel);
                                 let #tuple_pat = vals;
@@ -435,8 +435,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
-                                // Die Wiederholung endet regulaer - der Grund wird
-                                // gemerkt, sonst geht er hier verloren.
+                                // The repetition ends regularly - the reason is
+                                // recorded, otherwise it would be lost here.
                                 ctx.record_failure(&e);
                                 break;
                             }
@@ -456,15 +456,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         })();
                         match _res {
                             Ok(()) => {
-                                // Zero-Progress-Schutz: sonst dreht sich die Schleife ewig,
-                                // wenn das innere Muster ohne Tokenverbrauch matcht.
+                                // Zero-progress guard: otherwise the loop spins forever
+                                // if the inner pattern matches without consuming tokens.
                                 if _gabel.cursor() == _start_cursor { break; }
                                 rt::uebernehmen(input, &_gabel);
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
-                                // Die Wiederholung endet regulaer - der Grund wird
-                                // gemerkt, sonst geht er hier verloren.
+                                // The repetition ends regularly - the reason is
+                                // recorded, otherwise it would be lost here.
                                 ctx.record_failure(&e);
                                 break;
                             }
@@ -501,9 +501,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
                 Ok(quote! {
                     #(#init_vecs)*
-                    // Erstes Pflicht-Element NICHT in einen Block wickeln: #inner_logic
-                    // endet mit `let mut cursor = next_cursor;`, das Vorruecken ginge
-                    // sonst am Blockende verloren und die Schleife liefe erneut darauf.
+                    // Do NOT wrap the first mandatory item in a block: #inner_logic
+                    // ends with `let mut cursor = next_cursor;`, the advance would otherwise
+                    // be lost at the end of the block and the loop would run over it again.
                     #inner_logic
                     let #tuple_pat = #return_tuple;
                     #(#push_vecs)*
@@ -517,7 +517,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         })();
                         match _res {
                             Ok(vals) => {
-                                // Zero-Progress-Schutz (siehe oben).
+                                // Zero-progress guard (see above).
                                 if _gabel.cursor() == _start_cursor { break; }
                                 rt::uebernehmen(input, &_gabel);
                                 let #tuple_pat = vals;
@@ -525,8 +525,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
-                                // Die Wiederholung endet regulaer - der Grund wird
-                                // gemerkt, sonst geht er hier verloren.
+                                // The repetition ends regularly - the reason is
+                                // recorded, otherwise it would be lost here.
                                 ctx.record_failure(&e);
                                 break;
                             }
@@ -547,15 +547,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         })();
                         match _res {
                             Ok(()) => {
-                                // Zero-Progress-Schutz: sonst dreht sich die Schleife ewig,
-                                // wenn das innere Muster ohne Tokenverbrauch matcht.
+                                // Zero-progress guard: otherwise the loop spins forever
+                                // if the inner pattern matches without consuming tokens.
                                 if _gabel.cursor() == _start_cursor { break; }
                                 rt::uebernehmen(input, &_gabel);
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
-                                // Die Wiederholung endet regulaer - der Grund wird
-                                // gemerkt, sonst geht er hier verloren.
+                                // The repetition ends regularly - the reason is
+                                // recorded, otherwise it would be lost here.
                                 ctx.record_failure(&e);
                                 break;
                             }
@@ -680,17 +680,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 quote!(let (#(#bindings),*) = _val;)
             };
 
-            // Die Bindings der Gruppe muessen im UMGEBENDEN Scope landen, sonst
-            // sieht der Action-Block sie nicht (sie starben frueher mit dem if-let-Block).
+            // The bindings of the group must land in the ENCLOSING scope, otherwise
+            // the action block does not see them (they used to die with the if-let block).
             Ok(quote! {
-                // `rt::gruppe` steigt in die Klammern ab und rueckt den aeusseren
-                // Strom hinter die Gruppe. Der Inhalt ist ein eigener Strom mit
-                // derselben Token-Lebensdauer - nur deshalb koennen Fehler aus der
-                // Gruppe nach aussen getragen werden.
+                // `rt::gruppe` descends into the delimiters and advances the outer
+                // stream past the group. The content is a separate stream with
+                // the same token lifetime - only because of that can errors from the
+                // group be carried outward.
                 let (_span, _inhalt) = rt::gruppe(input, proc_macro2::Delimiter::#delimiter)?;
-                // Innerhalb der Gruppe meldet Cursor::eof() das Gruppenende, nicht
-                // das Eingabeende. Die Tiefe merken, damit Meldungen den
-                // Unterschied benennen koennen.
+                // Inside the group, Cursor::eof() reports the end of the group, not
+                // the end of input. Record the depth so that messages can name the
+                // difference.
                 ctx.enter_group();
                 let _grp_res = (|| -> rt::StreamResult<'a, _> {
                     let input = &_inhalt;
@@ -699,10 +699,10 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 })();
                 ctx.exit_group();
                 let _val = _grp_res?;
-                // "unexpected token in delimited group" ist nur ein Platzhalter fuer
-                // "der Inhalt wurde nicht vollstaendig verbraucht". Wurde unterwegs
-                // ein Grund gemerkt, ist der strikt aussagekraeftiger - deshalb
-                // nicht strukturell, damit er nicht gewinnt.
+                // "unexpected token in delimited group" is only a placeholder for
+                // "the content was not consumed completely". If a reason was recorded
+                // along the way, it is strictly more informative - hence
+                // not structural, so that this one does not win.
                 if !_inhalt.cursor().eof() {
                     return Err(ctx.best_error(
                         rt::ParseError::at_cursor(_inhalt.cursor(), "unexpected token in delimited group")
@@ -715,9 +715,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
                 ctx.enter_lexical();
-                // Das `?` MUSS hinter `exit_mode()` stehen - sonst bleibt der
-                // Modus bei einem Fehler auf dem Stapel liegen. Der Delimiter-Zweig
-                // macht es mit `exit_group()` genauso.
+                // The `?` MUST come after `exit_mode()` - otherwise the
+                // mode stays on the stack in case of an error. The delimiter branch
+                // does the same with `exit_group()`.
                 let _mode_res = (|| -> rt::StreamResult<'a, _> {
                     #inner_logic
                     Ok(())
@@ -730,9 +730,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let inner_logic = generate_pattern_step(inner, ctx)?;
             Ok(quote! {
                 ctx.enter_spaced();
-                // Das `?` MUSS hinter `exit_mode()` stehen - sonst bleibt der
-                // Modus bei einem Fehler auf dem Stapel liegen. Der Delimiter-Zweig
-                // macht es mit `exit_group()` genauso.
+                // The `?` MUST come after `exit_mode()` - otherwise the
+                // mode stays on the stack in case of an error. The delimiter branch
+                // does the same with `exit_group()`.
                 let _mode_res = (|| -> rt::StreamResult<'a, _> {
                     #inner_logic
                     Ok(())
@@ -756,8 +756,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             sync,
             span: _,
         } => {
-            // Ein ungebundener Regelaufruf im Body erbt den aeusseren Binding-Namen,
-            // sonst haette der Body keinen Wert und recover() lieferte () statt Option<T>.
+            // An unbound rule call in the body inherits the outer binding name,
+            // otherwise the body would have no value and recover() would yield () instead of Option<T>.
             let effective_body = if let Some(bind) = binding {
                 match &**body {
                     ModelPattern::RuleCall {
@@ -799,9 +799,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             let none_exprs = bindings.iter().map(|_| quote!(Option::<_>::None));
             let some_exprs = bindings.iter().map(|b| quote!(Some(#b)));
 
-            // Kein Binding: nichts zuzuweisen. Genau eines: _val wird direkt in
-            // Some(..) gewickelt, eine Zwischenzuweisung wuerde den Wert vorher
-            // wegbewegen. Erst ab zwei wird destrukturiert.
+            // No binding: nothing to assign. Exactly one: _val is wrapped directly in
+            // Some(..), an intermediate assignment would move the value away
+            // beforehand. Only from two on is it destructured.
             let some_assign = if bindings.len() <= 1 {
                 quote!()
             } else {
@@ -837,9 +837,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     }
                     Err(e) => {
                         if e.priority >= 50 { return Err(e); }
-                        // Die Gabel wurde NICHT uebernommen - der Strom steht noch
-                        // am Anfang des Rumpfs. Von dort bis zur naechsten
-                        // Synchronisationsmarke ueberspringen.
+                        // The fork was NOT adopted - the stream is still at
+                        // the start of the body. Skip from there up to the next
+                        // synchronization mark.
                         loop {
                             if input.cursor().eof() { break; }
                             if rt::peek_syn(input.cursor(), #sync_peek) { break; }
@@ -872,8 +872,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             };
 
             Ok(quote! {
-                // Vorausschau: laeuft auf einer Gabel, die nie uebernommen wird -
-                // der Strom bleibt also stehen.
+                // Lookahead: runs on a fork that is never adopted -
+                // so the stream stays where it is.
                 let _val = (|| -> rt::StreamResult<'a, _> {
                     let _gabel = rt::gabel(input);
                     let input = &_gabel;
@@ -885,8 +885,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
         }
         ModelPattern::Not(inner, _) => {
             let inner_logic = generate_pattern_step(inner, ctx)?;
-            // Wenn `not(..)` eine Regel abwehrt, gehoert ihr Name in die Meldung -
-            // sonst steht dort nur "unexpected match" ohne jeden Anhaltspunkt.
+            // If `not(..)` rejects a rule, its name belongs in the message -
+            // otherwise it only says "unexpected match" without any clue.
             let inner_name = match &**inner {
                 ModelPattern::RuleCall { rule_path, .. } => rule_path
                     .segments
@@ -911,7 +911,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 None => quote!("unexpected match".to_string()),
             };
             Ok(quote! {
-                // Wie bei der Vorausschau: Gabel, die nie uebernommen wird.
+                // As with lookahead: a fork that is never adopted.
                 let _not_res = (|| -> rt::StreamResult<'a, _> {
                     let _gabel = rt::gabel(input);
                     let input = &_gabel;
@@ -957,18 +957,18 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             pattern: inner,
             ..
         } => {
-            // count(..) zaehlt das ELEMENT, nicht den Wiederholungs-Operator.
-            // `count("a"*)` auf "a a a" ist 3, nicht 1: also muss der Operator
-            // abgestreift und sein Element gezaehlt werden. Eine generische
-            // Schleife ueber "a"* wuerde beim ersten Durchlauf alles verbrauchen
-            // und danach endlos leer weiterlaufen.
+            // count(..) counts the ITEM, not the repetition operator.
+            // `count("a"*)` on "a a a" is 3, not 1: so the operator must be
+            // stripped off and its item counted. A generic
+            // loop over "a"* would consume everything on the first pass
+            // and then run on empty forever afterwards.
             let bind_stmt = if let Some(bind) = binding {
                 quote!(let #bind = _count;)
             } else {
                 quote!(let _ = _count;)
             };
 
-            // Ein Schleifendurchlauf ueber das Element, mit Zero-Progress-Schutz.
+            // One loop pass over the item, with zero-progress guard.
             let loop_over = |elem_logic: &proc_macro2::TokenStream| {
                 quote! {
                     loop {
@@ -987,8 +987,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
-                                // Die Wiederholung endet regulaer - der Grund wird
-                                // gemerkt, sonst geht er hier verloren.
+                                // The repetition ends regularly - the reason is
+                                // recorded, otherwise it would be lost here.
                                 ctx.record_failure(&e);
                                 break;
                             }
@@ -1006,8 +1006,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 ModelPattern::Plus(elem, _) => {
                     let elem_logic = generate_pattern_step(elem, ctx)?;
                     let lp = loop_over(&elem_logic);
-                    // Erstes Element ist Pflicht: nicht in einen Block wickeln,
-                    // sonst geht das Vorruecken des Cursors beim Blockende verloren.
+                    // The first item is mandatory: do not wrap it in a block,
+                    // otherwise the cursor advance is lost at the end of the block.
                     quote! {
                         let mut _count: usize = 0;
                         #elem_logic

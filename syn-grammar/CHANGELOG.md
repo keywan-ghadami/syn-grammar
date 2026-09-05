@@ -2,230 +2,227 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.0] - Entwurf, nicht veroeffentlicht
+## [0.9.0] - Draft, unreleased
 
-> Diese Version ist **noch nicht auf crates.io**. Die letzte veroeffentlichte
-> Fassung ist 0.8.0; alles hier Aufgefuehrte ist gegenueber 0.8.0 zu lesen.
+> This version is **not on crates.io yet**. The last published release is
+> 0.8.0; everything listed here is to be read against 0.8.0.
 
-Die Fehlerdiagnose wurde neu aufgebaut. Die Engine ging dabei zwischenzeitlich
-vom `ParseStream`-Modell auf funktionales Cursor-Parsing und ist mit ADR 15,
-Stufe 3 wieder auf einen Strom umgestellt - diesmal mit der neuen Diagnostik und
-ohne die Materialisierungs-Bruecke. Netto gegenueber 0.8.0: derselbe Stromtyp,
-neue Fehlerauswahl, lineare Laufzeit. Der Abschnitt fasst rund 280 Commits
-zusammen, die zwischenzeitlich nicht im Changelog gelandet waren.
+The error diagnostics were rebuilt. Along the way the engine moved from the
+`ParseStream` model to functional cursor parsing and, with ADR 15 stage 3, back
+onto a stream - this time with the new diagnostics and without the
+materialisation bridge. Net effect against 0.8.0: the same stream type, a new
+error selection, linear running time. This section summarises about 280 commits
+that had not made it into the changelog in the meantime.
 
-Fuer Endnutzer, die nur `grammar! { … }` schreiben und die generierte
-`parse_X(ParseStream) -> syn::Result<T>` aufrufen, ist der Umstieg klein: die
-Signatur dieses Wrappers ist unveraendert. Betroffen sind vor allem
-handgeschriebene Parser, die in eine Grammatik eingehaengt werden, und alles,
-was auf konkrete Fehlermeldungstexte prueft.
+For end users who only write `grammar! { … }` and call the generated
+`parse_X(ParseStream) -> syn::Result<T>`, the move is small: the signature of
+that wrapper is unchanged. Affected are mainly hand-written parsers plugged into
+a grammar, and anything that checks concrete error message text.
 
 ### Breaking Changes
 
-- **Crate- und Dateilayout.** Das Repo ist ein virtueller Workspace: `syn-grammar`
-  liegt unter `syn-grammar/`, `grammar-kit` und `syn-grammar-model` unter `core/`.
-  Alle `lib.rs`/`mod.rs` sind nach ihrem Modul benannt (`grammar_kit.rs`,
-  `syn_grammar.rs`, `model.rs`, `codegen.rs`) und ueber `[lib] path` eingebunden.
-  - **Impact**: Nur fuer Beitragende relevant, nicht fuer Nutzer der Crates.
+- **Crate and file layout.** The repo is a virtual workspace: `syn-grammar`
+  lives under `syn-grammar/`, `grammar-kit` and `syn-grammar-model` under
+  `core/`. All `lib.rs`/`mod.rs` files are named after their module
+  (`grammar_kit.rs`, `syn_grammar.rs`, `model.rs`, `codegen.rs`) and wired in
+  via `[lib] path`.
+  - **Impact**: only relevant for contributors, not for users of the crates.
 
-- **`ParseError<'a>` ersetzt `syn::Error` als interner Fehlertyp.** Neu:
-  `ParseResult<'a, T> = Result<(T, Cursor<'a>), ParseError<'a>>` und die
-  Prioritaetskonstanten `PRIO_NORMAL`/`PRIO_LABELED`/`PRIO_AGGREGATED`/`PRIO_STRUCTURAL`.
-  - **Impact**: Der Typ traegt eine Lifetime. Wer ihn in eigenen Signaturen
-    nennt, muss sie durchreichen.
+- **`ParseError<'a>` replaces `syn::Error` as the internal error type.** New:
+  `ParseResult<'a, T> = Result<(T, Cursor<'a>), ParseError<'a>>` and the
+  priority constants `PRIO_NORMAL`/`PRIO_LABELED`/`PRIO_AGGREGATED`/`PRIO_STRUCTURAL`.
+  - **Impact**: the type carries a lifetime. Anyone naming it in their own
+    signatures has to thread it through.
 
-- **`ParseContext` heisst jetzt `ParseContext<'a>`.** Entfallen: `set_fatal`,
+- **`ParseContext` is now `ParseContext<'a>`.** Removed: `set_fatal`,
   `check_fatal`, `trigger_fail`, `record_error`, `take_best_error`,
-  `is_best_error_deep`, `define`/`is_defined`/`enter_scope`/`exit_scope` direkt
-  auf dem Kontext, `rule_stack()`. Neu: `record_failure`, `absorb`, `best_error`,
-  `furthest`, `enter_rule`/`exit_rule`, `enter_group`/`exit_group`,
-  `end_of_scope_msg`, `mode_stack`, `group_depth`. `record_span` gibt jetzt
-  `syn::Result<()>` zurueck.
-  - **Migration**: Fatalitaet sitzt am Fehler (`ParseError::is_fatal`), nicht
-    mehr am Kontext. Namensraeume liegen unter `ctx.scopes`.
+  `is_best_error_deep`, `define`/`is_defined`/`enter_scope`/`exit_scope`
+  directly on the context, `rule_stack()`. New: `record_failure`, `absorb`,
+  `best_error`, `furthest`, `enter_rule`/`exit_rule`, `enter_group`/`exit_group`,
+  `end_of_scope_msg`, `mode_stack`, `group_depth`. `record_span` now returns
+  `syn::Result<()>`.
+  - **Migration**: fatality lives on the error (`ParseError::is_fatal`), no
+    longer on the context. Scopes live under `ctx.scopes`.
 
-- **Alle Kombinatoren aus `grammar-kit` sind ersatzlos entfernt**: `attempt`,
-  `peek`, `not_check`, `attempt_recover`, `parse_ident`, `parse_int`,
-  `skip_until`. Sie nahmen einen `ParseStream`.
-  - **Migration**: Die Entsprechungen heissen
-    `peek_syn`, `finish_variants`, `parse_separated`, `parse_repeated`, sowie
-    das neue Modul `stream` (`Strom`, `StreamResult`, `parse_syn`, `parse_mit`,
-    `gabel`, `uebernehmen`, `gruppe`, `schritt`, `token_nehmen`).
+- **All combinators from `grammar-kit` are removed without replacement**:
+  `attempt`, `peek`, `not_check`, `attempt_recover`, `parse_ident`,
+  `parse_int`, `skip_until`. They took a `ParseStream`.
+  - **Migration**: the counterparts are `peek_syn`, `finish_variants`,
+    `parse_separated`, `parse_repeated`, and the new module `stream` (`Strom`,
+    `StreamResult`, `parse_syn`, `parse_mit`, `gabel`, `uebernehmen`, `gruppe`,
+    `schritt`, `token_nehmen`).
 
-- **Alle `builtins::parse_*_impl` haben eine neue Signatur**: statt
-  `<T: CommonBuiltins>(&mut T, &mut ParseContext) -> syn::Result<X>` jetzt
-  `<'a>(&rt::Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, X>`. Das Trait
-  `CommonBuiltins` samt seiner `impl for ParseStream` ist geloescht.
-  `token_filter::{alpha, alphanumeric, digit, hex_digit, oct_digit}` bleiben
-  Cursor-Primitiven (`Cursor<'a> -> ParseResult<'a, X>`) und werden ueber
-  `rt::schritt` auf dem Strom ausgefuehrt.
+- **All `builtins::parse_*_impl` have a new signature**: instead of
+  `<T: CommonBuiltins>(&mut T, &mut ParseContext) -> syn::Result<X>` now
+  `<'a>(&rt::Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, X>`. The
+  trait `CommonBuiltins` and its `impl for ParseStream` are deleted.
+  `token_filter::{alpha, alphanumeric, digit, hex_digit, oct_digit}` remain
+  cursor primitives (`Cursor<'a> -> ParseResult<'a, X>`) and run on the stream
+  via `rt::schritt`.
 
-- **Die generierte `parse_X_impl` nimmt einen `&rt::Strom<'a>`** (also einen
-  `&syn::parse::ParseBuffer<'a>`) und liefert `rt::StreamResult<'a, T>`, das
-  heisst `Result<T, ParseError<'a>>` ohne Cursor im Erfolgsfall.
-  - **Impact**: Das ist der Einhaengepunkt fuer handgeschriebene Parser
-    (`extern`-Regeln); deren Signatur aendert sich entsprechend. Der oeffentliche
-    Wrapper `parse_X(ParseStream) -> syn::Result<T>` ist unveraendert -
-    **Endnutzer sind nicht betroffen**.
-  - Bewusst `&ParseBuffer<'a>` und nicht syns Alias
-    `ParseStream<'a> = &'a ParseBuffer<'a>`: der Alias wuerde `'a` beim Forken auf
-    den Stapelrahmen verkuerzen, womit Fehler aus einer Gabel den Aufruf nicht
-    mehr verlassen koennten.
-  - **Zurueckgesetzt wird jetzt ueber `rt::gabel`/`rt::uebernehmen`**
-    (`fork`/`advance_to`) statt ueber einen Cursor-Copy. Nach einem Fehler ist der
-    Strom moeglicherweise vorgerueckt; wer zuruecksetzen will, muss auf einer Gabel
-    arbeiten. Der Codegenerator tut das an jeder Ruecksetzstelle.
+- **The generated `parse_X_impl` takes a `&rt::Strom<'a>`** (that is, a
+  `&syn::parse::ParseBuffer<'a>`) and returns `rt::StreamResult<'a, T>`, i.e.
+  `Result<T, ParseError<'a>>` with no cursor on success.
+  - **Impact**: this is the hook for hand-written parsers (`extern` rules);
+    their signature changes accordingly. The public wrapper
+    `parse_X(ParseStream) -> syn::Result<T>` is unchanged - **end users are not
+    affected**.
+  - Deliberately `&ParseBuffer<'a>` and not syn's alias
+    `ParseStream<'a> = &'a ParseBuffer<'a>`: the alias would shorten `'a` to
+    the stack frame on a fork, so errors from a fork could no longer leave the
+    call.
+  - **Backtracking now goes through `rt::gabel`/`rt::uebernehmen`**
+    (`fork`/`advance_to`) instead of a cursor copy. After an error the stream
+    may have advanced; anyone who wants to backtrack must work on a fork. The
+    code generator does so at every backtracking point.
 
-- **`syn_grammar::Identifier` und `syn_grammar::StringLiteral` als
-  Wurzel-Re-Exports entfallen.**
-  - **Migration**: `syn_grammar::types::Identifier` bzw. `::types::StringLiteral`.
+- **`syn_grammar::Identifier` and `syn_grammar::StringLiteral` as root
+  re-exports are gone.**
+  - **Migration**: `syn_grammar::types::Identifier` and `::types::StringLiteral`.
 
-- **Das Makro `include_grammar` ist geloescht.** Es gab seit 0.2.0 nur noch eine
-  erklaerende `compile_error!`-Meldung; jetzt meldet der Compiler
-  "cannot find macro". Grammatiken gehoeren inline in `grammar! { … }`.
+- **The `include_grammar` macro is deleted.** Since 0.2.0 it had only emitted an
+  explanatory `compile_error!`; now the compiler reports "cannot find macro".
+  Grammars belong inline in `grammar! { … }`.
 
-- **`syn_grammar_model::parse_grammar_with_builtins` existiert nicht mehr.**
-  - **Migration**: `parse_grammar::<B: Backend>`. `model` re-exportiert
-    `backend::*`/`types::*` nicht mehr flach.
+- **`syn_grammar_model::parse_grammar_with_builtins` no longer exists.**
+  - **Migration**: `parse_grammar::<B: Backend>`. `model` no longer re-exports
+    `backend::*`/`types::*` flatly.
 
-- **Datenmodell**: `GrammarDefinition` verliert `inherits` und gewinnt
-  `extern_rules`/`imports`; `Rule` gewinnt `return_type_kind` und `is_lexical`;
-  `RuleCall.rule_name` heisst `rule_path`; `params` ist `Vec<RuleParameter>`.
+- **Data model**: `GrammarDefinition` loses `inherits` and gains
+  `extern_rules`/`imports`; `Rule` gains `return_type_kind` and `is_lexical`;
+  `RuleCall.rule_name` is now `rule_path`; `params` is `Vec<RuleParameter>`.
 
-- **Grossgeschriebene Regelnamen sind automatisch lexikalisch.** Zwischen den
-  Mustern einer solchen Regel ist kein Zwischenraum mehr erlaubt.
-  - **Impact**: Eine bestehende Grammatik mit einer grossgeschriebenen Regel
-    aendert *still* ihr Verhalten. Entweder umbenennen oder `spaced(...)` setzen.
+- **Uppercase rule names are automatically lexical.** No whitespace is allowed
+  between the patterns of such a rule any more.
+  - **Impact**: an existing grammar with an uppercase rule changes behaviour
+    *silently*. Either rename it or wrap it in `spaced(...)`.
 
-- **`separated(..., trailing=false)`** bricht bei einem Trenner ohne
-  Folgeelement nicht mehr hart ab, sondern setzt weich vor den Trenner zurueck.
-  - **Impact**: Grammatiken der Form `paren(liste? ","?)` funktionieren dadurch
-    neu; Grammatiken, die auf den harten Fehler gebaut haben, akzeptieren still.
+- **`separated(..., trailing=false)`** no longer fails hard on a separator with
+  no following item; it softly backtracks to before the separator.
+  - **Impact**: grammars of the form `paren(list? ","?)` now work; grammars
+    that relied on the hard error now accept silently.
 
-- **`any_ident` akzeptiert jetzt Schluesselwoerter** (`Ident::parse_any`) und ist
-  damit nicht mehr funktionsgleich mit `ident`.
-  - **Impact**: Wer sich darauf verlassen hat, dass `any_ident` an einem
-    Schluesselwort scheitert (etwa zur Abgrenzung in einer Alternativenkette),
-    muss auf `ident` wechseln.
+- **`any_ident` now accepts keywords** (`Ident::parse_any`) and is therefore
+  no longer equivalent to `ident`.
+  - **Impact**: anyone who relied on `any_ident` failing on a keyword (say, to
+    delimit an alternative chain) must switch to `ident`.
 
-- **Die Fehlerauswahl vergleicht zuerst den Fortschritt**, erst danach
-  Fatalitaet und Prioritaet.
-  - **Impact**: Ein frueh stehendes `fail("…")` verliert gegen einen tiefer
-    gekommenen Normalfehler - wer mehr Tokens verarbeitet hat, war naeher an der
-    gemeinten Ableitung. Bei *gleicher* Stelle gewinnt `fail` weiterhin.
-    (Eine fruehere Fassung dieses Entwurfs sagte "`fail` takes precedence" ohne
-    Einschraenkung; das galt nie fuer den Fortschrittsvergleich.)
+- **Error selection compares progress first**, only then fatality and
+  priority.
+  - **Impact**: an early `fail("…")` loses against a normal error that got
+    further - whoever consumed more tokens was closer to the intended
+    derivation. At the *same* position `fail` still wins. (An earlier version
+    of this draft said "`fail` takes precedence" without qualification; that
+    never applied to the progress comparison.)
 
-- **Das Format des Regelkontexts hat sich geaendert**: statt des Praefixes
-  `Error in rule 'inner': …` jetzt Suffixzeilen `\nin inner rule`, mit
-  Unterstrichen als Leerzeichen, plus ` at column N (line M)` sofern der Span
-  Positionsdaten traegt.
+- **The format of the rule context has changed**: instead of the prefix
+  `Error in rule 'inner': …` there are now suffix lines `\nin inner rule`, with
+  underscores as spaces, plus ` at column N (line M)` when the span carries
+  position data.
 
-- **Viele feste Meldungstexte haben sich geaendert**, u. a.
+- **Many fixed message texts have changed**, among them
   `No matching rule variant found` -> ``expected one of: `a`, `b`; found unexpected token `x` ``,
   `expected at least N items` -> `expected at least N <item>s, found M`,
   `unexpected match` -> ``unexpected match for rule `X`; found `Y` in rule `Z` ``.
-  - **Migration**: Der verbindliche Katalog ist neu
+  - **Migration**: the binding catalogue is now
     `docs/adr/adr13-error-message-contract.md`.
 
-- **`grammar-kit::testing::TestResult<T, E>` hat einen dritten Parameter
-  `S = ()`**; der `'static`-Bound auf `E` entfaellt;
-  `assert_failure_contains`/`assert_failure_not_contains` liefern `Self` statt
-  `()`; `Testable` ist von `syn::Result<T>` auf `Result<T, E>` verallgemeinert.
+- **`grammar-kit::testing::TestResult<T, E>` has a third parameter
+  `S = ()`**; the `'static` bound on `E` is gone;
+  `assert_failure_contains`/`assert_failure_not_contains` return `Self` instead
+  of `()`; `Testable` is generalised from `syn::Result<T>` to `Result<T, E>`.
 
-- **`grammar-kit`: die Features `rt` und `trace` sind entfernt** - sie schalteten
-  nichts. Ebenso das nie funktionsfaehige Makro `test_both_backends!` und das
-  nie eingebundene Modul `transaction`.
+- **`grammar-kit`: the features `rt` and `trace` are removed** - they switched
+  nothing on. Likewise the never-working macro `test_both_backends!` and the
+  never-included module `transaction`.
 
 ### Added
 
-- **Lineares Parsen (ADR 15).** Kein Parseschritt materialisiert mehr den
-  Reststrom. Ein `syn::Type` kostet `input.parse::<T>()` statt eines neuen
-  `TokenBuffer` ueber den gesamten Rest der umschliessenden Delimiter-Gruppe.
-  Gemessen an einer Argumentliste mit 2000 Eintraegen: 1,174 s -> 5,33 ms, und
-  aus quadratischem wurde lineares Verhalten (zwanzigfache Eingabe kostete
-  vorher 356x, jetzt 16x). Einzeltoken laufen ueber `take_single` in O(1),
-  `peek_syn` ohne jede Allokation.
+- **Linear parsing (ADR 15).** No parse step materialises the remaining
+  stream any more. A `syn::Type` costs `input.parse::<T>()` instead of a new
+  `TokenBuffer` over the entire rest of the enclosing delimiter group. Measured
+  on an argument list with 2000 entries: 1.174 s -> 5.33 ms, and quadratic
+  became linear (twenty times the input used to cost 356x, now 16x). Single
+  tokens go through `take_single` in O(1), `peek_syn` without any allocation.
 
-- **Cursor-basierte Diagnose-Engine.** Fortschritt wird ueber
-  `syn::buffer::Cursor` verglichen (`PartialOrd`, O(1)) statt ueber Zeile/Spalte.
-  Grund: der Cursor-Vergleich ist ein Zeigervergleich in O(1) und haengt an
-  keiner Compilerversion. (Bis Rust 1.87 lieferte `Span::start()` im
-  Prozedurmakro zudem fuer *jeden* Span `(0,0)`; seit 1.88 nicht mehr.)
-- **Hochwasserstand fuer verdeckte Fehler** (`ParseContext::furthest`). Ein
-  Fehler, den ein *erfolgreiches* Zuruecksetzen ueberdeckt (`?`, `*`,
-  `separated(min=0)`), ueberlebt und wird gemeldet, wenn sonst nur eine
-  nichtssagende Meldung uebrig bliebe.
-- **Lebender Regelstapel** (`enter_rule`/`exit_rule`) mit Momentaufnahme, damit
-  auch ein gemerkter Fehler seinen Regelkontext traegt.
-- **`item_label=`** fuer `separated`/`repeated`: benennt Listenelemente und
-  zaehlt sie (`expected function argument … in function argument 2`).
-- **Trennung von Fatalitaet und Prioritaet**: `ParseError::is_fatal` fuer den
-  Cut, `priority` fuer `fail(..)` und Labels.
-- **Unterscheidung `unexpected end of group` / `unexpected end of input`** ueber
-  die Gruppentiefe im Kontext.
-- **`extern`-Regeln und `import`** in der Grammatik-DSL.
-- **`lex(...)` und `spaced(...)`** zur expliziten Steuerung der
-  Whitespace-Empfindlichkeit, plus die Grossschreibungs-Konvention.
-- **`count(pattern)`**, das die Anzahl der Treffer liefert.
-- **Vereinfachte Regelsyntax**: ohne `rule`-Schluesselwort, ohne Rueckgabetyp,
-  ohne Aktionsblock.
-- **Neue Builtins**: `any_ident`, `named_field`, `unnamed_field`, `visibility`,
-  `generics`, `return_type`, `statements`, sowie `pat`, `inner_attrs` und
-  `lit_byte`. `pat` schliesst die groesste Luecke: `syn::Pat` hat kein
-  `impl Parse` und war ueber den `syn::`-Pfad nicht erreichbar.
-- **`with_span`-Ableitungsmakro** und der `WithSpan`-Trait.
-- **`DEBUG_GRAMMAR`**: Umgebungsvariable, die den generierten Code auf stderr
-  ausgibt.
-- **`cxx-parser`** als Abnahme-Benchmark (eigene Crate, Version 0.1.0).
+- **Cursor-based diagnostics engine.** Progress is compared via
+  `syn::buffer::Cursor` (`PartialOrd`, O(1)) instead of line/column. Reason:
+  the cursor comparison is a pointer comparison in O(1) and does not depend on
+  any compiler version. (Up to Rust 1.87 `Span::start()` inside a procedural
+  macro also returned `(0,0)` for *every* span; since 1.88 it no longer does.)
+- **High-water mark for hidden errors** (`ParseContext::furthest`). An error
+  that a *successful* backtrack covers up (`?`, `*`, `separated(min=0)`)
+  survives and is reported when otherwise only a meaningless message would be
+  left.
+- **Live rule stack** (`enter_rule`/`exit_rule`) with a snapshot, so that a
+  remembered error carries its rule context too.
+- **`item_label=`** for `separated`/`repeated`: names list items and counts
+  them (`expected function argument … in function argument 2`).
+- **Separation of fatality and priority**: `ParseError::is_fatal` for the cut,
+  `priority` for `fail(..)` and labels.
+- **Distinction `unexpected end of group` / `unexpected end of input`** via
+  the group depth in the context.
+- **`extern` rules and `import`** in the grammar DSL.
+- **`lex(...)` and `spaced(...)`** for explicit control of whitespace
+  sensitivity, plus the uppercase convention.
+- **`count(pattern)`**, which returns the number of matches.
+- **Simplified rule syntax**: without the `rule` keyword, without a return
+  type, without an action block.
+- **New built-ins**: `any_ident`, `named_field`, `unnamed_field`,
+  `visibility`, `generics`, `return_type`, `statements`, plus `pat`,
+  `inner_attrs` and `lit_byte`. `pat` closes the biggest gap: `syn::Pat` has no
+  `impl Parse` and was unreachable through the `syn::` path.
+- **The `with_span` derive macro** and the `WithSpan` trait.
+- **`DEBUG_GRAMMAR`**: an environment variable that prints the generated code
+  to stderr.
+- **`cxx-parser`** as the acceptance benchmark (its own crate, version 0.1.0).
 
 ### Fixed
 
-- **`digit`, `hex_digit`, `oct_digit`** waren im Builtin-Katalog als
-  `syn::Ident` deklariert, liefern aber `syn::LitInt`. Der deklarierte Typ
-  steuert die Generics-Inferenz - eine generische Regel, die mit `digit`
-  instanziiert wurde, erzeugte einen Compilerfehler im *generierten* Code.
-- **Die "Undefined rule"-Pruefung** wurde von *jedem* `use`-Statement
-  abgeschaltet. Sie haengt jetzt am Glob-Import (`use …::*;`), der als einziger
-  unbekannte Regelnamen mitbringen kann. Ein Tippfehler im Regelnamen wird damit
-  wieder sauber gemeldet statt als Folgefehler im generierten Code.
-- **Verworfene Alternativ-Fehler gingen verloren**, wenn eine spaetere
-  Alternative erfolgreich war und Eingabe uebrig liess. Statt einer Meldung wie
-  `expected integer literal … in term … in expression` erschien nur syns
-  `unexpected token`.
-- **Ein `syn::`-Typ ohne `Parse`** (z. B. `syn::Field`) erzeugte einen rohen
-  Trait-Bound-Fehler auf generiertem Code. Jetzt kommt eine Meldung auf der
-  Zeile des Nutzers, die das passende Builtin nennt.
-- **`peek_syn` und die Bruecken-Kombinatoren** scheiterten, sobald auf den
-  Aufruf noch Tokens folgten - `Parser::parse2` verlangt, dass der gesamte
-  Stream verbraucht wird. Die Bruecke ist mit ADR 15, Stufe 3 ganz entfallen.
-- **Zero-Progress-Schutz** in den Wiederholungsschleifen: `*`, `+` und die
-  Listen-Kombinatoren konnten bei einem Muster, das nichts verbraucht, endlos
-  laufen.
-- **`LexicalScope`/`SpacedScope`** raeumten bei einem Fehler den `mode_stack`
-  nicht ab (`?` stand vor `exit_mode()`).
-- **Der CI-Doc-Schritt** war rot: `syn::parse::<Token>()` ohne Backticks in
-  einem Doc-Kommentar liess rustdoc unter `-D warnings` abbrechen.
+- **`digit`, `hex_digit`, `oct_digit`** were declared as `syn::Ident` in the
+  built-in catalogue but return `syn::LitInt`. The declared type drives
+  generics inference - a generic rule instantiated with `digit` produced a
+  compiler error in the *generated* code.
+- **The "Undefined rule" check** was switched off by *any* `use` statement. It
+  now hangs on the glob import (`use …::*;`), the only thing that can bring in
+  unknown rule names. A typo in a rule name is reported cleanly again instead
+  of as a follow-up error in generated code.
+- **Discarded alternative errors were lost** when a later alternative
+  succeeded and left input behind. Instead of a message like
+  `expected integer literal … in term … in expression` only syn's
+  `unexpected token` appeared.
+- **A `syn::` type without `Parse`** (e.g. `syn::Field`) produced a raw
+  trait-bound error on generated code. Now a message appears on the user's
+  line, naming the built-in to use instead.
+- **`peek_syn` and the bridge combinators** failed as soon as tokens followed
+  the call - `Parser::parse2` requires the whole stream to be consumed. The
+  bridge is gone entirely with ADR 15 stage 3.
+- **Zero-progress guard** in the repetition loops: `*`, `+` and the list
+  combinators could loop forever on a pattern that consumes nothing.
+- **`LexicalScope`/`SpacedScope`** did not clean up the `mode_stack` on error
+  (`?` came before `exit_mode()`).
+- **The CI doc step** was red: `syn::parse::<Token>()` without backticks in a
+  doc comment made rustdoc abort under `-D warnings`.
 
 ### Documentation
 
-- `docs/ERROR_HANDLING.md` neu geschrieben - es beschrieb die alte Engine
-  (Positionsvergleich, Prioritaeten 0/1/2, Nachrichtenlaenge als Tiebreak) und
-  eine Label-Syntax, die es nie gab.
-- `docs/adr/adr13-error-message-contract.md` neu: der verbindliche Katalog fuer
-  Fehlermeldungen, jeder Punkt mit Testfundstelle.
-- `GOALS.md` und `ARCHITECTURE.md` neu; `EXTENDING.md` und `docs/adr/adr1.md`
-  als ueberholt bzw. zurueckgezogen markiert.
-- `SYNTAX.md`: der Label-Operator `#`, `item_label`, die `spanned_*`-Familie und
-  die Span-Bindung `@` waren nicht dokumentiert.
-- `#![warn(missing_docs)]` in `grammar-kit` und `syn-grammar`; 58 fehlende
-  Doc-Kommentare ergaenzt.
+- `docs/ERROR_HANDLING.md` rewritten - it described the old engine (position
+  comparison, priorities 0/1/2, message length as tie-break) and a label syntax
+  that never existed.
+- `docs/adr/adr13-error-message-contract.md` new: the binding catalogue for
+  error messages, every point with its test location.
+- `GOALS.md` and `ARCHITECTURE.md` new; `EXTENDING.md` and `docs/adr/adr1.md`
+  marked as outdated and withdrawn respectively.
+- `SYNTAX.md`: the label operator `#`, `item_label`, the `spanned_*` family and
+  the span binding `@` were undocumented.
+- `#![warn(missing_docs)]` in `grammar-kit` and `syn-grammar`; 58 missing doc
+  comments added.
 
-### Aeltere Eintraege dieses Entwurfs
+### Earlier entries of this draft
 
-Der 0.9.0-Entwurf war schon vor dem oben beschriebenen Umbau begonnen worden.
-Diese Eintraege stammen aus der ersten Haelfte und gelten weiterhin - sofern
-oben nichts anderes steht.
+The 0.9.0 draft had been started before the rebuild described above. These
+entries come from the first half and still apply - unless the text above says
+otherwise.
 
 #### Added
 - **Consolidated Error Messages with Labeled Alternatives**: The parser can now produce a single, clear error message when multiple alternatives fail at the same position (e.g., "expected one of: an expression, a statement"). This is enabled by a new labeling mechanism, which uses rule names as default labels and supports explicit labels via the `# "label"` syntax. This replaces ambiguous, single-alternative errors with a helpful summary of all valid possibilities.
