@@ -43,14 +43,20 @@ impl<T: syn::parse::Parse> SynParsable for T {}
 
 /// Finishes a chain of alternatives and picks the message that goes outward.
 ///
-/// `best` is the best individual error from the branches, `expected` collects the labels
-/// of the branches that already failed at their boundary (i.e. without consuming a single
-/// token). Implements ADR 13, points 6 and 7.
+/// `best` is the best individual error from the branches. `expected` collects what
+/// the branches that failed at their boundary (i.e. without consuming a single token)
+/// would have accepted: the label of a labelled branch, otherwise the
+/// [`expected`](ParseError::expected) set of the branch's own error - so a branch
+/// that starts with a built-in or with another rule is listed too, not only the
+/// branches with a peekable first token. `end_msg` is what the end of the current
+/// scope is called (`unexpected end of input` / `… of group`). Implements ADR 13,
+/// points 3, 6 and 7.
 pub fn finish_variants<'a>(
     best: Option<ParseError<'a>>,
     mut expected: Vec<String>,
     start: Cursor<'a>,
     fallback_msg: &str,
+    end_msg: &str,
 ) -> ParseError<'a> {
     // An error that got past the start point is more meaningful than the list of
     // alternatives at the start position - then `expected one of:` must not appear
@@ -65,6 +71,18 @@ pub fn finish_variants<'a>(
     expected.sort();
     expected.dedup();
 
+    // If the enumeration says exactly what the best error already says, its own
+    // wording stays: `expected integer literal` from a single built-in keeps
+    // syn's text and its `unexpected end of input, ` prefix.
+    if let Some(b) = &best {
+        let mut own = b.expected.clone();
+        own.sort();
+        own.dedup();
+        if b.at == Some(start) && !own.is_empty() && own == expected {
+            return best.unwrap();
+        }
+    }
+
     // What is actually at that position? (ADR 13, point 3)
     let found = match start.token_tree() {
         Some((tt, _)) => {
@@ -77,10 +95,15 @@ pub fn finish_variants<'a>(
         }
         None => String::new(),
     };
+    let at_end = if start.eof() {
+        format!("{end_msg}, ")
+    } else {
+        String::new()
+    };
 
-    match expected.len() {
-        0 => best.unwrap_or_else(|| ParseError::at_cursor(start, fallback_msg)),
-        1 => ParseError::at_cursor(start, format!("expected `{}`{}", expected[0], found))
+    let mut e = match expected.len() {
+        0 => return best.unwrap_or_else(|| ParseError::at_cursor(start, fallback_msg)),
+        1 => ParseError::at_cursor(start, format!("{at_end}expected `{}`{found}", expected[0]))
             .with_priority(PRIO_LABELED),
         _ => {
             let list = expected
@@ -88,10 +111,12 @@ pub fn finish_variants<'a>(
                 .map(|e| format!("`{}`", e))
                 .collect::<Vec<_>>()
                 .join(", ");
-            ParseError::at_cursor(start, format!("expected one of: {}{}", list, found))
+            ParseError::at_cursor(start, format!("{at_end}expected one of: {list}{found}"))
                 .with_priority(PRIO_AGGREGATED)
         }
-    }
+    };
+    e.expected = expected;
+    e
 }
 
 /// Labels a failed attempt at a list item.
@@ -112,6 +137,7 @@ fn label_missing_item<'a>(
 ) -> ParseError<'a> {
     if replaces_message(&e, at) {
         e.message = item_expectation(at, item_name, ctx);
+        e.expected = vec![item_name.to_string()];
         e.span = at.span();
     }
     e.priority = e.priority.max(prio);
@@ -403,8 +429,10 @@ pub fn take_single<'a, T: SingleToken>(cursor: Cursor<'a>) -> ParseResult<'a, T>
         None if cursor.eof() => Err(ParseError::at_cursor(
             cursor,
             format!("unexpected end of input, {}", T::expected()),
-        )),
-        None => Err(ParseError::at_cursor(cursor, T::expected())),
+        )
+        .with_expected(T::expected().trim_start_matches("expected "))),
+        None => Err(ParseError::at_cursor(cursor, T::expected())
+            .with_expected(T::expected().trim_start_matches("expected "))),
     }
 }
 

@@ -524,9 +524,11 @@ for the binding contract.
 
 ### Alternative Labels (`#`)
 
-By default a failing alternative is described by its first token. `# "..."`
-replaces that with a human-readable name. The label is placed **after the
-pattern and before the action block**.
+By default a failing alternative is described by what it would have accepted:
+its first token, the delimiter it opens with, the expectation of the built-in
+it starts with (`integer literal`), or the list a called rule collected.
+`# "..."` replaces that with a human-readable name. The label is placed
+**after the pattern and before the action block**.
 
 ```rust
 # use syn_grammar::grammar;

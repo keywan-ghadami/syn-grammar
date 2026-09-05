@@ -21,7 +21,11 @@ where
     if check(&value) {
         Ok((value, next))
     } else {
-        Err(ParseError::new(value.span(), format!("expected {}", expected)).with_cursor(cursor))
+        Err(
+            ParseError::new(value.span(), format!("expected {}", expected))
+                .with_cursor(cursor)
+                .with_expected(expected),
+        )
     }
 }
 

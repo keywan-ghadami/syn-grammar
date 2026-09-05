@@ -28,6 +28,11 @@ complete list is in [`syn-grammar/CHANGELOG.md`](../../syn-grammar/CHANGELOG.md)
 
 ### Added
 
+- **`analysis::expectation_label`**: the display name of an alternative's
+  first pattern for `expected one of:` — the literal text, or syn's word for
+  a delimiter (`parentheses`, `square brackets`, `curly braces`) instead of
+  the enum name. `get_peek_token_string` is unchanged and serves the peek.
+
 - **The "Undefined rule" message names the replacements**: `extern rule` for
   a hand-written parser, `import … as alias;` for another grammar's rule, and
   says explicitly when a `use` of the same name is what the user tried.

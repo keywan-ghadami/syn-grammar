@@ -86,8 +86,10 @@ backend authors.
 - **`ParseError<'a>` replaces `syn::Error` inside the engine.** It carries the
   span (for display), the cursor (for progress comparison), a priority
   (`PRIO_NORMAL` / `PRIO_LABELED` / `PRIO_AGGREGATED` / `PRIO_STRUCTURAL`),
-  the fatality flag of the cut, and the rule stack. Action blocks may still
-  fail with `syn::Error`; it converts.
+  the fatality flag of the cut, the rule stack, and the expectation set
+  `expected` (`ParseError::expecting`, `with_expected`). Action blocks may
+  still fail with `syn::Error`; it converts. `finish_variants` takes the name
+  of the scope end as a fifth argument.
 - **`ParseContext` is `ParseContext<'a>`.** Removed: `set_fatal`,
   `check_fatal`, `trigger_fail`, `record_error`, `take_best_error`,
   `is_best_error_deep`, `rule_stack()`, and `define` / `is_defined` /
@@ -172,9 +174,26 @@ backend authors.
 - **`with_span` derive macro** and the `WithSpan` trait.
 - **`cxx-parser`**, a parser for the `cxx` bridge syntax, as the acceptance
   benchmark for error quality (its own crate, 0.1.0, not published).
+- **Self-hosting test** (`tests/self_hosting_test.rs`): the grammar DSL
+  written in the grammar DSL, parsing the documentation's grammars and
+  checking the diagnostics a grammar author gets. The second acceptance
+  benchmark next to `cxx-parser`.
 
 ### Fixed
 
+- **`expected one of:` lists every alternative.** A branch that starts with a
+  built-in or with another rule was invisible in the enumeration, and a
+  delimiter appeared under its internal name: `factor = i:i32 | paren(…)` on
+  `*` reported ``expected `Paren` ``. It now reports
+  ``expected one of: `integer literal`, `parentheses`; found unexpected token `*` ``.
+  Errors carry an expectation set (`ParseError::expected`) that the
+  alternative chain unions, through nested rules; a label still replaces the
+  inner list. At the end of the input or of a group the enumeration carries
+  the `unexpected end of …, ` prefix. A single built-in keeps syn's wording.
+- **A numeric literal used as a token** (`"0"`) is a pinned compile error
+  that names the built-ins to use (`i32`, `u64`, `lit_int`); the message used
+  to recommend `integer`, which does not exist. The parked test
+  `digits.fixme` became `tests/ui/numeric_literal_token.rs`.
 - **`digit`, `hex_digit`, `oct_digit`** were catalogued as `syn::Ident` but
   return `syn::LitInt`; a generic rule instantiated with them produced a
   compiler error in generated code.

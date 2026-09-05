@@ -255,7 +255,7 @@ pub fn generate_variants_internal(
     }
 
     let arms = variants.iter().map(|variant| {
-        let label_str = if let Some(l) = &variant.label { Some(l.clone()) } else { analysis::get_peek_token_string(&variant.pattern) };
+        let label_str = if let Some(l) = &variant.label { Some(l.clone()) } else { analysis::expectation_label(&variant.pattern) };
         let label_lit = if let Some(l) = &label_str { quote!(Some(#l)) } else { quote!(None::<&str>) };
 
         let cut_info = analysis::find_cut(&variant.pattern);
@@ -310,6 +310,11 @@ pub fn generate_variants_internal(
                         // the internal message outward (ADR 13, item 6).
                         if e.at == Some(_start_cursor) {
                             if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
+                            // Unlabelled: what the branch itself would have accepted -
+                            // a built-in's expectation, or the union an inner rule
+                            // already collected. Without this, only peekable
+                            // branches made it into `expected one of:`.
+                            else { _expected.extend(e.expected.iter().cloned()); }
                         }
                         // Only WITH progress into the high-water mark: if a later
                         // alternative wins, `_best_err` is discarded - and with
@@ -350,6 +355,11 @@ pub fn generate_variants_internal(
                         // the internal message outward (ADR 13, item 6).
                         if e.at == Some(_start_cursor) {
                             if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
+                            // Unlabelled: what the branch itself would have accepted -
+                            // a built-in's expectation, or the union an inner rule
+                            // already collected. Without this, only peekable
+                            // branches made it into `expected one of:`.
+                            else { _expected.extend(e.expected.iter().cloned()); }
                         }
                         // Only WITH progress into the high-water mark: if a later
                         // alternative wins, `_best_err` is discarded - and with
@@ -418,6 +428,6 @@ pub fn generate_variants_internal(
 
         #(#arms)*
 
-        Err(rt::finish_variants(_best_err, _expected, _start_cursor, #error_msg))
+        Err(rt::finish_variants(_best_err, _expected, _start_cursor, #error_msg, ctx.end_of_scope_msg()))
     })
 }

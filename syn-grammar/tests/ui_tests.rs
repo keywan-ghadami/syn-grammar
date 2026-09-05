@@ -15,6 +15,7 @@ fn ui() {
     t.compile_fail("tests/ui/inheritance_removed.rs");
     t.compile_fail("tests/ui/import_injection.rs");
     t.compile_fail("tests/ui/unknown_list_argument.rs");
+    t.compile_fail("tests/ui/numeric_literal_token.rs");
 
     // Cases on the REAL procedural-macro path (crate `tests/ui-macro`).
     // Only here does a real macro run; everything else goes through `parse_str`

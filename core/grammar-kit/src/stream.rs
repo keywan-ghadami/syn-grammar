@@ -61,12 +61,12 @@ where
     F: for<'c> FnOnce(Cursor<'c>) -> ParseResult<'c, T>,
 {
     let here = input.cursor();
-    let mut saved: Option<(Span, String, u8, bool)> = None;
+    let mut saved: Option<(Span, String, u8, bool, Vec<String>)> = None;
     let result = input.step(|sc| match f(*sc) {
         Ok((value, after)) => Ok((value, after)),
         Err(e) => {
             let span = e.span;
-            saved = Some((span, e.message, e.priority, e.is_fatal));
+            saved = Some((span, e.message, e.priority, e.is_fatal, e.expected));
             // The text is taken from `saved` outside; this error only serves
             // to make `step` refuse to advance.
             Err(syn::Error::new(span, "unreachable"))
@@ -76,11 +76,12 @@ where
     match result {
         Ok(value) => Ok(value),
         Err(syn_error) => Err(match saved {
-            Some((span, message, priority, fatal)) => {
+            Some((span, message, priority, fatal, expected)) => {
                 let mut e = ParseError::new(span, message)
                     .with_cursor(here)
                     .with_priority(priority);
                 e.is_fatal = fatal;
+                e.expected = expected;
                 e
             }
             // Can only occur if `step` itself fails, not the closure.
@@ -165,19 +166,27 @@ pub fn group<'a>(
     delimiter: Delimiter,
 ) -> StreamResult<'a, (proc_macro2::extra::DelimSpan, Stream<'a>)> {
     let here = input.cursor();
-    let result = match delimiter {
-        Delimiter::Parenthesis => {
-            syn::__private::parse_parens(input).map(|g| (g.token.span, g.content))
-        }
-        Delimiter::Brace => syn::__private::parse_braces(input).map(|g| (g.token.span, g.content)),
-        Delimiter::Bracket => {
-            syn::__private::parse_brackets(input).map(|g| (g.token.span, g.content))
-        }
-        Delimiter::None => Err(syn::Error::new(here.span(), "expected delimited group")),
+    let (result, what) = match delimiter {
+        Delimiter::Parenthesis => (
+            syn::__private::parse_parens(input).map(|g| (g.token.span, g.content)),
+            "parentheses",
+        ),
+        Delimiter::Brace => (
+            syn::__private::parse_braces(input).map(|g| (g.token.span, g.content)),
+            "curly braces",
+        ),
+        Delimiter::Bracket => (
+            syn::__private::parse_brackets(input).map(|g| (g.token.span, g.content)),
+            "square brackets",
+        ),
+        Delimiter::None => (
+            Err(syn::Error::new(here.span(), "expected delimited group")),
+            "delimited group",
+        ),
     };
-    result.map_err(|_| {
-        ParseError::at_cursor(here, "expected delimited group").with_priority(PRIO_STRUCTURAL)
-    })
+    // The same words syn uses in its own messages, so that a delimiter reads
+    // the same whether syn or the grammar reports it.
+    result.map_err(|_| ParseError::expecting(here, what).with_priority(PRIO_STRUCTURAL))
 }
 
 /// Takes exactly one token tree from the stream.

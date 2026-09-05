@@ -37,7 +37,17 @@ that touch this crate's API are listed here.
   unrunnable in principle because of a dependency cycle) and the never-included
   module `transaction`.
 
+- **`finish_variants`** takes a fifth argument, the name of the scope end
+  (`ctx.end_of_scope_msg()`), for the prefix on an enumeration at the end of
+  the input or of a group.
+
 ### Added
+
+- **`ParseError::expected`**, the set of what would have been accepted at the
+  error position, with the constructors `ParseError::expecting` and
+  `with_expected`. Filled by `take_single`, `group` and the token filters,
+  carried through `step`, and unioned by `finish_variants` so that
+  `expected one of:` lists every alternative (ADR 13, point 6).
 
 - `SynParsable`: a marker with `#[diagnostic::on_unimplemented]` so that a
   `syn::` type without `Parse` produces an understandable message.

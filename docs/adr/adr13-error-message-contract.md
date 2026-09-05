@@ -47,6 +47,9 @@ of the internal token expectation.
 * `; found unexpected token \`123\`` — `list_dx_test.rs:30`
 * `unexpected end of input, …` — `list_dx_test.rs:72`, `trailing_comma_test.rs:41`
 * `unexpected end of group, …` — `list_dx_test.rs:60`
+* the same prefixes on an enumeration: `unexpected end of input, expected one of: …`,
+  `unexpected end of group, expected one of: …` —
+  `expectation_aggregation_test.rs::enumeration_names_the_end_of_scope`
 * `unexpected match for rule \`bad\`; found \`bad\` in rule \`main\`` — `peek_not_test.rs:87`
 
 ### 4. Position
@@ -81,11 +84,30 @@ Nesting over several levels: `list_dx_test.rs:40`
 ### 6. Aggregation of alternatives
 
 If several alternatives fail at the same position, **one** message results:
-`expected one of: …`, sorted and deduplicated.
+`expected one of: …`, sorted and deduplicated, and it lists **every**
+alternative that failed at its boundary — not only those whose first token
+can be peeked. Each alternative contributes what it would have accepted:
+
+* a literal its token text, a delimiter syn's word for it (`parentheses`,
+  `square brackets`, `curly braces`);
+* a built-in the expectation of its own error (`identifier`,
+  `integer literal`, `string literal`);
+* a called rule the enumeration it collected itself (union through nested
+  rules);
+* a labelled alternative its label, in place of all of the above.
+
+An error carries this as `ParseError::expected`; the alternative chain unions
+the sets (`finish_variants`). A single built-in keeps its own wording
+(`expected integer literal`, no backticks) — the list form appears only when
+there is something to enumerate.
 
 * `expected one of: \`a\`, \`b\`` — `labeled_alternatives_test.rs:39`
 * `expected one of: \`one\`, \`two\`, \`zero\`` (alphabetical) — `error_reporting_test.rs:81`
 * also inside groups — `labeled_alternatives_test.rs:66`
+* built-in next to delimiter: `expected one of: \`integer literal\`, \`parentheses\`` —
+  `expectation_aggregation_test.rs::builtin_and_delimiter_are_both_listed`
+* union through a called rule; a label replacing the inner list; a single
+  built-in keeping syn's wording — `expectation_aggregation_test.rs`
 
 ### 7. Depth beats aggregation
 

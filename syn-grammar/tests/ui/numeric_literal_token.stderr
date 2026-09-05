@@ -1,0 +1,5 @@
+error: Numeric literal '0' cannot be used as a token. Use a numeric built-in such as `i32` or `u64`, or `lit_int`, instead.
+  --> tests/ui/numeric_literal_token.rs:12:29
+   |
+12 |         rule digit -> () = ("0" | "1" | "2") -> { () }
+   |                             ^^^

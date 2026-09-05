@@ -147,6 +147,29 @@ where these arise:
 - the chain `\nin X\nin Y` from inside out, deduplicated,
 - the position — only if the span carries real data.
 
+## Expectation sets — how `expected one of:` is built
+
+Besides its message an error carries `expected: Vec<String>` — what would
+have been accepted at `at`, as display names (`identifier`, `parentheses`,
+`a number`). The primitives fill it (`ParseError::expecting`,
+`take_single`, `rt::group`, the token filters), `step` carries it across
+syn's `step` barrier, and `finish_variants` in the alternative chain unions
+the sets of all branches that failed at their boundary:
+
+- a labelled branch contributes its label instead of its own set;
+- an unlabelled branch contributes its error's set — a built-in's
+  expectation, or the list a called rule collected one level down;
+- a branch that was never tried because its peek failed contributes the label
+  derived at macro time (`analysis::expectation_label`: the literal text or
+  syn's word for the delimiter).
+
+If the union says exactly what the best error already says, that error is
+returned unchanged, which keeps `expected integer literal` in syn's wording.
+Otherwise the enumeration is rendered, with `; found unexpected token …` and,
+at the end of the scope, the `unexpected end of input, ` / `… of group, `
+prefix. Before this, a branch starting with a built-in was invisible in the
+list: `factor = i:i32 | paren(…)` on `*` reported ``expected `Paren` ``.
+
 ## What the grammar author sees
 
 | Tool | Effect |

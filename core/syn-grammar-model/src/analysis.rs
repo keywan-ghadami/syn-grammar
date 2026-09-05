@@ -295,7 +295,7 @@ pub fn resolve_token_types(
     }
     if s.chars().next().is_some_and(|c| c.is_numeric()) {
         return Err(syn::Error::new(lit.span(),
-            format!("Numeric literal '{}' cannot be used as a token. Use `integer` or `lit_int` parsers instead.", s)));
+            format!("Numeric literal '{}' cannot be used as a token. Use a numeric built-in such as `i32` or `u64`, or `lit_int`, instead.", s)));
     }
 
     // Compound operators remain ONE token.
@@ -417,6 +417,38 @@ pub fn get_simple_peek(
             get_simple_peek(pattern, kws)
         }
         _ => Ok(None),
+    }
+}
+
+/// What the first pattern of a sequence would accept, as a display name for
+/// an `expected one of:` list.
+///
+/// Like [`get_peek_token_string`] for literals, but a delimiter is named the
+/// way syn names it (`parentheses`, not `Paren`). Rule calls and built-ins
+/// yield `None`: their expectation comes from the error they produce at
+/// runtime (the `expected` set of the runtime's `ParseError`), which the
+/// alternative chain unions into its list.
+pub fn expectation_label(patterns: &[ModelPattern]) -> Option<String> {
+    fn delimiter(p: &ModelPattern) -> Option<&'static str> {
+        match p {
+            ModelPattern::Parenthesized(_, _) => Some("parentheses"),
+            ModelPattern::Bracketed(_, _) => Some("square brackets"),
+            ModelPattern::Braced(_, _) => Some("curly braces"),
+            ModelPattern::Optional(inner, _)
+            | ModelPattern::Repeat(inner, _)
+            | ModelPattern::Plus(inner, _)
+            | ModelPattern::SpanBinding(inner, _, _)
+            | ModelPattern::Peek(inner, _) => delimiter(inner),
+            ModelPattern::Recover { body, .. } => delimiter(body),
+            ModelPattern::Group { alts, .. } if alts.len() == 1 => {
+                alts[0].0.first().and_then(delimiter)
+            }
+            _ => None,
+        }
+    }
+    match patterns.first().and_then(delimiter) {
+        Some(d) => Some(d.to_string()),
+        None => get_peek_token_string(patterns),
     }
 }
 

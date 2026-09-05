@@ -352,12 +352,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     }
                     "eof" => {
                         return Ok(quote! {
-                            if !input.cursor().eof() { return Err(rt::ParseError::at_cursor(input.cursor(), "expected end of input")); }
+                            if !input.cursor().eof() { return Err(rt::ParseError::expecting(input.cursor(), "end of input")); }
                         })
                     }
                     "whitespace" => {
                         return Ok(quote! {
-                            if !ctx.check_whitespace(input.cursor().span()) { return Err(rt::ParseError::at_cursor(input.cursor(), "expected whitespace")); }
+                            if !ctx.check_whitespace(input.cursor().span()) { return Err(rt::ParseError::expecting(input.cursor(), "whitespace")); }
                         })
                     }
                     "any_byte" => quote! { rt::step(input, rt::take_single::<syn::LitByte>)? },

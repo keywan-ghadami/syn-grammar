@@ -137,6 +137,16 @@ Evidenced, not assumed:
    `winnow-grammar`, which both depend on `grammar-kit` — a cycle. Its doctest
    only counted as green because the macro expanded to nothing.
 
+## Acceptance benchmarks
+
+Two grammars stand in for "real use" and are checked on every run:
+`cxx-parser` below, and `syn-grammar/tests/self_hosting_test.rs`, the
+grammar DSL written in the grammar DSL. The hand-written parser in
+`syn-grammar-model` stays the stage-zero parser (the macro crate cannot
+depend on itself); the self-hosted grammar parses the documentation's
+grammars into an AST and checks the messages a grammar author gets from the
+diagnostics engine.
+
 ## `cxx-parser`
 
 Acceptance benchmark on the syn backend (`cxx-parser/Cargo.toml:8`). 5 rules,

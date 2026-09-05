@@ -55,6 +55,14 @@ pub struct ParseError<'a> {
     /// The rules in which the error occurred, innermost first. Only for
     /// display - the selection does not use it.
     pub rule_stack: Vec<String>,
+    /// What would have been accepted at `at`, as display names without
+    /// backticks (`identifier`, `parentheses`, `a number`). Empty for errors
+    /// that only carry a message (syn's own errors, `fail(..)`).
+    ///
+    /// The alternative chain unions these sets of all branches that failed at
+    /// their boundary, so that `expected one of:` lists *every* alternative
+    /// and not only the ones that could be peeked (ADR 13, point 6).
+    pub expected: Vec<String>,
 }
 
 impl<'a> ParseError<'a> {
@@ -68,6 +76,7 @@ impl<'a> ParseError<'a> {
             priority: 0,
             is_fatal: false,
             rule_stack: Vec::new(),
+            expected: Vec::new(),
         }
     }
 
@@ -80,7 +89,24 @@ impl<'a> ParseError<'a> {
             priority: 0,
             is_fatal: false,
             rule_stack: Vec::new(),
+            expected: Vec::new(),
         }
+    }
+
+    /// An error that expected exactly one thing at `cursor`: the message is
+    /// `expected <what>` and [`expected`](Self::expected) records `what`, so
+    /// that an enclosing alternative chain can list it.
+    pub fn expecting(cursor: Cursor<'a>, what: impl Into<String>) -> Self {
+        let what = what.into();
+        let mut e = Self::at_cursor(cursor, format!("expected {what}"));
+        e.expected = vec![what];
+        e
+    }
+
+    /// Records `what` as the expectation without touching the message.
+    pub fn with_expected(mut self, what: impl Into<String>) -> Self {
+        self.expected = vec![what.into()];
+        self
     }
 
     /// Attaches a cursor to an error that was created without one.
@@ -175,6 +201,7 @@ impl<'a> fmt::Debug for ParseError<'a> {
             .field("message", &self.message)
             .field("priority", &self.priority)
             .field("rule_stack", &self.rule_stack)
+            .field("expected", &self.expected)
             .field("has_cursor", &self.at.is_some())
             .finish()
     }

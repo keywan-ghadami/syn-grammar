@@ -211,7 +211,7 @@ pub fn parse_any_ident_impl<'a>(
     // Appears in every function argument in cxx.
     let t = step(input, |cursor| match cursor.ident() {
         Some(x) => Ok(x),
-        None => Err(ParseError::at_cursor(cursor, "expected identifier")),
+        None => Err(ParseError::expecting(cursor, "identifier")),
     })?;
     ctx.record_span(t.span())
         .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
