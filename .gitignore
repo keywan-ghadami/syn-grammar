@@ -1,5 +1,4 @@
 target/
-.aider*
 
 # One-off dumps that used to be checked in by accident:
 # macro expansions, compiler output, test logs.

@@ -3,7 +3,7 @@ use syn_grammar::grammar;
 use syn_grammar::testing::Testable;
 
 grammar! {
-    grammar repro_parser {
+    grammar cxx_extern_block {
         pub top_level_mod -> () =
             outer_attrs
             "mod" any_ident
@@ -30,7 +30,7 @@ grammar! {
 }
 
 #[test]
-fn test_repro_issue() {
+fn parses_cxx_style_extern_block() {
     let input = r#"
         mod ffi {
             unsafe extern "C++" {
@@ -45,7 +45,7 @@ fn test_repro_issue() {
         }
     "#;
 
-    repro_parser::parse_top_level_mod
+    cxx_extern_block::parse_top_level_mod
         .parse_str(input)
         .test()
         .assert_success();
