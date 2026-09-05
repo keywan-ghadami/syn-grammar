@@ -162,7 +162,6 @@ pub struct GrammarDefinition {
     /// The name from `grammar Name { … }`.
     pub name: Ident,
     /// A `: Base` after the name, if present.
-    pub inherits: Option<InheritanceSpec>,
     /// `use` statements that are carried over into the generated module.
     pub uses: Vec<ItemUse>,
     /// The rules in source order.
@@ -184,11 +183,25 @@ impl Parse for GrammarDefinition {
         let _ = input.parse::<kw::grammar>()?;
         let name = rt::parse_ident(input)?;
 
-        let inherits = if input.peek(Token![:]) {
-            Some(input.parse::<InheritanceSpec>()?)
-        } else {
-            None
-        };
+        // Grammar inheritance (`grammar Derived : Base`) was removed in 0.9.0.
+        // The old form is still recognised so that the user gets the
+        // replacement named at the exact spot, instead of a bare parse error
+        // on the `:`.
+        if input.peek(Token![:]) {
+            let colon = input.parse::<Token![:]>()?;
+            let base = input.parse::<Ident>().ok();
+            let base = base.map_or_else(|| "Base".to_string(), |b| b.to_string());
+            return Err(syn::Error::new(
+                colon.span,
+                format!(
+                    "grammar inheritance (`grammar {name} : {base}`) was removed in 0.9.0\n\
+                     help: `import {base} as {alias};` and call its rules as `{alias}::rule` \
+                     (see \"Importing Another Grammar\" in SYNTAX.md)\n\
+                     help: for a single hand-written parser, declare an `extern rule`",
+                    alias = base.to_lowercase(),
+                ),
+            ));
+        }
 
         let content;
         let _ = syn::braced!(content in input);
@@ -216,7 +229,6 @@ impl Parse for GrammarDefinition {
 
         Ok(GrammarDefinition {
             name,
-            inherits,
             uses,
             rules,
             extern_rules,
@@ -228,39 +240,16 @@ impl Parse for GrammarDefinition {
 impl ToTokens for GrammarDefinition {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let name = &self.name;
-        let inherits = &self.inherits;
         let uses = &self.uses;
         let rules = &self.rules;
         // extern_rules and imports are not currently emitted in ToTokens as they are structural metadata
 
         tokens.append_all(quote! {
-            grammar #name #inherits {
+            grammar #name {
                 #(#uses)*
                 #(#rules)*
             }
         });
-    }
-}
-
-#[derive(Debug, Clone)]
-/// A `: Base` after the grammar name.
-pub struct InheritanceSpec {
-    /// Name of the base grammar.
-    pub name: Ident,
-}
-
-impl Parse for InheritanceSpec {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let _ = input.parse::<Token![:]>()?;
-        let name = rt::parse_ident(input)?;
-        Ok(InheritanceSpec { name })
-    }
-}
-
-impl ToTokens for InheritanceSpec {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let name = &self.name;
-        tokens.append_all(quote! { : #name });
     }
 }
 

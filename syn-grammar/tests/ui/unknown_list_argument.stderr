@@ -1,0 +1,5 @@
+error: unknown argument `error` for `separated`; supported: min, trailing, item_label
+ --> tests/ui/unknown_list_argument.rs:8:39
+  |
+8 |             items:separated(i32, ",", error = "need numbers") -> { items }
+  |                                       ^^^^^

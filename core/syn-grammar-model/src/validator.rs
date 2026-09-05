@@ -49,8 +49,16 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
     let should_validate_rule_calls = !grammar.uses.iter().any(|u| use_tree_has_glob(&u.tree));
 
     if should_validate_rule_calls {
+        let mut use_names = HashSet::new();
+        for u in &grammar.uses {
+            use_tree_names(&u.tree, &mut use_names);
+        }
+        let scope = RuleScope {
+            defs: all_defs,
+            use_names,
+        };
         for rule in &grammar.rules {
-            validate_rule(rule, &all_defs)?;
+            validate_rule(rule, &scope)?;
         }
     }
 
@@ -103,27 +111,57 @@ pub fn validate<B: Backend>(grammar: &GrammarDefinition) -> syn::Result<()> {
     Ok(())
 }
 
-fn validate_rule(rule: &Rule, all_defs: &HashSet<String>) -> syn::Result<()> {
+/// The names a rule call may refer to, plus what the grammar's `use`
+/// statements bring into scope - the latter only to word the error.
+struct RuleScope {
+    /// Rules, extern rules and built-ins.
+    defs: HashSet<String>,
+    /// Last segments of the non-glob `use` statements (`use super::f;` -> `f`).
+    use_names: HashSet<String>,
+}
+
+fn validate_rule(rule: &Rule, scope: &RuleScope) -> syn::Result<()> {
     for variant in &rule.variants {
-        validate_pattern_sequence(&variant.pattern, all_defs, &rule.params)?;
+        validate_pattern_sequence(&variant.pattern, scope, &rule.params)?;
     }
     Ok(())
 }
 
 fn validate_pattern_sequence(
     patterns: &[ModelPattern],
-    all_defs: &HashSet<String>,
+    scope: &RuleScope,
     params: &[RuleParameter],
 ) -> syn::Result<()> {
     for pattern in patterns {
-        validate_pattern(pattern, all_defs, params)?;
+        validate_pattern(pattern, scope, params)?;
     }
     Ok(())
 }
 
+/// The message for a call of a name that is no rule.
+///
+/// Up to 0.8.0 a function brought in via `use` could be called like a rule
+/// ("import injection"). That went away with the black-box composition of
+/// ADR 08: hand-written parsers are declared as `extern rule`, other
+/// grammars are `import`ed. The message names both replacements, and says
+/// explicitly that a `use` of that very name is not enough.
+fn undefined_rule_message(name: &str, scope: &RuleScope) -> String {
+    let mut msg = format!("Undefined rule: '{name}'");
+    if scope.use_names.contains(name) {
+        msg.push_str(&format!(
+            "\nnote: `use …::{name};` makes the function visible, but does not make it a rule"
+        ));
+    }
+    msg.push_str(&format!(
+        "\nhelp: to call a hand-written parser, declare it: `extern rule {name} -> ReturnType;`\
+         \nhelp: to call a rule of another grammar: `import Other as other;` and write `other::{name}`"
+    ));
+    msg
+}
+
 fn validate_pattern(
     pattern: &ModelPattern,
-    all_defs: &HashSet<String>,
+    scope: &RuleScope,
     params: &[RuleParameter],
 ) -> syn::Result<()> {
     match pattern {
@@ -146,10 +184,10 @@ fn validate_pattern(
                 let is_portable_builtin =
                     rule_name_ident == "separated" || rule_name_ident == "repeated";
 
-                if !all_defs.contains(&rule_name_str) && !is_param && !is_portable_builtin {
+                if !scope.defs.contains(&rule_name_str) && !is_param && !is_portable_builtin {
                     return Err(syn::Error::new(
                         rule_path.span(),
-                        format!("Undefined rule: '{}'", rule_name_str),
+                        undefined_rule_message(&rule_name_str, scope),
                     ));
                 }
             } else {
@@ -159,7 +197,7 @@ fn validate_pattern(
             for arg in args {
                 match arg {
                     Argument::Positional(p) | Argument::Named(_, p) => {
-                        validate_pattern(p, all_defs, params)?;
+                        validate_pattern(p, scope, params)?;
                     }
                 }
             }
@@ -169,34 +207,34 @@ fn validate_pattern(
         | ModelPattern::Optional(inner, _)
         | ModelPattern::SpanBinding(inner, _, _)
         | ModelPattern::Peek(inner, _) => {
-            validate_pattern(inner, all_defs, params)?;
+            validate_pattern(inner, scope, params)?;
         }
         ModelPattern::Count { pattern: inner, .. } => {
-            validate_pattern(inner, all_defs, params)?;
+            validate_pattern(inner, scope, params)?;
         }
         ModelPattern::Not(inner, _) => {
-            validate_pattern(inner, all_defs, params)?;
+            validate_pattern(inner, scope, params)?;
         }
         ModelPattern::Group { alts, .. } => {
             for (seq, _, _) in alts {
-                validate_pattern_sequence(seq, all_defs, params)?;
+                validate_pattern_sequence(seq, scope, params)?;
             }
         }
         ModelPattern::Bracketed(seq, _)
         | ModelPattern::Braced(seq, _)
         | ModelPattern::Parenthesized(seq, _) => {
-            validate_pattern_sequence(seq, all_defs, params)?;
+            validate_pattern_sequence(seq, scope, params)?;
         }
         ModelPattern::Recover { body, sync, .. } => {
-            validate_pattern(body, all_defs, params)?;
-            validate_pattern(sync, all_defs, params)?;
+            validate_pattern(body, scope, params)?;
+            validate_pattern(sync, scope, params)?;
         }
         ModelPattern::Until { pattern, .. } => {
-            validate_pattern(pattern, all_defs, params)?;
+            validate_pattern(pattern, scope, params)?;
             validate_no_bindings(pattern)?;
         }
         ModelPattern::LexicalScope(pattern, _) | ModelPattern::SpacedScope(pattern, _) => {
-            validate_pattern(pattern, all_defs, params)?;
+            validate_pattern(pattern, scope, params)?;
         }
         ModelPattern::Fail { .. } => {}
         _ => {}
@@ -313,6 +351,31 @@ fn validate_args_recursive(
                 let rule_name_opt = rule_path.get_ident().map(|ident| ident.to_string());
 
                 if let Some(rule_name_str) = rule_name_opt {
+                    // The list built-ins take a fixed set of named arguments.
+                    // An unknown one used to be ignored silently - a typo in
+                    // `trailing=` then changed the grammar without a word.
+                    let allowed: Option<&[&str]> = match rule_name_str.as_str() {
+                        "separated" => Some(&["min", "trailing", "item_label"]),
+                        "repeated" => Some(&["min", "item_label"]),
+                        _ => None,
+                    };
+                    if let Some(allowed) = allowed {
+                        for arg in args {
+                            if let Argument::Named(id, _) = arg {
+                                if !allowed.contains(&id.to_string().as_str()) {
+                                    return Err(syn::Error::new(
+                                        id.span(),
+                                        format!(
+                                            "unknown argument `{}` for `{}`; supported: {}",
+                                            id,
+                                            rule_name_str,
+                                            allowed.join(", ")
+                                        ),
+                                    ));
+                                }
+                            }
+                        }
+                    }
                     if let Some(target_rule) = rule_map.get(&rule_name_str) {
                         // Removed named argument check to allow named args.
 
@@ -395,6 +458,21 @@ fn validate_args_recursive(
 ///
 /// Recursive, because the glob can sit in a path (`a::b::*`) or in a group
 /// (`a::{b, c::*}`).
+/// Collects the names a non-glob `use` tree brings into scope.
+fn use_tree_names(tree: &syn::UseTree, out: &mut HashSet<String>) {
+    match tree {
+        syn::UseTree::Name(n) => {
+            out.insert(n.ident.to_string());
+        }
+        syn::UseTree::Rename(r) => {
+            out.insert(r.rename.to_string());
+        }
+        syn::UseTree::Path(p) => use_tree_names(&p.tree, out),
+        syn::UseTree::Group(g) => g.items.iter().for_each(|t| use_tree_names(t, out)),
+        syn::UseTree::Glob(_) => {}
+    }
+}
+
 fn use_tree_has_glob(tree: &syn::UseTree) -> bool {
     match tree {
         syn::UseTree::Glob(_) => true,
@@ -442,8 +520,49 @@ mod tests {
         let err = validate::<TestBackend>(&model);
         match err {
             Ok(_) => panic!("Expected undefined rule error"),
-            Err(e) => assert_eq!(e.to_string(), "Undefined rule: 'undefined_rule'"),
+            Err(e) => {
+                let msg = e.to_string();
+                assert!(msg.starts_with("Undefined rule: 'undefined_rule'"), "{msg}");
+                assert!(
+                    msg.contains("extern rule undefined_rule -> ReturnType;"),
+                    "{msg}"
+                );
+                assert!(msg.contains("import Other as other;"), "{msg}");
+                // No `use` of that name -> no note about it.
+                assert!(!msg.contains("does not make it a rule"), "{msg}");
+            }
         }
+    }
+
+    #[test]
+    fn test_undefined_rule_brought_in_by_use() {
+        let input = quote! {
+            grammar test {
+                use super::my_parser;
+                main = my_parser
+            }
+        };
+        let model = parse_model(input);
+        let msg = validate::<TestBackend>(&model).unwrap_err().to_string();
+        assert!(
+            msg.contains("`use …::my_parser;` makes the function visible"),
+            "{msg}"
+        );
+    }
+
+    #[test]
+    fn test_unknown_list_argument() {
+        let input = quote! {
+            grammar test {
+                main = items:separated(ident, ",", error = "x")
+            }
+        };
+        let model = parse_model(input);
+        let msg = validate::<TestBackend>(&model).unwrap_err().to_string();
+        assert_eq!(
+            msg,
+            "unknown argument `error` for `separated`; supported: min, trailing, item_label"
+        );
     }
 
     #[test]

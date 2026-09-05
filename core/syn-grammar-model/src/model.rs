@@ -243,20 +243,12 @@ pub enum Argument {
 
 impl From<parser::GrammarDefinition> for GrammarDefinition {
     fn from(p: parser::GrammarDefinition) -> Self {
-        let mut uses = p.uses;
-        if let Some(inherits) = p.inherits {
-            // Deprecation warning could be emitted here if we had a way to report it
-            // For now, we just map it to a use super::*; for compatibility
-            let name = inherits.name;
-            let item_use: syn::ItemUse = syn::parse_quote!(use super::#name::*;);
-            uses.insert(0, item_use);
-        }
         GrammarDefinition {
             name: p.name,
             rules: p.rules.into_iter().map(Into::into).collect(),
             extern_rules: p.extern_rules.into_iter().map(Into::into).collect(),
             imports: p.imports.into_iter().map(Into::into).collect(),
-            uses,
+            uses: p.uses,
         }
     }
 }

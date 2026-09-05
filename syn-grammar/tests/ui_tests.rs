@@ -12,6 +12,9 @@ fn ui() {
     t.compile_fail("tests/ui/ampersand_operator.rs");
     t.compile_fail("tests/ui/undefined_rule_with_use.rs");
     t.compile_fail("tests/ui/syn_type_without_parse.rs");
+    t.compile_fail("tests/ui/inheritance_removed.rs");
+    t.compile_fail("tests/ui/import_injection.rs");
+    t.compile_fail("tests/ui/unknown_list_argument.rs");
 
     // Cases on the REAL procedural-macro path (crate `tests/ui-macro`).
     // Only here does a real macro run; everything else goes through `parse_str`
