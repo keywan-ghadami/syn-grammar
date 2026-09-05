@@ -174,14 +174,3 @@ Four dependencies were dead (not a single import): `syn` and
 into every winnow build.
 
 `docs/adr/adr14-shared-context-pattern.md` moved along.
-
-## Outdated documents
-
-* `ARCHITEKTUR_MANIFEST.txt` — describes `core/grammar-kit/src/lib.rs`; the file
-  has not existed since the rebuild.
-* `PROJECT_STRUCTURE.md` — speculatively worded ("likely contains"), names
-  neither `grammar-kit` nor `syn-grammar-model`, refers to a non-existent
-  `testresults.txt`.
-* `EXTENDING.md` — describes an API that does not exist
-  (`parse_grammar_with_builtins`, `Lit(LitStr)`, 6 instead of 19 patterns); the
-  example code would not compile.

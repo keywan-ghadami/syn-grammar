@@ -223,7 +223,8 @@ backend authors.
 - New: `docs/ERROR_HANDLING.md` (how the engine picks a message),
   `docs/adr/adr13-error-message-contract.md` (the binding catalogue, every
   point with its test), `docs/adr/adr15-linear-parsing.md`, `GOALS.md`,
-  `ARCHITECTURE.md`. `EXTENDING.md` is marked outdated.
+  `ARCHITECTURE.md`. `EXTENDING.md` was removed: it described an API
+  that no longer exists; `ARCHITECTURE.md` covers the same ground.
 - `#![warn(missing_docs)]` in all crates; every public item is documented.
 - The minimum supported Rust version is **1.88** (`rust-version`), the first
   version in which spans carry positions inside a procedural macro on stable.

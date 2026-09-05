@@ -53,9 +53,6 @@ separately; neither crate depends on the other.
   renders the error it reports.
 - **[Architecture decisions](docs/adr/)** — the ADRs.
 - **[Limitations](docs/LIMITATIONS.md)** — what this design cannot do, and why.
-- **[Extending guide](EXTENDING.md)** — for authors of alternative backends.
-  **Outdated**: it describes an API that no longer exists. The header of the
-  file says what changed.
 
 ## Building
 
@@ -70,4 +67,9 @@ Those are the checks the CI runs; the exact steps are in
 
 ## License
 
-Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+Licensed under either of
+
+- Apache License, Version 2.0 ([`LICENSE-APACHE`](LICENSE-APACHE))
+- MIT license ([`LICENSE-MIT`](LICENSE-MIT))
+
+at your option.
