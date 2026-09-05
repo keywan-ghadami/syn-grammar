@@ -122,8 +122,12 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 // from stage 1 (`take_braced_block`, `take_upto_group`) are thus
                 // moot - they bypassed exactly the materialization that
                 // no longer exists at all.
+                // syn's own message for a type is an enumeration of sixteen
+                // tokens; the type names itself instead when the parse did not
+                // get anywhere (ADR 13, points 2 and 6).
+                let expectation = crate::backend::syn_type_expectation(rule_path);
                 Ok(quote! {
-                    let _val = rt::parse_syn::<#rule_path>(input)?;
+                    let _val = rt::parse_syn_named::<#rule_path>(input, #expectation)?;
                     #bind_stmt
                 })
             } else if rule_path.is_ident("separated") {

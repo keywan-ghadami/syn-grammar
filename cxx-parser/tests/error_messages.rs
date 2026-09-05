@@ -76,12 +76,16 @@ fn found_token_is_named() {
 /// ADR 13, point 6: **every** alternative that failed at its boundary is
 /// listed, not only those whose first token can be peeked. All five items of
 /// the bridge module begin with `outer_attrs`, which matches the empty input,
-/// so none of them is peekable.
+/// so none of them is peekable — and one of them delegates to `syn`, which
+/// used to contribute nothing either.
+///
+/// The words come from the labels the four rules carry at their *definition*;
+/// `use statement` is what `syn::ItemUse` calls itself.
 #[test]
 fn all_alternatives_are_listed_even_when_none_can_be_peeked() {
     parse("mod ffi { 42 }")
         .assert_failure_contains("expected one of:")
-        .assert_failure_contains("a use statement")
+        .assert_failure_contains("use statement")
         .assert_failure_contains("a shared struct")
         .assert_failure_contains("a shared enum")
         .assert_failure_contains("an extern block")

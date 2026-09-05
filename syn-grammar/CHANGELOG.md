@@ -134,6 +134,10 @@ backend authors.
   start is reported by its label, and several such alternatives are
   aggregated into `expected one of: a number, a string`. An alternative that
   fails after consuming input keeps its own, more specific message.
+- **Rule labels**: a rule can name itself once at its definition
+  (`rule shared_struct # "a shared struct" -> …`), and every call site inherits
+  that name in error messages instead of repeating `# "…"` at each of them. A
+  label at the call site still wins.
 - **`fail("message")`**: fails with the given text at high priority.
 - **`separated(item, sep)` and `repeated(item)`** with the named arguments
   `min`, `trailing` and `item_label`, and an optional container type
@@ -190,6 +194,24 @@ backend authors.
   alternative chain unions, through nested rules; a label still replaces the
   inner list. At the end of the input or of a group the enumeration carries
   the `unexpected end of …, ` prefix. A single built-in keeps syn's wording.
+- **A parser that delegates to `syn` names what it wanted.** `fn f(a: )` used
+  to report syn's own enumeration of all sixteen tokens a type may begin with -
+  exhaustive, unusable, and saying nothing the position did not already say.
+  It now reports `expected Rust type`, and the rule stack supplies the context.
+  Only when nothing was consumed: if syn got somewhere, its message is the more
+  specific one and stays (`fn f(a: dyn)` still names the missing trait). The
+  same delegations also record an expectation, so an alternative that hands off
+  to `syn` is listed in `expected one of:` instead of silently missing from it -
+  `tests/syn_expectation_test.rs`.
+- **An alternative that is nothing but a rule call is named after that rule**,
+  and unfolded into what the rule accepts:
+  `expected one of: \`string literal\`, term(\`integer literal\`, \`parentheses\`)`.
+  The flat union alone said what may be typed but not what it would become. A
+  group absorbs starts already listed beside it, nesting is flattened to one
+  level, and past three starts the rule name is dropped again - from there the
+  group is longer than what it replaces, and a label is the better answer.
+  New in `grammar-kit`: `push_grouped`, `group_expectation`,
+  `MAX_GROUPED_STARTS` - `tests/expectation_aggregation_test.rs`.
 - **`expected one of:` also lists alternatives behind a nullable prefix.** A
   branch starting with a pattern that can match nothing — `outer_attrs`, `x?`,
   `x*` — cannot be peeked, so it was entered and failed inside, and contributed
@@ -242,6 +264,22 @@ backend authors.
   `ARCHITECTURE.md`. `EXTENDING.md` was removed: it described an API
   that no longer exists; `ARCHITECTURE.md` covers the same ground.
 - `#![warn(missing_docs)]` in all crates; every public item is documented.
+- **The licence texts are in the repository**: `LICENSE-APACHE` and
+  `LICENSE-MIT` at the root, symlinked into every published crate directory so
+  they are part of the `.crate` tarballs. Every crate declared
+  `license = "MIT OR Apache-2.0"` and both READMEs promised the dual licence,
+  but neither text was there and the licence badge pointed at a 404.
+- The root README leads with `syn-grammar` and what it is, followed by a table
+  of the workspace crates and the commands the CI runs. Removed with
+  `EXTENDING.md`: the "Outdated documents" section of `ARCHITECTURE.md`, which
+  listed only files that no longer exist.
+- **`cxx-parser`, the acceptance benchmark, parses the real bridge IDL.**
+  16 rules instead of 5: shared structs and enums, `extern "C++"` /
+  `extern "Rust"`, `include!`, opaque types, type aliases, all four receiver
+  forms, `unsafe fn`, and the `impl UniquePtr<T> {}` instantiations, with 31
+  tests split between the AST and the messages. Both diagnostics defects fixed
+  above were found by it. Tool configuration that no longer applied
+  (`.aider.conf.yml`, `.idx/dev.nix`, `ai-instruction.md`) is gone.
 - The minimum supported Rust version is **1.88** (`rust-version`), the first
   version in which spans carry positions inside a procedural macro on stable.
 

@@ -269,6 +269,66 @@ impl Backend for SynBackend {
     }
 }
 
+/// What a `syn` type written by its path (`x:syn::Type`) is called in an error
+/// message.
+///
+/// Without this, a failed `syn::Type` reports syn's own enumeration of all
+/// sixteen tokens a type may start with, and contributes nothing at all to
+/// `expected one of:` - see `grammar_kit::name_syn_failure`.
+///
+/// A table rather than a derivation, because the mechanical camel-case split is
+/// wrong for exactly the types that occur most: `ItemUse` is not "item use" and
+/// `Expr` is not "expr". The split remains the fallback for the long tail of
+/// `syn` types, where a slightly clumsy word still beats no word.
+pub fn syn_type_expectation(path: &syn::Path) -> String {
+    let Some(last) = path.segments.last() else {
+        return "syn type".to_string();
+    };
+    let name = last.ident.to_string();
+    let known = match name.as_str() {
+        "Type" | "TypePath" => "Rust type",
+        "Expr" => "expression",
+        "Path" => "path",
+        "ItemUse" => "use statement",
+        "Item" => "item",
+        "Stmt" => "statement",
+        "Block" => "block",
+        "Pat" => "pattern",
+        "Ident" => "identifier",
+        "Lifetime" => "lifetime",
+        "Generics" => "generic parameters",
+        "GenericParam" => "generic parameter",
+        "ReturnType" => "return type",
+        "Signature" => "function signature",
+        "Macro" => "macro invocation",
+        "Attribute" => "attribute",
+        "Meta" => "attribute content",
+        "Visibility" => "visibility",
+        "Field" => "field",
+        "FnArg" => "function argument",
+        "LitStr" => "string literal",
+        "LitInt" => "integer literal",
+        "LitFloat" => "floating point literal",
+        "LitChar" => "character literal",
+        "LitBool" => "`true` or `false`",
+        "LitByte" => "byte literal",
+        "Lit" => "literal",
+        _ => "",
+    };
+    if !known.is_empty() {
+        return known.to_string();
+    }
+    // Fallback: `ItemStruct` -> "item struct".
+    let mut words = String::new();
+    for (i, c) in name.char_indices() {
+        if c.is_uppercase() && i > 0 {
+            words.push(' ');
+        }
+        words.extend(c.to_lowercase());
+    }
+    words
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -110,6 +110,59 @@ pub fn parse_syn<'a, T: crate::SynParsable>(input: &Stream<'a>) -> StreamResult<
     input.parse::<T>().map_err(|e| error_from_syn(e, here))
 }
 
+/// Names what a `syn` parser wanted, instead of passing its token dump on.
+///
+/// syn describes a failed `Type::parse` by enumerating all sixteen tokens a type
+/// may begin with. That is exhaustive and unusable, and it says nothing the
+/// position does not already say - so when the parser did not get anywhere at
+/// all, the message becomes `expected <what>`; the rule stack supplies the rest
+/// of the context (ADR 13, points 2 and 4).
+///
+/// **`before` and `after` are the cursors around the call, not the error's
+/// span.** syn attaches its error to the beginning of the construct even when it
+/// read half of it, so `e.at` cannot tell the two cases apart. If the parser did
+/// consume something, its message is the more specific one and stays: on
+/// `dyn` it names the missing trait, which `expected Rust type` would throw
+/// away.
+///
+/// The expectation is recorded in either case, so an enclosing alternative
+/// chain can list this branch in `expected one of:` (ADR 13, point 6).
+pub fn name_syn_failure<'a>(
+    mut e: ParseError<'a>,
+    before: Cursor<'a>,
+    after: Cursor<'a>,
+    what: &str,
+) -> ParseError<'a> {
+    if before == after {
+        let at_end = if before.eof() {
+            "unexpected end of input, "
+        } else {
+            ""
+        };
+        e.message = format!("{at_end}expected {what}");
+    }
+    e.expected = vec![what.to_string()];
+    e
+}
+
+/// [`parse_syn`] with a name for what it wanted - see [`name_syn_failure`].
+pub fn parse_syn_named<'a, T: crate::SynParsable>(
+    input: &Stream<'a>,
+    what: &str,
+) -> StreamResult<'a, T> {
+    let before = input.cursor();
+    parse_syn::<T>(input).map_err(|e| name_syn_failure(e, before, input.cursor(), what))
+}
+
+/// [`parse_with`] with a name for what it wanted - see [`name_syn_failure`].
+pub fn parse_with_named<'a, T, F>(input: &Stream<'a>, what: &str, parser: F) -> StreamResult<'a, T>
+where
+    F: FnOnce(syn::parse::ParseStream) -> syn::Result<T>,
+{
+    let before = input.cursor();
+    parse_with(input, parser).map_err(|e| name_syn_failure(e, before, input.cursor(), what))
+}
+
 /// Like [`parse_syn`], but with a special parser - for types without `impl Parse`
 /// (`syn::Attribute`, `syn::Pat`) or with a different entry point
 /// (`Block::parse_within`, `Ident::parse_any`).

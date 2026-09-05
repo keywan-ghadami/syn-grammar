@@ -18,11 +18,11 @@ error[E0277]: `syn::Field` cannot be used directly in a grammar
              Auto
            and $N others
    = note: required for `syn::Field` to implement `SynParsable`
-note: required by a bound in `parse_syn`
+note: required by a bound in `parse_syn_named`
   --> $WORKSPACE/core/grammar-kit/src/stream.rs
    |
-   | pub fn parse_syn<'a, T: crate::SynParsable>(input: &Stream<'a>) -> StreamResult<'a, T> {
-   |                         ^^^^^^^^^^^^^^^^^^ required by this bound in `parse_syn`
+   | pub fn parse_syn_named<'a, T: crate::SynParsable>(
+   |                               ^^^^^^^^^^^^^^^^^^ required by this bound in `parse_syn_named`
 
 error[E0308]: mismatched types
   --> tests/ui/syn_type_without_parse.rs:11:1

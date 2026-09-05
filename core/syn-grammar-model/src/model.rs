@@ -63,6 +63,10 @@ pub struct Rule {
     pub generics: syn::Generics,
     /// Runtime parameters, e.g. `value(offset: i32)`.
     pub params: Vec<RuleParameter>,
+    /// What the rule calls itself in an error message (`# "a shared struct"`
+    /// at the definition). Every call site inherits it unless it carries a
+    /// label of its own.
+    pub label: Option<String>,
     /// The type after `->`.
     pub return_type: syn::Type,
     /// Precomputed classification of [`Rule::return_type`].
@@ -287,6 +291,7 @@ impl From<parser::Rule> for Rule {
             name: p.name,
             generics: p.generics,
             params: p.params.into_iter().map(Into::into).collect(),
+            label: p.label,
             return_type: p.return_type,
             return_type_kind,
             variants: p.variants.into_iter().map(Into::into).collect(),

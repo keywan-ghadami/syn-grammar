@@ -48,7 +48,7 @@ parameter, `Result` only in return position) are out of scope.
 |---|---|
 | Hand-over to `syn` mid-rule | `syn::Type`, `syn::Path`, `syn::ReturnType`, `syn::Generics`, `syn::ItemUse` |
 | Alternatives behind a nullable prefix | every item rule starts with `outer_attrs` |
-| Alternative labels (`#`) | `mod_item`, `extern_item` — they are what makes `expected one of:` readable |
+| Rule labels (`#` at the definition) | `shared_struct`, `extern_block`, `foreign_fn`, … — named once, inherited by every call site |
 | Cut (`=>`) | after `type`, `fn`, `impl`, `extern`: commits so the error stays inside the right item |
 | Lists with labels | `separated(…, item_label="function parameter")` and the struct/enum lists |
 | `extern rule` | `extern_lang` checks the *content* of the language string, which the grammar cannot |

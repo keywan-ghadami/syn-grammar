@@ -70,6 +70,7 @@ pub fn finish_variants<'a>(
 
     expected.sort();
     expected.dedup();
+    absorb_grouped(&mut expected);
 
     // If the enumeration says exactly what the best error already says, its own
     // wording stays: `expected integer literal` from a single built-in keeps
@@ -103,12 +104,18 @@ pub fn finish_variants<'a>(
 
     let mut e = match expected.len() {
         0 => return best.unwrap_or_else(|| ParseError::at_cursor(start, fallback_msg)),
-        1 => ParseError::at_cursor(start, format!("{at_end}expected `{}`{found}", expected[0]))
-            .with_priority(PRIO_LABELED),
+        1 => ParseError::at_cursor(
+            start,
+            format!(
+                "{at_end}expected {}{found}",
+                render_expectation(&expected[0])
+            ),
+        )
+        .with_priority(PRIO_LABELED),
         _ => {
             let list = expected
                 .iter()
-                .map(|e| format!("`{}`", e))
+                .map(|e| render_expectation(e))
                 .collect::<Vec<_>>()
                 .join(", ");
             ParseError::at_cursor(start, format!("{at_end}expected one of: {list}{found}"))
@@ -117,6 +124,95 @@ pub fn finish_variants<'a>(
     };
     e.expected = expected;
     e
+}
+
+/// Drops expectations that a grouped one already lists.
+///
+/// `term = f:factor "*" t:term | f:factor` produces both forms at once: the
+/// first alternative is not just a rule call and contributes what `factor`
+/// accepts flatly, the second one is and contributes `factor(…)`. Without this
+/// the enumeration would name the same two tokens twice, once inside the group
+/// and once beside it.
+fn absorb_grouped(expected: &mut Vec<String>) {
+    let leaves: Vec<String> = expected
+        .iter()
+        .filter_map(|e| match (e.find('('), e.rfind(')')) {
+            (Some(open), Some(close)) if open < close => Some(&e[open + 1..close]),
+            _ => None,
+        })
+        .flat_map(|inner| inner.split(", ").map(str::to_string))
+        .collect();
+    if leaves.is_empty() {
+        return;
+    }
+    expected.retain(|e| e.contains('(') || !leaves.contains(&render_expectation(e)));
+}
+
+/// Quotes an expectation - unless it already carries quoting of its own, which
+/// is the case for the grouped form `rule(`a`, `b`)` from
+/// [`group_expectation`].
+fn render_expectation(e: &str) -> String {
+    if e.contains('`') {
+        e.to_string()
+    } else {
+        format!("`{e}`")
+    }
+}
+
+/// Adds an alternative that consists of a single rule call to the enumeration:
+/// the rule, and what it can start with.
+///
+/// ```text
+/// expected one of: `string literal`, term(`integer literal`, `parentheses`)
+/// ```
+///
+/// The flat union alone (`integer literal`, `parentheses`, `string literal`)
+/// says what may be typed but not what it would become; the rule name alone
+/// says the opposite. Both together is the only form that answers each
+/// question, so it is the default whenever both are known - a label at the
+/// rule or at the call site still replaces it entirely (ADR 13, point 2).
+///
+/// Past a handful of starts the group is dropped again in favour of the flat
+/// union; see [`MAX_GROUPED_STARTS`].
+pub fn push_grouped(expected: &mut Vec<String>, rule: &str, inner: &[String]) {
+    let grouped = group_expectation(rule, inner);
+    // Beyond a handful of starts the group is longer than the flat union it
+    // replaces, and the reader has to take the nesting apart to see the tokens.
+    // The self-hosting grammar has such a rule: `base` accepts seven different
+    // starts, and two alternatives calling it would print the same seven twice.
+    // There the rule name belongs in a label, which the author can add.
+    if grouped.matches(", ").count() < MAX_GROUPED_STARTS {
+        expected.push(grouped);
+    } else {
+        expected.extend(inner.iter().cloned());
+    }
+}
+
+/// How many starts a rule may have before its name is dropped from the
+/// enumeration again - see [`push_grouped`].
+pub const MAX_GROUPED_STARTS: usize = 3;
+
+/// Renders the grouped form `rule(`a`, `b`)` - see [`push_grouped`].
+///
+/// Nesting is flattened to one level: an inner group contributes its leaves,
+/// not itself, so that `a(b(c))` cannot grow with the depth of the grammar.
+pub fn group_expectation(rule: &str, inner: &[String]) -> String {
+    let mut leaves: Vec<String> = Vec::new();
+    for entry in inner {
+        match (entry.find('('), entry.rfind(')')) {
+            // Already a group: take its leaves, they are rendered already.
+            (Some(open), Some(close)) if open < close => {
+                leaves.extend(entry[open + 1..close].split(", ").map(str::to_string))
+            }
+            _ => leaves.push(render_expectation(entry)),
+        }
+    }
+    leaves.sort();
+    leaves.dedup();
+    if leaves.is_empty() {
+        return rule.to_string();
+    }
+    format!("{rule}({})", leaves.join(", "))
 }
 
 /// Labels a failed attempt at a list item.

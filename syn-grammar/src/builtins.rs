@@ -1,5 +1,6 @@
 use crate::rt::{
-    parse_syn, parse_with, step, take_single, ParseContext, ParseError, Stream, StreamResult,
+    parse_syn_named, parse_with_named, step, take_single, ParseContext, ParseError, Stream,
+    StreamResult,
 };
 use syn::spanned::Spanned;
 use syn::Ident;
@@ -179,9 +180,13 @@ macro_rules! impl_single_token_builtin {
 // Real syn AST types. Since ADR 15, stage 3 this is an ordinary `parse`
 // call on the existing stream - O(length of the type) instead of O(rest).
 macro_rules! impl_syn_builtin {
-    ($name:ident, $ty:ty) => {
+    // `$what` is what the built-in wanted, for the error message: syn's own
+    // wording for a failed `Type::parse` enumerates sixteen tokens and says
+    // nothing the position does not already say. See
+    // `grammar_kit::name_syn_failure`.
+    ($name:ident, $ty:ty, $what:literal) => {
         pub fn $name<'a>(input: &Stream<'a>, ctx: &mut ParseContext<'a>) -> StreamResult<'a, $ty> {
-            let t = parse_syn::<$ty>(input)?;
+            let t = parse_syn_named::<$ty>(input, $what)?;
             ctx.record_span(t.span())
                 .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
             Ok(t)
@@ -189,8 +194,8 @@ macro_rules! impl_syn_builtin {
     };
 }
 
-impl_syn_builtin!(parse_rust_type_impl, syn::Type);
-impl_syn_builtin!(parse_rust_block_impl, syn::Block);
+impl_syn_builtin!(parse_rust_type_impl, syn::Type, "Rust type");
+impl_syn_builtin!(parse_rust_block_impl, syn::Block, "block");
 impl_single_token_builtin!(parse_lit_str_impl, syn::LitStr);
 impl_single_token_builtin!(parse_lit_int_impl, syn::LitInt);
 impl_single_token_builtin!(parse_lit_char_impl, syn::LitChar);
@@ -217,9 +222,9 @@ pub fn parse_any_ident_impl<'a>(
         .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
     Ok(t)
 }
-impl_syn_builtin!(parse_visibility_impl, syn::Visibility);
-impl_syn_builtin!(parse_generics_impl, syn::Generics);
-impl_syn_builtin!(parse_return_type_impl, syn::ReturnType);
+impl_syn_builtin!(parse_visibility_impl, syn::Visibility, "visibility");
+impl_syn_builtin!(parse_generics_impl, syn::Generics, "generic parameters");
+impl_syn_builtin!(parse_return_type_impl, syn::ReturnType, "return type");
 
 // --- Custom Parsers (Field, Attribute, Block::parse_within) ---
 
@@ -227,7 +232,7 @@ pub fn parse_named_field_impl<'a>(
     input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> StreamResult<'a, syn::Field> {
-    let t = parse_with(input, syn::Field::parse_named)?;
+    let t = parse_with_named(input, "named field", syn::Field::parse_named)?;
     ctx.record_span(t.span())
         .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
     Ok(t)
@@ -237,7 +242,7 @@ pub fn parse_unnamed_field_impl<'a>(
     input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> StreamResult<'a, syn::Field> {
-    let t = parse_with(input, syn::Field::parse_unnamed)?;
+    let t = parse_with_named(input, "field type", syn::Field::parse_unnamed)?;
     ctx.record_span(t.span())
         .map_err(|e: syn::Error| ParseError::new(t.span(), e.to_string()))?;
     Ok(t)
@@ -247,7 +252,7 @@ pub fn parse_outer_attrs_impl<'a>(
     input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> StreamResult<'a, Vec<syn::Attribute>> {
-    let attrs = parse_with(input, syn::Attribute::parse_outer)?;
+    let attrs = parse_with_named(input, "outer attributes", syn::Attribute::parse_outer)?;
     if let Some(last) = attrs.last() {
         ctx.record_span(last.span())
             .map_err(|e: syn::Error| ParseError::new(last.span(), e.to_string()))?;
@@ -259,7 +264,7 @@ pub fn parse_statements_impl<'a>(
     input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> StreamResult<'a, Vec<syn::Stmt>> {
-    let stmts = parse_with(input, syn::Block::parse_within)?;
+    let stmts = parse_with_named(input, "statements", syn::Block::parse_within)?;
     if let Some(last) = stmts.last() {
         ctx.record_span(last.span())
             .map_err(|e: syn::Error| ParseError::new(last.span(), e.to_string()))?;
@@ -282,7 +287,7 @@ pub fn parse_pat_impl<'a>(
     input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> StreamResult<'a, syn::Pat> {
-    let pat = parse_with(input, syn::Pat::parse_multi_with_leading_vert)?;
+    let pat = parse_with_named(input, "pattern", syn::Pat::parse_multi_with_leading_vert)?;
     ctx.record_span(pat.span())
         .map_err(|e: syn::Error| ParseError::new(pat.span(), e.to_string()))?;
     Ok(pat)
@@ -296,7 +301,7 @@ pub fn parse_inner_attrs_impl<'a>(
     input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
 ) -> StreamResult<'a, Vec<syn::Attribute>> {
-    let attrs = parse_with(input, syn::Attribute::parse_inner)?;
+    let attrs = parse_with_named(input, "inner attributes", syn::Attribute::parse_inner)?;
     if let Some(last) = attrs.last() {
         ctx.record_span(last.span())
             .map_err(|e: syn::Error| ParseError::new(last.span(), e.to_string()))?;

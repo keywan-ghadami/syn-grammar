@@ -36,11 +36,23 @@ Every message says what was expected. Tokens in backticks, primitives without.
 
 ### 2. Labels replace the token level
 
-An explicit label (`# "…"` on a variant, `item_label=` on lists) takes the place
-of the internal token expectation.
+An explicit label takes the place of the internal token expectation. A label may
+stand on a variant (`# "…"` before the action block), on a **rule definition**
+(`# "…"` between the parameters and the `->`), or on a list (`item_label=`). A
+rule's label is inherited by every call site; a label at the call site is the
+more specific statement and wins.
 
 * `expected \`type name\`` instead of `expected \`::\`` — `list_dx_test.rs:40`
 * `expected one of: \`Letter A\`, \`Letter B\`` — `labeled_alternatives_test.rs:47`
+* rule label inherited, and beaten by the call site —
+  `labeled_alternatives_test.rs::rule_label_is_inherited_by_the_call_site`,
+  `::call_site_label_beats_the_rule_label`
+
+**A parser that delegates to `syn` names itself** rather than passing syn's
+enumeration of every token its construct may begin with outwards — `expected
+Rust type`, not the sixteen tokens a type can start with. Only when nothing was
+consumed: if syn got somewhere, its message is the more specific one and stays
+(`grammar_kit::name_syn_failure`, `syn_expectation_test.rs`).
 
 ### 3. Name what was found
 
@@ -92,8 +104,16 @@ can be peeked. Each alternative contributes what it would have accepted:
   `square brackets`, `curly braces`);
 * a built-in the expectation of its own error (`identifier`,
   `integer literal`, `string literal`);
-* a called rule the enumeration it collected itself (union through nested
-  rules);
+* a `syn` delegation the name of what it parses (`Rust type`, `use statement`);
+* an alternative that is **nothing but a call to another rule** that rule and
+  what it accepts: `term(\`integer literal\`, \`parentheses\`)`. The flat union
+  alone says what may be typed but not what it would become, the rule name
+  alone says the opposite. A group absorbs starts that are already listed
+  beside it; nesting is flattened to one level; past three starts the rule name
+  is dropped again, because from there the group is longer than what it
+  replaces;
+* any other called rule the enumeration it collected itself (union through
+  nested rules);
 * a labelled alternative its label, in place of all of the above.
 
 An error carries this as `ParseError::expected`; the alternative chain unions
@@ -108,6 +128,13 @@ there is something to enumerate.
   `expectation_aggregation_test.rs::builtin_and_delimiter_are_both_listed`
 * union through a called rule; a label replacing the inner list; a single
   built-in keeping syn's wording — `expectation_aggregation_test.rs`
+* an alternative behind a nullable prefix (`outer_attrs`, `x?`, `x*`) is listed
+  although it cannot be peeked —
+  `expectation_aggregation_test.rs::alternatives_behind_a_nullable_prefix_are_listed`
+* the grouped form, its absorption, its flattening and its limit —
+  `expectation_aggregation_test.rs::a_rule_call_is_named_and_unfolded`,
+  `::a_group_absorbs_the_starts_it_already_lists`, `::groups_do_not_nest`,
+  `::a_rule_with_many_starts_stays_flat`
 
 ### 7. Depth beats aggregation
 

@@ -319,16 +319,18 @@ grammar! {
             { items:mod_item* }
             -> { FfiMod { attrs, vis, name: name.into(), items } }
 
+        // No labels at the call sites: `syn::ItemUse` names itself, and the
+        // four rules carry their label at their definition.
         mod_item -> ModItem =
-            u:syn::ItemUse    # "a use statement"  -> { ModItem::Use(Box::new(u)) }
-          | s:shared_struct   # "a shared struct"  -> { ModItem::Struct(s) }
-          | e:shared_enum     # "a shared enum"    -> { ModItem::Enum(e) }
-          | b:extern_block    # "an extern block"  -> { ModItem::Extern(b) }
-          | i:impl_block      # "an impl block"    -> { ModItem::Impl(Box::new(i)) }
+            u:syn::ItemUse  -> { ModItem::Use(Box::new(u)) }
+          | s:shared_struct -> { ModItem::Struct(s) }
+          | e:shared_enum   -> { ModItem::Enum(e) }
+          | b:extern_block  -> { ModItem::Extern(b) }
+          | i:impl_block    -> { ModItem::Impl(Box::new(i)) }
 
         // --- shared types ----------------------------------------------------
 
-        shared_struct -> SharedStruct =
+        shared_struct # "a shared struct" -> SharedStruct =
             attrs:outer_attrs "struct" => name:ident
             { fields:separated(field, ",", trailing=true, item_label="struct field") }
             -> { SharedStruct { attrs, name: name.into(), fields } }
@@ -337,7 +339,7 @@ grammar! {
             attrs:outer_attrs name:ident ":" ty:syn::Type
             -> { Field { attrs, name: name.into(), ty } }
 
-        shared_enum -> SharedEnum =
+        shared_enum # "a shared enum" -> SharedEnum =
             attrs:outer_attrs "enum" => name:ident
             { variants:separated(variant, ",", trailing=true, item_label="enum variant") }
             -> { SharedEnum { attrs, name: name.into(), variants } }
@@ -350,7 +352,7 @@ grammar! {
 
         // --- extern blocks ---------------------------------------------------
 
-        extern_block -> ExternBlock =
+        extern_block # "an extern block" -> ExternBlock =
             attrs:outer_attrs is_unsafe:"unsafe"? "extern" => lang:extern_lang
             { items:extern_item* }
             -> {
@@ -363,20 +365,20 @@ grammar! {
             }
 
         extern_item -> ExternItem =
-            i:include_item  # "an include"         -> { ExternItem::Include(i) }
-          | t:type_item     # "a type declaration"  -> { t }
-          | f:foreign_fn    # "a function"          -> { ExternItem::Fn(f) }
+            i:include_item -> { ExternItem::Include(i) }
+          | t:type_item    -> { t }
+          | f:foreign_fn   -> { ExternItem::Fn(f) }
 
         // `include!` is the only macro the bridge language allows, so it is
         // matched by name instead of by `syn::Macro`: `printn!("x.h");` then
         // reports `expected `include``, not a puzzling item error.
-        include_item -> LitStr =
+        include_item # "an include" -> LitStr =
             "include" "!" => paren(header:lit_str) ";" -> { header }
 
         // Opaque type and alias share their whole prefix; splitting them into
         // two alternatives would report the second one's `=` as the expectation
         // for a plain `type Foo;`.
-        type_item -> ExternItem =
+        type_item # "a type declaration" -> ExternItem =
             attrs:outer_attrs "type" => name:ident generics:syn::Generics?
             path:type_alias_target? ";"
             -> {
@@ -390,7 +392,7 @@ grammar! {
 
         type_alias_target -> Path = "=" => p:syn::Path -> { p }
 
-        foreign_fn -> ForeignFn =
+        foreign_fn # "a function" -> ForeignFn =
             attrs:outer_attrs is_unsafe:"unsafe"? "fn" => name:ident generics:syn::Generics?
             paren(params:separated(param, ",", trailing=true, item_label="function parameter"))
             ret:syn::ReturnType ";"
@@ -414,7 +416,7 @@ grammar! {
 
         // --- explicit instantiations ----------------------------------------
 
-        impl_block -> ImplBlock =
+        impl_block # "an impl block" -> ImplBlock =
             "impl" => generics:syn::Generics? ty:syn::Type { empty_body }
             -> { ImplBlock { generics: generics.unwrap_or_default(), ty } }
 

@@ -49,6 +49,17 @@ that touch this crate's API are listed here.
   carried through `step`, and unioned by `finish_variants` so that
   `expected one of:` lists every alternative (ADR 13, point 6).
 
+- **`name_syn_failure`, `parse_syn_named`, `parse_with_named`**: a parser that
+  delegates to `syn` names what it wanted (`expected Rust type`) instead of
+  passing syn's enumeration of every token its construct may begin with
+  outwards - but only when it consumed nothing, since otherwise syn's own
+  message is the more specific one. The expectation is recorded either way, so
+  such a branch appears in `expected one of:` (ADR 13, points 2 and 6).
+- **`push_grouped`, `group_expectation`, `MAX_GROUPED_STARTS`**: an alternative
+  that is nothing but a rule call is listed as `term(`integer literal`,
+  `parentheses`)` - the rule and what it accepts. Groups absorb starts already
+  listed beside them, do not nest, and give way to the flat union past
+  `MAX_GROUPED_STARTS` different starts.
 - `SynParsable`: a marker with `#[diagnostic::on_unimplemented]` so that a
   `syn::` type without `Parse` produces an understandable message.
 - `WithSpan` and the derive macro `with_span` (from `grammar-kit-macros`).
