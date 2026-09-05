@@ -66,20 +66,20 @@ The body of a rule works on a **stream** (`ParseBuffer`), the leaf primitives
 still on the **cursor**:
 
 ```rust
-pub type Strom<'a>            = syn::parse::ParseBuffer<'a>;          // stream.rs
+pub type Stream<'a>            = syn::parse::ParseBuffer<'a>;          // stream.rs
 pub type StreamResult<'a, T>  = Result<T, ParseError<'a>>;            // stream.rs
 pub type ParseResult<'a, T>   = Result<(T, Cursor<'a>), ParseError<'a>>; // error.rs
 ```
 
-A rule is `fn parse_x_impl<'a>(input: &Strom<'a>, ctx: &mut ParseContext<'a>)
--> StreamResult<'a, T>`. Deliberately `&Strom<'a>` and **not** syn's alias
+A rule is `fn parse_x_impl<'a>(input: &Stream<'a>, ctx: &mut ParseContext<'a>)
+-> StreamResult<'a, T>`. Deliberately `&Stream<'a>` and **not** syn's alias
 `ParseStream<'a> = &'a ParseBuffer<'a>`: the alias equates the lifetime of the
 reference with that of the tokens, so an `input.fork()` would shorten `'a` to
 the stack frame — errors from a fork could then no longer leave the call. And
 those are exactly what error selection needs.
 
-Backtracking goes through `gabel` (`fork`) and `uebernehmen` (`advance_to`,
-O(1) according to syn): an attempt runs on the fork, only success is played
+Backtracking goes through `fork` and `advance_to` (the latter O(1)
+according to syn): an attempt runs on the fork, only success is played
 back. Errors are return values and are combined via `ParseError::merge`
 (`error.rs`) — there is **no** global error state.
 
@@ -87,7 +87,7 @@ back. Errors are return values and are combined via `ParseError::merge`
 |---|---|
 | `error.rs` | `ParseError` (span, `at` cursor, message, priority, `is_fatal`, rule_stack), `merge`, `Display` |
 | `context.rs` | `ParseContext`: scopes, lexical mode, `last_span`, `furthest` — **without** error state |
-| `stream.rs` | `Strom`, `parse_syn`, `parse_mit`, `gabel`/`uebernehmen`, `gruppe`, `schritt`, `token_nehmen` |
+| `stream.rs` | `Stream`, `parse_syn`, `parse_with`, `fork`/`advance_to`, `group`, `step`, `take_token` |
 | `combinators.rs` | `peek_syn`, `take_single`/`SingleToken`, `parse_separated`, `parse_repeated`, `finish_variants` |
 | `testing.rs` | `Testable`/`TestResult`, `assert_failure_contains` (substring comparison) |
 
@@ -98,14 +98,14 @@ through a bridge that materialised the remaining stream and let
 and hence quadratic in the length of a list. See
 `docs/adr/adr15-linear-parsing.md`.
 
-Conversely, single tokens stay on the cursor: `schritt` runs a cursor primitive
+Conversely, single tokens stay on the cursor: `step` runs a cursor primitive
 inside a `ParseBuffer::step` episode and advances the stream by exactly its
 result. `step` demands a closure that works for **every** lifetime, which is why
-a `ParseError<'c>` cannot leave it; `schritt` carries the error through without
+a `ParseError<'c>` cannot leave it; `step` carries the error through without
 its cursor and re-attaches it outside at the entry position. That is not an
 approximation — these primitives report their error there anyway.
 
-Into delimiter groups, `gruppe` descends via
+Into delimiter groups, `group` descends via
 `syn::__private::parse_{parens,braces,brackets}`. `AnyDelimiter::parse_any_delimiter`
 does not work: its return value is shortened to the lifetime of `&self`, so no
 error from inside the group would carry outward.

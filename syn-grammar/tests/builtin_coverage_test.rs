@@ -16,7 +16,7 @@ use syn_grammar::testing::Testable;
 use syn_grammar::types::SpannedValue;
 
 #[test]
-fn ganzzahl_breiten() {
+fn integer_widths() {
     mod inner {
         use super::*;
         grammar! {
@@ -87,7 +87,7 @@ fn ganzzahl_breiten() {
 }
 
 #[test]
-fn zeichen_und_wahrheitswert() {
+fn char_and_bool() {
     mod inner {
         use super::*;
         grammar! {
@@ -122,7 +122,7 @@ fn zeichen_und_wahrheitswert() {
 /// It was completely untested, although `syn_grammar::types` is re-exported
 /// specifically for it.
 #[test]
-fn spanned_familie_liefert_wert_und_span() {
+fn spanned_family_returns_value_and_span() {
     mod inner {
         use super::*;
         grammar! {
@@ -252,17 +252,17 @@ fn spanned_familie_liefert_wert_und_span() {
         1usize
     );
 
-    let f32_wert: SpannedValue<f32> = sp::parse_s_f32.parse_str("1.5").test().assert_success();
-    assert!((f32_wert.value - 1.5f32).abs() < f32::EPSILON);
-    let f64_wert: SpannedValue<f64> = sp::parse_s_f64.parse_str("2.5").test().assert_success();
-    assert!((f64_wert.value - 2.5f64).abs() < f64::EPSILON);
+    let f32_value: SpannedValue<f32> = sp::parse_s_f32.parse_str("1.5").test().assert_success();
+    assert!((f32_value.value - 1.5f32).abs() < f32::EPSILON);
+    let f64_value: SpannedValue<f64> = sp::parse_s_f64.parse_str("2.5").test().assert_success();
+    assert!((f64_value.value - 2.5f64).abs() < f64::EPSILON);
 
     // The span must carry real position data - otherwise the whole family
     // would be pointless. Via `parse_str` proc-macro2 runs in fallback mode,
     // where line/column exist (inside a real procedural macro only from
     // Rust 1.88 on, see GOALS.md).
-    let mit_span = sp::parse_s_u32.parse_str("77").test().assert_success();
-    assert_eq!(mit_span.span.start().line, 1);
+    let spanned_value = sp::parse_s_u32.parse_str("77").test().assert_success();
+    assert_eq!(spanned_value.span.start().line, 1);
 }
 
 /// The token filters. `digit`, `hex_digit` and `oct_digit` return `syn::LitInt`,
@@ -346,9 +346,9 @@ fn literal_token() {
         .test()
         .assert_success_is(3.5f64);
     lits::parse_p_str
-        .parse_str("\"hallo\"")
+        .parse_str("\"hello\"")
         .test()
-        .assert_success_is("hallo".to_string());
+        .assert_success_is("hello".to_string());
     lits::parse_p_byte
         .parse_str("b'A'")
         .test()
@@ -405,7 +405,7 @@ fn syn_interop_builtins() {
 /// without a signature change - exactly the kind that regresses unnoticed
 /// without a test.
 #[test]
-fn any_ident_nimmt_schluesselwoerter_ident_nicht() {
+fn any_ident_accepts_keywords_ident_does_not() {
     mod inner {
         use super::*;
         grammar! {
@@ -443,48 +443,45 @@ fn any_ident_nimmt_schluesselwoerter_ident_nicht() {
 /// `impl Parse`; `inner_attrs` was missing as the counterpart of `outer_attrs`;
 /// `lit_byte` completes the naming scheme of the `lit_*` family.
 #[test]
-fn neu_ergaenzte_builtins() {
+fn newly_added_builtins() {
     mod inner {
         use super::*;
         grammar! {
-            grammar luecken {
+            grammar gaps {
                 pub p_pat -> String = v:pat -> { quote::quote!(#v).to_string() }
                 pub p_inner -> usize = v:inner_attrs -> { v.len() }
                 pub p_byte -> u8 = v:lit_byte -> { v.value() }
             }
         }
     }
-    use inner::luecken;
+    use inner::gaps;
 
     // Simple binding pattern, tuple pattern and or-pattern.
-    luecken::parse_p_pat
+    gaps::parse_p_pat
         .parse_str("x")
         .test()
         .assert_success_is("x".to_string());
-    luecken::parse_p_pat
+    gaps::parse_p_pat
         .parse_str("(a, b)")
         .test()
         .assert_success_is("(a , b)".to_string());
-    luecken::parse_p_pat
+    gaps::parse_p_pat
         .parse_str("Some(v)")
         .test()
         .assert_success_is("Some (v)".to_string());
     // Or-pattern - exactly the case why syn offers no `impl Parse`.
-    luecken::parse_p_pat
-        .parse_str("A | B")
-        .test()
-        .assert_success();
+    gaps::parse_p_pat.parse_str("A | B").test().assert_success();
 
-    luecken::parse_p_inner
+    gaps::parse_p_inner
         .parse_str("#![allow(dead_code)]")
         .test()
         .assert_success_is(1usize);
-    luecken::parse_p_inner
+    gaps::parse_p_inner
         .parse_str("")
         .test()
         .assert_success_is(0usize);
 
-    luecken::parse_p_byte
+    gaps::parse_p_byte
         .parse_str("b'Z'")
         .test()
         .assert_success_is(b'Z');

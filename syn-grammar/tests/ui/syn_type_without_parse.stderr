@@ -21,7 +21,7 @@ error[E0277]: `syn::Field` cannot be used directly in a grammar
 note: required by a bound in `parse_syn`
   --> $WORKSPACE/core/grammar-kit/src/stream.rs
    |
-   | pub fn parse_syn<'a, T: crate::SynParsable>(input: &Strom<'a>) -> StreamResult<'a, T> {
+   | pub fn parse_syn<'a, T: crate::SynParsable>(input: &Stream<'a>) -> StreamResult<'a, T> {
    |                         ^^^^^^^^^^^^^^^^^^ required by this bound in `parse_syn`
 
 error[E0308]: mismatched types

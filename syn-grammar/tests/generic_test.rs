@@ -58,32 +58,32 @@ fn test_generic_inference() {
 /// generic rule and fails on a wrong catalogue entry before any user stumbles
 /// over it.
 #[test]
-fn generische_regel_mit_token_filtern() {
+fn generic_rule_with_token_filters() {
     grammar! {
         grammar digit_generics {
-            rule liste<T>(item) -> Vec<T> = items:item* -> { items }
+            rule list<T>(item) -> Vec<T> = items:item* -> { items }
 
-            pub rule dezimal -> Vec<syn::LitInt> = l:liste(item=digit) -> { l }
-            pub rule hexadezimal -> Vec<syn::LitInt> = l:liste(item=hex_digit) -> { l }
-            pub rule oktal -> Vec<syn::LitInt> = l:liste(item=oct_digit) -> { l }
+            pub rule decimal -> Vec<syn::LitInt> = l:list(item=digit) -> { l }
+            pub rule hexadecimal -> Vec<syn::LitInt> = l:list(item=hex_digit) -> { l }
+            pub rule octal -> Vec<syn::LitInt> = l:list(item=oct_digit) -> { l }
         }
     }
 
-    let werte = digit_generics::parse_dezimal
+    let values = digit_generics::parse_decimal
         .parse_str("1 2 3")
         .test()
         .assert_success();
-    let gelesen: Vec<String> = werte
+    let digits: Vec<String> = values
         .iter()
         .map(|l| l.base10_digits().to_string())
         .collect();
-    assert_eq!(gelesen, vec!["1", "2", "3"]);
+    assert_eq!(digits, vec!["1", "2", "3"]);
 
-    digit_generics::parse_hexadezimal
+    digit_generics::parse_hexadecimal
         .parse_str("10 11")
         .test()
         .assert_success();
-    digit_generics::parse_oktal
+    digit_generics::parse_octal
         .parse_str("7 5")
         .test()
         .assert_success();

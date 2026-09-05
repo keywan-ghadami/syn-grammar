@@ -167,14 +167,14 @@ once.
 **The signature is the pivot.** A rule is
 
 ```rust
-fn parse_x_impl<'a>(input: &Strom<'a>, ctx: &mut ParseContext<'a>) -> StreamResult<'a, T>
+fn parse_x_impl<'a>(input: &Stream<'a>, ctx: &mut ParseContext<'a>) -> StreamResult<'a, T>
 ```
 
-with `Strom<'a> = ParseBuffer<'a>` — deliberately **not** syn's alias
+with `Stream<'a> = ParseBuffer<'a>` — deliberately **not** syn's alias
 `ParseStream<'a> = &'a ParseBuffer<'a>`. The alias equates the lifetime of the
 reference with that of the tokens; but an `input.fork()` only lives to the end
 of the stack frame, so `'a` would be shortened to that frame and a
-`ParseError<'a>` from a fork could no longer leave the call. With `&Strom<'a>`
+`ParseError<'a>` from a fork could no longer leave the call. With `&Stream<'a>`
 the reference lifetime stays free. This was checked in advance on a running
 spike, not inferred.
 
@@ -192,9 +192,9 @@ place each:
   path is a bare `return Err(syn::Error)`. `AnyDelimiter::parse_any_delimiter`
   does not work either — its return value is shortened to the lifetime of
   `&self`, so no error from inside the group would carry outward.
-* `ParseBuffer::step` in `schritt`, to run cursor primitives on the stream.
+* `ParseBuffer::step` in `step`, to run cursor primitives on the stream.
   Since `step` demands a closure for **every** lifetime, a `ParseError<'c>`
-  cannot leave it; `schritt` carries it through without its cursor and
+  cannot leave it; `step` carries it through without its cursor and
   re-attaches it outside at the entry position. These primitives report their
   error there anyway.
 
@@ -230,15 +230,15 @@ disappears in the noise — `any_ident` even got faster.
 **The rationale changed with stage 3.** Originally this read: "with it,
 cursor-first would be possible without detours and this ADR would be moot".
 That is outdated — cursor-first is no longer the goal. What remains is smaller
-and more concrete: `schritt` has to carry the error of a cursor primitive
+and more concrete: `step` has to carry the error of a cursor primitive
 **without** its cursor across the `step` barrier, because the closure must work
 for every lifetime `'c` and a `ParseError<'c>` cannot leave it. With
 `StepCursor::advance_to` the cursor could be lifted from `'c` to `'a` and the
 error would stay untouched.
 
 **Measured by its benefit: small.** All current primitives report their error
-at the entry position, so the reconstruction in `schritt` is exact. Built
-locally against a patched syn 2.0.117 with `schritt` converted: 153 tests green,
+at the entry position, so the reconstruction in `step` is exact. Built
+locally against a patched syn 2.0.117 with `step` converted: 153 tests green,
 identical to the unpatched state — **no observable behavioural difference**. The
 gain is the vanished detour and the vanished tacit condition that a primitive
 may only fail at its entry position.

@@ -217,51 +217,52 @@ mod tests {
     /// errors deliberately get the same span; they are distinguishable solely
     /// via the cursor.
     #[test]
-    fn auswahl_funktioniert_bei_identischen_spans() {
+    fn selection_works_with_identical_spans() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
 
-        let flach = buf.begin();
-        let tief = flach.token_tree().unwrap().1.token_tree().unwrap().1;
+        let shallow = buf.begin();
+        let deep = shallow.token_tree().unwrap().1.token_tree().unwrap().1;
 
-        let gleicher_span = Span::call_site();
-        let flacher = ParseError::new(gleicher_span, "flach").with_cursor(flach);
-        let tieferer = ParseError::new(gleicher_span, "tief").with_cursor(tief);
+        let same_span = Span::call_site();
+        let shallower = ParseError::new(same_span, "shallow").with_cursor(shallow);
+        let deeper = ParseError::new(same_span, "deep").with_cursor(deep);
 
         // The error that got further wins - regardless of the order.
-        assert_eq!(flacher.clone().merge(tieferer.clone()).message, "tief");
-        assert_eq!(tieferer.merge(flacher).message, "tief");
+        assert_eq!(shallower.clone().merge(deeper.clone()).message, "deep");
+        assert_eq!(deeper.merge(shallower).message, "deep");
     }
 
     /// Progress beats priority — even a `fail(..)` located earlier.
     /// Whoever processed more tokens was closer to the intended derivation.
     #[test]
-    fn fortschritt_schlaegt_fail_prioritaet() {
+    fn progress_beats_fail_priority() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
 
-        let flach = buf.begin();
-        let tief = flach.token_tree().unwrap().1.token_tree().unwrap().1;
+        let shallow = buf.begin();
+        let deep = shallow.token_tree().unwrap().1.token_tree().unwrap().1;
 
-        let flach_fail = ParseError::at_cursor(flach, "hard fail").with_priority(PRIO_STRUCTURAL);
-        let tief_normal = ParseError::at_cursor(tief, "tief");
+        let shallow_fail =
+            ParseError::at_cursor(shallow, "hard fail").with_priority(PRIO_STRUCTURAL);
+        let deep_normal = ParseError::at_cursor(deep, "deep");
 
         assert_eq!(
-            flach_fail.clone().merge(tief_normal.clone()).message,
-            "tief"
+            shallow_fail.clone().merge(deep_normal.clone()).message,
+            "deep"
         );
-        assert_eq!(tief_normal.merge(flach_fail).message, "tief");
+        assert_eq!(deep_normal.merge(shallow_fail).message, "deep");
     }
 
     /// At the SAME position the priority then decides in favour of `fail`.
     #[test]
-    fn bei_gleicher_stelle_gewinnt_fail() {
+    fn at_same_position_fail_wins() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
-        let hier = buf.begin();
+        let here = buf.begin();
 
-        let f = ParseError::at_cursor(hier, "hard fail").with_priority(PRIO_STRUCTURAL);
-        let n = ParseError::at_cursor(hier, "normal");
+        let f = ParseError::at_cursor(here, "hard fail").with_priority(PRIO_STRUCTURAL);
+        let n = ParseError::at_cursor(here, "normal");
 
         assert_eq!(f.clone().merge(n.clone()).message, "hard fail");
         assert_eq!(n.merge(f).message, "hard fail");
@@ -269,14 +270,14 @@ mod tests {
 
     /// An error without progress information loses against one with it.
     #[test]
-    fn fehler_mit_cursor_schlaegt_fehler_ohne() {
+    fn error_with_cursor_beats_error_without() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
-        let mit = ParseError::at_cursor(buf.begin(), "mit");
-        let ohne = ParseError::new(Span::call_site(), "ohne");
+        let with_at = ParseError::at_cursor(buf.begin(), "with_at");
+        let without_at = ParseError::new(Span::call_site(), "without_at");
 
-        assert_eq!(mit.clone().merge(ohne.clone()).message, "mit");
-        assert_eq!(ohne.merge(mit).message, "mit");
+        assert_eq!(with_at.clone().merge(without_at.clone()).message, "with_at");
+        assert_eq!(without_at.merge(with_at).message, "with_at");
     }
 
     /// Display of the position (ADR 13, point 4).
@@ -289,14 +290,14 @@ mod tests {
     /// case — the suppression itself is guarded by the `line != 0` condition in
     /// `Display`.
     #[test]
-    fn position_wird_im_fallback_gedruckt() {
+    fn position_is_printed_in_fallback() {
         let e = ParseError::new(Span::call_site(), "expected `x`");
         assert_eq!(e.to_string(), "expected `x` at column 0 (line 1)");
     }
 
     /// The rule stack is appended from inside out and deduplicated.
     #[test]
-    fn regelstapel_wird_angehaengt() {
+    fn rule_stack_is_appended() {
         let mut e = ParseError::new(Span::call_site(), "expected `x`");
         e.push_rule("inner");
         e.push_rule("outer");

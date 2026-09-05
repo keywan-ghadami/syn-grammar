@@ -278,11 +278,11 @@ mod tests {
     /// A duplicate would be silent: `iter().any(...)` in `codegen/pattern.rs`
     /// takes the first hit, the second entry would remain ineffective.
     #[test]
-    fn namen_sind_eindeutig() {
-        let mut gesehen = HashSet::new();
+    fn names_are_unique() {
+        let mut seen = HashSet::new();
         for b in SynBackend::get_builtins() {
             assert!(
-                gesehen.insert(b.name),
+                seen.insert(b.name),
                 "Doppelter Builtin-Name im Katalog: '{}'",
                 b.name
             );
@@ -295,7 +295,7 @@ mod tests {
     /// (`if let Ok(ty) = ...`) and only leads to an error later in the
     /// generated code.
     #[test]
-    fn rueckgabetypen_sind_parsebar() {
+    fn return_types_are_parseable() {
         for b in SynBackend::get_builtins() {
             assert!(
                 syn::parse_str::<syn::Type>(b.return_type).is_ok(),
@@ -311,7 +311,7 @@ mod tests {
     /// added deliberately - together with a test and a docs entry
     /// (`syn-grammar/tests/builtin_coverage_test.rs`, `SYNTAX.md`).
     #[test]
-    fn katalogumfang_ist_bewusst_gewaehlt() {
+    fn catalogue_size_is_deliberate() {
         assert_eq!(
             SynBackend::get_builtins().len(),
             63,

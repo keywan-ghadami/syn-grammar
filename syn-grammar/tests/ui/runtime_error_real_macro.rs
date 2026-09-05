@@ -8,6 +8,6 @@
 // the case from Rust 1.88 on (proc-macro2 then sets `proc_macro_span_location`
 // on stable too); below that all spans would be (0,0). The project requires
 // 1.88; this test pins that promise.
-ui_macro::zuweisung!(let x = ;);
+ui_macro::assignment!(let x = ;);
 
 fn main() {}

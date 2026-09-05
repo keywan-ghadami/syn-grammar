@@ -26,7 +26,7 @@ fn parse(src: &str) -> syn_grammar::testing::TestResult<cxx_parser::FfiMod, syn:
 /// out, de-snake-cased. That is the property that makes a message in a nested
 /// grammar locatable in the first place.
 #[test]
-fn regelstapel_zeigt_den_weg_von_innen_nach_aussen() {
+fn rule_stack_shows_the_way_from_inside_out() {
     parse(r#"mod ffi { extern "C++" { fn f(a: ); } }"#)
         .assert_failure_contains("in cxx arg")
         .assert_failure_contains("in cxx item")
@@ -37,7 +37,7 @@ fn regelstapel_zeigt_den_weg_von_innen_nach_aussen() {
 /// ADR 13, point 11: lists name their item and the index. The label comes
 /// from `item_label="function argument"` in the grammar.
 #[test]
-fn listenfehler_nennt_element_und_index() {
+fn list_error_names_item_and_index() {
     parse(r#"mod ffi { extern "C++" { fn f(a: i32, , b: i32); } }"#)
         .assert_failure_contains("expected function argument")
         .assert_failure_contains("in function argument 2");
@@ -45,7 +45,7 @@ fn listenfehler_nennt_element_und_index() {
 
 /// The index counts along: the same error in the first argument names index 1.
 #[test]
-fn listenindex_zaehlt_mit() {
+fn list_index_counts_along() {
     parse(r#"mod ffi { extern "C++" { fn f(a: ); } }"#)
         .assert_failure_contains("in function argument 1");
 }
@@ -53,7 +53,7 @@ fn listenindex_zaehlt_mit() {
 /// ADR 13, point 3: at the end of the input the prefix form instead of a bare
 /// "expected" message.
 #[test]
-fn eingabeende_wird_benannt() {
+fn end_of_input_is_named() {
     parse(r#"mod ffi { extern "C++" { fn f(a: ); } }"#)
         .assert_failure_contains("unexpected end of input");
 }
@@ -61,7 +61,7 @@ fn eingabeende_wird_benannt() {
 /// ADR 13, point 3: what was actually found is named - here a keyword that
 /// is out of the question as an item name.
 #[test]
-fn gefundenes_token_wird_benannt() {
+fn found_token_is_named() {
     parse(r#"mod ffi { extern "C++" { struct S; } }"#)
         .assert_failure_contains("expected identifier")
         .assert_failure_contains("found keyword `struct`");
@@ -70,7 +70,7 @@ fn gefundenes_token_wird_benannt() {
 /// If the outermost rule fails immediately, the stack stays a single line - no
 /// context is invented that does not exist.
 #[test]
-fn fehler_ganz_aussen_bleibt_knapp() {
+fn outermost_error_stays_brief() {
     parse(r#"extern "C++" { }"#)
         .assert_failure_contains("expected `mod`")
         .assert_failure_contains("in top level mod")
@@ -80,7 +80,7 @@ fn fehler_ganz_aussen_bleibt_knapp() {
 /// A `syn` type parsed via the bridge returns its own message - and still gets
 /// the grammar's rule context appended.
 #[test]
-fn syn_typ_fehler_behaelt_grammatik_kontext() {
+fn syn_type_error_keeps_grammar_context() {
     parse(r#"mod ffi { extern C++ { } }"#)
         .assert_failure_contains("expected string literal")
         .assert_failure_contains("in extern block");
@@ -99,7 +99,7 @@ fn syn_typ_fehler_behaelt_grammatik_kontext() {
 /// gets the rank of a label (`PRIO_LABELED`); a mere token error has
 /// `PRIO_NORMAL`. Previously ``expected `,` `` stood here.
 #[test]
-fn ungueltiges_argument_wird_als_fehlendes_element_gemeldet() {
+fn invalid_argument_is_reported_as_missing_item() {
     parse(r#"mod ffi { extern "C++" { fn f( 123 ); } }"#)
         .assert_failure_contains("expected function argument")
         .assert_failure_contains("in function argument 1")

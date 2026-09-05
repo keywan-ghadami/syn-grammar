@@ -1,6 +1,6 @@
 use crate::{
-    gabel, uebernehmen, ParseContext, ParseError, ParseResult, StreamResult, Strom,
-    PRIO_AGGREGATED, PRIO_LABELED, PRIO_STRUCTURAL,
+    advance_to, fork, ParseContext, ParseError, ParseResult, Stream, StreamResult, PRIO_AGGREGATED,
+    PRIO_LABELED, PRIO_STRUCTURAL,
 };
 use syn::buffer::Cursor;
 
@@ -56,8 +56,8 @@ pub fn finish_variants<'a>(
     // alternatives at the start position - then `expected one of:` must not appear
     // at all (ADR 13, point 7).
     if let Some(b) = &best {
-        let kam_weiter = b.at.map(|at| at > start).unwrap_or(false);
-        if kam_weiter || b.priority >= PRIO_STRUCTURAL {
+        let got_further = b.at.map(|at| at > start).unwrap_or(false);
+        if got_further || b.priority >= PRIO_STRUCTURAL {
             return best.unwrap();
         }
     }
@@ -66,7 +66,7 @@ pub fn finish_variants<'a>(
     expected.dedup();
 
     // What is actually at that position? (ADR 13, point 3)
-    let gefunden = match start.token_tree() {
+    let found = match start.token_tree() {
         Some((tt, _)) => {
             let t = tt.to_string();
             if t.trim().is_empty() {
@@ -80,15 +80,15 @@ pub fn finish_variants<'a>(
 
     match expected.len() {
         0 => best.unwrap_or_else(|| ParseError::at_cursor(start, fallback_msg)),
-        1 => ParseError::at_cursor(start, format!("expected `{}`{}", expected[0], gefunden))
+        1 => ParseError::at_cursor(start, format!("expected `{}`{}", expected[0], found))
             .with_priority(PRIO_LABELED),
         _ => {
-            let liste = expected
+            let list = expected
                 .iter()
                 .map(|e| format!("`{}`", e))
                 .collect::<Vec<_>>()
                 .join(", ");
-            ParseError::at_cursor(start, format!("expected one of: {}{}", liste, gefunden))
+            ParseError::at_cursor(start, format!("expected one of: {}{}", list, found))
                 .with_priority(PRIO_AGGREGATED)
         }
     }
@@ -110,8 +110,8 @@ fn label_missing_item<'a>(
     ctx: &ParseContext<'a>,
     prio: u8,
 ) -> ParseError<'a> {
-    if ersetzt_meldung(&e, at) {
-        e.message = erwartung_item(at, item_name, ctx);
+    if replaces_message(&e, at) {
+        e.message = item_expectation(at, item_name, ctx);
         e.span = at.span();
     }
     e.priority = e.priority.max(prio);
@@ -131,7 +131,7 @@ fn label_missing_item<'a>(
 /// The exception is the end of the input or of the group: there the note that the
 /// scope ends matters more than any enumeration - otherwise the message claims
 /// something could have been there where nothing follows any more (ADR 13, point 3).
-fn ersetzt_meldung(e: &ParseError<'_>, at: Cursor<'_>) -> bool {
+fn replaces_message(e: &ParseError<'_>, at: Cursor<'_>) -> bool {
     e.at == Some(at) && (e.priority < PRIO_LABELED || at.eof())
 }
 
@@ -139,7 +139,7 @@ fn ersetzt_meldung(e: &ParseError<'_>, at: Cursor<'_>) -> bool {
 ///
 /// At the end of the input or of the group this is said explicitly - "expected function
 /// argument" alone would be misleading there (ADR 13, point 3).
-fn erwartung_item(at: Cursor<'_>, item_name: &str, ctx: &ParseContext<'_>) -> String {
+fn item_expectation(at: Cursor<'_>, item_name: &str, ctx: &ParseContext<'_>) -> String {
     if at.eof() {
         format!("{}, expected {}", ctx.end_of_scope_msg(), item_name)
     } else {
@@ -154,12 +154,12 @@ fn erwartung_item(at: Cursor<'_>, item_name: &str, ctx: &ParseContext<'_>) -> St
 /// `"<item_name> <index>"` on the live rule stack - hence
 /// `in function parameter 2`.
 ///
-/// Every attempt runs on a [`gabel`] (fork); only success is applied via
-/// [`uebernehmen`] (advance_to). In the cursor design, resetting was free
+/// Every attempt runs on a [`fork`] (fork); only success is applied via
+/// [`advance_to`] (advance_to). In the cursor design, resetting was free
 /// (simply do not use the new cursor); on the stream it costs the fork
 /// - in exchange the `TokenBuffer` build per AST type disappears (ADR 15, stage 3).
 pub fn parse_separated<'a, T, P, S>(
-    input: &Strom<'a>,
+    input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
     mut item_parser: P,
     mut sep_parser: S,
@@ -168,21 +168,21 @@ pub fn parse_separated<'a, T, P, S>(
     item_name: &str,
 ) -> StreamResult<'a, Vec<T>>
 where
-    P: FnMut(&Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, T>,
-    S: FnMut(&Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, ()>,
+    P: FnMut(&Stream<'a>, &mut ParseContext<'a>) -> StreamResult<'a, T>,
+    S: FnMut(&Stream<'a>, &mut ParseContext<'a>) -> StreamResult<'a, ()>,
 {
     let mut items = Vec::new();
 
     // First item. The item name is on the live stack during the attempt - only
     // that way does an error recorded DEEP inside the item carry the list index.
     let start = input.cursor();
-    let erste_gabel = gabel(input);
+    let first_fork = fork(input);
     ctx.enter_rule(&format!("{} 1", item_name));
-    let erstes = item_parser(&erste_gabel, ctx);
+    let first = item_parser(&first_fork, ctx);
     ctx.exit_rule();
-    match erstes {
+    match first {
         Ok(item) => {
-            uebernehmen(input, &erste_gabel);
+            advance_to(input, &first_fork);
             items.push(item);
         }
         Err(mut e) => {
@@ -190,7 +190,7 @@ where
                 // If the message is replaced, the internal rule stack no longer
                 // says anything about the error either - then only the list
                 // context counts. If the message stays, so does the stack.
-                if ersetzt_meldung(&e, start) {
+                if replaces_message(&e, start) {
                     e.rule_stack.clear();
                 }
                 // The error belongs to the first item of the list (ADR 13, point 11).
@@ -215,7 +215,7 @@ where
             //
             // If it made progress, everything stays untouched: its own message
             // is then the more meaningful one, together with its rule stack.
-            if ersetzt_meldung(&e, start) {
+            if replaces_message(&e, start) {
                 e.rule_stack.clear();
             }
             let mut e = label_missing_item(e, start, item_name, ctx, PRIO_LABELED);
@@ -230,30 +230,30 @@ where
 
         // Try the separator - on a fork, so that on failure the stream stays
         // BEFORE the separator.
-        let sep_gabel = gabel(input);
+        let sep_fork = fork(input);
         sep_ctx.enter_rule("separator");
-        let sep_res = sep_parser(&sep_gabel, &mut sep_ctx);
+        let sep_res = sep_parser(&sep_fork, &mut sep_ctx);
         sep_ctx.exit_rule();
         match sep_res {
             Ok(()) => {
-                let nach_sep = sep_gabel.cursor();
+                let after_sep = sep_fork.cursor();
                 let mut item_ctx = sep_ctx.clone();
 
                 // Try the item AFTER the separator, again on its own fork.
-                let item_gabel = gabel(&sep_gabel);
+                let item_fork = fork(&sep_fork);
                 item_ctx.enter_rule(&format!("{} {}", item_name, items.len() + 1));
-                let item_res = item_parser(&item_gabel, &mut item_ctx);
+                let item_res = item_parser(&item_fork, &mut item_ctx);
                 item_ctx.exit_rule();
                 match item_res {
                     Ok(item) => {
-                        uebernehmen(input, &item_gabel);
+                        advance_to(input, &item_fork);
                         items.push(item);
                         *ctx = item_ctx;
                     }
                     Err(mut e) => {
                         // See above: if the message is replaced, the internal
                         // stack contributes nothing.
-                        if ersetzt_meldung(&e, nach_sep) {
+                        if replaces_message(&e, after_sep) {
                             e.rule_stack.clear();
                         }
                         // Index of the ATTEMPTED item, 1-based.
@@ -262,7 +262,7 @@ where
                             // A dangling separator is allowed: it BELONGS to the list
                             // and is consumed. Without this it stayed in the stream and
                             // the surrounding rule failed on it.
-                            uebernehmen(input, &sep_gabel);
+                            advance_to(input, &sep_fork);
                             *ctx = sep_ctx;
                             ctx.record_failure(&e);
                             break;
@@ -276,9 +276,9 @@ where
                             // it resurfaces instead of being replaced by a generic
                             // message. The REAL error is enriched, so that its rule
                             // stack and, if it was deeper, its position are preserved.
-                            let markiert =
-                                label_missing_item(e, nach_sep, item_name, ctx, PRIO_STRUCTURAL);
-                            ctx.record_failure(&markiert);
+                            let labelled =
+                                label_missing_item(e, after_sep, item_name, ctx, PRIO_STRUCTURAL);
+                            ctx.record_failure(&labelled);
                             ctx.absorb(&item_ctx);
                             break;
                         }
@@ -318,31 +318,31 @@ where
 /// Counterpart of [`parse_separated`]. A structural error (priority
 /// >= 50) aborts the loop hard instead of merely ending it.
 pub fn parse_repeated<'a, T, P>(
-    input: &Strom<'a>,
+    input: &Stream<'a>,
     ctx: &mut ParseContext<'a>,
     mut item_parser: P,
     min: usize,
     item_name: &str,
 ) -> StreamResult<'a, Vec<T>>
 where
-    P: FnMut(&Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, T>,
+    P: FnMut(&Stream<'a>, &mut ParseContext<'a>) -> StreamResult<'a, T>,
 {
     let mut items = Vec::new();
 
     loop {
-        let vorher = input.cursor();
-        let item_gabel = gabel(input);
+        let before = input.cursor();
+        let item_fork = fork(input);
         let mut item_ctx = ctx.clone();
         item_ctx.enter_rule(&format!("{} {}", item_name, items.len() + 1));
-        let item_res = item_parser(&item_gabel, &mut item_ctx);
+        let item_res = item_parser(&item_fork, &mut item_ctx);
         item_ctx.exit_rule();
         match item_res {
             Ok(item) => {
                 // No progress despite success -> otherwise an endless loop.
-                if item_gabel.cursor() == vorher {
+                if item_fork.cursor() == before {
                     break;
                 }
-                uebernehmen(input, &item_gabel);
+                advance_to(input, &item_fork);
                 items.push(item);
                 *ctx = item_ctx;
             }
@@ -381,7 +381,7 @@ where
 ///
 /// Even with [`crate::parse_syn`] (ADR 15, stage 3) this pays off: an
 /// `input.parse::<T>()` goes through syn's expectation and error machinery,
-/// whereas here a pointer comparison suffices. [`crate::schritt`] runs these
+/// whereas here a pointer comparison suffices. [`crate::step`] runs these
 /// primitives on the stream.
 ///
 /// The error messages are word-for-word identical to syn's - several tests
@@ -390,21 +390,21 @@ pub trait SingleToken: Sized {
     /// Reads the token if it matches. `None` means: does not match.
     fn take(cursor: Cursor<'_>) -> Option<(Self, Cursor<'_>)>;
     /// The message when it does not match - word-for-word identical to syn.
-    fn erwartet() -> &'static str;
+    fn expected() -> &'static str;
 }
 
 /// Reads a [`SingleToken`] type from the cursor in O(1).
 pub fn take_single<'a, T: SingleToken>(cursor: Cursor<'a>) -> ParseResult<'a, T> {
     match T::take(cursor) {
-        Some((wert, next)) => Ok((wert, next)),
+        Some((value, next)) => Ok((value, next)),
         // At the end of the input syn prefixes its message with
         // "unexpected end of input, ". That is reproduced here so that the
         // message does not change (`list_dx_test::test_cxx_unexpected_eof`).
         None if cursor.eof() => Err(ParseError::at_cursor(
             cursor,
-            format!("unexpected end of input, {}", T::erwartet()),
+            format!("unexpected end of input, {}", T::expected()),
         )),
-        None => Err(ParseError::at_cursor(cursor, T::erwartet())),
+        None => Err(ParseError::at_cursor(cursor, T::expected())),
     }
 }
 
@@ -413,20 +413,20 @@ impl SingleToken for proc_macro2::Ident {
         // `impl Parse for Ident` rejects keywords (`accept_as_ident`).
         // The difference to `any_ident` hinges on exactly that.
         let (id, next) = cursor.ident()?;
-        if akzeptiert_als_ident(&id.to_string()) {
+        if accepted_as_ident(&id.to_string()) {
             Some((id, next))
         } else {
             None
         }
     }
-    fn erwartet() -> &'static str {
+    fn expected() -> &'static str {
         "expected identifier"
     }
 }
 
 /// The keywords that `syn` does not let pass as an ordinary identifier
 /// (`syn::ext::IdentExt::parse_any` bypasses this).
-fn akzeptiert_als_ident(s: &str) -> bool {
+fn accepted_as_ident(s: &str) -> bool {
     !matches!(
         s,
         "abstract"
@@ -500,7 +500,7 @@ impl SingleToken for syn::LitBool {
             None
         }
     }
-    fn erwartet() -> &'static str {
+    fn expected() -> &'static str {
         "expected boolean literal"
     }
 }
@@ -510,17 +510,17 @@ impl SingleToken for syn::LitBool {
 /// `-5` is a `LitInt` made of TWO cursor tokens; syn handles that in
 /// `parse_negative_lit`. Without this step `i32`, `f64` and relatives lose
 /// the ability to read negative values.
-fn lit_mit_vorzeichen(cursor: Cursor<'_>) -> Option<(syn::Lit, Cursor<'_>)> {
-    if let Some((p, nach_minus)) = cursor.punct() {
+fn signed_literal(cursor: Cursor<'_>) -> Option<(syn::Lit, Cursor<'_>)> {
+    if let Some((p, after_minus)) = cursor.punct() {
         if p.as_char() == '-' {
-            let (lit, next) = nach_minus.literal()?;
-            let mit_minus = format!("-{}", lit);
+            let (lit, next) = after_minus.literal()?;
+            let with_minus = format!("-{}", lit);
             // Only numbers may carry a sign.
             return match syn::Lit::new(lit) {
                 syn::Lit::Int(_) | syn::Lit::Float(_) => {
-                    let mut neu: proc_macro2::Literal = mit_minus.parse().ok()?;
-                    neu.set_span(p.span());
-                    Some((syn::Lit::new(neu), next))
+                    let mut signed: proc_macro2::Literal = with_minus.parse().ok()?;
+                    signed.set_span(p.span());
+                    Some((syn::Lit::new(signed), next))
                 }
                 _ => None,
             };
@@ -530,24 +530,24 @@ fn lit_mit_vorzeichen(cursor: Cursor<'_>) -> Option<(syn::Lit, Cursor<'_>)> {
     Some((syn::Lit::new(lit), next))
 }
 
-macro_rules! einzeltoken_literal {
-    ($typ:ty, $variante:ident, $msg:literal) => {
-        impl SingleToken for $typ {
+macro_rules! single_token_literal {
+    ($ty:ty, $variant:ident, $msg:literal) => {
+        impl SingleToken for $ty {
             fn take(cursor: Cursor<'_>) -> Option<(Self, Cursor<'_>)> {
-                match lit_mit_vorzeichen(cursor)? {
-                    (syn::Lit::$variante(l), next) => Some((l, next)),
+                match signed_literal(cursor)? {
+                    (syn::Lit::$variant(l), next) => Some((l, next)),
                     _ => None,
                 }
             }
-            fn erwartet() -> &'static str {
+            fn expected() -> &'static str {
                 $msg
             }
         }
     };
 }
 
-einzeltoken_literal!(syn::LitStr, Str, "expected string literal");
-einzeltoken_literal!(syn::LitInt, Int, "expected integer literal");
-einzeltoken_literal!(syn::LitFloat, Float, "expected floating point literal");
-einzeltoken_literal!(syn::LitChar, Char, "expected character literal");
-einzeltoken_literal!(syn::LitByte, Byte, "expected byte literal");
+single_token_literal!(syn::LitStr, Str, "expected string literal");
+single_token_literal!(syn::LitInt, Int, "expected integer literal");
+single_token_literal!(syn::LitFloat, Float, "expected floating point literal");
+single_token_literal!(syn::LitChar, Char, "expected character literal");
+single_token_literal!(syn::LitByte, Byte, "expected byte literal");

@@ -10,7 +10,7 @@
 //! A `syn::Type` thus costs `input.parse::<T>()`, i.e. O(length of the type)
 //! instead of O(rest).
 //!
-//! The cursor primitives remain unchanged: [`schritt`] runs them inside a
+//! The cursor primitives remain unchanged: [`step`] runs them inside a
 //! `step` episode and advances the stream by exactly the result.
 
 use crate::{ParseError, ParseResult, PRIO_STRUCTURAL};
@@ -29,9 +29,9 @@ use syn::parse::ParseBuffer;
 /// frame and a `ParseError<'a>` from a fork could no longer leave the call -
 /// exactly the errors the selection needs.
 ///
-/// With `&Strom<'a>` the reference lifetime stays free and `'a` depends solely
+/// With `&Stream<'a>` the reference lifetime stays free and `'a` depends solely
 /// on the tokens. That is the prerequisite for the whole error selection.
-pub type Strom<'a> = ParseBuffer<'a>;
+pub type Stream<'a> = ParseBuffer<'a>;
 
 /// Result of a parse step on the stream.
 ///
@@ -56,36 +56,36 @@ pub type StreamResult<'a, T> = Result<T, ParseError<'a>>;
 /// `docs/upstream/syn-stepcursor-advance-to.md` (ADR 15, stage 4); until it is
 /// through, the rule is: **a primitive may only fail at its entry position
 /// here**, otherwise its error position shifts.
-pub fn schritt<'a, T, F>(input: &Strom<'a>, f: F) -> StreamResult<'a, T>
+pub fn step<'a, T, F>(input: &Stream<'a>, f: F) -> StreamResult<'a, T>
 where
     F: for<'c> FnOnce(Cursor<'c>) -> ParseResult<'c, T>,
 {
-    let hier = input.cursor();
-    let mut merk: Option<(Span, String, u8, bool)> = None;
-    let ergebnis = input.step(|sc| match f(*sc) {
-        Ok((wert, danach)) => Ok((wert, danach)),
+    let here = input.cursor();
+    let mut saved: Option<(Span, String, u8, bool)> = None;
+    let result = input.step(|sc| match f(*sc) {
+        Ok((value, after)) => Ok((value, after)),
         Err(e) => {
             let span = e.span;
-            merk = Some((span, e.message, e.priority, e.is_fatal));
-            // The text is taken from `merk` outside; this error only serves
+            saved = Some((span, e.message, e.priority, e.is_fatal));
+            // The text is taken from `saved` outside; this error only serves
             // to make `step` refuse to advance.
             Err(syn::Error::new(span, "unreachable"))
         }
     });
 
-    match ergebnis {
-        Ok(wert) => Ok(wert),
-        Err(syn_fehler) => Err(match merk {
+    match result {
+        Ok(value) => Ok(value),
+        Err(syn_error) => Err(match saved {
             Some((span, message, priority, fatal)) => {
                 let mut e = ParseError::new(span, message)
-                    .with_cursor(hier)
+                    .with_cursor(here)
                     .with_priority(priority);
                 e.is_fatal = fatal;
                 e
             }
             // Can only occur if `step` itself fails, not the closure.
             // Defensive, not the normal case.
-            None => ParseError::new(syn_fehler.span(), syn_fehler.to_string()).with_cursor(hier),
+            None => ParseError::new(syn_error.span(), syn_error.to_string()).with_cursor(here),
         }),
     }
 }
@@ -104,20 +104,20 @@ where
 /// **After an error the stream may have advanced.** Unlike with the cursor,
 /// resetting is not free here; the caller must work on a fork if it wants to
 /// be able to reset. The code generator does that at every reset point.
-pub fn parse_syn<'a, T: crate::SynParsable>(input: &Strom<'a>) -> StreamResult<'a, T> {
-    let hier = input.cursor();
-    input.parse::<T>().map_err(|e| fehler_von_syn(e, hier))
+pub fn parse_syn<'a, T: crate::SynParsable>(input: &Stream<'a>) -> StreamResult<'a, T> {
+    let here = input.cursor();
+    input.parse::<T>().map_err(|e| error_from_syn(e, here))
 }
 
 /// Like [`parse_syn`], but with a special parser - for types without `impl Parse`
 /// (`syn::Attribute`, `syn::Pat`) or with a different entry point
 /// (`Block::parse_within`, `Ident::parse_any`).
-pub fn parse_mit<'a, T, F>(input: &Strom<'a>, parser: F) -> StreamResult<'a, T>
+pub fn parse_with<'a, T, F>(input: &Stream<'a>, parser: F) -> StreamResult<'a, T>
 where
     F: FnOnce(syn::parse::ParseStream) -> syn::Result<T>,
 {
-    let hier = input.cursor();
-    parser(input).map_err(|e| fehler_von_syn(e, hier))
+    let here = input.cursor();
+    parser(input).map_err(|e| error_from_syn(e, here))
 }
 
 /// Adopts a `syn::Error`.
@@ -125,24 +125,24 @@ where
 /// Span from syn - it is more precise for display. Progress from the entry
 /// position. At the end of the input or of the group syn's error carries only
 /// `Span::call_site()`; there the cursor is the better source.
-fn fehler_von_syn<'a>(e: syn::Error, hier: Cursor<'a>) -> ParseError<'a> {
-    let span = if hier.eof() { hier.span() } else { e.span() };
-    ParseError::new(span, e.to_string()).with_cursor(hier)
+fn error_from_syn<'a>(e: syn::Error, here: Cursor<'a>) -> ParseError<'a> {
+    let span = if here.eof() { here.span() } else { e.span() };
+    ParseError::new(span, e.to_string()).with_cursor(here)
 }
 
 /// A fork of the stream - the reset point.
 ///
-/// As long as the fork is not applied via [`uebernehmen`], the stream stays
+/// As long as the fork is not applied via [`advance_to`], the stream stays
 /// put. This replaces the cursor copy of the old design; it costs a small
 /// `Rc` allocation, but the `TokenBuffer` build disappears.
-pub fn gabel<'a>(input: &Strom<'a>) -> Strom<'a> {
+pub fn fork<'a>(input: &Stream<'a>) -> Stream<'a> {
     input.fork()
 }
 
 /// Applies a successful fork to the stream. According to syn O(1), regardless
 /// of the distance.
-pub fn uebernehmen<'a>(input: &Strom<'a>, gabel: &Strom<'a>) {
-    input.advance_to(gabel);
+pub fn advance_to<'a>(input: &Stream<'a>, fork: &Stream<'a>) {
+    input.advance_to(fork);
 }
 
 /// Descends into a delimiter group.
@@ -160,12 +160,12 @@ pub fn uebernehmen<'a>(input: &Strom<'a>, gabel: &Strom<'a>) {
 /// that error type. `AnyDelimiter::parse_any_delimiter` does not work either -
 /// its return value is shortened to the lifetime of `&self`, so no error from
 /// the group could be carried outward any more.
-pub fn gruppe<'a>(
-    input: &Strom<'a>,
+pub fn group<'a>(
+    input: &Stream<'a>,
     delimiter: Delimiter,
-) -> StreamResult<'a, (proc_macro2::extra::DelimSpan, Strom<'a>)> {
-    let hier = input.cursor();
-    let ergebnis = match delimiter {
+) -> StreamResult<'a, (proc_macro2::extra::DelimSpan, Stream<'a>)> {
+    let here = input.cursor();
+    let result = match delimiter {
         Delimiter::Parenthesis => {
             syn::__private::parse_parens(input).map(|g| (g.token.span, g.content))
         }
@@ -173,10 +173,10 @@ pub fn gruppe<'a>(
         Delimiter::Bracket => {
             syn::__private::parse_brackets(input).map(|g| (g.token.span, g.content))
         }
-        Delimiter::None => Err(syn::Error::new(hier.span(), "expected delimited group")),
+        Delimiter::None => Err(syn::Error::new(here.span(), "expected delimited group")),
     };
-    ergebnis.map_err(|_| {
-        ParseError::at_cursor(hier, "expected delimited group").with_priority(PRIO_STRUCTURAL)
+    result.map_err(|_| {
+        ParseError::at_cursor(here, "expected delimited group").with_priority(PRIO_STRUCTURAL)
     })
 }
 
@@ -184,9 +184,9 @@ pub fn gruppe<'a>(
 ///
 /// For the places that run over raw tokens: `until(..)` collects them,
 /// `recover(..)` skips them up to the synchronisation marker.
-pub fn token_nehmen<'a>(input: &Strom<'a>) -> StreamResult<'a, proc_macro2::TokenTree> {
-    schritt(input, |cursor| match cursor.token_tree() {
-        Some((tt, danach)) => Ok((tt, danach)),
+pub fn take_token<'a>(input: &Stream<'a>) -> StreamResult<'a, proc_macro2::TokenTree> {
+    step(input, |cursor| match cursor.token_tree() {
+        Some((tt, after)) => Ok((tt, after)),
         None => Err(ParseError::at_cursor(cursor, "unexpected end of input")),
     })
 }

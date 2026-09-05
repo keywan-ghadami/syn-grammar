@@ -2,6 +2,6 @@
 // `t.pass(...)` case - that a grammar runs through cleanly in the real macro
 // at all was unchecked.
 fn main() {
-    let wert: i32 = ui_macro::zuweisung!(let x = 42;);
-    assert_eq!(wert, 42);
+    let value: i32 = ui_macro::assignment!(let x = 42;);
+    assert_eq!(value, 42);
 }

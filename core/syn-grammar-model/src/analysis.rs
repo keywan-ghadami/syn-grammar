@@ -312,7 +312,7 @@ pub fn resolve_token_types(
     // syn's own token types check `Spacing::Joint` themselves and correctly on
     // every toolchain. An entry here also saves a complete bridge call
     // per operator.
-    if let Some(ty) = zusammengesetzter_operator(&s) {
+    if let Some(ty) = compound_operator(&s) {
         return Ok(vec![ty]);
     }
 
@@ -1190,15 +1190,15 @@ fn pattern_structure_eq(p1: &ModelPattern, p2: &ModelPattern) -> bool {
 ///
 /// `None` for anything that is not a known operator - then the
 /// character-by-character decomposition in [`resolve_token_types`] applies.
-fn zusammengesetzter_operator(s: &str) -> Option<syn::Type> {
+fn compound_operator(s: &str) -> Option<syn::Type> {
     // Only operators that `Token![..]` knows as a type of their own. Deliberately as
     // a list rather than a heuristic: a wrongly guessed operator would silently
     // accept a different token.
-    let bekannt = [
+    let known = [
         "::", "->", "=>", "==", "!=", "<=", ">=", "&&", "||", "..", "..=", "...", "+=", "-=", "*=",
         "/=", "%=", "^=", "&=", "|=", "<<", ">>", "<<=", ">>=",
     ];
-    if !bekannt.contains(&s) {
+    if !known.contains(&s) {
         return None;
     }
     syn::parse_str::<syn::Type>(&format!("Token![{}]", s)).ok()

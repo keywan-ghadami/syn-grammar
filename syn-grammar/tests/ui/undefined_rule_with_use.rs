@@ -10,7 +10,7 @@ grammar! {
     grammar Test {
         use super::Stmt;
 
-        main = tyop_fehler
+        main = tyop_error
     }
 }
 

@@ -23,10 +23,10 @@ that touch this crate's API are listed here.
 - **All previous combinators are removed** (`attempt`, `peek`, `not_check`,
   `attempt_recover`, `parse_ident`, `parse_int`, `skip_until`) and replaced by
   `peek_syn`, `take_single`, `finish_variants`, `parse_separated`,
-  `parse_repeated` and the module `stream` (`Strom`, `StreamResult`,
-  `parse_syn`, `parse_mit`, `gabel`, `uebernehmen`, `gruppe`, `schritt`,
-  `token_nehmen`). The list combinators take a `&Strom<'a>` instead of a
-  `Cursor<'a>`; backtracking goes through `gabel`/`uebernehmen` (ADR 15,
+  `parse_repeated` and the module `stream` (`Stream`, `StreamResult`,
+  `parse_syn`, `parse_with`, `fork`, `advance_to`, `group`, `step`,
+  `take_token`). The list combinators take a `&Stream<'a>` instead of a
+  `Cursor<'a>`; backtracking goes through `fork`/`advance_to` (ADR 15,
   stage 3).
 - **`testing::TestResult<T, E>`** has a third parameter `S = ()`; the `'static`
   bound on `E` is gone; `assert_failure_contains` and

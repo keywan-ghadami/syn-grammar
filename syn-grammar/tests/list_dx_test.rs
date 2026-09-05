@@ -102,7 +102,7 @@ fn test_cxx_garbage_after_item() {
 /// Applies to the hard path (`min=1`) just as to the soft one; that was not the
 /// case before.
 #[test]
-fn beschriftetes_element_behaelt_seine_meldung_auch_bei_min1() {
+fn labelled_item_keeps_its_message_even_with_min1() {
     cxx_min1::parse_signature
         .parse_str("fn foo( 123 );")
         .test()
@@ -116,7 +116,7 @@ fn beschriftetes_element_behaelt_seine_meldung_auch_bei_min1() {
 /// been there would be misleading - simply nothing follows any more
 /// (ADR 13, point 3).
 #[test]
-fn am_gruppenende_gewinnt_die_elementerwartung() {
+fn at_group_end_item_expectation_wins() {
     cxx_min1::parse_signature
         .parse_str("fn foo( );")
         .test()

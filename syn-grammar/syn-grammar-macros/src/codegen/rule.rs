@@ -95,7 +95,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
         quote! {
             let mut lhs = {
-                let base_parser = |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| -> rt::StreamResult<'a, #ret_type> {
+                let base_parser = |input: &rt::Stream<'a>, ctx: &mut rt::ParseContext<'a>| -> rt::StreamResult<'a, #ret_type> {
                     #base_logic
                 };
                 base_parser(input, ctx)?
@@ -115,7 +115,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
         #default_doc
         #vis fn #fn_name(input: syn::parse::ParseStream #(#params)*) -> syn::Result<#ret_type> #where_clause {
             // `ParseStream<'z>` is `&'z ParseBuffer<'z>` and thus fits directly
-            // onto `&rt::Strom<'a>` with `'a = 'z`. The stream is advanced by the rule
+            // onto `&rt::Stream<'a>` with `'a = 'z`. The stream is advanced by the rule
             // itself - the `input.step` detour that used to be needed (only there was
             // the cursor lifetime nameable) is gone.
             let mut ctx = rt::ParseContext::new();
@@ -146,7 +146,7 @@ pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
 
         #[doc(hidden)]
         #(#impl_attrs)*
-        pub fn #impl_name<'a>(input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a> #(#params)*) -> rt::StreamResult<'a, #ret_type> #where_clause {
+        pub fn #impl_name<'a>(input: &rt::Stream<'a>, ctx: &mut rt::ParseContext<'a> #(#params)*) -> rt::StreamResult<'a, #ret_type> #where_clause {
             // The rule name sits on the live stack for the duration of the body, so that
             // an error recorded here (rather than passed out) picks it up.
             // enter/exit enclose the body closure - all early-returning
@@ -191,16 +191,16 @@ fn generate_recursive_loop_body(
             // Try on a fork: if the arm fails, the stream stays
             // where it was. With the cursor design this was free (simply don't use
             // the new cursor), here it costs the fork.
-            let _gabel = rt::gabel(input);
+            let _fork = rt::fork(input);
             let _arm_res = (|| -> rt::StreamResult<'a, _> {
-                let input = &_gabel;
+                let input = &_fork;
                 #bind_stmt
                 #logic
             })();
 
             match _arm_res {
                 Ok(new_lhs) => {
-                    let next_cursor = _gabel.cursor();
+                    let next_cursor = _fork.cursor();
                     // Cursor comparison, not position comparison: `Cursor` is
                     // `PartialEq` (pointer equality within the shared TokenBuffer),
                     // and that is exactly the question - did the parser stand at
@@ -210,7 +210,7 @@ fn generate_recursive_loop_body(
                     if _start_cursor == next_cursor {
                         return Err(rt::ParseError::at_cursor(_start_cursor, "Left-recursive rule matched empty string").with_priority(50));
                     }
-                    rt::uebernehmen(input, &_gabel);
+                    rt::advance_to(input, &_fork);
                     lhs = new_lhs;
                     continue;
                 }
@@ -274,9 +274,9 @@ pub fn generate_variants_internal(
             let pre_bindings = analysis::collect_bindings(cut.pre_cut);
 
             let cut_block = quote! {
-                let _gabel = rt::gabel(input);
+                let _fork = rt::fork(input);
                 let pre_res = (|| -> rt::StreamResult<'a, _> {
-                    let input = &_gabel;
+                    let input = &_fork;
                     #pre_logic
                     Ok((#(#pre_bindings),*))
                 })();
@@ -287,13 +287,13 @@ pub fn generate_variants_internal(
                         // continues on the same fork; an error after this is
                         // fatal, so there is no backtracking anyway.
                         let post_res = (|| -> rt::StreamResult<'a, _> {
-                            let input = &_gabel;
+                            let input = &_fork;
                             #post_logic
                             Ok((|| -> syn::Result<_> { Ok({ #action }) })().map_err(rt::ParseError::from)?)
                         })();
                         match post_res {
                             Ok(res) => {
-                                rt::uebernehmen(input, &_gabel);
+                                rt::advance_to(input, &_fork);
                                 return Ok(res);
                             }
                             // CUT: the derivation is fixed, backtracking is pointless.
@@ -330,14 +330,14 @@ pub fn generate_variants_internal(
         } else {
             let inner_logic = pattern::generate_sequence(&variant.pattern, &variant.action, ctx)?;
             quote! {
-                let _gabel = rt::gabel(input);
+                let _fork = rt::fork(input);
                 let _arm_res = (|| -> rt::StreamResult<'a, _> {
-                    let input = &_gabel;
+                    let input = &_fork;
                     #inner_logic
                 })();
                 match _arm_res {
                     Ok(res) => {
-                        rt::uebernehmen(input, &_gabel);
+                        rt::advance_to(input, &_fork);
                         return Ok(res);
                     }
                     Err(e) => {
@@ -372,7 +372,7 @@ pub fn generate_variants_internal(
         // error. Its label is nevertheless a valid expectation at this
         // position and must go into the enumeration (ADR 13, item 6) - otherwise only
         // the meaningless message "No matching rule variant found" remains.
-        let sonst_erwartet = quote! {
+        let otherwise_expected = quote! {
             else if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
         };
 
@@ -393,12 +393,12 @@ pub fn generate_variants_internal(
                         return Err(rt::ParseError::at_cursor(_start_cursor, "propagating unique variant error"));
                     }
                 }
-                #sonst_erwartet
+                #otherwise_expected
             })
         } else if let Some(token_code) = peek_token_obj {
             Ok(quote! {
                 if rt::peek_syn(_start_cursor, #token_code) { #logic }
-                #sonst_erwartet
+                #otherwise_expected
             })
         } else {
             Ok(logic)

@@ -48,19 +48,19 @@ a grammar, and anything that checks concrete error message text.
   `attempt`, `peek`, `not_check`, `attempt_recover`, `parse_ident`,
   `parse_int`, `skip_until`. They took a `ParseStream`.
   - **Migration**: the counterparts are `peek_syn`, `finish_variants`,
-    `parse_separated`, `parse_repeated`, and the new module `stream` (`Strom`,
-    `StreamResult`, `parse_syn`, `parse_mit`, `gabel`, `uebernehmen`, `gruppe`,
-    `schritt`, `token_nehmen`).
+    `parse_separated`, `parse_repeated`, and the new module `stream` (`Stream`,
+    `StreamResult`, `parse_syn`, `parse_with`, `fork`, `advance_to`, `group`,
+    `step`, `take_token`).
 
 - **All `builtins::parse_*_impl` have a new signature**: instead of
   `<T: CommonBuiltins>(&mut T, &mut ParseContext) -> syn::Result<X>` now
-  `<'a>(&rt::Strom<'a>, &mut ParseContext<'a>) -> StreamResult<'a, X>`. The
+  `<'a>(&rt::Stream<'a>, &mut ParseContext<'a>) -> StreamResult<'a, X>`. The
   trait `CommonBuiltins` and its `impl for ParseStream` are deleted.
   `token_filter::{alpha, alphanumeric, digit, hex_digit, oct_digit}` remain
   cursor primitives (`Cursor<'a> -> ParseResult<'a, X>`) and run on the stream
-  via `rt::schritt`.
+  via `rt::step`.
 
-- **The generated `parse_X_impl` takes a `&rt::Strom<'a>`** (that is, a
+- **The generated `parse_X_impl` takes a `&rt::Stream<'a>`** (that is, a
   `&syn::parse::ParseBuffer<'a>`) and returns `rt::StreamResult<'a, T>`, i.e.
   `Result<T, ParseError<'a>>` with no cursor on success.
   - **Impact**: this is the hook for hand-written parsers (`extern` rules);
@@ -71,7 +71,7 @@ a grammar, and anything that checks concrete error message text.
     `ParseStream<'a> = &'a ParseBuffer<'a>`: the alias would shorten `'a` to
     the stack frame on a fork, so errors from a fork could no longer leave the
     call.
-  - **Backtracking now goes through `rt::gabel`/`rt::uebernehmen`**
+  - **Backtracking now goes through `rt::fork`/`rt::advance_to`**
     (`fork`/`advance_to`) instead of a cursor copy. After an error the stream
     may have advanced; anyone who wants to backtrack must work on a fork. The
     code generator does so at every backtracking point.

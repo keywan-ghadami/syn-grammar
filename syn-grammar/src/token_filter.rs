@@ -12,16 +12,16 @@ use syn::{Ident, LitInt};
 
 /// Reads a token and checks it; if the check fails, an error arises at the
 /// position where the parser was.
-fn filtered<'a, T, F>(cursor: Cursor<'a>, pruefung: F, erwartet: &str) -> ParseResult<'a, T>
+fn filtered<'a, T, F>(cursor: Cursor<'a>, check: F, expected: &str) -> ParseResult<'a, T>
 where
     T: crate::rt::SingleToken + Spanned,
     F: FnOnce(&T) -> bool,
 {
-    let (wert, next) = take_single::<T>(cursor)?;
-    if pruefung(&wert) {
-        Ok((wert, next))
+    let (value, next) = take_single::<T>(cursor)?;
+    if check(&value) {
+        Ok((value, next))
     } else {
-        Err(ParseError::new(wert.span(), format!("expected {}", erwartet)).with_cursor(cursor))
+        Err(ParseError::new(value.span(), format!("expected {}", expected)).with_cursor(cursor))
     }
 }
 

@@ -160,7 +160,7 @@ where these arise:
 ## A failed list item
 
 `parse_separated` handles a failed item attempt by a rule that lives in
-`ersetzt_meldung` (`core/grammar-kit/src/combinators.rs`):
+`replaces_message` (`core/grammar-kit/src/combinators.rs`):
 
 | Situation | Message | Rank |
 |---|---|---|
@@ -187,7 +187,7 @@ additionally names what was actually there, and is therefore richer than
 enumeration would be misleading there, since nothing more is coming, and
 naming the end of the scope is what matters (ADR 13, point 3).
 
-Evidenced in `cxx-parser/tests/error_messages.rs::ungueltiges_argument_wird_als_fehlendes_element_gemeldet`
+Evidenced in `cxx-parser/tests/error_messages.rs::invalid_argument_is_reported_as_missing_item`
 and `syn-grammar/tests/list_dx_test.rs`
-(`beschriftetes_element_behaelt_seine_meldung_auch_bei_min1`,
-`am_gruppenende_gewinnt_die_elementerwartung`).
+(`labelled_item_keeps_its_message_even_with_min1`,
+`at_group_end_item_expectation_wins`).

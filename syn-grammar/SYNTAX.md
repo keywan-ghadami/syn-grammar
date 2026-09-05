@@ -520,10 +520,10 @@ The function must be in scope where the grammar is defined (the generated module
 does `use super::*`) and have this signature:
 
 ```rust
-use syn_grammar::rt::{ParseError, StreamResult, Strom};
+use syn_grammar::rt::{ParseError, StreamResult, Stream};
 
-fn even_int<'a>(input: &Strom<'a>) -> StreamResult<'a, u64> {
-    let lit = syn_grammar::rt::schritt(input, syn_grammar::rt::take_single::<syn::LitInt>)?;
+fn even_int<'a>(input: &Stream<'a>) -> StreamResult<'a, u64> {
+    let lit = syn_grammar::rt::step(input, syn_grammar::rt::take_single::<syn::LitInt>)?;
     let v: u64 = lit.base10_parse().map_err(ParseError::from)?;
     if v % 2 == 0 {
         Ok(v)
@@ -553,7 +553,7 @@ Declared parameters are passed through positionally after `input`, so
 `extern rule f(offset: u64) -> u64;` called as `f(offset=3)` invokes
 `f(input, 3)`.
 
-> The `&Strom<'a>` signature is deliberate — `Strom<'a>` is `syn::parse::ParseBuffer<'a>`,
+> The `&Stream<'a>` signature is deliberate — `Stream<'a>` is `syn::parse::ParseBuffer<'a>`,
 > **not** syn's `ParseStream<'a>` alias. See `docs/adr/adr15-linear-parsing.md`.
 > Note that after an error the stream may have advanced; callers that backtrack
 > run your rule on a fork, so you do not need to restore it yourself.

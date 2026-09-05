@@ -30,7 +30,7 @@ pub struct GrammarDefinition {
 ///
 /// From `extern rule name(p: T) -> R;`. The function must be visible at the
 /// grammar's definition site and be named
-/// `fn name<'a>(input: &Strom<'a>, p: T) -> StreamResult<'a, R>`.
+/// `fn name<'a>(input: &Stream<'a>, p: T) -> StreamResult<'a, R>`.
 #[derive(Debug, Clone)]
 pub struct ExternRule {
     /// Name of the rule and thus of the function to call.

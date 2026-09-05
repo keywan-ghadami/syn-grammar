@@ -113,7 +113,7 @@ impl<'a> ParseContext<'a> {
             }
         }
         self.furthest = Some(match self.furthest.take() {
-            Some(bisher) => bisher.merge(e),
+            Some(so_far) => so_far.merge(e),
             None => e,
         });
     }

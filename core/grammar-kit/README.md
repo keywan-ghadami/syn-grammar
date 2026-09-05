@@ -41,13 +41,14 @@ The library exposes several helper functions used by generated parsers:
     a plain `input.parse::<T>()`, so O(length of the type). The bound is the
     marker `SynParsable`, which carries a `#[diagnostic::on_unimplemented]` so
     that a `syn::` type *without* `Parse` produces a grammar-level message
-    instead of a raw trait-bound error. `parse_mit` is the variant for types
+    instead of a raw trait-bound error. `parse_with` is the variant for types
     that need a custom parser (`Attribute::parse_outer`, `Pat::parse_multi_…`).
-*   `gabel` / `uebernehmen`: The backtracking pair (`fork` / `advance_to`). An
+*   `fork` / `advance_to`: The backtracking pair, wrapping syn's `fork` and
+    `advance_to`. An
     attempt runs on the fork; only success is played back into the stream.
-*   `gruppe`: Descends into a delimiter group, returning the group's span and a
+*   `group`: Descends into a delimiter group, returning the group's span and a
     stream over its contents.
-*   `schritt`: Runs a cursor primitive (`take_single`, the character filters) in
+*   `step`: Runs a cursor primitive (`take_single`, the character filters) in
     a `ParseBuffer::step` episode and advances the stream by exactly its result.
 *   `peek_syn`: Non-consuming lookahead, pure pointer arithmetic.
 *   `finish_variants`: Aggregates the expectations of failed alternatives into

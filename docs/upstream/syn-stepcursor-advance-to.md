@@ -70,11 +70,11 @@ Today the error is therefore carried across the barrier **without** its cursor
 and re-attached outside at the entry position:
 
 ```rust
-let mut merk: Option<(Span, String, u8, bool)> = None;
-let ergebnis = input.step(|sc| match f(*sc) {
-    Ok((wert, danach)) => Ok((wert, danach)),
+let mut saved: Option<(Span, String, u8, bool)> = None;
+let result = input.step(|sc| match f(*sc) {
+    Ok((value, after)) => Ok((value, after)),
     Err(e) => {
-        merk = Some((e.span, e.message, e.priority, e.is_fatal));
+        saved = Some((e.span, e.message, e.priority, e.is_fatal));
         Err(syn::Error::new(e.span, "unreachable"))   // only to deny `step` the advance
     }
 });
@@ -83,8 +83,8 @@ let ergebnis = input.step(|sc| match f(*sc) {
 With the method the detour disappears:
 
 ```rust
-let ergebnis = input.step(|sc| match f(*sc) {
-    Ok((wert, danach)) => Ok((wert, danach)),
+let result = input.step(|sc| match f(*sc) {
+    Ok((value, after)) => Ok((value, after)),
     Err(e) => {
         fehler = Some(e.mit_cursor(e.at.map(|c| sc.advance_to(c))));  // keeps its position
         Err(syn::Error::new(e.span, "unreachable"))
@@ -107,7 +107,7 @@ costs six lines — not that it is burning here.
 
 ## Evidence
 
-Built locally against syn 2.0.117 with exactly this patch, with `schritt`
+Built locally against syn 2.0.117 with exactly this patch, with `step`
 (`core/grammar-kit/src/stream.rs`) converted to the form above: **153 tests
 green / 0 red**, identical to the unpatched state. The patch and the conversion
 were reverted afterwards; the repo still holds the version without the API.

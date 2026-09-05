@@ -8,6 +8,6 @@
 // `proc_macro_span_location`). On older toolchains `a : : b` passed as `::`.
 // Since the mapping to `Token![::]`, syn itself checks `Spacing::Joint`,
 // regardless of the toolchain version.
-ui_macro::pfad!(a : : b);
+ui_macro::path!(a : : b);
 
 fn main() {}

@@ -230,8 +230,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 Ok(quote! {
                     let _items_vec = rt::parse_separated(
                         input, ctx,
-                        |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| { #rule_parser Ok(#item_return_expr) },
-                        |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| { #sep_parser Ok(()) },
+                        |input: &rt::Stream<'a>, ctx: &mut rt::ParseContext<'a>| { #rule_parser Ok(#item_return_expr) },
+                        |input: &rt::Stream<'a>, ctx: &mut rt::ParseContext<'a>| { #sep_parser Ok(()) },
                         #min, #trailing, #label_tokens
                     )?;
                     #bind_stmt
@@ -335,7 +335,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 Ok(quote! {
                     let _items_vec = rt::parse_repeated(
                         input, ctx,
-                        |input: &rt::Strom<'a>, ctx: &mut rt::ParseContext<'a>| { #rule_parser Ok(#item_return_expr) },
+                        |input: &rt::Stream<'a>, ctx: &mut rt::ParseContext<'a>| { #rule_parser Ok(#item_return_expr) },
                         #min, #item_label_expr
                     )?;
                     #bind_stmt
@@ -344,11 +344,11 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let rule_name_str = rule_name_ident.unwrap().to_string();
                 let expr = match rule_name_str.as_str() {
                     // The character filters and `any_byte` remain cursor primitives
-                    // (O(1), no stream needed); `rt::schritt` lets them run in a
+                    // (O(1), no stream needed); `rt::step` lets them run in a
                     // `step` episode and advances the stream accordingly.
                     "alpha" | "digit" | "alphanumeric" | "hex_digit" | "oct_digit" => {
                         let func = format_ident!("{}", rule_name_str);
-                        quote! { rt::schritt(input, rt::token_filter::#func)? }
+                        quote! { rt::step(input, rt::token_filter::#func)? }
                     }
                     "eof" => {
                         return Ok(quote! {
@@ -360,7 +360,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             if !ctx.check_whitespace(input.cursor().span()) { return Err(rt::ParseError::at_cursor(input.cursor(), "expected whitespace")); }
                         })
                     }
-                    "any_byte" => quote! { rt::schritt(input, rt::take_single::<syn::LitByte>)? },
+                    "any_byte" => quote! { rt::step(input, rt::take_single::<syn::LitByte>)? },
                     _ => {
                         let impl_name = format_ident!("parse_{}_impl", rule_name_ident.unwrap());
                         quote! { rt::builtins::#impl_name(input, ctx)? }
@@ -419,17 +419,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     #(#init_vecs)*
                     loop {
                         let _start_cursor = input.cursor();
-                        let _gabel = rt::gabel(input);
+                        let _fork = rt::fork(input);
                         let _res = (|| -> rt::StreamResult<'a, _> {
-                            let input = &_gabel;
+                            let input = &_fork;
                             #inner_logic
                             Ok(#return_tuple)
                         })();
                         match _res {
                             Ok(vals) => {
                                 // Zero-progress guard (see above).
-                                if _gabel.cursor() == _start_cursor { break; }
-                                rt::uebernehmen(input, &_gabel);
+                                if _fork.cursor() == _start_cursor { break; }
+                                rt::advance_to(input, &_fork);
                                 let #tuple_pat = vals;
                                 #(#push_vecs)*
                             }
@@ -448,9 +448,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 Ok(quote! {
                     loop {
                         let _start_cursor = input.cursor();
-                        let _gabel = rt::gabel(input);
+                        let _fork = rt::fork(input);
                         let _res = (|| -> rt::StreamResult<'a, _> {
-                            let input = &_gabel;
+                            let input = &_fork;
                             #inner_logic
                             Ok(())
                         })();
@@ -458,8 +458,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             Ok(()) => {
                                 // Zero-progress guard: otherwise the loop spins forever
                                 // if the inner pattern matches without consuming tokens.
-                                if _gabel.cursor() == _start_cursor { break; }
-                                rt::uebernehmen(input, &_gabel);
+                                if _fork.cursor() == _start_cursor { break; }
+                                rt::advance_to(input, &_fork);
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
@@ -509,17 +509,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     #(#push_vecs)*
                     loop {
                         let _start_cursor = input.cursor();
-                        let _gabel = rt::gabel(input);
+                        let _fork = rt::fork(input);
                         let _res = (|| -> rt::StreamResult<'a, _> {
-                            let input = &_gabel;
+                            let input = &_fork;
                             #inner_logic
                             Ok(#return_tuple)
                         })();
                         match _res {
                             Ok(vals) => {
                                 // Zero-progress guard (see above).
-                                if _gabel.cursor() == _start_cursor { break; }
-                                rt::uebernehmen(input, &_gabel);
+                                if _fork.cursor() == _start_cursor { break; }
+                                rt::advance_to(input, &_fork);
                                 let #tuple_pat = vals;
                                 #(#push_vecs)*
                             }
@@ -539,9 +539,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     #inner_logic
                     loop {
                         let _start_cursor = input.cursor();
-                        let _gabel = rt::gabel(input);
+                        let _fork = rt::fork(input);
                         let _res = (|| -> rt::StreamResult<'a, _> {
-                            let input = &_gabel;
+                            let input = &_fork;
                             #inner_logic
                             Ok(())
                         })();
@@ -549,8 +549,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                             Ok(()) => {
                                 // Zero-progress guard: otherwise the loop spins forever
                                 // if the inner pattern matches without consuming tokens.
-                                if _gabel.cursor() == _start_cursor { break; }
-                                rt::uebernehmen(input, &_gabel);
+                                if _fork.cursor() == _start_cursor { break; }
+                                rt::advance_to(input, &_fork);
                             }
                             Err(e) => {
                                 if e.priority >= 50 { return Err(e); }
@@ -570,14 +570,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
 
             if bindings.is_empty() {
                 Ok(quote! {
-                    let _gabel = rt::gabel(input);
+                    let _fork = rt::fork(input);
                     let _opt_res = (|| -> rt::StreamResult<'a, _> {
-                        let input = &_gabel;
+                        let input = &_fork;
                         #inner_logic
                         Ok(())
                     })();
                     match _opt_res {
-                        Ok(()) => { rt::uebernehmen(input, &_gabel); }
+                        Ok(()) => { rt::advance_to(input, &_fork); }
                         Err(e) => {
                             if e.priority >= 50 { return Err(e); }
                             ctx.record_failure(&e);
@@ -589,15 +589,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 let some_vars: Vec<_> = bindings.iter().map(|b| quote!(Some(#b))).collect();
                 let none_vars: Vec<_> = bindings.iter().map(|_| quote!(None)).collect();
                 Ok(quote! {
-                    let _gabel = rt::gabel(input);
+                    let _fork = rt::fork(input);
                     let _opt_res = (|| -> rt::StreamResult<'a, _> {
-                        let input = &_gabel;
+                        let input = &_fork;
                         #inner_logic
                         Ok((#(#vars),*))
                     })();
                     let (#(#vars),*) = match _opt_res {
                         Ok(vals) => {
-                            rt::uebernehmen(input, &_gabel);
+                            rt::advance_to(input, &_fork);
                             let (#(#vars),*) = vals;
                             (#(#some_vars),*)
                         }
@@ -683,17 +683,17 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             // The bindings of the group must land in the ENCLOSING scope, otherwise
             // the action block does not see them (they used to die with the if-let block).
             Ok(quote! {
-                // `rt::gruppe` descends into the delimiters and advances the outer
+                // `rt::group` descends into the delimiters and advances the outer
                 // stream past the group. The content is a separate stream with
                 // the same token lifetime - only because of that can errors from the
                 // group be carried outward.
-                let (_span, _inhalt) = rt::gruppe(input, proc_macro2::Delimiter::#delimiter)?;
+                let (_span, _content) = rt::group(input, proc_macro2::Delimiter::#delimiter)?;
                 // Inside the group, Cursor::eof() reports the end of the group, not
                 // the end of input. Record the depth so that messages can name the
                 // difference.
                 ctx.enter_group();
                 let _grp_res = (|| -> rt::StreamResult<'a, _> {
-                    let input = &_inhalt;
+                    let input = &_content;
                     #inner_logic
                     Ok(#return_expr)
                 })();
@@ -703,9 +703,9 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 // "the content was not consumed completely". If a reason was recorded
                 // along the way, it is strictly more informative - hence
                 // not structural, so that this one does not win.
-                if !_inhalt.cursor().eof() {
+                if !_content.cursor().eof() {
                     return Err(ctx.best_error(
-                        rt::ParseError::at_cursor(_inhalt.cursor(), "unexpected token in delimited group")
+                        rt::ParseError::at_cursor(_content.cursor(), "unexpected token in delimited group")
                     ));
                 }
                 #bind_stmt
@@ -823,15 +823,15 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             };
 
             Ok(quote! {
-                let _gabel = rt::gabel(input);
+                let _fork = rt::fork(input);
                 let _rec_res = (|| -> rt::StreamResult<'a, _> {
-                    let input = &_gabel;
+                    let input = &_fork;
                     #inner_logic
                     Ok(#return_expr)
                 })();
                 let _val = match _rec_res {
                     Ok(_val) => {
-                        rt::uebernehmen(input, &_gabel);
+                        rt::advance_to(input, &_fork);
                         #some_assign
                         #option_ret
                     }
@@ -843,7 +843,7 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                         loop {
                             if input.cursor().eof() { break; }
                             if rt::peek_syn(input.cursor(), #sync_peek) { break; }
-                            if rt::token_nehmen(input).is_err() { break; }
+                            if rt::take_token(input).is_err() { break; }
                         }
                         #none_ret
                     }
@@ -875,8 +875,8 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 // Lookahead: runs on a fork that is never adopted -
                 // so the stream stays where it is.
                 let _val = (|| -> rt::StreamResult<'a, _> {
-                    let _gabel = rt::gabel(input);
-                    let input = &_gabel;
+                    let _fork = rt::fork(input);
+                    let input = &_fork;
                     #inner_logic
                     Ok(#return_expr)
                 })()?;
@@ -895,16 +895,16 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 _ => None,
             };
             let current_rule = ctx.current_rule.clone();
-            let meldung = match inner_name {
+            let message = match inner_name {
                 Some(name) => quote! {
                     {
-                        let _gefunden = input.cursor()
+                        let _found = input.cursor()
                             .token_tree()
                             .map(|(tt, _)| tt.to_string())
                             .unwrap_or_default();
                         format!(
                             "unexpected match for rule `{}`; found `{}` in rule `{}`",
-                            #name, _gefunden, #current_rule
+                            #name, _found, #current_rule
                         )
                     }
                 },
@@ -913,13 +913,13 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
             Ok(quote! {
                 // As with lookahead: a fork that is never adopted.
                 let _not_res = (|| -> rt::StreamResult<'a, _> {
-                    let _gabel = rt::gabel(input);
-                    let input = &_gabel;
+                    let _fork = rt::fork(input);
+                    let input = &_fork;
                     #inner_logic
                     Ok(())
                 })();
                 if _not_res.is_ok() {
-                    return Err(rt::ParseError::at_cursor(input.cursor(), #meldung).with_priority(50));
+                    return Err(rt::ParseError::at_cursor(input.cursor(), #message).with_priority(50));
                 }
             })
         }
@@ -937,13 +937,13 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 loop {
                     if input.cursor().eof() { break; }
                     let _is_match = (|| -> rt::StreamResult<'a, _> {
-                        let _gabel = rt::gabel(input);
-                        let input = &_gabel;
+                        let _fork = rt::fork(input);
+                        let input = &_fork;
                         #inner_logic
                         Ok(())
                     })().is_ok();
                     if _is_match { break; }
-                    match rt::token_nehmen(input) {
+                    match rt::take_token(input) {
                         Ok(tt) => _tokens.push(tt),
                         Err(_) => break,
                     }
@@ -973,16 +973,16 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                 quote! {
                     loop {
                         let _start_cursor = input.cursor();
-                        let _gabel = rt::gabel(input);
+                        let _fork = rt::fork(input);
                         let _res = (|| -> rt::StreamResult<'a, _> {
-                            let input = &_gabel;
+                            let input = &_fork;
                             #elem_logic
                             Ok(())
                         })();
                         match _res {
                             Ok(()) => {
-                                if _gabel.cursor() == _start_cursor { break; }
-                                rt::uebernehmen(input, &_gabel);
+                                if _fork.cursor() == _start_cursor { break; }
+                                rt::advance_to(input, &_fork);
                                 _count += 1;
                             }
                             Err(e) => {
@@ -1019,14 +1019,14 @@ fn generate_pattern_step(pattern: &ModelPattern, ctx: &CodegenContext) -> Result
                     let elem_logic = generate_pattern_step(elem, ctx)?;
                     quote! {
                         let mut _count: usize = 0;
-                        let _gabel = rt::gabel(input);
+                        let _fork = rt::fork(input);
                         let _res = (|| -> rt::StreamResult<'a, _> {
-                            let input = &_gabel;
+                            let input = &_fork;
                             #elem_logic
                             Ok(())
                         })();
                         match _res {
-                            Ok(()) => { rt::uebernehmen(input, &_gabel); _count += 1; }
+                            Ok(()) => { rt::advance_to(input, &_fork); _count += 1; }
                             Err(e) => {
                             if e.priority >= 50 { return Err(e); }
                             ctx.record_failure(&e);

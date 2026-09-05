@@ -14,7 +14,7 @@ pub mod context;
 #[cfg(feature = "syn")]
 pub mod error;
 
-/// The stream-driven runtime: `Strom`, `schritt`, `parse_syn`, forks.
+/// The stream-driven runtime: `Stream`, `step`, `parse_syn`, forks.
 #[cfg(feature = "testing")]
 pub mod stream;
 

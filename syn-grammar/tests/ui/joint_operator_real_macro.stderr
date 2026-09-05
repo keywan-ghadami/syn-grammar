@@ -1,6 +1,6 @@
 error: expected `::` at column 18 (line 11)
-       in pfad
+       in path
   --> tests/ui/joint_operator_real_macro.rs:11:19
    |
-11 | ui_macro::pfad!(a : : b);
+11 | ui_macro::path!(a : : b);
    |                   ^
