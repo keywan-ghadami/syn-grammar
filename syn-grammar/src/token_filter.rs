@@ -1,31 +1,35 @@
 //! Token filters for emulating character-level primitives in a token stream.
 //!
-//! Sie arbeiten auf dem `Cursor` wie der uebrige generierte Code: sie lesen ein
-//! Token ueber die Bruecke und pruefen es nach. Vor der Umstellung auf
-//! Cursor-Parsing nahmen sie noch einen `ParseStream` und waren dadurch aus dem
-//! generierten Code gar nicht mehr aufrufbar.
+//! They work on the `Cursor` like the rest of the generated code: they read a
+//! token via the bridge and check it afterwards. Before the switch to cursor
+//! parsing they still took a `ParseStream` and were therefore no longer callable
+//! from the generated code at all.
 
 use crate::rt::{take_single, ParseError, ParseResult};
 use syn::buffer::Cursor;
 use syn::spanned::Spanned;
 use syn::{Ident, LitInt};
 
-/// Liest ein Token und prueft es; schlaegt die Pruefung fehl, entsteht ein Fehler
-/// an der Stelle, an der der Parser stand.
-fn filtered<'a, T, F>(cursor: Cursor<'a>, pruefung: F, erwartet: &str) -> ParseResult<'a, T>
+/// Reads a token and checks it; if the check fails, an error arises at the
+/// position where the parser was.
+fn filtered<'a, T, F>(cursor: Cursor<'a>, check: F, expected: &str) -> ParseResult<'a, T>
 where
     T: crate::rt::SingleToken + Spanned,
     F: FnOnce(&T) -> bool,
 {
-    let (wert, next) = take_single::<T>(cursor)?;
-    if pruefung(&wert) {
-        Ok((wert, next))
+    let (value, next) = take_single::<T>(cursor)?;
+    if check(&value) {
+        Ok((value, next))
     } else {
-        Err(ParseError::new(wert.span(), format!("expected {}", erwartet)).with_cursor(cursor))
+        Err(
+            ParseError::new(value.span(), format!("expected {}", expected))
+                .with_cursor(cursor)
+                .with_expected(expected),
+        )
     }
 }
 
-/// Ein Bezeichner, der ausschliesslich aus Buchstaben besteht.
+/// An identifier consisting exclusively of letters.
 pub fn alpha(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     filtered(
         cursor,
@@ -34,7 +38,7 @@ pub fn alpha(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     )
 }
 
-/// Ein Bezeichner aus Buchstaben und Ziffern.
+/// An identifier made of letters and digits.
 pub fn alphanumeric(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     filtered(
         cursor,
@@ -43,7 +47,7 @@ pub fn alphanumeric(cursor: Cursor<'_>) -> ParseResult<'_, Ident> {
     )
 }
 
-/// Ein Ganzzahlliteral aus reinen Dezimalziffern.
+/// An integer literal made of pure decimal digits.
 pub fn digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     filtered(
         cursor,
@@ -52,7 +56,7 @@ pub fn digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     )
 }
 
-/// Ein Ganzzahlliteral, dessen Ziffern hexadezimal gueltig sind.
+/// An integer literal whose digits are valid hexadecimal.
 pub fn hex_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     filtered(
         cursor,
@@ -61,7 +65,7 @@ pub fn hex_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     )
 }
 
-/// Ein Ganzzahlliteral, dessen Ziffern oktal gueltig sind.
+/// An integer literal whose digits are valid octal.
 pub fn oct_digit(cursor: Cursor<'_>) -> ParseResult<'_, LitInt> {
     filtered(
         cursor,

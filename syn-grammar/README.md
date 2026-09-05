@@ -10,7 +10,8 @@ Writing parsers for procedural macros or Domain Specific Languages (DSLs) in Rus
 
 ## Documentation
 
-- **[Grammar Syntax Reference](SYNTAX.md)**: Detailed guide to the grammar definition language (rules, operators, built-ins).
+- **[Grammar Syntax Reference](https://github.com/keywan-ghadami/syn-grammar/blob/main/syn-grammar/SYNTAX.md)**: Detailed guide to the grammar definition language (rules, operators, built-ins, error messages). On docs.rs it follows directly after this README.
+- **[Changelog](https://github.com/keywan-ghadami/syn-grammar/blob/main/syn-grammar/CHANGELOG.md)**: what changed between releases, with migration notes.
 
 If you need to parse plain text or binary data rather than Rust tokens, see the
 sibling project [`winnow-grammar`](https://github.com/keywan-ghadami/winnow-grammar),
@@ -18,11 +19,17 @@ which shares this DSL but targets [`winnow`](https://docs.rs/winnow).
 
 ## Features
 
-- **Inline Grammars**: Define your grammar directly in your Rust code using the `grammar!` macro.
-- **Black-Box Grammar Composition**: Safely compose grammars across modules and crates using `import` and `extern` interfaces.
+- **Inline Grammars**: Define your grammar directly in your Rust code using the `grammar!` macro, in an EBNF-like syntax with sequences, alternatives (`|`), optionals (`?`), repetitions (`*`, `+`) and grouping.
+- **Error Messages Built for Users**: Every failure names what was expected, what was found, the position, and the chain of rules it happened in (`expected integer literal … in term, in expression`). Alternatives can be labelled (`# "a number"`), list items named (`item_label`), and `fail(...)` and the cut operator (`=>`) let the grammar author decide what the message says.
 - **Type-Safe Actions**: Directly map parsing rules to Rust types and AST nodes using action blocks (`-> { ... }`).
-- **Seamless Syn Integration**: First-class support for parsing Rust tokens like identifiers, literals, types, and blocks.
-- **Testing Utilities**: Fluent API for testing your parsers with pretty-printed error reporting.
+- **Seamless Syn Integration**: First-class support for Rust tokens — identifiers, literals, types, blocks, patterns, attributes — and any `syn::` type that implements `Parse`, written by its path.
+- **Automatic Left Recursion**: Write natural expression grammars (`expr = expr "+" term`) without infinite recursion.
+- **Backtracking, Cut and Lookahead**: Ambiguous alternatives are handled by speculative parsing; `=>` commits, `peek(...)` and `not(...)` look ahead.
+- **Rule Arguments and Generic Rules**: Pass parameters between rules, and write reusable higher-order rules (`list<T>(item)`) that are monomorphized at compile time.
+- **Black-Box Grammar Composition**: Compose grammars across modules and crates using `import` and `extern rule`, with the "Undefined rule" check intact.
+- **Shadowing Detection**: Compile-time detection of alternatives that can never match because an earlier one shadows them.
+- **Linear Parsing**: No parse step re-scans the remaining input; a 2000-argument list parses in milliseconds.
+- **Testing Utilities**: Fluent API for testing your parsers, with pretty-printed error reporting.
 
 ## Installation
 
@@ -100,7 +107,7 @@ The `grammar!` macro expands into a Rust module (named `Calc` in the example) co
 The generated parser functions take a `syn::parse::ParseStream`.
 
 ### Built-ins
-In addition to the portable built-ins (see [SYNTAX.md](SYNTAX.md)), `syn-grammar` provides the following `syn`-specific parsers:
+In addition to the portable built-ins (see [SYNTAX.md](https://github.com/keywan-ghadami/syn-grammar/blob/main/syn-grammar/SYNTAX.md#built-in-primitives)), `syn-grammar` provides the following `syn`-specific parsers:
 
 | Parser | Description | Returns |
 |---|---|---|
@@ -131,7 +138,7 @@ the built-in to use instead.
 Beyond these there is a `spanned_` variant for every numeric and character
 primitive (`spanned_i32`, `spanned_u64`, `spanned_f32`, `spanned_char`,
 `spanned_bool`, …) returning `syn_grammar::types::SpannedValue<T>` with both
-`value` and `span`. See [SYNTAX.md](SYNTAX.md).
+`value` and `span`. See [SYNTAX.md](https://github.com/keywan-ghadami/syn-grammar/blob/main/syn-grammar/SYNTAX.md#spanned-primitives).
 
 ### Return Types
 Portable built-ins map to specific `syn` or `syn-grammar` types:

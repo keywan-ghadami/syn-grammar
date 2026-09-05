@@ -1,78 +1,80 @@
-# Ziele
+# Goals
 
-Dieses Dokument hält fest, was das Projekt sein will. Es ist die Referenz, gegen die
-Architektur- und Umsetzungsentscheidungen geprüft werden. Es ersetzt `ARCHITEKTUR_MANIFEST.txt`
-und `PROJECT_STRUCTURE.md`, die maschinell erzeugt wurden und Code beschreiben, den es
-teilweise nicht mehr gibt.
+This document records what the project wants to be. It is the reference
+against which architecture and implementation decisions are checked. It
+replaces `ARCHITEKTUR_MANIFEST.txt` and `PROJECT_STRUCTURE.md`, which were
+machine-generated and describe code that partly no longer exists.
 
-Stand: 2026-08-30.
+As of 2026-08-30.
 
-## Was das Produkt ist
+## What the product is
 
-**`syn-grammar` ist ein Parser-Generator für Rust-Prozedurmakros.** Aus einer
-EBNF-ähnlichen Grammatik (`grammar! { … }`) entsteht Rust-Code, der einen
-`proc_macro2::TokenStream` parst.
+**`syn-grammar` is a parser generator for Rust procedural macros.** From an
+EBNF-like grammar (`grammar! { … }`) it produces Rust code that parses a
+`proc_macro2::TokenStream`.
 
-Das ist der Fokus der Weiterentwicklung.
+That is the focus of further development.
 
-## Das eigentliche Qualitätsmerkmal: Fehlermeldungen
+## The actual quality criterion: error messages
 
-Ein Parser-Generator ist so gut wie seine Fehlermeldungen. Sie sind kein Beiwerk,
-sondern der Grund, einen Generator einer handgeschriebenen `syn`-Schleife vorzuziehen.
+A parser generator is as good as its error messages. They are not an
+accessory but the reason to prefer a generator over a hand-written `syn` loop.
 
-Der verbindliche Anforderungskatalog steht in
+The binding catalogue of requirements is
 [`docs/adr/adr13-error-message-contract.md`](docs/adr/adr13-error-message-contract.md).
-Was dort nicht steht, ist keine Anforderung; was dort steht, ist durch Tests belegt.
+What is not in there is not a requirement; what is in there is backed by
+tests.
 
-## Randbedingung, die die Architektur bestimmt
+## The constraint that shapes the architecture
 
-**Stand 31.08.2026: teilweise entschärft — die Folgerungen gelten weiterhin.**
+**As of 2026-08-31: partly defused — the conclusions still apply.**
 
-Bis Rust 1.87 lieferte `proc_macro2::Span::start()` innerhalb eines Prozedurmakros
-keine Positionsdaten:
+Up to Rust 1.87, `proc_macro2::Span::start()` inside a procedural macro
+provided no position data:
 
 ```rust
 #[cfg(not(proc_macro_span_location))]
 Span::Compiler(_) => LineColumn { line: 0, column: 0 },
 ```
 
-Seit **Rust 1.88** setzt proc-macro2 dieses `cfg` auch auf stable
+Since **Rust 1.88** proc-macro2 sets this `cfg` on stable as well
 (`proc-macro2/build.rs`: `rustc >= 88 && compile_probe_stable("proc_macro_span_location")`),
-und `Span::start()` liefert echte Zeilen und Spalten. Belegt durch
-`syn-grammar/tests/ui/runtime_error_real_macro.stderr` — ein Schnappschuss aus einem
-echten Makro, mit Positionsangabe.
+and `Span::start()` returns real lines and columns. Evidenced by
+`syn-grammar/tests/ui/runtime_error_real_macro.stderr` — a snapshot from a real
+macro, with a position.
 
-Das Projekt setzt deshalb `rust-version = "1.88"`; ältere Toolchains weist cargo mit
-klarer Meldung ab, und ein eigener CI-Job baut gegen genau diese Version.
+The project therefore sets `rust-version = "1.88"`; cargo rejects older
+toolchains with a clear message, and a dedicated CI job builds against exactly
+that version.
 
-**Die Folgerungen bleiben trotzdem bindend**, aus zwei Gründen: die Cursor-Metrik ist
-mit O(1) ohnehin billiger als ein Positionsvergleich, und sie hängt an gar keiner
-Toolchain-Eigenschaft. Ein Verhalten, das erst ab einer bestimmten Compilerversion
-korrekt wird, ist kein gutes Fundament für das Qualitätsmerkmal dieses Projekts.
+**The conclusions remain binding anyway**, for two reasons: the cursor metric
+is cheaper at O(1) than a position comparison, and it does not depend on any
+toolchain property. Behaviour that only becomes correct from a certain compiler
+version on is no good foundation for this project's quality criterion.
 
-* **Auswahl** (welcher Fehler gewinnt) benutzt eine toolchain-unabhängige
-  Fortschrittsmetrik. `syn::buffer::Cursor` implementiert `PartialOrd` (Zeigervergleich
-  im gemeinsamen `TokenBuffer`, O(1)) — das ist die Metrik.
-* **Anzeige** ist davon getrennt. Im Prozedurmakro unterstreicht rustc den Span selbst;
-  eine Textangabe `at column N` ist dort wertlos und wird weggelassen statt als `0` gedruckt.
-* Es muss mindestens einen Test geben, der den **echten Makro-Pfad** prüft, nicht nur
-  `parse_str`.
+* **Selection** (which error wins) uses a toolchain-independent progress
+  metric. `syn::buffer::Cursor` implements `PartialOrd` (pointer comparison in
+  the shared `TokenBuffer`, O(1)) — that is the metric.
+* **Display** is separate from it. Inside a procedural macro rustc underlines
+  the span itself; a textual `at column N` is worthless there and is omitted
+  rather than printed as `0`.
+* There must be at least one test that exercises the **real macro path**, not
+  just `parse_str`.
 
-## Abnahme-Benchmark
+## Acceptance benchmark
 
-`cxx-parser` ist der konkrete Anwendungsfall, an dem sich das Projekt messen lässt: eine
-Fremd-DSL, die ohne trennende Delimiter in echte Rust-Syntax übergeht. Er muss fehlerfrei
-funktionieren und erstklassige Fehlermeldungen liefern.
+`cxx-parser` is the concrete use case against which the project measures
+itself: a foreign DSL that transitions into real Rust syntax without separating
+delimiters. It must work flawlessly and produce first-class error messages.
 
-`cxx-parser` bleibt auf dem syn-Backend.
+`cxx-parser` stays on the syn backend.
 
-## Nicht-Ziele
+## Non-goals
 
-* **Keine Harmonisierung mit `winnow-grammar`.** Das ist ein eigenständiges
-  Projekt unter <https://github.com/keywan-ghadami/winnow-grammar>. Es hat das
-  Frontend (DSL-Parser, Modell, Validator) geforkt statt es zu beziehen — das
-  Modell hier ist `syn`-basiert (`syn::Path`, `syn::Lit`, `syn::Type`) und lässt
-  sich nicht backendneutral weiterentwickeln. Die beiden Fassungen der DSL
-  driften also auseinander. Dieses Repository enthält nur das syn-Backend.
-* **Keine gemeinsame Codegen-Abstraktion** über mehrere Backends.
-
+* **No harmonisation with `winnow-grammar`.** That is a separate project at
+  <https://github.com/keywan-ghadami/winnow-grammar>. It forked the front end
+  (DSL parser, model, validator) instead of depending on it — the model here is
+  `syn`-based (`syn::Path`, `syn::Lit`, `syn::Type`) and cannot be developed in
+  a backend-neutral direction. The two versions of the DSL therefore drift
+  apart. This repository contains only the syn backend.
+* **No shared codegen abstraction** across several backends.

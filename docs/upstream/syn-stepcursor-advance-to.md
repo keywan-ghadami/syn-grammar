@@ -1,23 +1,23 @@
-# Upstream-Anfrage an `syn`: `StepCursor::advance_to`
+# Upstream request to `syn`: `StepCursor::advance_to`
 
-**Status:** Entwurf, bewusst **zurueckgestellt** (Entscheidung vom 2026-09-01).
-Der Nutzen ist nachweislich null an beobachtbarem Verhalten (siehe „Nachweis"),
-und syn ist bei API-Erweiterungen zurueckhaltend — ein PR ohne Druck bindet vor
-allem fremde Aufmerksamkeit. Der Entwurf bleibt einreichbar, falls sich das
-aendert: etwa wenn eine Primitive gebraucht wird, die nicht an ihrer
-Eintrittsstelle scheitert.
-**Bezug:** ADR 15, Stufe 4.
+**Status:** Draft, deliberately **shelved** (decision of 2026-09-01). The
+benefit is demonstrably zero in observable behaviour (see "Evidence"), and syn
+is conservative about API additions — a PR without pressure mostly consumes
+other people's attention. The draft remains submittable should that change:
+for instance if a primitive is needed that does not fail at its entry
+position.
+**Reference:** ADR 15, stage 4.
 
-## Worum es geht
+## What it is about
 
-`syn::parse::advance_step_cursor` ist `pub(crate)`:
+`syn::parse::advance_step_cursor` is `pub(crate)`:
 
 ```rust
 pub(crate) fn advance_step_cursor<'c, 'a>(proof: StepCursor<'c, 'a>, to: Cursor<'c>) -> Cursor<'a>
 ```
 
-Der Quelltext von `ParseBuffer::step` sagt selbst, dass eine oeffentliche
-Fassung sicher waere (syn 2.0.117, `src/parse.rs`):
+The source of `ParseBuffer::step` itself says a public version would be safe
+(syn 2.0.117, `src/parse.rs`):
 
 > In some cases it may be necessary for `R` to contain a `Cursor<'a>`. Within
 > Syn we solve this using `advance_step_cursor` which uses the existence of a
@@ -25,12 +25,12 @@ Fassung sicher waere (syn 2.0.117, `src/parse.rs`):
 > `Cursor<'a>`. **If needed outside of Syn, it would be safe to expose that API
 > as a method on `StepCursor`.**
 
-Die Anfrage ist genau das: die bereits vorhandene Funktion als Methode
-freischalten. Kein neues Verhalten, keine neue Invariante.
+The request is exactly that: expose the existing function as a method. No new
+behaviour, no new invariant.
 
-## Der Patch
+## The patch
 
-Sechs Zeilen in `impl<'c, 'a> StepCursor<'c, 'a>`:
+Six lines in `impl<'c, 'a> StepCursor<'c, 'a>`:
 
 ```rust
 /// Converts a cursor derived from this step cursor into one carrying the
@@ -43,79 +43,77 @@ pub fn advance_to(self, to: Cursor<'c>) -> Cursor<'a> {
 }
 ```
 
-`StepCursor` ist `Copy`, `self` per Wert ist also unproblematisch.
+`StepCursor` is `Copy`, so `self` by value is unproblematic.
 
-## Der Anwendungsfall
+## The use case
 
-Ein Parsergenerator, dessen Fehlertyp einen `Cursor` traegt — bei uns fuer den
-Fortschrittsvergleich zwischen konkurrierenden Fehlern (O(1) Zeigervergleich im
-gemeinsamen `TokenBuffer`, unabhaengig von Span-Positionen):
+A parser generator whose error type carries a `Cursor` — in our case for the
+progress comparison between competing errors (O(1) pointer comparison in the
+shared `TokenBuffer`, independent of span positions):
 
 ```rust
 pub struct ParseError<'a> {
     pub span: Span,
-    pub at: Option<Cursor<'a>>,   // <- hieran haengt es
+    pub at: Option<Cursor<'a>>,   // <- this is what it hinges on
     pub message: String,
     // ...
 }
 ```
 
-Der Regelrumpf laeuft auf einem `ParseBuffer<'a>`, einzelne Primitiven aber auf
-dem `Cursor` — sie sind dort O(1) und brauchen keinen Strom. Um so eine
-Primitive auf dem Strom laufen zu lassen und ihn um genau ihr Ergebnis
-vorzuruecken, ist `step` der einzige Weg. Da die Closure fuer **jede**
-Lebensdauer `'c` funktionieren muss, kann ein `ParseError<'c>` sie nicht
-verlassen.
+The rule body runs on a `ParseBuffer<'a>`, but individual primitives run on
+the `Cursor` — they are O(1) there and need no stream. To run such a primitive
+on the stream and advance it by exactly its result, `step` is the only way.
+Since the closure must work for **every** lifetime `'c`, a `ParseError<'c>`
+cannot leave it.
 
-Heute wird der Fehler deshalb **ohne** seinen Cursor durch die Schranke getragen
-und draussen an die Eintrittsstelle neu gehaengt:
+Today the error is therefore carried across the barrier **without** its cursor
+and re-attached outside at the entry position:
 
 ```rust
-let mut merk: Option<(Span, String, u8, bool)> = None;
-let ergebnis = input.step(|sc| match f(*sc) {
-    Ok((wert, danach)) => Ok((wert, danach)),
+let mut saved: Option<(Span, String, u8, bool)> = None;
+let result = input.step(|sc| match f(*sc) {
+    Ok((value, after)) => Ok((value, after)),
     Err(e) => {
-        merk = Some((e.span, e.message, e.priority, e.is_fatal));
-        Err(syn::Error::new(e.span, "unreachable"))   // nur, um step das Vorruecken zu verweigern
+        saved = Some((e.span, e.message, e.priority, e.is_fatal));
+        Err(syn::Error::new(e.span, "unreachable"))   // only to deny `step` the advance
     }
 });
 ```
 
-Mit der Methode entfaellt der Umweg:
+With the method the detour disappears:
 
 ```rust
-let ergebnis = input.step(|sc| match f(*sc) {
-    Ok((wert, danach)) => Ok((wert, danach)),
+let result = input.step(|sc| match f(*sc) {
+    Ok((value, after)) => Ok((value, after)),
     Err(e) => {
-        fehler = Some(e.mit_cursor(e.at.map(|c| sc.advance_to(c))));  // behaelt seine Stelle
+        fehler = Some(e.mit_cursor(e.at.map(|c| sc.advance_to(c))));  // keeps its position
         Err(syn::Error::new(e.span, "unreachable"))
     }
 });
 ```
 
-## Was es *nicht* bringt
+## What it does *not* bring
 
-Bei uns heute **nichts an beobachtbarem Verhalten**. Alle betroffenen Primitiven
-melden ihren Fehler ohnehin an der Eintrittsstelle, die Rekonstruktion ist also
-exakt. Die Testsuite ist mit beiden Fassungen gleich gruen.
+For us today, **nothing in observable behaviour**. All affected primitives
+report their error at the entry position anyway, so the reconstruction is
+exact. The test suite is equally green with both versions.
 
-Der Gewinn ist, dass der Umweg verschwindet und die stillschweigende Bedingung
-entfaellt, dass eine Primitive nur an ihrer Eintrittsstelle scheitern darf.
+The gain is that the detour disappears, along with the tacit condition that a
+primitive may only fail at its entry position.
 
-Das gehoert in die Anfrage: es waere unredlich, hier Dringlichkeit zu behaupten,
-die nicht besteht. Das Argument ist, dass syn die Aenderung selbst als sicher
-bezeichnet und sie sechs Zeilen kostet — nicht, dass sie hier brennt.
+That belongs in the request: it would be dishonest to claim urgency here that
+does not exist. The argument is that syn itself calls the change safe and it
+costs six lines — not that it is burning here.
 
-## Nachweis
+## Evidence
 
-Lokal gegen syn 2.0.117 mit genau diesem Patch gebaut, `schritt`
-(`core/grammar-kit/src/stream.rs`) auf die obige Form umgestellt:
-**153 Tests gruen / 0 rot**, identisch zum ungepatchten Stand. Der Patch und die
-Umstellung sind danach zurueckgebaut worden; im Repo steht weiterhin die Fassung
-ohne die API.
+Built locally against syn 2.0.117 with exactly this patch, with `step`
+(`core/grammar-kit/src/stream.rs`) converted to the form above: **153 tests
+green / 0 red**, identical to the unpatched state. The patch and the conversion
+were reverted afterwards; the repo still holds the version without the API.
 
-## Vorgeschlagener Weg
+## Proposed route
 
-Ein Pull Request gegen `dtolnay/syn` mit dem Patch oben, im Text auf den
-bestehenden Kommentar in `step` verweisend. Ein Issue waere der schwaechere Weg:
-die Aenderung ist kleiner als ihre Beschreibung.
+A pull request against `dtolnay/syn` with the patch above, referencing the
+existing comment in `step` in the text. An issue would be the weaker route: the
+change is smaller than its description.

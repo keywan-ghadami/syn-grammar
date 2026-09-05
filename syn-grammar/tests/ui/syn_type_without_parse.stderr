@@ -1,12 +1,12 @@
-error[E0277]: `syn::Field` kann in einer Grammatik nicht direkt verwendet werden
+error[E0277]: `syn::Field` cannot be used directly in a grammar
   --> tests/ui/syn_type_without_parse.rs:13:18
    |
 13 |         main = f:syn::Field
    |                  ^^^^^^^^^^ the trait `Parse` is not implemented for `syn::Field`
    |
-   = note: Ein `syn::`-Typ ist in einer Grammatik nur nutzbar, wenn er `syn::parse::Parse` implementiert.
-   = note: Typen wie `syn::Field`, `syn::Attribute` oder `syn::Pat` tun das nicht - fuer sie gibt es eingebaute Regeln (`named_field`, `outer_attrs`/`inner_attrs`, `pat`).
-   = note: Fuer alles andere: eine `extern`-Regel mit eigener Parserfunktion.
+   = note: A `syn::` type is usable in a grammar only if it implements `syn::parse::Parse`.
+   = note: Types such as `syn::Field`, `syn::Attribute` or `syn::Pat` do not - for them there are built-in rules (`named_field`, `outer_attrs`/`inner_attrs`, `pat`).
+   = note: For everything else: an `extern` rule with its own parser function.
    = help: the following other types implement trait `Parse`:
              Abstract
              AndAnd
@@ -21,7 +21,7 @@ error[E0277]: `syn::Field` kann in einer Grammatik nicht direkt verwendet werden
 note: required by a bound in `parse_syn`
   --> $WORKSPACE/core/grammar-kit/src/stream.rs
    |
-   | pub fn parse_syn<'a, T: crate::SynParsable>(input: &Strom<'a>) -> StreamResult<'a, T> {
+   | pub fn parse_syn<'a, T: crate::SynParsable>(input: &Stream<'a>) -> StreamResult<'a, T> {
    |                         ^^^^^^^^^^^^^^^^^^ required by this bound in `parse_syn`
 
 error[E0308]: mismatched types

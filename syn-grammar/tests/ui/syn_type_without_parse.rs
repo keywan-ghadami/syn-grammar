@@ -1,11 +1,11 @@
-// HINWEIS: Dieser Schnappschuss enthaelt rustc-eigene Trait-Diagnostik und kann
-// sich mit einem Toolchain-Wechsel aendern. Dann mit
-// `TRYBUILD=overwrite cargo test -p syn-grammar --test ui_tests` neu erzeugen und
-// pruefen, dass die *erste* Meldung weiterhin die Grammatik-Meldung ist.
+// NOTE: This snapshot contains rustc's own trait diagnostics and may change
+// with a toolchain switch. In that case regenerate it with
+// `TRYBUILD=overwrite cargo test -p syn-grammar --test ui_tests` and check
+// that the *first* message is still the grammar message.
 //
-// `syn::Field` implementiert kein `Parse`. Der Codegenerator laesst jeden Pfad
-// durch, dessen erstes Segment `syn` heisst - ohne den Marker `SynParsable`
-// bekam der Nutzer hier einen rohen Trait-Bound-Fehler auf generierten Code.
+// `syn::Field` does not implement `Parse`. The code generator lets every path
+// through whose first segment is `syn` - without the `SynParsable` marker the
+// user got a raw trait-bound error on generated code here.
 use syn_grammar::grammar;
 
 grammar! {

@@ -2,208 +2,208 @@ use crate::{analysis, parser};
 use proc_macro2::{Ident, TokenStream};
 use syn::spanned::Spanned;
 
-/// Was ein Backend an eingebauten Regeln mitbringt.
+/// What a backend brings along in terms of built-in rules.
 pub mod backend;
-/// Backend-unabhaengige Werttypen fuer Aktionsbloecke.
+/// Backend-independent value types for action blocks.
 pub mod types;
 
-/// Eine ganze Grammatik, so wie `grammar! { … }` sie meint.
+/// A whole grammar, as `grammar! { … }` means it.
 #[derive(Debug, Clone)]
 pub struct GrammarDefinition {
-    /// Der Name aus `grammar Name { … }`; zugleich der Name des erzeugten Moduls.
+    /// The name from `grammar Name { … }`; also the name of the generated module.
     pub name: Ident,
-    /// Die erzeugten Regeln, in Quellreihenfolge.
+    /// The generated rules, in source order.
     pub rules: Vec<Rule>,
-    /// Regeln aus `extern rule …;` - sie werden **nicht** erzeugt, sondern von
-    /// Hand geschrieben und nur aufgerufen.
+    /// Rules from `extern rule …;` - they are **not** generated but written by
+    /// hand and only called.
     pub extern_rules: Vec<ExternRule>,
-    /// Grammatiken aus `import … as alias;`, deren Regeln als `alias::regel`
-    /// aufrufbar sind.
+    /// Grammars from `import … as alias;`, whose rules can be called as
+    /// `alias::rule`.
     pub imports: Vec<ImportedGrammar>,
-    /// `use`-Anweisungen, die unveraendert in das erzeugte Modul uebernommen
-    /// werden. Ein Glob darunter schaltet die "Undefined rule"-Pruefung ab -
-    /// dann ist die Menge der sichtbaren Namen zur Makro-Zeit nicht bekannt.
+    /// `use` statements that are carried over unchanged into the generated module.
+    /// A glob among them switches off the "Undefined rule" check - the set of
+    /// visible names is then not known at macro time.
     pub uses: Vec<syn::ItemUse>,
 }
 
-/// Eine von Hand geschriebene Regel, die die Grammatik nur aufruft.
+/// A hand-written rule that the grammar only calls.
 ///
-/// Aus `extern rule name(p: T) -> R;`. Die Funktion muss am Definitionsort der
-/// Grammatik sichtbar sein und
-/// `fn name<'a>(input: &Strom<'a>, p: T) -> StreamResult<'a, R>` heissen.
+/// From `extern rule name(p: T) -> R;`. The function must be visible at the
+/// grammar's definition site and be named
+/// `fn name<'a>(input: &Stream<'a>, p: T) -> StreamResult<'a, R>`.
 #[derive(Debug, Clone)]
 pub struct ExternRule {
-    /// Name der Regel und damit der aufzurufenden Funktion.
+    /// Name of the rule and thus of the function to call.
     pub name: Ident,
-    /// Generische Parameter der Deklaration.
+    /// Generic parameters of the declaration.
     pub generics: syn::Generics,
-    /// Deklarierte Parameter; sie werden hinter `input` durchgereicht.
+    /// Declared parameters; they are passed through after `input`.
     pub params: Vec<RuleParameter>,
-    /// Der Typ, den die Funktion liefert.
+    /// The type the function returns.
     pub return_type: syn::Type,
-    /// Attribute an der Deklaration.
+    /// Attributes on the declaration.
     pub attrs: Vec<syn::Attribute>,
 }
 
-/// Eine per `import … as …;` eingebundene fremde Grammatik.
+/// A foreign grammar included via `import … as …;`.
 #[derive(Debug, Clone)]
 pub struct ImportedGrammar {
-    /// Pfad zum Modul der fremden Grammatik.
+    /// Path to the module of the foreign grammar.
     pub path: syn::Path,
-    /// Der Aliasname, unter dem ihre Regeln aufgerufen werden.
+    /// The alias name under which its rules are called.
     pub alias: Ident,
 }
 
-/// Eine Regel der Grammatik.
+/// A rule of the grammar.
 #[derive(Debug, Clone)]
 pub struct Rule {
-    /// Der Regelname. Daraus werden `parse_<name>` und `parse_<name>_impl`.
+    /// The rule name. `parse_<name>` and `parse_<name>_impl` are derived from it.
     pub name: Ident,
-    /// Generische Parameter, etwa `list<T>`.
+    /// Generic parameters, e.g. `list<T>`.
     pub generics: syn::Generics,
-    /// Laufzeitparameter, etwa `value(offset: i32)`.
+    /// Runtime parameters, e.g. `value(offset: i32)`.
     pub params: Vec<RuleParameter>,
-    /// Der Typ hinter `->`.
+    /// The type after `->`.
     pub return_type: syn::Type,
-    /// Vorab bestimmte Klassifikation von [`Rule::return_type`].
+    /// Precomputed classification of [`Rule::return_type`].
     pub return_type_kind: analysis::ReturnTypeKind,
-    /// Die durch `|` getrennten Alternativen, in Quellreihenfolge.
+    /// The alternatives separated by `|`, in source order.
     pub variants: Vec<RuleVariant>,
-    /// Steht `pub` davor? Die Regel `main` gilt immer als oeffentlich.
+    /// Is it preceded by `pub`? The rule `main` always counts as public.
     pub is_pub: bool,
-    /// Lexikalische Regel: innerhalb gilt Zeichen-, nicht Tokengenauigkeit.
+    /// Lexical rule: inside it, character precision applies rather than token precision.
     pub is_lexical: bool,
-    /// Attribute an der Regel; `#[doc]`, `#[cfg]` und die Lint-Attribute
-    /// wandern in den erzeugten Code.
+    /// Attributes on the rule; `#[doc]`, `#[cfg]` and the lint attributes
+    /// are carried into the generated code.
     pub attrs: Vec<syn::Attribute>,
 }
 
-/// Ein Parameter einer Regel.
+/// A parameter of a rule.
 #[derive(Debug, Clone)]
 pub struct RuleParameter {
-    /// Der Name, unter dem er im Rumpf sichtbar ist.
+    /// The name under which it is visible in the body.
     pub name: Ident,
-    /// Der Typ. `None` heisst: ein **Parser**-Parameter (etwa `list<T>(item)`),
-    /// kein Wert - er wird zur Makro-Zeit eingesetzt, nicht zur Laufzeit
-    /// uebergeben.
+    /// The type. `None` means: a **parser** parameter (e.g. `list<T>(item)`),
+    /// not a value - it is substituted at macro time, not passed at
+    /// runtime.
     pub ty: Option<syn::Type>,
 }
 
-/// Eine Alternative einer Regel.
+/// An alternative of a rule.
 #[derive(Debug, Clone)]
 pub struct RuleVariant {
-    /// Die Mustersequenz, die passen muss.
+    /// The pattern sequence that must match.
     pub pattern: Vec<ModelPattern>,
-    /// Der Aktionsblock hinter `->`, der den Wert baut.
+    /// The action block after `->` that builds the value.
     pub action: TokenStream,
-    /// Der Klartextname aus `# "…"`. Scheitert die Alternative an ihrer
-    /// Anfangsstelle, tritt er als Erwartung an die Stelle der internen Meldung.
+    /// The plain-text name from `# "…"`. If the alternative fails at its
+    /// starting position, it replaces the internal message as the expectation.
     pub label: Option<String>,
-    /// Soll die Spanne der Alternative mitgeliefert werden?
+    /// Should the span of the alternative be supplied as well?
     pub with_span: bool,
-    /// Wurde der Aktionsblock ausgeschrieben, oder hat der Generator ihn
-    /// ergaenzt? Nur Ersteres darf eine Typpruefung ausloesen.
+    /// Was the action block written out, or did the generator add it?
+    /// Only the former may trigger a type check.
     pub is_explicit: bool,
 }
 
-/// Ein Muster der Grammatik-DSL.
+/// A pattern of the grammar DSL.
 ///
-/// Jede Variante entspricht einer Schreibweise in `SYNTAX.md`.
+/// Each variant corresponds to a notation in `SYNTAX.md`.
 #[derive(Debug, Clone)]
 pub enum ModelPattern {
-    /// `=>` - Cut. Ab hier ist die Ableitung festgelegt; ein Fehler dahinter
-    /// ist fatal und laesst keine andere Alternative mehr zu.
+    /// `=>` - cut. From here on the derivation is fixed; an error after it
+    /// is fatal and no longer allows any other alternative.
     Cut(proc_macro2::Span),
-    /// Ein Literalterminal, etwa `"fn"` oder `"::"`.
+    /// A literal terminal, e.g. `"fn"` or `"::"`.
     Lit {
-        /// Bindungsname aus `name:"fn"`.
+        /// Binding name from `name:"fn"`.
         binding: Option<Ident>,
-        /// Das Literal selbst.
+        /// The literal itself.
         lit: syn::Lit,
     },
-    /// Der Aufruf einer Regel, eines Builtins oder eines `syn::`-Typs.
+    /// The call of a rule, a builtin or a `syn::` type.
     RuleCall {
-        /// Bindungsname aus `name:regel`.
+        /// Binding name from `name:rule`.
         binding: Option<Ident>,
-        /// Der Pfad: `regel`, `alias::regel` oder `syn::Type`.
+        /// The path: `rule`, `alias::rule` or `syn::Type`.
         rule_path: syn::Path,
-        /// Generische Argumente, etwa `list<Vec<T>>`.
+        /// Generic arguments, e.g. `list<Vec<T>>`.
         generics: Vec<syn::Type>,
-        /// Argumente in Klammern, etwa `separated(item, ",")`.
+        /// Arguments in parentheses, e.g. `separated(item, ",")`.
         args: Vec<Argument>,
     },
-    /// Eine geklammerte Alternativenmenge, `( a | b )`.
+    /// A parenthesized set of alternatives, `( a | b )`.
     Group {
-        /// Bindungsname der ganzen Gruppe.
+        /// Binding name of the whole group.
         binding: Option<Ident>,
-        /// Die Alternativen als Tripel aus Mustern, Aktionsblock und Label.
+        /// The alternatives as triples of patterns, action block and label.
         alts: Vec<(Vec<ModelPattern>, Option<TokenStream>, Option<String>)>,
-        /// Quellstelle der Gruppe.
+        /// Source location of the group.
         span: proc_macro2::Span,
     },
-    /// `bracket( … )` - Inhalt echter eckiger Klammern.
+    /// `bracket( … )` - content of real square brackets.
     Bracketed(Vec<ModelPattern>, proc_macro2::Span),
-    /// `brace( … )` bzw. `{ … }` - Inhalt echter geschweifter Klammern.
+    /// `brace( … )` or `{ … }` - content of real curly braces.
     Braced(Vec<ModelPattern>, proc_macro2::Span),
-    /// `paren( … )` - Inhalt echter runder Klammern.
+    /// `paren( … )` - content of real parentheses.
     Parenthesized(Vec<ModelPattern>, proc_macro2::Span),
-    /// `x?` - hoechstens einmal.
+    /// `x?` - at most once.
     Optional(Box<ModelPattern>, proc_macro2::Span),
-    /// `x*` - beliebig oft, auch nullmal.
+    /// `x*` - any number of times, including zero.
     Repeat(Box<ModelPattern>, proc_macro2::Span),
-    /// `x+` - mindestens einmal.
+    /// `x+` - at least once.
     Plus(Box<ModelPattern>, proc_macro2::Span),
-    /// `x @ name` - bindet die Spanne des Musters an `name`.
+    /// `x @ name` - binds the span of the pattern to `name`.
     SpanBinding(Box<ModelPattern>, Ident, proc_macro2::Span),
-    /// `recover(body, sync)` - scheitert `body`, wird bis `sync` uebersprungen,
-    /// statt die ganze Regel scheitern zu lassen.
+    /// `recover(body, sync)` - if `body` fails, input is skipped up to `sync`
+    /// instead of letting the whole rule fail.
     Recover {
-        /// Bindungsname; das Ergebnis ist ein `Option`.
+        /// Binding name; the result is an `Option`.
         binding: Option<Ident>,
-        /// Das eigentliche Muster.
+        /// The actual pattern.
         body: Box<ModelPattern>,
-        /// Die Synchronisationsmarke, bis zu der uebersprungen wird.
+        /// The synchronization mark up to which input is skipped.
         sync: Box<ModelPattern>,
-        /// Quellstelle.
+        /// Source location.
         span: proc_macro2::Span,
     },
-    /// `peek(x)` - prueft, ohne zu verbrauchen.
+    /// `peek(x)` - checks without consuming.
     Peek(Box<ModelPattern>, proc_macro2::Span),
-    /// `not(x)` - schlaegt fehl, wenn `x` passen wuerde. Verbraucht nichts.
+    /// `not(x)` - fails if `x` would match. Consumes nothing.
     Not(Box<ModelPattern>, proc_macro2::Span),
-    /// `until(x)` - sammelt rohe Tokens bis `x` passen wuerde.
+    /// `until(x)` - collects raw tokens until `x` would match.
     Until {
-        /// Bindungsname; das Ergebnis ist ein `TokenStream`.
+        /// Binding name; the result is a `TokenStream`.
         binding: Option<Ident>,
-        /// Das Abbruchmuster. Es wird nicht verbraucht.
+        /// The stop pattern. It is not consumed.
         pattern: Box<ModelPattern>,
-        /// Quellstelle.
+        /// Source location.
         span: proc_macro2::Span,
     },
-    /// `count(x)` - zaehlt, wie oft das **Element** passte.
+    /// `count(x)` - counts how often the **item** matched.
     Count {
-        /// Bindungsname; das Ergebnis ist ein `usize`.
+        /// Binding name; the result is a `usize`.
         binding: Option<Ident>,
-        /// Das gezaehlte Muster, samt seinem Wiederholungsoperator.
+        /// The counted pattern, including its repetition operator.
         pattern: Box<ModelPattern>,
-        /// Quellstelle.
+        /// Source location.
         span: proc_macro2::Span,
     },
-    /// `lex( … )` - zeichengenaue Betrachtung innerhalb des Bereichs.
+    /// `lex( … )` - character-precise treatment within the region.
     LexicalScope(Box<ModelPattern>, proc_macro2::Span),
-    /// `spaced( … )` - Leerraum zwischen Tokens wird bedeutsam.
+    /// `spaced( … )` - whitespace between tokens becomes significant.
     SpacedScope(Box<ModelPattern>, proc_macro2::Span),
-    /// `fail("…")` - bricht mit dieser Meldung ab, wortwoertlich und hochprior.
+    /// `fail("…")` - aborts with this message, verbatim and with high priority.
     Fail {
-        /// Die Meldung. Ohne sie steht dort "Explicit failure".
+        /// The message. Without it, "Explicit failure" is used.
         message: Option<syn::Lit>,
-        /// Quellstelle.
+        /// Source location.
         span: proc_macro2::Span,
     },
 }
 
 impl ModelPattern {
-    /// Die Quellstelle des Musters - fuer Fehlermeldungen des Generators.
+    /// The source location of the pattern - for error messages of the generator.
     pub fn span(&self) -> proc_macro2::Span {
         match self {
             ModelPattern::Cut(s) => *s,
@@ -232,31 +232,23 @@ impl ModelPattern {
     }
 }
 
-/// Ein Argument eines Regelaufrufs.
+/// An argument of a rule call.
 #[derive(Debug, Clone)]
 pub enum Argument {
-    /// Nach Position, etwa `separated(item, ",")`.
+    /// By position, e.g. `separated(item, ",")`.
     Positional(ModelPattern),
-    /// Nach Name, etwa `separated(item, ",", min=1)`.
+    /// By name, e.g. `separated(item, ",", min=1)`.
     Named(Ident, ModelPattern),
 }
 
 impl From<parser::GrammarDefinition> for GrammarDefinition {
     fn from(p: parser::GrammarDefinition) -> Self {
-        let mut uses = p.uses;
-        if let Some(inherits) = p.inherits {
-            // Deprecation warning could be emitted here if we had a way to report it
-            // For now, we just map it to a use super::*; for compatibility
-            let name = inherits.name;
-            let item_use: syn::ItemUse = syn::parse_quote!(use super::#name::*;);
-            uses.insert(0, item_use);
-        }
         GrammarDefinition {
             name: p.name,
             rules: p.rules.into_iter().map(Into::into).collect(),
             extern_rules: p.extern_rules.into_iter().map(Into::into).collect(),
             imports: p.imports.into_iter().map(Into::into).collect(),
-            uses,
+            uses: p.uses,
         }
     }
 }

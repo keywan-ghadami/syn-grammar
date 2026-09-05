@@ -1,0 +1,8 @@
+error: Undefined rule: 'my_custom_parser'
+       note: `use …::my_custom_parser;` makes the function visible, but does not make it a rule
+       help: to call a hand-written parser, declare it: `extern rule my_custom_parser -> ReturnType;`
+       help: to call a rule of another grammar: `import Other as other;` and write `other::my_custom_parser`
+  --> tests/ui/import_injection.rs:16:35
+   |
+16 |         pub rule main -> () = val:my_custom_parser -> { let _ = val; }
+   |                                   ^^^^^^^^^^^^^^^^

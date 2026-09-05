@@ -12,11 +12,15 @@ fn ui() {
     t.compile_fail("tests/ui/ampersand_operator.rs");
     t.compile_fail("tests/ui/undefined_rule_with_use.rs");
     t.compile_fail("tests/ui/syn_type_without_parse.rs");
+    t.compile_fail("tests/ui/inheritance_removed.rs");
+    t.compile_fail("tests/ui/import_injection.rs");
+    t.compile_fail("tests/ui/unknown_list_argument.rs");
+    t.compile_fail("tests/ui/numeric_literal_token.rs");
 
-    // Faelle auf dem ECHTEN Prozedurmakro-Pfad (Crate `tests/ui-macro`).
-    // Nur hier laeuft ein wirkliches Makro; alles andere geht ueber `parse_str`
-    // und damit ueber den proc-macro2-Fallback. Was im Produkteinsatz passiert,
-    // sieht man ausschliesslich hier.
+    // Cases on the REAL procedural-macro path (crate `tests/ui-macro`).
+    // Only here does a real macro run; everything else goes through `parse_str`
+    // and thus the proc-macro2 fallback. What happens in production use is
+    // visible exclusively here.
     t.compile_fail("tests/ui/runtime_error_real_macro.rs");
     t.pass("tests/ui/runtime_ok_real_macro.rs");
     t.compile_fail("tests/ui/joint_operator_real_macro.rs");

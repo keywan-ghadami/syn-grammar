@@ -1,7 +1,15 @@
 # ADR 007: Deprecation of Colon-Based Grammar Inheritance
 
 **Date:** 2026-02-21
-**Status:** Accepted
+**Status:** Accepted — superseded in its details by [ADR 08](adr08-black-box-composition.md).
+
+> **What actually happened (2026-09):** the `include` syntax proposed here was
+> replaced by `import … as alias;` and `extern rule` (ADR 08). The phased
+> deprecation below never shipped: the inheritance syntax was still parsed
+> but no longer worked, and failed deep inside generated code. Since 0.9.0
+> `grammar Derived : Base` is a hard compile error at the `:` that names
+> `import Base as base;` as the replacement. The migration note is in
+> `syn-grammar/SYNTAX.md`, "Importing Another Grammar".
 
 ## Context
 With the implementation of the new namespaced grammar composition system (as detailed in [ADR 006](./adr6.md)), the old mechanism for grammar reuse—colon-based inheritance (`grammar Derived : Base`)—is now obsolete.

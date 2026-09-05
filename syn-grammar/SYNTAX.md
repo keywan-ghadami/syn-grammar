@@ -17,18 +17,85 @@ grammar! {
 # }
 ```
 
+### `use` Statements
+
+A grammar block may contain ordinary Rust `use` statements. They are copied
+into the generated module, so the types they name are available in return
+types and action blocks. The generated module also contains `use super::*;`,
+so everything visible where the grammar is defined is visible inside it.
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+grammar! {
+    grammar WithUse {
+        use std::collections::HashMap;
+
+        pub table -> HashMap<String, i32> =
+            entries:separated(entry, ",") -> { entries.into_iter().collect() }
+        entry -> (String, i32) = k:ident "=" v:i32 -> { (k.to_string(), v) }
+    }
+}
+# }
+```
+
+A `use` makes a *type or function visible*; it does not turn a function into a
+rule. Hand-written parsers are declared with `extern rule` (see
+[External Rules](#external-rules)).
+
 ## Rules
 
 A rule consists of a name, a return type, a pattern, and an action block.
 
 ```text
-    name -> ReturnType = pattern -> { action_code }
+    rule name -> ReturnType = pattern -> { action_code }
 ```
 
 - **`name`**: The name of the rule.
 - **`ReturnType`**: The Rust type returned by the rule.
 - **`pattern`**: The grammar pattern to match.
 - **`action_code`**: A Rust block that constructs the return value.
+
+The `rule` keyword, the return type and the action block are all optional:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+grammar! {
+    grammar Forms {
+        pub rule full -> () = "full" -> { () }   // everything spelled out
+        pub no_keyword -> () = "nokw" -> { () }  // no `rule`
+        pub no_return_type = "noret" -> { () }   // returns `()`
+        pub short = "short"                      // returns `()`
+        pub pair -> (kw::a, kw::b) = a:"a" b:"b" // bound literals: the tuple of the tokens
+    }
+}
+# }
+```
+
+- Without `-> ReturnType` the rule returns `()`.
+- Without an action block the rule returns `()`, unless it binds literals
+  (`a:"a" b:"b"`): then it returns the tuple of the bound tokens.
+- `pub` makes the generated `parse_<name>` public. The rule `main` is always
+  public.
+
+### Attributes and Doc Comments
+
+Doc comments, `#[cfg]` and lint attributes on a rule are passed through to the
+generated function:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+grammar! {
+    grammar Documented {
+        /// Parses a version number such as `1.2`.
+        #[allow(dead_code)]
+        pub version -> (u32, u32) = major:u32 "." minor:u32 -> { (major, minor) }
+    }
+}
+# }
+```
 
 ### Lexical vs. Syntactic Rules (Case Sensitivity)
 
@@ -149,6 +216,29 @@ Match specific tokens or text using string literals.
 # }
 ```
 
+A literal containing **several tokens** matches them strictly adjacent, with
+no whitespace in between. Multi-character Rust operators (`::`, `->`, `=>`,
+`==`, `..=`, …) are matched as syn's joint tokens, so `a : : b` never matches
+`"::"`.
+
+```rust
+use syn::parse::Parser;
+use syn_grammar::grammar;
+
+grammar! {
+    grammar Adjacent {
+        // Matches `?.` as in `foo?.bar`, but not `? .`
+        pub optional_dot -> () = "?." -> { () }
+    }
+}
+
+assert!(Adjacent::parse_optional_dot.parse_str("?.").is_ok());
+assert!(Adjacent::parse_optional_dot.parse_str("? .").is_err());
+```
+
+Delimiters (`(`, `[`, `{`) cannot be written as literals; see
+[Delimiters](#delimiters).
+
 For matching Rust literals as values, use the `lit_*` built-ins:
 - `lit_str`: Matches a string literal.
 - `lit_int`: Matches an integer literal.
@@ -157,21 +247,39 @@ For matching Rust literals as values, use the `lit_*` built-ins:
 - `lit_float`: Matches a floating-point literal.
 
 ### Built-in Primitives
-The following primitives are "portable" and expected to be available in all backends, though their exact return types may vary slightly (e.g., `String` vs `syn::Ident`).
 
-| Parser | Description |
+The portable core, expected in every backend (return types may differ per
+backend; the `syn` types are given here):
+
+| Parser | Description | Returns |
+|---|---|---|
+| `ident` | An identifier; keywords are rejected | `syn_grammar::types::Identifier` |
+| `any_ident` | An identifier, keywords included | `syn::Ident` |
+| `string` | A string literal | `syn_grammar::types::StringLiteral` |
+| `char` | A character literal | `char` |
+| `bool` | `true` or `false` | `bool` |
+| `alpha` | An identifier made of letters only | `syn::Ident` |
+| `alphanumeric` | An identifier made of letters and digits | `syn::Ident` |
+| `digit` | An integer literal of decimal digits | `syn::LitInt` |
+| `hex_digit`, `oct_digit` | An integer literal whose digits are valid hex / octal | `syn::LitInt` |
+| `whitespace` | Succeeds only if whitespace precedes the next token | `()` |
+| `eof` | End of input (or of the enclosing group) | `()` |
+
+**Numbers.** Every Rust integer type is a built-in of the same name, negative
+literals included; an out-of-range value (`256` for `u8`) is a parse error,
+not a truncation.
+
+| Grammar name | Returns |
 |---|---|
-| `ident` | An identifier (e.g., variable name). |
-| `string` | A string literal (same as `lit_str`). |
-| `u32` | Unsigned 32-bit integer. |
-| `i32` | Signed 32-bit integer. |
-| `bool` | Boolean (`true` or `false`). |
-| `alpha` | Alphabetic characters. |
-| `digit` | Numeric digits. |
-| `whitespace` | Explicit whitespace matching. |
-| `eof` | End of input. |
+| `i8`, `i16`, `i32`, `i64`, `i128`, `isize` | the same Rust type |
+| `u8`, `u16`, `u32`, `u64`, `u128`, `usize` | the same Rust type |
+| `f32`, `f64` | the same Rust type |
+| `hex_literal`, `oct_literal`, `bin_literal` | `u64` — an integer literal in any base (`0xFF`, `0o17`, `0b101`) |
 
-*Note: Backends may provide additional specialized built-ins.*
+The `syn`-specific built-ins (`rust_type`, `rust_block`, the `lit_*` family,
+`outer_attrs`, `pat`, `visibility`, …) and the rule for using any `syn::` type
+by its path are listed under **Backend Specifics** in the
+[README](https://github.com/keywan-ghadami/syn-grammar/blob/main/syn-grammar/README.md#backend-specifics).
 
 ### Spanned Primitives
 
@@ -230,8 +338,11 @@ The grammar provides convenient built-in functions for parsing lists and repetit
 Both functions return a `Vec` of the `item`'s result type. They can be customized with the following named arguments:
 
 - `min = <usize>`: The minimum number of items required.
-- `trailing = <bool>`: Whether a trailing separator is allowed (defaults to `false`).
-- `error = <&str>`: A custom error message to display on failure.
+- `trailing = <bool>`: Whether a trailing separator is allowed (defaults to `false`; `separated` only).
+- `item_label = "<name>"`: How the items are called in error messages (see
+  [List Item Labels](#list-item-labels-item_label)).
+
+Any other named argument is a compile error.
 
 ```rust
 # use syn_grammar::grammar;
@@ -250,6 +361,21 @@ min_two_items -> Vec<StringLiteral> = items:separated(string, ",", min = 2) -> {
 
 // Matches "a" "b" "c"
 space_list -> Vec<StringLiteral> = items:repeated(string) -> { items }
+#         }
+#     }
+# }
+```
+
+The container defaults to `Vec`. Any type implementing `FromIterator` can be
+chosen with a generic argument:
+
+```rust
+# use syn_grammar::grammar;
+# use std::collections::HashSet;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ unique -> HashSet<i32> = items:separated<HashSet>(i32, ",") -> { items }
 #         }
 #     }
 # }
@@ -297,6 +423,16 @@ check = "a" peek("b")
 #     }
 # }
 ```
+
+### Backtracking
+
+Alternatives are tried in order. Before an alternative is attempted, the
+generator checks whether the next token can start it at all (a `peek`); when
+several alternatives remain, it attempts them on a fork of the input, and a
+failed attempt leaves the input where it was. This makes ambiguous grammars
+work without any annotation, at the cost of re-parsing the shared prefix. Use
+the [cut operator](#cut-operator-) to commit once an alternative is certain;
+it also improves the error message.
 
 ### Lexical Control (`lex`, `spaced`)
 - `lex(pattern)`: Forces a **lexical context** (no implicit whitespace) for the duration of the pattern.
@@ -381,16 +517,18 @@ the parser skips to the synchronisation token and continues:
 ## Error Messages
 
 Error message quality is the point of this library, and two operators control it
-directly. See [`docs/ERROR_HANDLING.md`](../docs/ERROR_HANDLING.md) for how the
+directly. See [`docs/ERROR_HANDLING.md`](https://github.com/keywan-ghadami/syn-grammar/blob/main/docs/ERROR_HANDLING.md) for how the
 engine picks a message, and
-[`docs/adr/adr13-error-message-contract.md`](../docs/adr/adr13-error-message-contract.md)
+[`docs/adr/adr13-error-message-contract.md`](https://github.com/keywan-ghadami/syn-grammar/blob/main/docs/adr/adr13-error-message-contract.md)
 for the binding contract.
 
 ### Alternative Labels (`#`)
 
-By default a failing alternative is described by its first token. `# "..."`
-replaces that with a human-readable name. The label is placed **after the
-pattern and before the action block**.
+By default a failing alternative is described by what it would have accepted:
+its first token, the delimiter it opens with, the expectation of the built-in
+it starts with (`integer literal`), or the list a called rule collected.
+`# "..."` replaces that with a human-readable name. The label is placed
+**after the pattern and before the action block**.
 
 ```rust
 # use syn_grammar::grammar;
@@ -449,7 +587,7 @@ The position is only printed when the span actually has line/column data. That i
 the case inside a real proc macro from Rust 1.88 onwards, which this project
 requires (`rust-version = "1.88"`); a span without position data — `Span::call_site()`,
 for instance — prints without it. Either way rustc underlines the span in the editor.
-See [`GOALS.md`](../GOALS.md).
+See [`GOALS.md`](https://github.com/keywan-ghadami/syn-grammar/blob/main/GOALS.md).
 
 ## Advanced Features
 
@@ -504,6 +642,14 @@ term -> i32 = i:i32 -> {i}
 ### Shadowing Detection
 The compiler checks for unreachable alternatives (e.g., if a prefix shadows a longer rule) and emits warnings or errors.
 
+### Overriding Built-ins
+
+A rule with the name of a built-in shadows that built-in for the whole grammar,
+its own body included, so it cannot call the built-in it replaces:
+`ident -> String = i:ident -> { … }` is rejected as left recursion. Give the
+rule its own name (`upper_ident -> String = i:ident -> { … }`), or put the
+custom logic into an [`extern rule`](#external-rules).
+
 ### External Rules
 
 `extern rule` declares a rule that the generator must **not** generate: you
@@ -520,10 +666,10 @@ The function must be in scope where the grammar is defined (the generated module
 does `use super::*`) and have this signature:
 
 ```rust
-use syn_grammar::rt::{ParseError, StreamResult, Strom};
+use syn_grammar::rt::{ParseError, StreamResult, Stream};
 
-fn even_int<'a>(input: &Strom<'a>) -> StreamResult<'a, u64> {
-    let lit = syn_grammar::rt::schritt(input, syn_grammar::rt::take_single::<syn::LitInt>)?;
+fn even_int<'a>(input: &Stream<'a>) -> StreamResult<'a, u64> {
+    let lit = syn_grammar::rt::step(input, syn_grammar::rt::take_single::<syn::LitInt>)?;
     let v: u64 = lit.base10_parse().map_err(ParseError::from)?;
     if v % 2 == 0 {
         Ok(v)
@@ -553,8 +699,8 @@ Declared parameters are passed through positionally after `input`, so
 `extern rule f(offset: u64) -> u64;` called as `f(offset=3)` invokes
 `f(input, 3)`.
 
-> The `&Strom<'a>` signature is deliberate — `Strom<'a>` is `syn::parse::ParseBuffer<'a>`,
-> **not** syn's `ParseStream<'a>` alias. See `docs/adr/adr15-linear-parsing.md`.
+> The `&Stream<'a>` signature is deliberate — `Stream<'a>` is `syn::parse::ParseBuffer<'a>`,
+> **not** syn's `ParseStream<'a>` alias. See [`docs/adr/adr15-linear-parsing.md`](https://github.com/keywan-ghadami/syn-grammar/blob/main/docs/adr/adr15-linear-parsing.md).
 > Note that after an error the stream may have advanced; callers that backtrack
 > run your rule on a fork, so you do not need to restore it yourself.
 
@@ -591,3 +737,18 @@ assert_eq!(Outer::parse_pair.parse_str("1, 2").unwrap(), (1, 2));
 ```
 
 The `import` may stand before the `grammar` block (as above) or inside it.
+
+> **Migrating from `grammar Derived : Base`** (grammar inheritance, removed in
+> 0.9.0): write `import Base as base;` and qualify the calls, `a:base::num`.
+> The old form is rejected with a message saying exactly this. Inheritance
+> worked through an implicit glob import, which switched off the "Undefined
+> rule" check and the shadowing analysis; `import` keeps both.
+
+## Debugging
+
+Set the environment variable `DEBUG_GRAMMAR` to print the code generated for
+every `grammar!` invocation to stderr during the build:
+
+```text
+DEBUG_GRAMMAR=1 cargo build
+```

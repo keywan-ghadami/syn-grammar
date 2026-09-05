@@ -2,84 +2,82 @@ use crate::ParseError;
 use proc_macro2::Span;
 use std::collections::HashSet;
 
-/// Geschachtelte Namensraeume fuer Grammatiken, die selbst Bezeichner verwalten
-/// (etwa um bereits deklarierte Namen wiederzuerkennen).
+/// Nested scopes for grammars that manage identifiers themselves
+/// (e.g. to recognise already declared names).
 #[derive(Clone, Default)]
 pub struct ScopeStack {
-    /// Die Ebenen, aeusserste zuerst.
+    /// The levels, outermost first.
     pub scopes: Vec<HashSet<String>>,
 }
 
 impl ScopeStack {
-    /// Ein Stapel mit einer leeren aeussersten Ebene.
+    /// A stack with one empty outermost level.
     pub fn new() -> Self {
         Self {
             scopes: vec![HashSet::new()],
         }
     }
-    /// Oeffnet eine neue innere Ebene.
+    /// Opens a new inner level.
     pub fn enter_scope(&mut self) {
         self.scopes.push(HashSet::new());
     }
-    /// Schliesst die innerste Ebene; die aeusserste bleibt immer bestehen.
+    /// Closes the innermost level; the outermost always remains.
     pub fn exit_scope(&mut self) {
         if self.scopes.len() > 1 {
             self.scopes.pop();
         }
     }
 
-    /// Traegt `name` in die innerste Ebene ein.
+    /// Registers `name` in the innermost level.
     pub fn define(&mut self, name: impl Into<String>) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.into());
         }
     }
 
-    /// Ist `name` in irgendeiner Ebene bekannt? Sucht von innen nach aussen.
+    /// Is `name` known in any level? Searches from inside out.
     pub fn is_defined(&self, name: &str) -> bool {
         self.scopes.iter().rev().any(|scope| scope.contains(name))
     }
 }
 
-/// Schlanker State für Variablen, Whitespace-Modus und Span-Tracking.
-/// Wird beim Backtracking geklont (billig, da meist winzig).
+/// Lean state for variables, whitespace mode and span tracking.
+/// Cloned on backtracking (cheap, since usually tiny).
 #[derive(Clone)]
 pub struct ParseContext<'a> {
-    /// Die weiteste Stelle, an der das Parsen jemals gescheitert ist.
+    /// The furthest position at which parsing ever failed.
     ///
-    /// Ein rein funktionales Modell verliert jeden Fehler, der von einem
-    /// *erfolgreichen* Zuruecksetzen ueberdeckt wird: `separated` mit `min=0`, ein
-    /// gescheitertes `?` oder `*` liefern `Ok`, und ein `Ok` traegt keinen Fehler.
-    /// Genau dann bleibt am Ende nur eine flache, generische Meldung uebrig.
-    /// Dieses Feld ist der Kanal dafuer - es wird beim Zuruecksetzen NICHT
-    /// verworfen, sondern hochgereicht.
+    /// A purely functional model loses every error that is covered by a
+    /// *successful* reset: `separated` with `min=0`, a failed `?` or `*` return
+    /// `Ok`, and an `Ok` carries no error. Exactly then only a flat, generic
+    /// message remains at the end. This field is the channel for that - on reset
+    /// it is NOT discarded but passed upward.
     pub furthest: Option<ParseError<'a>>,
-    /// Namensraeume fuer Grammatiken, die selbst Bezeichner verwalten.
+    /// Scopes for grammars that manage identifiers themselves.
     pub scopes: ScopeStack,
-    /// Der Stapel der Whitespace-Modi: `true` = lexikalisch (`lex(..)`, kein
-    /// Zwischenraum erlaubt), `false` = `spaced(..)`.
+    /// The stack of whitespace modes: `true` = lexical (`lex(..)`, no
+    /// whitespace allowed), `false` = `spaced(..)`.
     pub mode_stack: Vec<bool>,
-    /// Der Span des zuletzt gelesenen Tokens - die Grundlage der
-    /// Adjazenzpruefung im lexikalischen Modus.
+    /// The span of the most recently read token - the basis of the
+    /// adjacency check in lexical mode.
     pub last_span: Option<Span>,
-    /// Wie tief stehen wir in Delimiter-Gruppen (`paren(..)`, `{..}`, `[..]`)?
+    /// How deep are we in delimiter groups (`paren(..)`, `{..}`, `[..]`)?
     ///
-    /// `Cursor::eof()` bezieht sich auf den *Scope*, meldet am Ende einer Gruppe
-    /// also dasselbe wie am Ende der Eingabe. Für die Meldung ist der Unterschied
-    /// aber wesentlich: "unexpected end of group" gegen "unexpected end of input".
-    /// Zur Laufzeit sind beide nicht unterscheidbar, der Codegen weiss es jedoch.
+    /// `Cursor::eof()` refers to the *scope*, so at the end of a group it reports
+    /// the same as at the end of the input. For the message the difference is
+    /// essential though: "unexpected end of group" versus "unexpected end of input".
+    /// At runtime the two are indistinguishable, but the codegen knows.
     pub group_depth: usize,
-    /// Die Regeln, in denen der Parser GERADE steht, aeusserste zuerst.
+    /// The rules the parser is CURRENTLY in, outermost first.
     ///
-    /// Ein Fehler, der herausgereicht wird, sammelt seine Regelnamen unterwegs selbst
-    /// ein (`push_rule`). Ein Fehler, der von einem erfolgreichen Zuruecksetzen
-    /// ueberdeckt und nur gemerkt wird, nimmt diesen Weg nie - fuer ihn wird hier
-    /// eine Momentaufnahme genommen.
+    /// An error that is passed outward collects its rule names on the way itself
+    /// (`push_rule`). An error that is covered by a successful reset and merely
+    /// recorded never takes that path - for it a snapshot is taken here.
     pub rule_stack: Vec<String>,
 }
 
 impl<'a> ParseContext<'a> {
-    /// Ein frischer Kontext fuer einen Parselauf.
+    /// A fresh context for a parse run.
     pub fn new() -> Self {
         Self {
             scopes: ScopeStack::new(),
@@ -91,22 +89,22 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    /// Legt `name` auf den lebenden Regelstapel. Umschliesst im generierten Code
-    /// den Regelrumpf und ist mit [`exit_rule`](Self::exit_rule) gepaart.
+    /// Pushes `name` onto the live rule stack. Wraps the rule body in the generated
+    /// code and is paired with [`exit_rule`](Self::exit_rule).
     pub fn enter_rule(&mut self, name: &str) {
         self.rule_stack.push(name.to_string());
     }
 
-    /// Nimmt den innersten Regelnamen wieder vom lebenden Stapel.
+    /// Pops the innermost rule name off the live stack again.
     pub fn exit_rule(&mut self) {
         self.rule_stack.pop();
     }
 
-    /// Merkt sich einen Fehler, auch wenn der Parser danach erfolgreich weitermacht.
+    /// Records an error even if the parser continues successfully afterwards.
     ///
-    /// Dabei bekommt er die Regeln mit, in denen der Parser gerade steht - von innen
-    /// nach aussen, passend zu dem, was schon an ihm haengt. Ohne das traegt ein
-    /// ueberdeckter Fehler nur den Kontext, den er bis zum Verwerfen gesammelt hat.
+    /// In doing so it receives the rules the parser is currently in - from inside
+    /// out, matching what is already attached to it. Without that, a covered error
+    /// carries only the context it collected up to being discarded.
     pub fn record_failure(&mut self, e: &ParseError<'a>) {
         let mut e = e.clone();
         for name in self.rule_stack.iter().rev() {
@@ -115,22 +113,22 @@ impl<'a> ParseContext<'a> {
             }
         }
         self.furthest = Some(match self.furthest.take() {
-            Some(bisher) => bisher.merge(e),
+            Some(so_far) => so_far.merge(e),
             None => e,
         });
     }
 
-    /// Uebernimmt die Merkstelle eines verworfenen Kontext-Klons.
+    /// Adopts the recorded error of a discarded context clone.
     ///
-    /// Ohne das ginge der Fehler genau in den Faellen verloren, um die es geht:
-    /// beim Backtracking wird der Klon weggeworfen.
+    /// Without this the error would be lost in exactly the cases that matter:
+    /// on backtracking the clone is thrown away.
     pub fn absorb(&mut self, other: &ParseContext<'a>) {
         if let Some(e) = &other.furthest {
             self.record_failure(e);
         }
     }
 
-    /// Waehlt zwischen dem zurueckgegebenen Fehler und der gemerkten Stelle.
+    /// Chooses between the returned error and the recorded one.
     pub fn best_error(&self, returned: ParseError<'a>) -> ParseError<'a> {
         match &self.furthest {
             Some(f) => returned.merge(f.clone()),
@@ -138,15 +136,15 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    /// Betritt eine Delimiter-Gruppe (`paren(..)`, `{..}`, `[..]`).
+    /// Enters a delimiter group (`paren(..)`, `{..}`, `[..]`).
     pub fn enter_group(&mut self) {
         self.group_depth += 1;
     }
-    /// Verlaesst eine Delimiter-Gruppe.
+    /// Leaves a delimiter group.
     pub fn exit_group(&mut self) {
         self.group_depth = self.group_depth.saturating_sub(1);
     }
-    /// Beschreibt das Ende des aktuellen Scopes so, wie es in einer Meldung stehen soll.
+    /// Describes the end of the current scope the way it should appear in a message.
     pub fn end_of_scope_msg(&self) -> &'static str {
         if self.group_depth > 0 {
             "unexpected end of group"
@@ -155,29 +153,29 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    /// Betritt einen `lex(..)`-Block: zwischen den Tokens ist kein Zwischenraum erlaubt.
+    /// Enters a `lex(..)` block: no whitespace is allowed between the tokens.
     pub fn enter_lexical(&mut self) {
         self.mode_stack.push(true);
     }
-    /// Betritt einen `spaced(..)`-Block: Zwischenraum ist wieder erlaubt.
+    /// Enters a `spaced(..)` block: whitespace is allowed again.
     pub fn enter_spaced(&mut self) {
         self.mode_stack.push(false);
     }
-    /// Verlaesst den innersten Whitespace-Modus.
+    /// Leaves the innermost whitespace mode.
     pub fn exit_mode(&mut self) {
         self.mode_stack.pop();
     }
-    /// Gilt gerade der lexikalische Modus?
+    /// Is lexical mode currently active?
     pub fn is_lexical(&self) -> bool {
         *self.mode_stack.last().unwrap_or(&false)
     }
 
-    /// Zeichnet den Span auf und wirft einen Fehler, wenn im Lexical-Mode
-    /// fälschlicherweise Leerzeichen zwischen den Tokens stehen.
+    /// Records the span and raises an error if, in lexical mode, there is
+    /// whitespace between the tokens where there must not be.
     pub fn record_span(&mut self, span: Span) -> syn::Result<()> {
         if self.is_lexical() {
             if let Some(last) = self.last_span {
-                // Wenn das Ende des letzten Tokens nicht der Anfang des neuen ist, gibt es Whitespace
+                // If the end of the last token is not the start of the new one, there is whitespace
                 if last.end() != span.start() {
                     return Err(syn::Error::new(span, "expected no whitespace"));
                 }
@@ -187,8 +185,8 @@ impl<'a> ParseContext<'a> {
         Ok(())
     }
 
-    /// Steht vor `next_span` tatsaechlich ein Zwischenraum? Traegt das
-    /// `whitespace`-Builtin.
+    /// Is there actually whitespace before `next_span`? Backs the
+    /// `whitespace` builtin.
     pub fn check_whitespace(&self, next_span: Span) -> bool {
         if let Some(last) = self.last_span {
             last.end() != next_span.start()

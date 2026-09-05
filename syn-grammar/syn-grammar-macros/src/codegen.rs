@@ -10,8 +10,8 @@ use syn_grammar_model::{analysis, model::*};
 pub struct CodegenContext<'a> {
     pub grammar: &'a GrammarDefinition,
     pub custom_keywords: &'a HashSet<String>,
-    /// Die Regel, deren Rumpf gerade erzeugt wird - in Leerzeichen-Form.
-    /// Manche Meldungen nennen sie (z.B. `not(..)`: "in rule `main`").
+    /// The rule whose body is currently being generated - in whitespace form.
+    /// Some messages name it (e.g. `not(..)`: "in rule `main`").
     pub current_rule: String,
 }
 
@@ -60,12 +60,12 @@ pub fn generate_rust(grammar: GrammarDefinition) -> Result<TokenStream> {
     Ok(quote! {
         #[allow(non_snake_case)]
         pub mod #grammar_name {
-            // `unreachable_code`: `fail(..)` erzeugt ein `return Err(..)`
-            // (`codegen/pattern.rs`, ModelPattern::Fail). Alles dahinter in derselben
-            // Regel ist damit unerreichbar - auch das abschliessende `Ok(..)`, das der
-            // Generator immer anhaengt. Ohne dieses Allow bekommt JEDER Nutzer, der
-            // `fail(..)` in seine Grammatik schreibt, eine Warnung in seinem eigenen
-            // Crate, auf Code, den er nie geschrieben hat.
+            // `unreachable_code`: `fail(..)` generates a `return Err(..)`
+            // (`codegen/pattern.rs`, ModelPattern::Fail). Everything after it in the same
+            // rule is thus unreachable - including the final `Ok(..)` that the
+            // generator always appends. Without this allow, EVERY user who writes
+            // `fail(..)` in their grammar gets a warning in their own
+            // crate, on code they never wrote.
             #![allow(unused_imports, unused_variables, dead_code, unused_braces, unused_parens)]
             #![allow(unreachable_code)]
             #![allow(clippy::all)]

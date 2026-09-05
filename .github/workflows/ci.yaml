@@ -1,9 +1,9 @@
 name: Rust CI
 
 on:
-  # Bewusst ohne Branch-Filter: die Liste stand vorher auf ["main",
-  # "logic-changes"], womit auf jedem anderen Arbeitsbranch gar keine CI lief -
-  # Fehler fielen erst im Pull Request auf.
+  # Deliberately without a branch filter: the list used to be ["main",
+  # "logic-changes"], so no CI ran at all on any other working branch -
+  # failures only surfaced in the pull request.
   push:
   pull_request:
   workflow_dispatch:
@@ -19,14 +19,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Gepinnt, nicht `stable`. `-D warnings` auf einer gleitenden Toolchain
-      # heisst: die CI kann rot werden, ohne dass sich eine Zeile aendert -
-      # sobald eine Rust-Veroeffentlichung einen Lint ergaenzt. Genau das ist
-      # schon einmal passiert (clippy::collapsible_match).
+      # Pinned, not `stable`. `-D warnings` on a moving toolchain means the CI
+      # can turn red without a single line changing - as soon as a Rust
+      # release adds a lint. Exactly that has happened before
+      # (clippy::collapsible_match).
       #
-      # Neue Lints gehen dadurch nicht verloren: der Job `lint-vorschau` unten
-      # laeuft auf `stable` und meldet sie, ohne zu blockieren. Diese Version
-      # darf jederzeit angehoben werden, wenn die Vorschau gruen ist.
+      # New lints are not lost: the `lint-preview` job below runs on `stable`
+      # and reports them without blocking. This version may be raised at any
+      # time once the preview is green.
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@1.98.0
         with:
@@ -39,8 +39,8 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Linting (Clippy)
-        # --all-targets deckt auch Tests, Beispiele und Benches ab. Ohne das lief
-        # Clippy nur ueber lib und bins - genau dort, wo die Warnungen NICHT waren.
+        # --all-targets also covers tests, examples and benches. Without it,
+        # Clippy only ran over lib and bins - exactly where the warnings were NOT.
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Build
@@ -56,20 +56,20 @@ jobs:
         run: cargo doc --no-deps --document-private-items
 
   msrv:
-    name: Mindest-Toolchain (MSRV)
+    name: Minimum toolchain (MSRV)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Die in den Cargo.toml deklarierte `rust-version` ist eine Zusage an
-      # Nutzer: cargo bricht darunter mit klarer Meldung ab. Damit die Zusage
-      # auch stimmt, wird sie hier gegen genau diese Toolchain gebaut - sonst
-      # rutscht unbemerkt ein neueres Sprachmittel hinein.
+      # The `rust-version` declared in the Cargo.toml files is a promise to
+      # users: cargo aborts below it with a clear message. To keep that promise
+      # true, the workspace is built here against exactly that toolchain -
+      # otherwise a newer language feature slips in unnoticed.
       #
-      # 1.88 ist nicht frei gewaehlt: ab dort liefert `Span::start()` auch im
-      # Prozedurmakro auf stable echte Positionen (proc-macro2 setzt dann
-      # `proc_macro_span_location`). Darunter sind alle Spans (0,0).
+      # 1.88 is not chosen arbitrarily: from there on, `Span::start()` returns
+      # real positions inside a procedural macro on stable (proc-macro2 then
+      # sets `proc_macro_span_location`). Below that, all spans are (0,0).
       - name: Install Rust 1.88
         uses: dtolnay/rust-toolchain@1.88.0
 
@@ -84,11 +84,11 @@ jobs:
       - name: Run Tests
         run: cargo test --workspace --verbose
 
-  lint-vorschau:
-    name: Lint-Vorschau (stable, nicht blockierend)
+  lint-preview:
+    name: Lint preview (stable, non-blocking)
     runs-on: ubuntu-latest
-    # Meldet Lints einer neueren Toolchain, bevor das Anheben der gepinnten
-    # Version faellig wird. Ein Fehlschlag hier ist eine Vorwarnung, kein Stopp.
+    # Reports lints of a newer toolchain before raising the pinned version
+    # becomes due. A failure here is an early warning, not a stop.
     continue-on-error: true
     steps:
       - name: Checkout Code
@@ -102,7 +102,7 @@ jobs:
       - name: Cache Cargo Registry
         uses: Swatinem/rust-cache@v2
         with:
-          key: lint-vorschau
+          key: lint-preview
 
       - name: Check Formatting
         run: cargo fmt --all -- --check

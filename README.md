@@ -27,9 +27,6 @@ separately; neither crate depends on the other.
 - **[Architecture decisions](docs/adr/)** — the ADRs.
 - **[Limitations](docs/LIMITATIONS.md)** — what this design cannot do, and why.
 
-> Some of these design documents are written in German; the crate
-> documentation, the grammar reference and all public API docs are in English.
-
 - **[Extending guide](EXTENDING.md)** — for authors of alternative backends.
   **Outdated**: it describes an API that no longer exists. The header of the
   file says what changed.

@@ -1,0 +1,7 @@
+error: grammar inheritance (`grammar Derived : Base`) was removed in 0.9.0
+       help: `import Base as base;` and call its rules as `base::rule` (see "Importing Another Grammar" in SYNTAX.md)
+       help: for a single hand-written parser, declare an `extern rule`
+  --> tests/ui/inheritance_removed.rs:14:21
+   |
+14 |     grammar Derived : Base {
+   |                     ^

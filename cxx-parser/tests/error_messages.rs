@@ -1,20 +1,20 @@
-//! Fehlermeldungs-Tests fuer den Abnahme-Benchmark.
+//! Error message tests for the acceptance benchmark.
 //!
-//! `GOALS.md` macht `cxx-parser` zum Massstab: er "muss super funktionieren und
-//! perfekte Fehlermeldungen liefern". Geprueft wurde bisher aber nur der
-//! Erfolgsfall (`src/cxx_parser.rs`, `parse_complex_cxx_bridge`) - mit nackten
-//! `assert_eq!`, ohne das gemeinsame Testframework und ohne eine einzige
-//! Zusicherung ueber eine Fehlermeldung.
+//! `GOALS.md` makes `cxx-parser` the yardstick: it "must work great and deliver
+//! perfect error messages". Until now only the success case was checked
+//! (`src/cxx_parser.rs`, `parse_complex_cxx_bridge`) - with bare `assert_eq!`,
+//! without the shared test framework and without a single assertion about an
+//! error message.
 //!
-//! Diese Datei schliesst die Luecke. Sie prueft den Vertrag aus
-//! `docs/adr/adr13-error-message-contract.md` an echten, kaputten
-//! CXX-Bridge-Eingaben - nicht an kuenstlichen Minimalgrammatiken.
+//! This file closes the gap. It checks the contract from
+//! `docs/adr/adr13-error-message-contract.md` against real, broken CXX bridge
+//! inputs - not against artificial minimal grammars.
 
 use cxx_parser::CxxParser;
 use syn::parse::Parser;
 use syn_grammar::testing::Testable;
 
-/// Kurzform: Quelltext parsen und in das gemeinsame `TestResult` heben.
+/// Shorthand: parse source text and lift it into the shared `TestResult`.
 fn parse(src: &str) -> syn_grammar::testing::TestResult<cxx_parser::FfiMod, syn::Error> {
     CxxParser::parse_top_level_mod
         .parse_str(src)
@@ -22,11 +22,11 @@ fn parse(src: &str) -> syn_grammar::testing::TestResult<cxx_parser::FfiMod, syn:
         .with_source(src)
 }
 
-/// ADR 13, Punkt 4: der Regelstapel wird mehrzeilig von innen nach aussen
-/// ausgegeben, de-snake-cased. Das ist die Eigenschaft, die eine Meldung in
-/// einer verschachtelten Grammatik ueberhaupt erst verortbar macht.
+/// ADR 13, point 4: the rule stack is printed on multiple lines from inside
+/// out, de-snake-cased. That is the property that makes a message in a nested
+/// grammar locatable in the first place.
 #[test]
-fn regelstapel_zeigt_den_weg_von_innen_nach_aussen() {
+fn rule_stack_shows_the_way_from_inside_out() {
     parse(r#"mod ffi { extern "C++" { fn f(a: ); } }"#)
         .assert_failure_contains("in cxx arg")
         .assert_failure_contains("in cxx item")
@@ -34,73 +34,72 @@ fn regelstapel_zeigt_den_weg_von_innen_nach_aussen() {
         .assert_failure_contains("in top level mod");
 }
 
-/// ADR 13, Punkt 11: Listen benennen ihr Element und den Index. Das Label kommt
-/// aus `item_label="function argument"` in der Grammatik.
+/// ADR 13, point 11: lists name their item and the index. The label comes
+/// from `item_label="function argument"` in the grammar.
 #[test]
-fn listenfehler_nennt_element_und_index() {
+fn list_error_names_item_and_index() {
     parse(r#"mod ffi { extern "C++" { fn f(a: i32, , b: i32); } }"#)
         .assert_failure_contains("expected function argument")
         .assert_failure_contains("in function argument 2");
 }
 
-/// Der Index zaehlt mit: derselbe Fehler im ersten Argument nennt Index 1.
+/// The index counts along: the same error in the first argument names index 1.
 #[test]
-fn listenindex_zaehlt_mit() {
+fn list_index_counts_along() {
     parse(r#"mod ffi { extern "C++" { fn f(a: ); } }"#)
         .assert_failure_contains("in function argument 1");
 }
 
-/// ADR 13, Punkt 3: am Eingabeende die Praefixform statt einer nackten
-/// "expected"-Meldung.
+/// ADR 13, point 3: at the end of the input the prefix form instead of a bare
+/// "expected" message.
 #[test]
-fn eingabeende_wird_benannt() {
+fn end_of_input_is_named() {
     parse(r#"mod ffi { extern "C++" { fn f(a: ); } }"#)
         .assert_failure_contains("unexpected end of input");
 }
 
-/// ADR 13, Punkt 3: das tatsaechlich Vorgefundene wird benannt - hier ein
-/// Schluesselwort, das als Item-Name nicht in Frage kommt.
+/// ADR 13, point 3: what was actually found is named - here a keyword that
+/// is out of the question as an item name.
 #[test]
-fn gefundenes_token_wird_benannt() {
+fn found_token_is_named() {
     parse(r#"mod ffi { extern "C++" { struct S; } }"#)
         .assert_failure_contains("expected identifier")
         .assert_failure_contains("found keyword `struct`");
 }
 
-/// Scheitert die aeusserste Regel sofort, bleibt der Stapel einzeilig - es wird
-/// kein Kontext erfunden, den es nicht gibt.
+/// If the outermost rule fails immediately, the stack stays a single line - no
+/// context is invented that does not exist.
 #[test]
-fn fehler_ganz_aussen_bleibt_knapp() {
+fn outermost_error_stays_brief() {
     parse(r#"extern "C++" { }"#)
         .assert_failure_contains("expected `mod`")
         .assert_failure_contains("in top level mod")
         .assert_failure_not_contains("in extern block");
 }
 
-/// Ein `syn`-Typ, der ueber die Bruecke geparst wird, liefert seine eigene
-/// Meldung - und bekommt trotzdem den Regelkontext der Grammatik angehaengt.
+/// A `syn` type parsed via the bridge returns its own message - and still gets
+/// the grammar's rule context appended.
 #[test]
-fn syn_typ_fehler_behaelt_grammatik_kontext() {
+fn syn_type_error_keeps_grammar_context() {
     parse(r#"mod ffi { extern C++ { } }"#)
         .assert_failure_contains("expected string literal")
         .assert_failure_contains("in extern block");
 }
 
-/// Ein Argument, das gleich an seiner Anfangsstelle scheitert, wird als
-/// fehlendes Listenelement gemeldet - nicht als fehlender Trenner.
+/// An argument that fails right at its start position is reported as a missing
+/// list item - not as a missing separator.
 ///
-/// `cxx_arg` scheitert an `123`, ohne ein Token zu verbrauchen. Die Liste ist
-/// optional (`cxx_arg_list?`, also `min=0`), der Grund wird deshalb nur in
-/// `ParseContext::furthest` gemerkt. Direkt danach scheitert das optionale
-/// `","?` an derselben Stelle und wird ebenfalls gemerkt.
+/// `cxx_arg` fails on `123` without consuming a token. The list is optional
+/// (`cxx_arg_list?`, i.e. `min=0`), so the reason is only recorded in
+/// `ParseContext::furthest`. Right after that the optional `","?` fails at the
+/// same position and is recorded as well.
 ///
-/// Beide stehen am gleichen Cursor, und bei Gleichstand gibt `merge` dem
-/// spaeteren den Vorzug. Damit hier nicht der nichtssagende Trenner-Fehler
-/// gewinnt, bekommt die Elementerwartung den Rang einer Beschriftung
-/// (`PRIO_LABELED`); ein blosser Token-Fehler hat `PRIO_NORMAL`. Vorher stand
-/// hier ``expected `,` ``.
+/// Both are at the same cursor, and on a tie `merge` prefers the later one. So
+/// that the meaningless separator error does not win here, the item expectation
+/// gets the rank of a label (`PRIO_LABELED`); a mere token error has
+/// `PRIO_NORMAL`. Previously ``expected `,` `` stood here.
 #[test]
-fn ungueltiges_argument_wird_als_fehlendes_element_gemeldet() {
+fn invalid_argument_is_reported_as_missing_item() {
     parse(r#"mod ffi { extern "C++" { fn f( 123 ); } }"#)
         .assert_failure_contains("expected function argument")
         .assert_failure_contains("in function argument 1")

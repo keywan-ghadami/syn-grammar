@@ -48,42 +48,42 @@ fn test_generic_inference() {
         .assert_success_is(expected);
 }
 
-/// Der Builtin-Katalog (`backend.rs`) deklariert fuer jedes Builtin einen
-/// Rueckgabetyp. `monomorphize::infer_type` liest genau diesen Eintrag, um den
-/// Generic-Parameter einer Regel zu bestimmen - ein falscher Eintrag erzeugt
-/// deshalb einen Compilerfehler im *generierten* Code, nicht an der Aufrufstelle.
+/// The builtin catalogue (`backend.rs`) declares a return type for every
+/// builtin. `monomorphize::infer_type` reads exactly that entry to determine the
+/// generic parameter of a rule - a wrong entry therefore produces a compiler
+/// error in the *generated* code, not at the call site.
 ///
-/// `digit`, `hex_digit` und `oct_digit` waren als `syn::Ident` deklariert,
-/// liefern aber `syn::LitInt` (`token_filter.rs`). Dieser Test bindet die drei
-/// ueber eine generische Regel ein und schlaegt bei einem falschen Katalogeintrag
-/// fehl, bevor irgendein Nutzer darueber stolpert.
+/// `digit`, `hex_digit` and `oct_digit` were declared as `syn::Ident` but
+/// return `syn::LitInt` (`token_filter.rs`). This test binds the three via a
+/// generic rule and fails on a wrong catalogue entry before any user stumbles
+/// over it.
 #[test]
-fn generische_regel_mit_token_filtern() {
+fn generic_rule_with_token_filters() {
     grammar! {
         grammar digit_generics {
-            rule liste<T>(item) -> Vec<T> = items:item* -> { items }
+            rule list<T>(item) -> Vec<T> = items:item* -> { items }
 
-            pub rule dezimal -> Vec<syn::LitInt> = l:liste(item=digit) -> { l }
-            pub rule hexadezimal -> Vec<syn::LitInt> = l:liste(item=hex_digit) -> { l }
-            pub rule oktal -> Vec<syn::LitInt> = l:liste(item=oct_digit) -> { l }
+            pub rule decimal -> Vec<syn::LitInt> = l:list(item=digit) -> { l }
+            pub rule hexadecimal -> Vec<syn::LitInt> = l:list(item=hex_digit) -> { l }
+            pub rule octal -> Vec<syn::LitInt> = l:list(item=oct_digit) -> { l }
         }
     }
 
-    let werte = digit_generics::parse_dezimal
+    let values = digit_generics::parse_decimal
         .parse_str("1 2 3")
         .test()
         .assert_success();
-    let gelesen: Vec<String> = werte
+    let digits: Vec<String> = values
         .iter()
         .map(|l| l.base10_digits().to_string())
         .collect();
-    assert_eq!(gelesen, vec!["1", "2", "3"]);
+    assert_eq!(digits, vec!["1", "2", "3"]);
 
-    digit_generics::parse_hexadezimal
+    digit_generics::parse_hexadecimal
         .parse_str("10 11")
         .test()
         .assert_success();
-    digit_generics::parse_oktal
+    digit_generics::parse_octal
         .parse_str("7 5")
         .test()
         .assert_success();

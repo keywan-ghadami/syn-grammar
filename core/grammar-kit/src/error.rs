@@ -2,64 +2,72 @@ use proc_macro2::Span;
 use std::fmt;
 use syn::buffer::Cursor;
 
-/// Das Ergebnis eines Parseschritts.
+/// The result of a parse step.
 ///
-/// Bei Erfolg der Wert **und** der Cursor dahinter - dieser neue Cursor *ist*
-/// der Fortschritt. Zuruecksetzen heisst schlicht, ihn nicht zu benutzen.
+/// On success the value **and** the cursor behind it - this new cursor *is*
+/// the progress. Resetting simply means not using it.
 pub type ParseResult<'a, T> = Result<(T, Cursor<'a>), ParseError<'a>>;
 
-// Prioritätsleiter nach ADR 13, Punkt 8. Nur relevant, wenn zwei Fehler an
-// derselben Stelle stehen — Fortschritt schlägt Priorität.
+// Priority ladder per ADR 13, point 8. Only relevant when two errors are at
+// the same position — progress beats priority.
 
-/// Gewöhnlicher Parsefehler.
+/// Ordinary parse error.
 pub const PRIO_NORMAL: u8 = 0;
-/// Eine benannte Alternative (`# "…"`) ist an ihrer Grenze gescheitert.
+/// A labelled alternative (`# "…"`) failed at its boundary.
 pub const PRIO_LABELED: u8 = 10;
-/// Zusammengefasste Erwartungen mehrerer Alternativen (`expected one of: …`).
+/// Aggregated expectations of several alternatives (`expected one of: …`).
 pub const PRIO_AGGREGATED: u8 = 20;
-/// `fail(..)` oder hinter einem Cut: schlägt alles andere.
+/// `fail(..)` or behind a cut: beats everything else.
 pub const PRIO_STRUCTURAL: u8 = 50;
 
-/// Ein Parsefehler.
+/// A parse error.
 ///
-/// Traegt getrennt, was er zur *Anzeige* (`span`) und was er zur *Auswahl*
-/// (`at`) braucht - siehe `docs/ERROR_HANDLING.md`.
+/// Carries separately what it needs for *display* (`span`) and what it needs
+/// for *selection* (`at`) - see `docs/ERROR_HANDLING.md`.
 #[derive(Clone)]
 pub struct ParseError<'a> {
-    /// Für die ANZEIGE: rustc unterstreicht diesen Span im Editor.
+    /// For DISPLAY: rustc underlines this span in the editor.
     pub span: Span,
-    /// Für die AUSWAHL: wie weit kam der Parser, als es schiefging.
+    /// For SELECTION: how far the parser got when things went wrong.
     ///
-    /// Bewusst nicht über `span.start()` gemessen: `Cursor` implementiert
-    /// `PartialOrd` als Zeigervergleich im gemeinsamen `TokenBuffer` — O(1) und
-    /// unabhängig von der Compilerversion.
+    /// Deliberately not measured via `span.start()`: `Cursor` implements
+    /// `PartialOrd` as a pointer comparison within the shared `TokenBuffer` —
+    /// O(1) and independent of the compiler version.
     ///
-    /// Bis Rust 1.87 lieferte `Span::start()` im Prozedurmakro zudem für jeden
-    /// Span `(0,0)` (proc-macro2, `Span::Compiler` ohne
-    /// `proc_macro_span_location`), womit ein Positionsvergleich dort wirkungslos
-    /// gewesen wäre. Seit 1.88 ist das behoben — die Cursor-Metrik bleibt
-    /// trotzdem, weil sie billiger ist und an nichts hängt.
+    /// Up to Rust 1.87, `Span::start()` inside a procedural macro also returned
+    /// `(0,0)` for every span (proc-macro2, `Span::Compiler` without
+    /// `proc_macro_span_location`), so a position comparison would have been
+    /// ineffective there. Since 1.88 that is fixed — the cursor metric stays
+    /// nonetheless, because it is cheaper and depends on nothing.
     ///
-    /// `None` nur dort, wo beim Erzeugen kein Cursor zur Hand ist (etwa bei der
-    /// Übernahme eines fremden `syn::Error`).
+    /// `None` only where no cursor is at hand when creating the error (e.g. when
+    /// adopting a foreign `syn::Error`).
     pub at: Option<Cursor<'a>>,
-    /// Der Meldungstext. Waehrend des Parsens nie veraendert; formatiert wird
-    /// genau einmal am Ende.
+    /// The message text. Never modified during parsing; formatted exactly once
+    /// at the end.
     pub message: String,
-    /// Rang bei *gleicher* Stelle. Siehe die `PRIO_*`-Konstanten.
+    /// Rank at the *same* position. See the `PRIO_*` constants.
     pub priority: u8,
-    /// Hinter einem Cut (`=>`): die Ableitung ist festgelegt, Zurücksetzen ist
-    /// sinnlos. Bewusst getrennt von `priority` — `fail(..)` ist hochprior, aber
-    /// nicht fatal und nimmt deshalb am Fortschrittsvergleich teil.
+    /// Behind a cut (`=>`): the derivation is fixed, resetting is pointless.
+    /// Deliberately separate from `priority` — `fail(..)` is high-priority but
+    /// not fatal and therefore takes part in the progress comparison.
     pub is_fatal: bool,
-    /// Die Regeln, in denen der Fehler auftrat, innerste zuerst. Nur fuer die
-    /// Anzeige - die Auswahl benutzt ihn nicht.
+    /// The rules in which the error occurred, innermost first. Only for
+    /// display - the selection does not use it.
     pub rule_stack: Vec<String>,
+    /// What would have been accepted at `at`, as display names without
+    /// backticks (`identifier`, `parentheses`, `a number`). Empty for errors
+    /// that only carry a message (syn's own errors, `fail(..)`).
+    ///
+    /// The alternative chain unions these sets of all branches that failed at
+    /// their boundary, so that `expected one of:` lists *every* alternative
+    /// and not only the ones that could be peeked (ADR 13, point 6).
+    pub expected: Vec<String>,
 }
 
 impl<'a> ParseError<'a> {
-    /// Ohne Cursor — nur verwenden, wenn wirklich keiner verfügbar ist.
-    /// Solche Fehler verlieren jeden Fortschrittsvergleich gegen einen mit Cursor.
+    /// Without a cursor — use only when really none is available.
+    /// Such errors lose every progress comparison against one with a cursor.
     pub fn new(span: Span, message: impl Into<String>) -> Self {
         Self {
             span,
@@ -68,10 +76,11 @@ impl<'a> ParseError<'a> {
             priority: 0,
             is_fatal: false,
             rule_stack: Vec::new(),
+            expected: Vec::new(),
         }
     }
 
-    /// Der Normalfall: Fehler an der Stelle, an der der Parser steht.
+    /// The normal case: an error at the position where the parser is.
     pub fn at_cursor(cursor: Cursor<'a>, message: impl Into<String>) -> Self {
         Self {
             span: cursor.span(),
@@ -80,40 +89,57 @@ impl<'a> ParseError<'a> {
             priority: 0,
             is_fatal: false,
             rule_stack: Vec::new(),
+            expected: Vec::new(),
         }
     }
 
-    /// Hängt einen Cursor an einen Fehler, der ohne erzeugt wurde.
+    /// An error that expected exactly one thing at `cursor`: the message is
+    /// `expected <what>` and [`expected`](Self::expected) records `what`, so
+    /// that an enclosing alternative chain can list it.
+    pub fn expecting(cursor: Cursor<'a>, what: impl Into<String>) -> Self {
+        let what = what.into();
+        let mut e = Self::at_cursor(cursor, format!("expected {what}"));
+        e.expected = vec![what];
+        e
+    }
+
+    /// Records `what` as the expectation without touching the message.
+    pub fn with_expected(mut self, what: impl Into<String>) -> Self {
+        self.expected = vec![what.into()];
+        self
+    }
+
+    /// Attaches a cursor to an error that was created without one.
     pub fn with_cursor(mut self, cursor: Cursor<'a>) -> Self {
         self.at = Some(cursor);
         self
     }
 
-    /// Setzt die Prioritaet (siehe die `PRIO_*`-Konstanten).
+    /// Sets the priority (see the `PRIO_*` constants).
     pub fn with_priority(mut self, prio: u8) -> Self {
         self.priority = prio;
         self
     }
 
-    /// Markiert den Fehler als hinter einem Cut entstanden.
+    /// Marks the error as having occurred behind a cut.
     pub fn as_fatal(mut self) -> Self {
         self.is_fatal = true;
         self.priority = PRIO_STRUCTURAL;
         self
     }
 
-    /// Haengt einen Regelnamen an den Stapel an - benutzt auf dem
-    /// Rueckgabepfad, wenn eine aeussere Regel einen Fehler herausreicht.
+    /// Appends a rule name to the stack - used on the return path when an
+    /// outer rule passes an error outward.
     pub fn push_rule(&mut self, rule: &str) {
         self.rule_stack.push(rule.to_string());
     }
 
-    /// Kam `self` weiter als `other`?
+    /// Did `self` get further than `other`?
     ///
-    /// `None`, wenn sich die beiden nicht vergleichen lassen — entweder weil einem der
-    /// Cursor fehlt oder weil sie aus verschiedenen `TokenBuffer`n stammen. Innerhalb
-    /// eines Parse-Laufs teilen sich alle Cursor einen Buffer, auch die aus
-    /// `Cursor::group`; der Fall ist also defensiv, nicht der Normalfall.
+    /// `None` if the two cannot be compared — either because one lacks the cursor or
+    /// because they come from different `TokenBuffer`s. Within one parse run all
+    /// cursors share one buffer, including those from `Cursor::group`; so the case is
+    /// defensive, not the normal case.
     fn progress_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self.at, other.at) {
             (Some(a), Some(b)) => a.partial_cmp(&b),
@@ -121,25 +147,25 @@ impl<'a> ParseError<'a> {
         }
     }
 
-    /// Wählt aus zwei konkurrierenden Fehlern den aussagekräftigeren.
+    /// Picks the more meaningful of two competing errors.
     ///
-    /// Reihenfolge: Fortschritt, dann Priorität (`fail`/Cut > Label > Standard).
+    /// Order: progress, then priority (`fail`/cut > label > default).
     ///
-    /// Fortschritt kommt bewusst ZUERST - auch vor einem `fail(..)`. Wer mehr Tokens
-    /// erfolgreich verarbeitet hat, war näher an der gemeinten Ableitung; ein früher
-    /// stehendes `fail` beschreibt dann einen Zweig, den der Parser gar nicht meinte.
-    /// Siehe `error_abstraction_test::test_fail_vs_deep_error`.
+    /// Progress deliberately comes FIRST - even before a `fail(..)`. Whoever processed
+    /// more tokens successfully was closer to the intended derivation; a `fail` located
+    /// earlier then describes a branch the parser did not mean at all.
+    /// See `error_abstraction_test::test_fail_vs_deep_error`.
     pub fn merge(self, other: Self) -> Self {
-        // 1. Fortschritt: wer weiter im Input kam, gewinnt - auch gegen einen
-        //    `fail(..)`, das frueher stand. Wer mehr Tokens erfolgreich verarbeitet
-        //    hat, war naeher an der gemeinten Ableitung.
+        // 1. Progress: whoever got further in the input wins - even against a
+        //    `fail(..)` located earlier. Whoever processed more tokens successfully
+        //    was closer to the intended derivation.
         match self.progress_cmp(&other) {
             Some(std::cmp::Ordering::Greater) => return self,
             Some(std::cmp::Ordering::Less) => return other,
             Some(std::cmp::Ordering::Equal) => {}
             None => {
-                // Kein Cursorvergleich möglich. Ein Fehler MIT Fortschrittsangabe ist
-                // aussagekräftiger als einer ohne.
+                // No cursor comparison possible. An error WITH progress information
+                // is more meaningful than one without.
                 match (self.at.is_some(), other.at.is_some()) {
                     (true, false) => return self,
                     (false, true) => return other,
@@ -148,12 +174,12 @@ impl<'a> ParseError<'a> {
             }
         }
 
-        // 2. Fatalität schlägt bei GLEICHER Stelle alles andere.
+        // 2. Fatality beats everything else at the SAME position.
         if self.is_fatal != other.is_fatal {
             return if self.is_fatal { self } else { other };
         }
 
-        // 3. Priorität: fail > Label > Standard. Bei Gleichstand gewinnt der neuere.
+        // 3. Priority: fail > label > default. On a tie the newer one wins.
         if self.priority > other.priority {
             self
         } else {
@@ -162,7 +188,7 @@ impl<'a> ParseError<'a> {
     }
 }
 
-/// Action-Bloecke in Grammatiken duerfen weiterhin mit `syn::Error` scheitern.
+/// Action blocks in grammars may still fail with `syn::Error`.
 impl<'a> From<syn::Error> for ParseError<'a> {
     fn from(e: syn::Error) -> Self {
         ParseError::new(e.span(), e.to_string())
@@ -175,6 +201,7 @@ impl<'a> fmt::Debug for ParseError<'a> {
             .field("message", &self.message)
             .field("priority", &self.priority)
             .field("rule_stack", &self.rule_stack)
+            .field("expected", &self.expected)
             .field("has_cursor", &self.at.is_some())
             .finish()
     }
@@ -185,9 +212,9 @@ impl<'a> fmt::Display for ParseError<'a> {
         let mut msg = self.message.clone();
         let start = self.span.start();
 
-        // Position nur anhängen, wenn sie etwas aussagt. Ein Span ohne
-        // Positionsdaten meldet Zeile 0 — das wäre irreführend statt hilfreich,
-        // und rustc unterstreicht den Span ohnehin selbst. Siehe ADR 13, Punkt 4.
+        // Append the position only if it says something. A span without
+        // position data reports line 0 — that would be misleading rather than
+        // helpful, and rustc underlines the span itself anyway. See ADR 13, point 4.
         if start.line != 0 && !msg.contains("at column ") {
             msg = format!("{} at column {} (line {})", msg, start.column, start.line);
         }
@@ -209,98 +236,99 @@ mod tests {
     use super::*;
     use syn::buffer::TokenBuffer;
 
-    /// Der Kerntest zu ADR 13, Punkt 8.
+    /// The core test for ADR 13, point 8.
     ///
-    /// Die Auswahl des besten Fehlers darf nicht am Span hängen — Spans können
-    /// gleich sein, ohne dass die Fehler es sind (bis Rust 1.87 trugen im
-    /// Prozedurmakro sogar ALLE dieselbe Position `(0,0)`). Hier bekommen beide
-    /// Fehler bewusst denselben Span; unterscheidbar sind sie allein über den
-    /// Cursor.
+    /// Selecting the best error must not depend on the span — spans can be
+    /// equal without the errors being so (up to Rust 1.87, inside a procedural
+    /// macro ALL of them even carried the same position `(0,0)`). Here both
+    /// errors deliberately get the same span; they are distinguishable solely
+    /// via the cursor.
     #[test]
-    fn auswahl_funktioniert_bei_identischen_spans() {
+    fn selection_works_with_identical_spans() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
 
-        let flach = buf.begin();
-        let tief = flach.token_tree().unwrap().1.token_tree().unwrap().1;
+        let shallow = buf.begin();
+        let deep = shallow.token_tree().unwrap().1.token_tree().unwrap().1;
 
-        let gleicher_span = Span::call_site();
-        let flacher = ParseError::new(gleicher_span, "flach").with_cursor(flach);
-        let tieferer = ParseError::new(gleicher_span, "tief").with_cursor(tief);
+        let same_span = Span::call_site();
+        let shallower = ParseError::new(same_span, "shallow").with_cursor(shallow);
+        let deeper = ParseError::new(same_span, "deep").with_cursor(deep);
 
-        // Der weiter gekommene Fehler gewinnt - unabhaengig von der Reihenfolge.
-        assert_eq!(flacher.clone().merge(tieferer.clone()).message, "tief");
-        assert_eq!(tieferer.merge(flacher).message, "tief");
+        // The error that got further wins - regardless of the order.
+        assert_eq!(shallower.clone().merge(deeper.clone()).message, "deep");
+        assert_eq!(deeper.merge(shallower).message, "deep");
     }
 
-    /// Fortschritt schlägt Priorität — auch ein `fail(..)`, das früher steht.
-    /// Wer mehr Tokens verarbeitet hat, war näher an der gemeinten Ableitung.
+    /// Progress beats priority — even a `fail(..)` located earlier.
+    /// Whoever processed more tokens was closer to the intended derivation.
     #[test]
-    fn fortschritt_schlaegt_fail_prioritaet() {
+    fn progress_beats_fail_priority() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
 
-        let flach = buf.begin();
-        let tief = flach.token_tree().unwrap().1.token_tree().unwrap().1;
+        let shallow = buf.begin();
+        let deep = shallow.token_tree().unwrap().1.token_tree().unwrap().1;
 
-        let flach_fail = ParseError::at_cursor(flach, "hard fail").with_priority(PRIO_STRUCTURAL);
-        let tief_normal = ParseError::at_cursor(tief, "tief");
+        let shallow_fail =
+            ParseError::at_cursor(shallow, "hard fail").with_priority(PRIO_STRUCTURAL);
+        let deep_normal = ParseError::at_cursor(deep, "deep");
 
         assert_eq!(
-            flach_fail.clone().merge(tief_normal.clone()).message,
-            "tief"
+            shallow_fail.clone().merge(deep_normal.clone()).message,
+            "deep"
         );
-        assert_eq!(tief_normal.merge(flach_fail).message, "tief");
+        assert_eq!(deep_normal.merge(shallow_fail).message, "deep");
     }
 
-    /// An DERSELBEN Stelle entscheidet dann die Priorität zugunsten von `fail`.
+    /// At the SAME position the priority then decides in favour of `fail`.
     #[test]
-    fn bei_gleicher_stelle_gewinnt_fail() {
+    fn at_same_position_fail_wins() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
-        let hier = buf.begin();
+        let here = buf.begin();
 
-        let f = ParseError::at_cursor(hier, "hard fail").with_priority(PRIO_STRUCTURAL);
-        let n = ParseError::at_cursor(hier, "normal");
+        let f = ParseError::at_cursor(here, "hard fail").with_priority(PRIO_STRUCTURAL);
+        let n = ParseError::at_cursor(here, "normal");
 
         assert_eq!(f.clone().merge(n.clone()).message, "hard fail");
         assert_eq!(n.merge(f).message, "hard fail");
     }
 
-    /// Ein Fehler ohne Fortschrittsangabe verliert gegen einen mit.
+    /// An error without progress information loses against one with it.
     #[test]
-    fn fehler_mit_cursor_schlaegt_fehler_ohne() {
+    fn error_with_cursor_beats_error_without() {
         let tokens: proc_macro2::TokenStream = "a b c".parse().unwrap();
         let buf = TokenBuffer::new2(tokens);
-        let mit = ParseError::at_cursor(buf.begin(), "mit");
-        let ohne = ParseError::new(Span::call_site(), "ohne");
+        let with_at = ParseError::at_cursor(buf.begin(), "with_at");
+        let without_at = ParseError::new(Span::call_site(), "without_at");
 
-        assert_eq!(mit.clone().merge(ohne.clone()).message, "mit");
-        assert_eq!(ohne.merge(mit).message, "mit");
+        assert_eq!(with_at.clone().merge(without_at.clone()).message, "with_at");
+        assert_eq!(without_at.merge(with_at).message, "with_at");
     }
 
-    /// Anzeige der Position (ADR 13, Punkt 4).
+    /// Display of the position (ADR 13, point 4).
     ///
-    /// Ausserhalb eines Prozedurmakros benutzt proc-macro2 seinen Fallback und liefert
-    /// echte Zeilen (ab 1) — die Position gehoert dann in die Meldung. Ein Span ohne
-    /// Positionsdaten meldet Zeile 0 und wird von `Display` unterdrueckt; dieser Fall
-    /// laesst sich hier nicht nachstellen, weil sich ein `Span::Compiler` ausserhalb
-    /// eines echten Makros nicht erzeugen laesst. Der Test haelt deshalb fest, dass die
-    /// Angabe im Normalfall erscheint — die Unterdrueckung selbst sichert die
-    /// `line != 0`-Bedingung in `Display`.
+    /// Outside a procedural macro proc-macro2 uses its fallback and returns real lines
+    /// (from 1) — the position then belongs in the message. A span without position
+    /// data reports line 0 and is suppressed by `Display`; that case cannot be
+    /// reproduced here because a `Span::Compiler` cannot be created outside a real
+    /// macro. The test therefore records that the information appears in the normal
+    /// case — the suppression itself is guarded by the `line != 0` condition in
+    /// `Display`.
     #[test]
-    fn position_wird_im_fallback_gedruckt() {
+    fn position_is_printed_in_fallback() {
         let e = ParseError::new(Span::call_site(), "expected `x`");
         assert_eq!(e.to_string(), "expected `x` at column 0 (line 1)");
     }
 
-    /// Der Regelstapel haengt von innen nach aussen an und dedupliziert.
+    /// The rule stack is appended from inside out and deduplicated.
     #[test]
-    fn regelstapel_wird_angehaengt() {
+    fn rule_stack_is_appended() {
         let mut e = ParseError::new(Span::call_site(), "expected `x`");
         e.push_rule("inner");
         e.push_rule("outer");
-        e.push_rule("outer"); // Duplikat wird nicht erneut angehaengt
+        e.push_rule("outer"); // duplicate is not appended again
         assert_eq!(
             e.to_string(),
             "expected `x` at column 0 (line 1)\nin inner\nin outer"

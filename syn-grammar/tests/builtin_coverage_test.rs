@@ -1,14 +1,14 @@
-//! Abdeckung fuer die eingebauten Regeln, die bisher kein Test angefasst hat.
+//! Coverage for the built-in rules that no test had touched before.
 //!
-//! Der Katalog in `syn-grammar-macros/src/backend.rs` hat 60 Eintraege; vor
-//! dieser Datei waren 39 davon ungetestet - darunter die komplette
-//! `spanned_*`-Familie, alle Token-Filter und die syn-Interop-Builtins. Genau in
-//! dieser Zone lagen die beiden Defekte, die der Review gefunden hat (falscher
-//! Rueckgabetyp bei `digit`/`hex_digit`/`oct_digit`, toter Katalogeintrag
-//! `fail`). Ein ungetestetes Builtin ist ein Versprechen ohne Deckung.
+//! The catalogue in `syn-grammar-macros/src/backend.rs` has 60 entries; before
+//! this file 39 of them were untested - among them the complete `spanned_*`
+//! family, all token filters and the syn interop builtins. Exactly in this zone
+//! were the two defects the review found (wrong return type for
+//! `digit`/`hex_digit`/`oct_digit`, dead catalogue entry `fail`). An untested
+//! builtin is a promise without cover.
 //!
-//! Gebuendelt nach Familie statt 39 Einzeltests: eine Grammatik pro Familie,
-//! darin je eine Regel pro Builtin.
+//! Bundled by family instead of 39 individual tests: one grammar per family,
+//! with one rule per builtin in it.
 
 use syn::parse::Parser;
 use syn_grammar::grammar;
@@ -16,7 +16,7 @@ use syn_grammar::testing::Testable;
 use syn_grammar::types::SpannedValue;
 
 #[test]
-fn ganzzahl_breiten() {
+fn integer_widths() {
     mod inner {
         use super::*;
         grammar! {
@@ -82,12 +82,12 @@ fn ganzzahl_breiten() {
         .test()
         .assert_success_is(7usize);
 
-    // Ueberlauf muss als Fehler ankommen, nicht still abgeschnitten werden.
+    // Overflow must arrive as an error, not be silently truncated.
     ints::parse_p_u8.parse_str("256").test().assert_failure();
 }
 
 #[test]
-fn zeichen_und_wahrheitswert() {
+fn char_and_bool() {
     mod inner {
         use super::*;
         grammar! {
@@ -118,11 +118,11 @@ fn zeichen_und_wahrheitswert() {
         .assert_success_is(2.5f64);
 }
 
-/// Die `spanned_*`-Familie: sie liefert `SpannedValue<T>` mit `value` und `span`.
-/// Sie war vollstaendig ungetestet, obwohl `syn_grammar::types` eigens dafuer
-/// re-exportiert wird.
+/// The `spanned_*` family: it returns `SpannedValue<T>` with `value` and `span`.
+/// It was completely untested, although `syn_grammar::types` is re-exported
+/// specifically for it.
 #[test]
-fn spanned_familie_liefert_wert_und_span() {
+fn spanned_family_returns_value_and_span() {
     mod inner {
         use super::*;
         grammar! {
@@ -252,21 +252,21 @@ fn spanned_familie_liefert_wert_und_span() {
         1usize
     );
 
-    let f32_wert: SpannedValue<f32> = sp::parse_s_f32.parse_str("1.5").test().assert_success();
-    assert!((f32_wert.value - 1.5f32).abs() < f32::EPSILON);
-    let f64_wert: SpannedValue<f64> = sp::parse_s_f64.parse_str("2.5").test().assert_success();
-    assert!((f64_wert.value - 2.5f64).abs() < f64::EPSILON);
+    let f32_value: SpannedValue<f32> = sp::parse_s_f32.parse_str("1.5").test().assert_success();
+    assert!((f32_value.value - 1.5f32).abs() < f32::EPSILON);
+    let f64_value: SpannedValue<f64> = sp::parse_s_f64.parse_str("2.5").test().assert_success();
+    assert!((f64_value.value - 2.5f64).abs() < f64::EPSILON);
 
-    // Der Span muss echte Positionsdaten tragen - sonst waere die ganze Familie
-    // sinnlos. Ueber `parse_str` laeuft proc-macro2 im Fallback, dort gibt es
-    // Zeile/Spalte (im echten Prozedurmakro erst ab Rust 1.88, siehe
-    // GOALS.md).
-    let mit_span = sp::parse_s_u32.parse_str("77").test().assert_success();
-    assert_eq!(mit_span.span.start().line, 1);
+    // The span must carry real position data - otherwise the whole family
+    // would be pointless. Via `parse_str` proc-macro2 runs in fallback mode,
+    // where line/column exist (inside a real procedural macro only from
+    // Rust 1.88 on, see GOALS.md).
+    let spanned_value = sp::parse_s_u32.parse_str("77").test().assert_success();
+    assert_eq!(spanned_value.span.start().line, 1);
 }
 
-/// Die Token-Filter. `digit`, `hex_digit` und `oct_digit` liefern `syn::LitInt`,
-/// nicht `syn::Ident` - der Katalog behauptete lange das Gegenteil.
+/// The token filters. `digit`, `hex_digit` and `oct_digit` return `syn::LitInt`,
+/// not `syn::Ident` - the catalogue claimed the opposite for a long time.
 #[test]
 fn token_filter() {
     mod inner {
@@ -304,14 +304,14 @@ fn token_filter() {
         .test()
         .assert_success_is("17".to_string());
 
-    // `alpha` darf keine Ziffern durchlassen.
+    // `alpha` must not let digits through.
     tf::parse_p_alpha
         .parse_str("a1")
         .test()
         .assert_failure_contains("expected an alphabetic identifier");
 }
 
-/// Die `lit_*`-Familie liefert die rohen syn-Token statt ausgewerteter Werte.
+/// The `lit_*` family returns the raw syn tokens instead of evaluated values.
 #[test]
 fn literal_token() {
     mod inner {
@@ -346,17 +346,17 @@ fn literal_token() {
         .test()
         .assert_success_is(3.5f64);
     lits::parse_p_str
-        .parse_str("\"hallo\"")
+        .parse_str("\"hello\"")
         .test()
-        .assert_success_is("hallo".to_string());
+        .assert_success_is("hello".to_string());
     lits::parse_p_byte
         .parse_str("b'A'")
         .test()
         .assert_success_is(b'A');
 }
 
-/// Die syn-Interop-Builtins. Sie fehlen ausgerechnet in der README-Tabelle, die
-/// genau dafuer da ist.
+/// The syn interop builtins. They are missing, of all places, from the README
+/// table that exists precisely for them.
 #[test]
 fn syn_interop_builtins() {
     mod inner {
@@ -400,12 +400,12 @@ fn syn_interop_builtins() {
         .assert_success_is("-> i32".to_string());
 }
 
-/// `any_ident` akzeptiert seit `201162a` Schluesselwoerter (`Ident::parse_any`)
-/// und ist damit nicht mehr funktionsgleich mit `ident`. Das ist eine
-/// Verhaltensaenderung ohne Signaturaenderung - genau die Sorte, die ohne Test
-/// unbemerkt zurueckfaellt.
+/// Since `201162a`, `any_ident` accepts keywords (`Ident::parse_any`) and is
+/// thus no longer functionally identical to `ident`. That is a behaviour change
+/// without a signature change - exactly the kind that regresses unnoticed
+/// without a test.
 #[test]
-fn any_ident_nimmt_schluesselwoerter_ident_nicht() {
+fn any_ident_accepts_keywords_ident_does_not() {
     mod inner {
         use super::*;
         grammar! {
@@ -437,54 +437,51 @@ fn any_ident_nimmt_schluesselwoerter_ident_nicht() {
     ids::parse_p_plain.parse_str("type").test().assert_failure();
 }
 
-/// Die drei Builtins, die der Review als echte Luecken identifiziert hat.
+/// The three builtins the review identified as real gaps.
 ///
-/// `syn::Pat` war ueber den `syn::`-Pfad gar nicht erreichbar, weil es kein
-/// `impl Parse` hat; `inner_attrs` fehlte als Gegenstueck zu `outer_attrs`;
-/// `lit_byte` schliesst das Namensschema der `lit_*`-Familie.
+/// `syn::Pat` was not reachable at all via the `syn::` path because it has no
+/// `impl Parse`; `inner_attrs` was missing as the counterpart of `outer_attrs`;
+/// `lit_byte` completes the naming scheme of the `lit_*` family.
 #[test]
-fn neu_ergaenzte_builtins() {
+fn newly_added_builtins() {
     mod inner {
         use super::*;
         grammar! {
-            grammar luecken {
+            grammar gaps {
                 pub p_pat -> String = v:pat -> { quote::quote!(#v).to_string() }
                 pub p_inner -> usize = v:inner_attrs -> { v.len() }
                 pub p_byte -> u8 = v:lit_byte -> { v.value() }
             }
         }
     }
-    use inner::luecken;
+    use inner::gaps;
 
-    // Einfaches Bindungsmuster, Tupelmuster und Oder-Muster.
-    luecken::parse_p_pat
+    // Simple binding pattern, tuple pattern and or-pattern.
+    gaps::parse_p_pat
         .parse_str("x")
         .test()
         .assert_success_is("x".to_string());
-    luecken::parse_p_pat
+    gaps::parse_p_pat
         .parse_str("(a, b)")
         .test()
         .assert_success_is("(a , b)".to_string());
-    luecken::parse_p_pat
+    gaps::parse_p_pat
         .parse_str("Some(v)")
         .test()
         .assert_success_is("Some (v)".to_string());
-    // Oder-Muster - genau der Fall, weshalb syn kein `impl Parse` anbietet.
-    luecken::parse_p_pat
-        .parse_str("A | B")
-        .test()
-        .assert_success();
+    // Or-pattern - exactly the case why syn offers no `impl Parse`.
+    gaps::parse_p_pat.parse_str("A | B").test().assert_success();
 
-    luecken::parse_p_inner
+    gaps::parse_p_inner
         .parse_str("#![allow(dead_code)]")
         .test()
         .assert_success_is(1usize);
-    luecken::parse_p_inner
+    gaps::parse_p_inner
         .parse_str("")
         .test()
         .assert_success_is(0usize);
 
-    luecken::parse_p_byte
+    gaps::parse_p_byte
         .parse_str("b'Z'")
         .test()
         .assert_success_is(b'Z');

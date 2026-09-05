@@ -1,169 +1,187 @@
-# Architektur (Ist-Zustand)
+# Architecture (as is)
 
-Beschreibt, wie der Code am 2026-08-30 auf `logic-changes` tatsächlich aussieht — nicht,
-wie er gedacht war. Ziele stehen in [`GOALS.md`](GOALS.md).
+Describes how the code actually looks on 2026-08-30 on `logic-changes` — not
+how it was meant to be. Goals are in [`GOALS.md`](GOALS.md).
 
-Alle Zeilenangaben sind gegen den Stand dieses Dokuments geprüft.
+All line numbers are checked against the state of this document.
 
-## Aufbau
+## Structure
 
-Der Weg von der Grammatik zum Parser hat drei Stufen:
+The path from grammar to parser has three stages:
 
 ```
-grammar! { … }                          Makro-Eingabe (TokenStream)
+grammar! { … }                          macro input (TokenStream)
       │
       ▼
-core/syn-grammar-model                  FRONTEND, backendunabhängig genutzt
-      parser.rs      1262 Z.   TokenStream → syntaktischer AST
-      model.rs        364 Z.   → semantisches Modell (ModelPattern, 19 Varianten, :61)
-      validator.rs    527 Z.   Ambiguität, Shadowing, indirekte Linksrekursion
-      analysis.rs    1153 Z.   Bindings, Nullable, Cut, Linksrekursion, Token-Auflösung
-      │                        Einstieg: parse_grammar::<B: Backend> (syn_grammar_model.rs:30)
+core/syn-grammar-model                  FRONT END, used backend-independently
+      parser.rs      1262 lines  TokenStream → syntactic AST
+      model.rs        364 lines  → semantic model (ModelPattern, 19 variants, :61)
+      validator.rs    527 lines  ambiguity, shadowing, indirect left recursion
+      analysis.rs    1153 lines  bindings, nullable, cut, left recursion, token resolution
+      │                          entry: parse_grammar::<B: Backend> (syn_grammar_model.rs:30)
       ▼
-syn-grammar/syn-grammar-macros          CODEGEN (syn-Backend)
-      codegen/rule.rs      273 Z.   Regeln, Varianten, Linksrekursion
-      codegen/pattern.rs   687 Z.   die 19 Muster
-      monomorphize.rs      420 Z.   Generics zur Makro-Zeit auflösen
-      backend.rs           262 Z.   BuiltIn-Katalog des syn-Backends
+syn-grammar/syn-grammar-macros          CODEGEN (syn backend)
+      codegen/rule.rs      273 lines  rules, variants, left recursion
+      codegen/pattern.rs   687 lines  the 19 patterns
+      monomorphize.rs      420 lines  resolve generics at macro time
+      backend.rs           262 lines  built-in catalogue of the syn backend
       │
       ▼
-core/grammar-kit + syn-grammar/src      RUNTIME, wird vom erzeugten Code aufgerufen
+core/grammar-kit + syn-grammar/src      RUNTIME, called by the generated code
 ```
 
-Der erzeugte Code spricht die Runtime über den Alias `rt` an
-(`syn-grammar/src/syn_grammar.rs:5-9`), der `grammar_kit::*`, `builtins` und
-`token_filter` bündelt.
+The generated code addresses the runtime through the alias `rt`
+(`syn-grammar/src/syn_grammar.rs:5-9`), which bundles `grammar_kit::*`,
+`builtins` and `token_filter`.
 
-## Frontend: `core/syn-grammar-model`
+## Front end: `core/syn-grammar-model`
 
-Parst die DSL, überführt sie ins semantische Modell und validiert sie.
-Einstieg `parse_grammar::<B: Backend>(TokenStream)` (`syn_grammar_model.rs:30-41`):
+Parses the DSL, transforms it into the semantic model and validates it. Entry
+`parse_grammar::<B: Backend>(TokenStream)` (`syn_grammar_model.rs:30-41`):
 `syn::parse2` → `.into()` → `validator::validate::<B>`.
 
-`ModelPattern` (`model.rs:61`) hat **19** Varianten: `Cut`, `Lit`, `RuleCall`, `Group`,
-`Bracketed`, `Braced`, `Parenthesized`, `Optional`, `Repeat`, `Plus`, `SpanBinding`,
-`Recover`, `Peek`, `Not`, `Until`, `Count`, `LexicalScope`, `SpacedScope`, `Fail`.
+`ModelPattern` (`model.rs:61`) has **19** variants: `Cut`, `Lit`, `RuleCall`,
+`Group`, `Bracketed`, `Braced`, `Parenthesized`, `Optional`, `Repeat`, `Plus`,
+`SpanBinding`, `Recover`, `Peek`, `Not`, `Until`, `Count`, `LexicalScope`,
+`SpacedScope`, `Fail`.
 
-Der `Backend`-Trait (`model/backend.rs:13-16`) hat genau eine Methode,
-`get_builtins() -> &'static [BuiltIn]`. Er steuert **ausschließlich die Validierung** der
-Builtin-Namen — er sagt nichts über Codegen. Es gibt keine gemeinsame Codegen-Abstraktion.
+The `Backend` trait (`model/backend.rs:13-16`) has exactly one method,
+`get_builtins() -> &'static [BuiltIn]`. It drives **only the validation** of
+built-in names — it says nothing about codegen. There is no shared codegen
+abstraction.
 
-**Zum Namen:** Das Crate hieß `syn-grammar-model`, weil es einmal von zwei Backends
-benutzt wurde. Seit dem Auszug von `winnow-grammar` (31.08.2026) hat es nur noch einen
-Nutzer, und der Name passt wieder. Backendunabhängig war es ohnehin nur in der
-*Nutzung*, nicht in den *Typen*: das Modell trägt `syn::Path`, `syn::Lit`, `syn::Type`,
-`syn::ItemUse` (`model.rs:14,20-23,28,65,69-70`), und `analysis::resolve_token_types` /
-`analysis::get_simple_peek` erzeugen `Token![…]`- und `syn::token::*`-Typen. Genau
-deshalb hat winnow das Crate beim Auszug geforkt statt es weiter zu beziehen — nur so
-kann es dort in Richtung `syn`-Freiheit weiterentwickelt werden.
+**On the name:** the crate was called `syn-grammar-model` because it was once
+used by two backends. Since `winnow-grammar` moved out (2026-08-31) it has
+only one user, and the name fits again. It was backend-independent only in its
+*use*, not in its *types*: the model carries `syn::Path`, `syn::Lit`,
+`syn::Type`, `syn::ItemUse` (`model.rs:14,20-23,28,65,69-70`), and
+`analysis::resolve_token_types` / `analysis::get_simple_peek` produce
+`Token![…]` and `syn::token::*` types. That is exactly why winnow forked the
+crate when moving out instead of depending on it — only that way can it be
+developed towards `syn`-independence there.
 
 ## Runtime: `core/grammar-kit`
 
-Der Rumpf einer Regel arbeitet auf einem **Strom** (`ParseBuffer`), die
-Blatt-Primitiven weiterhin auf dem **Cursor**:
+The body of a rule works on a **stream** (`ParseBuffer`), the leaf primitives
+still on the **cursor**:
 
 ```rust
-pub type Strom<'a>            = syn::parse::ParseBuffer<'a>;          // stream.rs
+pub type Stream<'a>            = syn::parse::ParseBuffer<'a>;          // stream.rs
 pub type StreamResult<'a, T>  = Result<T, ParseError<'a>>;            // stream.rs
 pub type ParseResult<'a, T>   = Result<(T, Cursor<'a>), ParseError<'a>>; // error.rs
 ```
 
-Eine Regel heißt `fn parse_x_impl<'a>(input: &Strom<'a>, ctx: &mut ParseContext<'a>)
--> StreamResult<'a, T>`. Bewusst `&Strom<'a>` und **nicht** syns Alias
-`ParseStream<'a> = &'a ParseBuffer<'a>`: der Alias setzt die Lebensdauer der Referenz
-mit der der Tokens gleich, womit ein `input.fork()` `'a` auf den Stapelrahmen verkürzen
-würde — Fehler aus einer Gabel könnten den Aufruf dann nicht mehr verlassen. Genau die
-braucht die Fehlerauswahl.
+A rule is `fn parse_x_impl<'a>(input: &Stream<'a>, ctx: &mut ParseContext<'a>)
+-> StreamResult<'a, T>`. Deliberately `&Stream<'a>` and **not** syn's alias
+`ParseStream<'a> = &'a ParseBuffer<'a>`: the alias equates the lifetime of the
+reference with that of the tokens, so an `input.fork()` would shorten `'a` to
+the stack frame — errors from a fork could then no longer leave the call. And
+those are exactly what error selection needs.
 
-Zurücksetzen läuft über `gabel` (`fork`) und `uebernehmen` (`advance_to`, laut syn O(1)):
-ein Versuch läuft auf der Gabel, erst der Erfolg wird eingespielt. Fehler sind
-Rückgabewerte und werden per `ParseError::merge` (`error.rs`) kombiniert — es gibt
-**keinen** globalen Fehlerzustand.
+Backtracking goes through `fork` and `advance_to` (the latter O(1)
+according to syn): an attempt runs on the fork, only success is played
+back. Errors are return values and are combined via `ParseError::merge`
+(`error.rs`) — there is **no** global error state.
 
-| Datei | Inhalt |
+| File | Contents |
 |---|---|
-| `error.rs` | `ParseError` (span, `at`-Cursor, message, priority, `is_fatal`, rule_stack), `merge`, `Display` |
-| `context.rs` | `ParseContext`: Scopes, Lexical-Mode, `last_span`, `furthest` — **ohne** Fehlerzustand |
-| `stream.rs` | `Strom`, `parse_syn`, `parse_mit`, `gabel`/`uebernehmen`, `gruppe`, `schritt`, `token_nehmen` |
+| `error.rs` | `ParseError` (span, `at` cursor, message, priority, `is_fatal`, rule_stack), `merge`, `Display` |
+| `context.rs` | `ParseContext`: scopes, lexical mode, `last_span`, `furthest` — **without** error state |
+| `stream.rs` | `Stream`, `parse_syn`, `parse_with`, `fork`/`advance_to`, `group`, `step`, `take_token` |
 | `combinators.rs` | `peek_syn`, `take_single`/`SingleToken`, `parse_separated`, `parse_repeated`, `finish_variants` |
-| `testing.rs` | `Testable`/`TestResult`, `assert_failure_contains` (Substring-Vergleich) |
+| `testing.rs` | `Testable`/`TestResult`, `assert_failure_contains` (substring comparison) |
 
-`parse_syn` (`stream.rs`) ist der Zugang zu syns `Parse`-Impls und schlicht ein
-`input.parse::<T>()` — O(Länge des Typs). Bis August 2026 lief das über eine Brücke, die
-den Reststrom materialisierte und `Parser::parse2` daraus einen neuen `TokenBuffer` bauen
-ließ; das war O(Rest) je Aufruf und damit quadratisch in der Länge einer Liste. Siehe
+`parse_syn` (`stream.rs`) is the access to syn's `Parse` impls and simply an
+`input.parse::<T>()` — O(length of the type). Until August 2026 this went
+through a bridge that materialised the remaining stream and let
+`Parser::parse2` build a new `TokenBuffer` from it; that was O(rest) per call
+and hence quadratic in the length of a list. See
 `docs/adr/adr15-linear-parsing.md`.
 
-Umgekehrt bleiben Einzeltoken auf dem Cursor: `schritt` lässt eine Cursor-Primitive in
-einer `ParseBuffer::step`-Episode laufen und rückt den Strom um genau ihr Ergebnis vor.
-`step` verlangt eine Closure, die für **jede** Lebensdauer funktioniert, weshalb ein
-`ParseError<'c>` sie nicht verlassen kann; `schritt` trägt den Fehler ohne seinen Cursor
-hindurch und hängt ihn draußen an die Eintrittsstelle. Das ist keine Näherung — diese
-Primitiven melden ihren Fehler ohnehin dort.
+Conversely, single tokens stay on the cursor: `step` runs a cursor primitive
+inside a `ParseBuffer::step` episode and advances the stream by exactly its
+result. `step` demands a closure that works for **every** lifetime, which is why
+a `ParseError<'c>` cannot leave it; `step` carries the error through without
+its cursor and re-attaches it outside at the entry position. That is not an
+approximation — these primitives report their error there anyway.
 
-In Delimiter-Gruppen steigt `gruppe` über `syn::__private::parse_{parens,braces,brackets}`
-ab. `AnyDelimiter::parse_any_delimiter` geht nicht: seine Rückgabe ist auf die Lebensdauer
-von `&self` verkürzt, womit kein Fehler aus der Gruppe nach außen tragen würde.
+Into delimiter groups, `group` descends via
+`syn::__private::parse_{parens,braces,brackets}`. `AnyDelimiter::parse_any_delimiter`
+does not work: its return value is shortened to the lifetime of `&self`, so no
+error from inside the group would carry outward.
 
-## Bekannte Schwachstellen
+## Known weaknesses
 
-Belegt, nicht vermutet:
+Evidenced, not assumed:
 
-1. ~~**Diagnostik greift im Produkteinsatz nicht.**~~ *Erledigt.* `merge` vergleicht
-   `Cursor` per `PartialOrd` (O(1), `src/buffer.rs`) statt `span.start()`. Die
-   ursprüngliche Begründung — `(0,0)` im Prozedurmakro — gilt seit Rust 1.88 ohnehin
-   nicht mehr; das Projekt verlangt diese Version. Die Cursor-Metrik bleibt, weil sie
-   billiger und toolchain-unabhängig ist. Siehe `GOALS.md`.
+1. ~~**Diagnostics do not work in production use.**~~ *Done.* `merge` compares
+   `Cursor` via `PartialOrd` (O(1), `src/buffer.rs`) instead of `span.start()`.
+   The original reason — `(0,0)` inside a procedural macro — no longer applies
+   since Rust 1.88 anyway; the project requires that version. The cursor metric
+   stays because it is cheaper and toolchain-independent. See `GOALS.md`.
 
-2. ~~**Der Brückenaufruf für syn-AST-Typen bleibt O(n).**~~ *Erledigt* (ADR 15,
-   Stufe 3). Der Rumpf läuft auf einem `ParseBuffer`, der genau einmal gebaut wird;
-   ein `syn::Type` kostet `input.parse::<T>()`. Gemessen an einer generierten
-   Argumentliste mit 2000 Einträgen: 1,17 s → 5,3 ms, und aus quadratisch wurde
-   linear. Der Preis ist eine `Rc`-Allokation je Rücksetzpunkt statt eines
-   Cursor-Copies.
+2. ~~**The bridge call for syn AST types remains O(n).**~~ *Done* (ADR 15,
+   stage 3). The body runs on a `ParseBuffer` that is built exactly once; a
+   `syn::Type` costs `input.parse::<T>()`. Measured on a generated argument list
+   with 2000 entries: 1.17 s → 5.3 ms, and quadratic became linear. The price is
+   an `Rc` allocation per backtracking point instead of a cursor copy.
 
-3. **Fehlende Diagnostik-Bausteine.** `expected one of: …`, Label-Bubbling, Item-Index
-   im Regel-Stack (`in item 3`) existierten vor dem Umbau und fehlen seither.
+3. **Missing diagnostics building blocks.** `expected one of: …`, label
+   bubbling, item index in the rule stack (`in item 3`) existed before the
+   rebuild and have been missing since.
 
-4. ~~**Toter Code.**~~ *Erledigt.* `transaction.rs` (147 Z., nie als Modul deklariert),
-   `macros.rs` (`test_both_backends!`, auf nicht existierende Features gegated) und die
-   leeren Features `rt`/`trace` sind entfernt. `test_both_backends!` war zusaetzlich
-   prinzipiell nicht reparierbar: sein Rumpf braucht `syn-grammar` und `winnow-grammar`,
-   die beide von `grammar-kit` abhaengen - ein Zyklus. Sein Doctest galt nur deshalb als
-   gruen, weil das Makro zu nichts expandierte.
+4. ~~**Dead code.**~~ *Done.* `transaction.rs` (147 lines, never declared as a
+   module), `macros.rs` (`test_both_backends!`, gated on non-existent features)
+   and the empty features `rt`/`trace` are removed. `test_both_backends!` was
+   moreover unfixable in principle: its body needs `syn-grammar` and
+   `winnow-grammar`, which both depend on `grammar-kit` — a cycle. Its doctest
+   only counted as green because the macro expanded to nothing.
+
+## Acceptance benchmarks
+
+Two grammars stand in for "real use" and are checked on every run:
+`cxx-parser` below, and `syn-grammar/tests/self_hosting_test.rs`, the
+grammar DSL written in the grammar DSL. The hand-written parser in
+`syn-grammar-model` stays the stage-zero parser (the macro crate cannot
+depend on itself); the self-hosted grammar parses the documentation's
+grammars into an AST and checks the messages a grammar author gets from the
+diagnostics engine.
 
 ## `cxx-parser`
 
-Abnahme-Benchmark auf dem syn-Backend (`cxx-parser/Cargo.toml:8`). 5 Regeln,
-`src/cxx_parser.rs:37-79`. Der interessante Teil ist die Übergabe an syn für alles nach
-`:` und `->` (`syn::Type`, `syn::ReturnType`, `syn::Generics`, `syn::Macro`) — genau die
-Grenze, an der eine Fremd-DSL in echte Rust-Syntax übergeht.
+Acceptance benchmark on the syn backend (`cxx-parser/Cargo.toml:8`). 5 rules,
+`src/cxx_parser.rs:37-79`. The interesting part is the hand-over to syn for
+everything after `:` and `->` (`syn::Type`, `syn::ReturnType`, `syn::Generics`,
+`syn::Macro`) — exactly the boundary where a foreign DSL transitions into real
+Rust syntax.
 
-## `winnow-grammar` — ausgezogen
+## `winnow-grammar` — moved out
 
-War bis zum 31.08.2026 ein zweites Backend auf demselben Frontend. Es lebt jetzt unter
-<https://github.com/keywan-ghadami/winnow-grammar> und ist vollständig unabhängig: keine
-Referenz mehr auf `syn-grammar`, `syn-grammar-model` oder `grammar-kit`.
+Was a second backend on the same front end until 2026-08-31. It now lives at
+<https://github.com/keywan-ghadami/winnow-grammar> and is fully independent: no
+reference left to `syn-grammar`, `syn-grammar-model` or `grammar-kit`.
 
-Beim Auszug aufgelöst: das Frontend wurde als `winnow-grammar-model` geforkt; aus
-`grammar-kit` wanderten nur `WithSpan` (4 Zeilen) und `testing.rs` (341 Zeilen, ohne
-`syn`-Bezug) mit, das Crate selbst wurde nicht geforkt. Der eigentliche Blocker steckte
-nicht in den Manifesten, sondern im erzeugten Code: `codegen/variants.rs` schrieb
-`::grammar_kit::WithSpan` als absoluten Crate-Pfad, womit jedes Nutzer-Crate
-`grammar-kit` direkt brauchte.
+Resolved when moving out: the front end was forked as `winnow-grammar-model`;
+from `grammar-kit` only `WithSpan` (4 lines) and `testing.rs` (341 lines, no
+`syn` involvement) moved along, the crate itself was not forked. The actual
+blocker was not in the manifests but in the generated code:
+`codegen/variants.rs` wrote `::grammar_kit::WithSpan` as an absolute crate path,
+so every user crate needed `grammar-kit` directly.
 
-Vier Abhängigkeiten waren tot (kein einziger Import): `syn` und `syn-grammar-model` in
-`winnow-grammar`, `syn-grammar` und `grammar-kit` in `winnow-grammar-macros` — wobei
-`syn-grammar` das komplette syn-Backend in jeden winnow-Build zog.
+Four dependencies were dead (not a single import): `syn` and
+`syn-grammar-model` in `winnow-grammar`, `syn-grammar` and `grammar-kit` in
+`winnow-grammar-macros` — where `syn-grammar` pulled the complete syn backend
+into every winnow build.
 
-`docs/adr/adr14-shared-context-pattern.md` ist mitgezogen.
+`docs/adr/adr14-shared-context-pattern.md` moved along.
 
-## Veraltete Dokumente
+## Outdated documents
 
-* `ARCHITEKTUR_MANIFEST.txt` — beschreibt `core/grammar-kit/src/lib.rs`; die Datei gibt es
-  seit dem Umbau nicht mehr.
-* `PROJECT_STRUCTURE.md` — spekulativ formuliert („likely contains"), nennt weder
-  `grammar-kit` noch `syn-grammar-model`, verweist auf ein nicht existierendes `testresults.txt`.
-* `EXTENDING.md` — beschreibt eine API, die es nicht gibt
-  (`parse_grammar_with_builtins`, `Lit(LitStr)`, 6 statt 19 Muster); der Beispielcode
-  würde nicht kompilieren.
+* `ARCHITEKTUR_MANIFEST.txt` — describes `core/grammar-kit/src/lib.rs`; the file
+  has not existed since the rebuild.
+* `PROJECT_STRUCTURE.md` — speculatively worded ("likely contains"), names
+  neither `grammar-kit` nor `syn-grammar-model`, refers to a non-existent
+  `testresults.txt`.
+* `EXTENDING.md` — describes an API that does not exist
+  (`parse_grammar_with_builtins`, `Lit(LitStr)`, 6 instead of 19 patterns); the
+  example code would not compile.

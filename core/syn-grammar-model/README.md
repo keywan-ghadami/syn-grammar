@@ -9,7 +9,7 @@ This crate provides the core logic for parsing the `grammar! { ... }` DSL, valid
 The processing pipeline consists of four stages:
 
 1.  **Parsing (`parser`)**: Converts the raw `TokenStream` into a syntactic AST (`parser::GrammarDefinition`). This handles the concrete syntax of the DSL.
-2.  **Transformation (`model`)**: Converts the syntactic AST into a semantic model (`model::GrammarDefinition`). This simplifies the structure (e.g., flattening groups, resolving inheritance placeholders).
+2.  **Transformation (`model`)**: Converts the syntactic AST into a semantic model (`model::GrammarDefinition`). This simplifies the structure (e.g., flattening groups, resolving the return-type kind of each rule).
 3.  **Validation (`validator`)**: Checks the semantic model for errors, such as undefined rules, argument mismatches, or invalid token usage.
 4.  **Analysis (`analysis`)**: Provides helper functions to query the model, such as detecting left-recursion, collecting custom keywords, or finding "Cut" operators.
 

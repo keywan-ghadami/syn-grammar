@@ -29,11 +29,11 @@ mod rt {
     }
 }
 
-/// Die Schluesselwoerter der Grammatik-DSL.
+/// The keywords of the grammar DSL.
 ///
-/// Es sind **keine** Rust-Schluesselwoerter, sondern `custom_keyword!`-Typen:
-/// `grammar`, `rule` und `peek` bleiben als Bezeichner benutzbar, etwa als
-/// Regelnamen. Nur `extern`, `pub` und `as` sind echte Rust-Tokens.
+/// They are **not** Rust keywords but `custom_keyword!` types:
+/// `grammar`, `rule` and `peek` remain usable as identifiers, e.g. as
+/// rule names. Only `extern`, `pub` and `as` are real Rust tokens.
 #[allow(missing_docs)]
 pub mod kw {
     syn::custom_keyword!(grammar);
@@ -78,19 +78,19 @@ fn parse_path_no_args(input: ParseStream) -> Result<Path> {
 }
 
 #[derive(Debug, Clone)]
-/// `extern rule name(p: T) -> R;` - syntaktische Form.
+/// `extern rule name(p: T) -> R;` - syntactic form.
 ///
-/// Semantisches Gegenstueck: [`crate::model::ExternRule`].
+/// Semantic counterpart: [`crate::model::ExternRule`].
 pub struct ExternRule {
-    /// Attribute vor der Deklaration.
+    /// Attributes before the declaration.
     pub attrs: Vec<Attribute>,
-    /// Der Regelname.
+    /// The rule name.
     pub name: Ident,
-    /// Generische Parameter.
+    /// Generic parameters.
     pub generics: Generics,
-    /// Deklarierte Parameter.
+    /// Declared parameters.
     pub params: Vec<RuleParameter>,
-    /// Der Typ hinter `->`.
+    /// The type after `->`.
     pub return_type: Type,
 }
 
@@ -132,13 +132,13 @@ impl Parse for ExternRule {
 }
 
 #[derive(Debug, Clone)]
-/// `import pfad as alias;` - syntaktische Form.
+/// `import path as alias;` - syntactic form.
 ///
-/// Semantisches Gegenstueck: [`crate::model::ImportedGrammar`].
+/// Semantic counterpart: [`crate::model::ImportedGrammar`].
 pub struct ImportedGrammar {
-    /// Pfad zur fremden Grammatik.
+    /// Path to the foreign grammar.
     pub path: Path,
-    /// Der Alias hinter `as`.
+    /// The alias after `as`.
     pub alias: Ident,
 }
 
@@ -154,22 +154,21 @@ impl Parse for ImportedGrammar {
 }
 
 #[derive(Debug, Clone)]
-/// Der Inhalt eines `grammar! { … }` - syntaktische Form.
+/// The content of a `grammar! { … }` - syntactic form.
 ///
-/// Semantisches Gegenstueck: [`crate::model::GrammarDefinition`], in das diese
-/// Form per `Into` ueberfuehrt wird.
+/// Semantic counterpart: [`crate::model::GrammarDefinition`], into which this
+/// form is converted via `Into`.
 pub struct GrammarDefinition {
-    /// Der Name aus `grammar Name { … }`.
+    /// The name from `grammar Name { … }`.
     pub name: Ident,
-    /// Ein `: Basis` hinter dem Namen, falls vorhanden.
-    pub inherits: Option<InheritanceSpec>,
-    /// `use`-Anweisungen, die in das erzeugte Modul uebernommen werden.
+    /// A `: Base` after the name, if present.
+    /// `use` statements that are carried over into the generated module.
     pub uses: Vec<ItemUse>,
-    /// Die Regeln in Quellreihenfolge.
+    /// The rules in source order.
     pub rules: Vec<Rule>,
-    /// Die `extern rule`-Deklarationen.
+    /// The `extern rule` declarations.
     pub extern_rules: Vec<ExternRule>,
-    /// Die `import`-Anweisungen; sie duerfen vor oder im Block stehen.
+    /// The `import` statements; they may appear before or inside the block.
     pub imports: Vec<ImportedGrammar>,
 }
 
@@ -184,11 +183,25 @@ impl Parse for GrammarDefinition {
         let _ = input.parse::<kw::grammar>()?;
         let name = rt::parse_ident(input)?;
 
-        let inherits = if input.peek(Token![:]) {
-            Some(input.parse::<InheritanceSpec>()?)
-        } else {
-            None
-        };
+        // Grammar inheritance (`grammar Derived : Base`) was removed in 0.9.0.
+        // The old form is still recognised so that the user gets the
+        // replacement named at the exact spot, instead of a bare parse error
+        // on the `:`.
+        if input.peek(Token![:]) {
+            let colon = input.parse::<Token![:]>()?;
+            let base = input.parse::<Ident>().ok();
+            let base = base.map_or_else(|| "Base".to_string(), |b| b.to_string());
+            return Err(syn::Error::new(
+                colon.span,
+                format!(
+                    "grammar inheritance (`grammar {name} : {base}`) was removed in 0.9.0\n\
+                     help: `import {base} as {alias};` and call its rules as `{alias}::rule` \
+                     (see \"Importing Another Grammar\" in SYNTAX.md)\n\
+                     help: for a single hand-written parser, declare an `extern rule`",
+                    alias = base.to_lowercase(),
+                ),
+            ));
+        }
 
         let content;
         let _ = syn::braced!(content in input);
@@ -216,7 +229,6 @@ impl Parse for GrammarDefinition {
 
         Ok(GrammarDefinition {
             name,
-            inherits,
             uses,
             rules,
             extern_rules,
@@ -228,13 +240,12 @@ impl Parse for GrammarDefinition {
 impl ToTokens for GrammarDefinition {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let name = &self.name;
-        let inherits = &self.inherits;
         let uses = &self.uses;
         let rules = &self.rules;
         // extern_rules and imports are not currently emitted in ToTokens as they are structural metadata
 
         tokens.append_all(quote! {
-            grammar #name #inherits {
+            grammar #name {
                 #(#uses)*
                 #(#rules)*
             }
@@ -243,35 +254,13 @@ impl ToTokens for GrammarDefinition {
 }
 
 #[derive(Debug, Clone)]
-/// Ein `: Basis` hinter dem Grammatiknamen.
-pub struct InheritanceSpec {
-    /// Name der Basisgrammatik.
-    pub name: Ident,
-}
-
-impl Parse for InheritanceSpec {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let _ = input.parse::<Token![:]>()?;
-        let name = rt::parse_ident(input)?;
-        Ok(InheritanceSpec { name })
-    }
-}
-
-impl ToTokens for InheritanceSpec {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let name = &self.name;
-        tokens.append_all(quote! { : #name });
-    }
-}
-
-#[derive(Debug, Clone)]
-/// Ein Parameter einer Regel - syntaktische Form.
+/// A parameter of a rule - syntactic form.
 ///
-/// Semantisches Gegenstueck: [`crate::model::RuleParameter`].
+/// Semantic counterpart: [`crate::model::RuleParameter`].
 pub struct RuleParameter {
-    /// Der Parametername.
+    /// The parameter name.
     pub name: Ident,
-    /// Der Typ, oder `None` fuer einen Parser-Parameter (`list<T>(item)`).
+    /// The type, or `None` for a parser parameter (`list<T>(item)`).
     pub ty: Option<Type>,
 }
 
@@ -300,24 +289,24 @@ impl ToTokens for RuleParameter {
 }
 
 #[derive(Debug, Clone)]
-/// Eine Regel - syntaktische Form.
+/// A rule - syntactic form.
 ///
-/// Semantisches Gegenstueck: [`crate::model::Rule`]. Anders als dort ist die
-/// Klassifikation des Rueckgabetyps hier noch nicht bestimmt.
+/// Semantic counterpart: [`crate::model::Rule`]. Unlike there, the
+/// classification of the return type is not yet determined here.
 pub struct Rule {
-    /// Attribute vor der Regel.
+    /// Attributes before the rule.
     pub attrs: Vec<Attribute>,
-    /// Das `pub`-Token, falls vorhanden.
+    /// The `pub` token, if present.
     pub is_pub: Option<Token![pub]>,
-    /// Der Regelname.
+    /// The rule name.
     pub name: Ident,
-    /// Generische Parameter.
+    /// Generic parameters.
     pub generics: Generics,
-    /// Laufzeit- und Parser-Parameter.
+    /// Runtime and parser parameters.
     pub params: Vec<RuleParameter>,
-    /// Der Typ hinter `->`.
+    /// The type after `->`.
     pub return_type: Type,
-    /// Die durch `|` getrennten Alternativen.
+    /// The alternatives separated by `|`.
     pub variants: Vec<RuleVariant>,
 }
 
@@ -421,7 +410,7 @@ impl ToTokens for Rule {
 }
 
 impl Rule {
-    /// Liest alle aufeinanderfolgenden Muster einer Sequenz.
+    /// Reads all consecutive patterns of a sequence.
     pub fn parse_all(input: ParseStream) -> Result<Vec<Self>> {
         let mut rules = Vec::new();
         while !input.is_empty() {
@@ -432,26 +421,26 @@ impl Rule {
 }
 
 #[derive(Debug, Clone)]
-/// Eine Alternative einer Regel - syntaktische Form.
+/// An alternative of a rule - syntactic form.
 ///
-/// Semantisches Gegenstueck: [`crate::model::RuleVariant`].
+/// Semantic counterpart: [`crate::model::RuleVariant`].
 pub struct RuleVariant {
-    /// Die Mustersequenz.
+    /// The pattern sequence.
     pub pattern: Vec<Pattern>,
-    /// Der Klartextname aus `# "…"`.
+    /// The plain-text name from `# "…"`.
     pub label: Option<String>,
-    /// Der Aktionsblock hinter `->`.
+    /// The action block after `->`.
     pub action: TokenStream,
-    /// Soll die Spanne der Alternative gebunden werden?
+    /// Should the span of the alternative be bound?
     pub with_span: bool,
-    /// Wurde der Aktionsblock ausgeschrieben (statt ergaenzt)?
+    /// Was the action block written out (rather than added by the generator)?
     pub is_explicit: bool,
 }
 
 impl RuleVariant {
-    /// Liest die durch `|` getrennten Alternativen einer Regel.
+    /// Reads the alternatives of a rule separated by `|`.
     ///
-    /// `capture_span` schaltet die Spannenbindung fuer alle Alternativen an.
+    /// `capture_span` switches span binding on for all alternatives.
     pub fn parse_list(input: ParseStream, capture_span: bool) -> Result<Vec<Self>> {
         let mut variants = Vec::new();
         loop {
@@ -552,13 +541,13 @@ impl ToTokens for RuleVariant {
 }
 
 #[derive(Debug, Clone)]
-/// Ein Argument eines Regelaufrufs - syntaktische Form.
+/// An argument of a rule call - syntactic form.
 ///
-/// Semantisches Gegenstueck: [`crate::model::Argument`].
+/// Semantic counterpart: [`crate::model::Argument`].
 pub enum Argument {
-    /// Nach Position, etwa `separated(item, ",")`.
+    /// By position, e.g. `separated(item, ",")`.
     Positional(Pattern),
-    /// Nach Name, etwa `min=1`.
+    /// By name, e.g. `min=1`.
     Named(Ident, Pattern),
 }
 
@@ -592,69 +581,69 @@ impl ToTokens for Argument {
 pub type GroupAlternative = (Vec<Pattern>, Option<TokenStream>, Option<String>);
 
 #[derive(Debug, Clone)]
-/// Ein Muster - syntaktische Form.
+/// A pattern - syntactic form.
 ///
-/// Spiegelt [`crate::model::ModelPattern`], behaelt aber die tatsaechlichen
-/// Tokens (`Token![?]`, `kw::peek`, `token::Paren` …). Sie tragen die
-/// Quellstelle, aus der im Modell die blossen `Span`s werden. Was die einzelnen
-/// Varianten bedeuten, steht dort; hier steht, woraus sie gelesen werden.
+/// Mirrors [`crate::model::ModelPattern`], but keeps the actual
+/// tokens (`Token![?]`, `kw::peek`, `token::Paren` …). They carry the
+/// source location from which the bare `Span`s in the model are derived. What the
+/// individual variants mean is documented there; here it says what they are read from.
 pub enum Pattern {
-    /// `=>` - Cut.
+    /// `=>` - cut.
     Cut(Token![=>]),
-    /// Ein Literalterminal, etwa `"fn"`.
+    /// A literal terminal, e.g. `"fn"`.
     Lit {
-        /// Bindungsname aus `name:"fn"`.
+        /// Binding name from `name:"fn"`.
         binding: Option<Ident>,
-        /// Das Literal.
+        /// The literal.
         lit: Lit,
     },
-    /// Aufruf einer Regel, eines Builtins oder eines `syn::`-Typs.
+    /// Call of a rule, a builtin or a `syn::` type.
     RuleCall {
-        /// Bindungsname.
+        /// Binding name.
         binding: Option<Ident>,
-        /// Der aufgerufene Pfad.
+        /// The called path.
         rule_path: Path,
-        /// Generische Argumente in `<…>`.
+        /// Generic arguments in `<…>`.
         generics: Vec<Type>,
-        /// Argumente in `( … )`.
+        /// Arguments in `( … )`.
         args: Vec<Argument>,
     },
-    /// `( a | b )` - geklammerte Alternativenmenge.
+    /// `( a | b )` - parenthesized set of alternatives.
     Group {
-        /// Bindungsname der Gruppe.
+        /// Binding name of the group.
         binding: Option<Ident>,
-        /// Die Alternativen.
+        /// The alternatives.
         alts: Vec<GroupAlternative>,
-        /// Die Klammern selbst.
+        /// The parentheses themselves.
         token: token::Paren,
     },
-    /// `bracket( … )` - Inhalt echter eckiger Klammern.
+    /// `bracket( … )` - content of real square brackets.
     Bracketed {
-        /// Bindungsname.
+        /// Binding name.
         binding: Option<Ident>,
-        /// Die Muster im Inneren.
+        /// The patterns inside.
         patterns: Vec<Pattern>,
-        /// Die eckigen Klammern.
+        /// The square brackets.
         token: token::Bracket,
     },
-    /// `{ … }` - Inhalt echter geschweifter Klammern.
+    /// `{ … }` - content of real curly braces.
     Braced {
-        /// Bindungsname.
+        /// Binding name.
         binding: Option<Ident>,
-        /// Die Muster im Inneren.
+        /// The patterns inside.
         patterns: Vec<Pattern>,
-        /// Die geschweiften Klammern.
+        /// The curly braces.
         token: token::Brace,
     },
-    /// `paren( … )` - Inhalt echter runder Klammern.
+    /// `paren( … )` - content of real parentheses.
     Parenthesized {
-        /// Bindungsname.
+        /// Binding name.
         binding: Option<Ident>,
-        /// Die Muster im Inneren.
+        /// The patterns inside.
         patterns: Vec<Pattern>,
-        /// Das Schluesselwort `paren`.
+        /// The keyword `paren`.
         kw_token: kw::paren,
-        /// Die runden Klammern dahinter.
+        /// The parentheses after it.
         token: token::Paren,
     },
     /// `x?`
@@ -663,50 +652,50 @@ pub enum Pattern {
     Repeat(Box<Pattern>, Token![*]),
     /// `x+`
     Plus(Box<Pattern>, Token![+]),
-    /// `x @ name` - bindet die Spanne an `name`.
+    /// `x @ name` - binds the span to `name`.
     SpanBinding(Box<Pattern>, Ident, Token![@]),
     /// `recover(body, sync)`
     Recover {
-        /// Bindungsname; das Ergebnis ist ein `Option`.
+        /// Binding name; the result is an `Option`.
         binding: Option<Ident>,
-        /// Das eigentliche Muster.
+        /// The actual pattern.
         body: Box<Pattern>,
-        /// Die Synchronisationsmarke.
+        /// The synchronization mark.
         sync: Box<Pattern>,
-        /// Das Schluesselwort `recover`.
+        /// The keyword `recover`.
         kw_token: kw::recover,
     },
-    /// `peek(x)` - prueft, ohne zu verbrauchen.
+    /// `peek(x)` - checks without consuming.
     Peek(Box<Pattern>, kw::peek),
-    /// `not(x)` - schlaegt fehl, wenn `x` passen wuerde.
+    /// `not(x)` - fails if `x` would match.
     Not(Box<Pattern>, kw::not),
-    /// `until(x)` - sammelt rohe Tokens bis `x`.
+    /// `until(x)` - collects raw tokens up to `x`.
     Until {
-        /// Bindungsname; das Ergebnis ist ein `TokenStream`.
+        /// Binding name; the result is a `TokenStream`.
         binding: Option<Ident>,
-        /// Das Abbruchmuster.
+        /// The stop pattern.
         pattern: Box<Pattern>,
-        /// Das Schluesselwort `until`.
+        /// The keyword `until`.
         kw_token: kw::until,
     },
-    /// `count(x)` - zaehlt Treffer des Elements.
+    /// `count(x)` - counts matches of the item.
     Count {
-        /// Bindungsname; das Ergebnis ist ein `usize`.
+        /// Binding name; the result is a `usize`.
         binding: Option<Ident>,
-        /// Das gezaehlte Muster.
+        /// The counted pattern.
         pattern: Box<Pattern>,
-        /// Das Schluesselwort `count`.
+        /// The keyword `count`.
         kw_token: kw::count,
     },
-    /// `lex( … )` - zeichengenauer Bereich.
+    /// `lex( … )` - character-precise region.
     LexicalScope(Box<Pattern>, kw::lex),
-    /// `spaced( … )` - Bereich, in dem Leerraum zaehlt.
+    /// `spaced( … )` - region in which whitespace counts.
     SpacedScope(Box<Pattern>, kw::spaced),
-    /// `fail("…")` - bricht mit dieser Meldung ab.
+    /// `fail("…")` - aborts with this message.
     Fail {
-        /// Die Meldung.
+        /// The message.
         message: Option<Lit>,
-        /// Das Schluesselwort `fail`.
+        /// The keyword `fail`.
         kw_token: kw::fail,
     },
 }
@@ -724,7 +713,7 @@ impl Pattern {
         }
     }
 
-    /// Haengt alle Bindungsnamen dieses Musters an `acc` an, in Reihenfolge.
+    /// Appends all binding names of this pattern to `acc`, in order.
     pub fn collect_bindings(&self, acc: &mut Vec<Ident>) {
         match self {
             Pattern::Lit { binding, .. } => {
@@ -824,7 +813,7 @@ impl Pattern {
         }
     }
 
-    /// Bindet dieses Muster - oder eines darin - einen Namen?
+    /// Does this pattern - or one inside it - bind a name?
     pub fn has_binding(&self) -> bool {
         match self {
             Pattern::Lit { binding, .. } => binding.is_some(),

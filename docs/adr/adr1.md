@@ -6,24 +6,23 @@ A Unified Strategy for Portable and Backend-Specific Primitives
 
 ## 2. Status
 
-**Zurueckgezogen (2026-08-31).** Nie umgesetzt, und durch die Zielsetzung ueberholt.
+**Withdrawn (2026-08-31).** Never implemented, and superseded by the project goals.
 
-Der hier beschriebene Vertrag existiert im Code nicht: weder `PORTABLE_BUILTINS`
-noch `SYN_SPECIFIC_BUILTINS` sind irgendwo definiert, und `validator.rs` prueft
-ausschliesslich gegen `B::get_builtins()` des jeweiligen Backends - es gibt also
-keine Trennung und keine Portabilitaetspruefung.
+The contract described here does not exist in the code: neither `PORTABLE_BUILTINS`
+nor `SYN_SPECIFIC_BUILTINS` is defined anywhere, and `validator.rs` checks
+exclusively against `B::get_builtins()` of the respective backend — so there is
+neither a separation nor a portability check.
 
-Messbar gebrochen ist er ohnehin: das winnow-Backend kennt `alpha1`, `digit1`
-und `multispace1`, aber weder `alpha` noch `digit` noch `whitespace`. Eine
-Grammatik, die sich strikt an die hier geforderte portable Liste haelt,
-kompiliert dort nicht - und `alpha1` ist genau das "Vendor Leaking", das dieses
-ADR unter Alternative B ablehnt.
+It is measurably broken anyway: the winnow backend knows `alpha1`, `digit1`
+and `multispace1`, but neither `alpha` nor `digit` nor `whitespace`. A grammar
+that strictly follows the portable list demanded here does not compile there —
+and `alpha1` is exactly the "vendor leaking" this ADR rejects under alternative B.
 
-Laut [`GOALS.md`](../../GOALS.md) wird `winnow-grammar` ein eigenstaendiges
-Projekt; eine Harmonisierung der Backends ist ausdrueckliches Nicht-Ziel. Damit
-entfaellt der Zweck des Vertrags. Der Text bleibt als Entwurfsgeschichte stehen.
+According to [`GOALS.md`](../../GOALS.md), `winnow-grammar` becomes a standalone
+project; harmonising the backends is an explicit non-goal. That removes the
+purpose of the contract. The text remains as design history.
 
-*Vorher: Supersedes ADR of 2024-10-26. Accepted.*
+*Previously: Supersedes ADR of 2024-10-26. Accepted.*
 
 ## 3. Context
 
