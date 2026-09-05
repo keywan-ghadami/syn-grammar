@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/syn-grammar.svg)](https://crates.io/crates/syn-grammar)
 [![Documentation](https://docs.rs/syn-grammar/badge.svg)](https://docs.rs/syn-grammar)
-[![License](https://img.shields.io/crates/l/syn-grammar.svg)](https://github.com/keywan-ghadami/syn-grammar/blob/main/LICENSE)
+[![License](https://img.shields.io/crates/l/syn-grammar.svg)](https://github.com/keywan-ghadami/syn-grammar#license)
 
 **syn-grammar** is a powerful parser generator for Rust that allows you to define EBNF-like grammars directly inside your code. It compiles these definitions into efficient `syn` parsers at compile time.
 
@@ -39,7 +39,7 @@ Use this setup if you want to parse strings **at runtime** inside your applicati
 
 ```toml
 [dependencies]
-syn-grammar = "0.8.0"
+syn-grammar = "0.9.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
@@ -204,4 +204,8 @@ The exact commands the CI runs are in `.github/workflows/ci.yaml`.
 
 ## License
 
-Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+Licensed under either of Apache License, Version 2.0
+([`LICENSE-APACHE`](https://github.com/keywan-ghadami/syn-grammar/blob/main/LICENSE-APACHE))
+or the MIT license
+([`LICENSE-MIT`](https://github.com/keywan-ghadami/syn-grammar/blob/main/LICENSE-MIT))
+at your option.

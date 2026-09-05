@@ -30,7 +30,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-grammar-kit = "0.8.0"
+grammar-kit = "0.9.0"
 ```
 
 ### Runtime Helpers

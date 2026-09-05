@@ -526,8 +526,10 @@ for the binding contract.
 
 By default a failing alternative is described by what it would have accepted:
 its first token, the delimiter it opens with, the expectation of the built-in
-it starts with (`integer literal`), or the list a called rule collected.
-`# "..."` replaces that with a human-readable name. The label is placed
+it starts with (`integer literal`), the name a `syn` type gives itself
+(`Rust type`), or — if the alternative is nothing but a call to another rule —
+that rule with what it accepts, `term(`integer literal`, `parentheses`)`.
+`# "..."` replaces all of that with a human-readable name. The label is placed
 **after the pattern and before the action block**.
 
 ```rust
@@ -550,6 +552,45 @@ An alternative that fails **after consuming input** keeps its own detailed
 message — the label only stands in when the alternative failed right at its
 start. That is what keeps a deep, specific error from being replaced by a
 shallow summary.
+
+### Rule Labels
+
+A rule can carry its label at its **definition**, between the parameters and
+the `->`. Every call site then inherits it, instead of repeating the same
+`# "..."` at each of them:
+
+```rust
+# use syn_grammar::grammar;
+# fn main() {
+#     grammar! {
+#         grammar Test {
+ rule shared_struct # "a shared struct" -> () = "struct" ident ";" -> { () }
+ rule shared_enum   # "a shared enum"   -> () = "enum" ident ";"   -> { () }
+
+ pub item -> () = s:shared_struct -> { s } | e:shared_enum -> { e }
+#         }
+#     }
+# }
+```
+
+`item` on `42` then reports
+``expected one of: `a shared enum`, `a shared struct` ``. A label at the call
+site still wins over the rule's own — it is the more specific statement.
+
+### What an Unlabelled Rule Call Reports
+
+Without any label, an alternative that consists of a single rule call is named
+after the rule *and* unfolded into what the rule accepts:
+
+```text
+expected one of: `string literal`, term(`integer literal`, `parentheses`)
+```
+
+The flat list alone would say what may be typed but not what it would become;
+the rule name alone would say the opposite. Past three different starts the rule
+name is dropped again and the flat form returns — beyond that the grouped form
+is longer than what it replaces, and that is the point at which a label pays
+off.
 
 ### List Item Labels (`item_label`)
 

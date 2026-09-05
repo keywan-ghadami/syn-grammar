@@ -2,6 +2,8 @@
 name = "cxx-parser"
 version = "0.1.0"
 edition = "2021"
+# Dogfooding/stress-test crate for the workspace, never a release artifact.
+publish = false
 # Minimum toolchain. From 1.88 on, `Span::start()` returns real positions even
 # inside a procedural macro on stable (proc-macro2 sets `proc_macro_span_location`
 # there). Below that, all spans are (0,0) and the adjacency check for

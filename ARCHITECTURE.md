@@ -149,11 +149,23 @@ diagnostics engine.
 
 ## `cxx-parser`
 
-Acceptance benchmark on the syn backend (`cxx-parser/Cargo.toml:8`). 5 rules,
-`src/cxx_parser.rs:37-79`. The interesting part is the hand-over to syn for
-everything after `:` and `->` (`syn::Type`, `syn::ReturnType`, `syn::Generics`,
-`syn::Macro`) — exactly the boundary where a foreign DSL transitions into real
-Rust syntax.
+Acceptance benchmark on the syn backend, and not published (`publish = false`).
+16 rules covering the `#[cxx::bridge]` IDL as the cxx book documents it: shared
+structs and enums, `extern "C++"` / `extern "Rust"`, opaque types, type
+aliases, all four receiver forms, `unsafe fn`, and the `impl UniquePtr<T> {}`
+instantiations.
+
+Two things make it the benchmark rather than a demo. First, the hand-over to
+syn for everything after `:` and `->` (`syn::Type`, `syn::ReturnType`,
+`syn::Generics`, `syn::Path`, `syn::ItemUse`) — the boundary where a foreign
+DSL transitions into real Rust syntax without a delimiter to mark it. Second,
+every item rule begins with `outer_attrs`, so no alternative can be decided by
+its first token; that is the case the aggregation of `expected one of:` has to
+get right (ADR 13, point 6).
+
+31 tests: `tests/bridge_parsing.rs` on the AST, `tests/error_messages.rs` on
+the messages, point by point against ADR 13. `src/main.rs` is a small CLI that
+parses a file or stdin and prints the summary or the error.
 
 ## `winnow-grammar` — moved out
 
@@ -174,14 +186,3 @@ Four dependencies were dead (not a single import): `syn` and
 into every winnow build.
 
 `docs/adr/adr14-shared-context-pattern.md` moved along.
-
-## Outdated documents
-
-* `ARCHITEKTUR_MANIFEST.txt` — describes `core/grammar-kit/src/lib.rs`; the file
-  has not existed since the rebuild.
-* `PROJECT_STRUCTURE.md` — speculatively worded ("likely contains"), names
-  neither `grammar-kit` nor `syn-grammar-model`, refers to a non-existent
-  `testresults.txt`.
-* `EXTENDING.md` — describes an API that does not exist
-  (`parse_grammar_with_builtins`, `Lit(LitStr)`, 6 instead of 19 patterns); the
-  example code would not compile.

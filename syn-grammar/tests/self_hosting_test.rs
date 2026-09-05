@@ -273,12 +273,13 @@ fn reports_broken_grammars_with_context() {
         .assert_failure_contains("\nin argument 2\nin call args");
 
     // The `->` was consumed, so the type's own error wins over the label
-    // `# "return type"` (ADR 13, point 7): syn's list of what can start a
-    // type, placed in the grammar's rule context.
+    // `# "return type"` (ADR 13, point 7). The type names itself; syn's
+    // enumeration of the sixteen tokens a type may start with used to stand
+    // here and said nothing the position did not.
     Dsl::parse_grammar_def
         .parse_str("grammar G { rule a -> = x -> { 1 } }")
         .test()
-        .assert_failure_contains("expected one of: `for`, parentheses, `fn`")
+        .assert_failure_contains("expected Rust type")
         .assert_failure_contains(
             " at column 22 (line 1)\nin ret type\nin rule def\nin grammar def",
         );

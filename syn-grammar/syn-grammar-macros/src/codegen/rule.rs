@@ -1,10 +1,11 @@
 use super::pattern;
 use super::CodegenContext;
-use proc_macro2::TokenStream;
+use crate::backend::SynBackend;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use std::collections::HashMap;
 use syn::Result;
-use syn_grammar_model::{analysis, model::*};
+use syn_grammar_model::{analysis, model::*, Backend};
 
 pub fn generate_rule(rule: &Rule, ctx: &CodegenContext) -> Result<TokenStream> {
     let name = &rule.name;
@@ -255,8 +256,26 @@ pub fn generate_variants_internal(
     }
 
     let arms = variants.iter().map(|variant| {
-        let label_str = if let Some(l) = &variant.label { Some(l.clone()) } else { analysis::expectation_label(&variant.pattern) };
+        // An alternative that is nothing but a call to another rule can name
+        // that rule. Precedence: the label at the call site, then the label the
+        // called rule gives itself, then the grouped form `rule(`a`, `b`)`
+        // built at runtime from what the rule turned out to accept.
+        let called_rule = single_rule_call(&variant.pattern, ctx);
+        let inherited_label = called_rule
+            .as_ref()
+            .and_then(|r| ctx.grammar.rules.iter().find(|d| d.name == *r))
+            .and_then(|d| d.label.clone());
+        let label_str = if let Some(l) = &variant.label { Some(l.clone()) }
+            else if let Some(l) = inherited_label { Some(l) }
+            else { analysis::expectation_label(&variant.pattern) };
         let label_lit = if let Some(l) = &label_str { quote!(Some(#l)) } else { quote!(None::<&str>) };
+        let group_lit = match (&label_str, &called_rule) {
+            (None, Some(r)) => {
+                let display = r.to_string().replace('_', " ");
+                quote!(Some(#display))
+            }
+            _ => quote!(None::<&str>),
+        };
 
         let cut_info = analysis::find_cut(&variant.pattern);
         let first_pat = variant.pattern.first();
@@ -310,7 +329,12 @@ pub fn generate_variants_internal(
                         // the internal message outward (ADR 13, item 6).
                         if e.at == Some(_start_cursor) {
                             if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
-                            // Unlabelled: what the branch itself would have accepted -
+                            // A plain rule call names the rule and what it
+                            // accepts: `term(`integer literal`, `parentheses`)`.
+                            else if let Some(rule) = #group_lit {
+                                rt::push_grouped(&mut _expected, rule, &e.expected);
+                            }
+                            // Otherwise what the branch itself would have accepted -
                             // a built-in's expectation, or the union an inner rule
                             // already collected. Without this, only peekable
                             // branches made it into `expected one of:`.
@@ -355,7 +379,12 @@ pub fn generate_variants_internal(
                         // the internal message outward (ADR 13, item 6).
                         if e.at == Some(_start_cursor) {
                             if let Some(lbl) = #label_lit { _expected.push(lbl.to_string()); }
-                            // Unlabelled: what the branch itself would have accepted -
+                            // A plain rule call names the rule and what it
+                            // accepts: `term(`integer literal`, `parentheses`)`.
+                            else if let Some(rule) = #group_lit {
+                                rt::push_grouped(&mut _expected, rule, &e.expected);
+                            }
+                            // Otherwise what the branch itself would have accepted -
                             // a built-in's expectation, or the union an inner rule
                             // already collected. Without this, only peekable
                             // branches made it into `expected one of:`.
@@ -430,4 +459,28 @@ pub fn generate_variants_internal(
 
         Err(rt::finish_variants(_best_err, _expected, _start_cursor, #error_msg, ctx.end_of_scope_msg()))
     })
+}
+
+/// The rule an alternative consists of, if it consists of nothing else.
+///
+/// Only then can the alternative be named after it: `s:shared_struct` is a
+/// shared struct, whereas `attrs:outer_attrs "struct" …` merely starts with a
+/// rule call and is not that rule. Built-ins and `syn::` types name themselves
+/// already (`identifier`, `Rust type`) and are left alone.
+fn single_rule_call(pattern: &[ModelPattern], ctx: &CodegenContext) -> Option<Ident> {
+    let [ModelPattern::RuleCall {
+        rule_path, args, ..
+    }] = pattern
+    else {
+        return None;
+    };
+    if !args.is_empty() {
+        return None;
+    }
+    let name = rule_path.get_ident()?;
+    let is_builtin = SynBackend::get_builtins().iter().any(|b| name == b.name);
+    if is_builtin || !ctx.grammar.rules.iter().any(|r| r.name == *name) {
+        return None;
+    }
+    Some(name.clone())
 }

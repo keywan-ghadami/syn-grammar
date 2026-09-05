@@ -304,6 +304,10 @@ pub struct Rule {
     pub generics: Generics,
     /// Runtime and parser parameters.
     pub params: Vec<RuleParameter>,
+    /// The name the rule gives itself in error messages, `# "a shared struct"`
+    /// between the parameters and the `->`. Every call site inherits it; a
+    /// label at the call site still wins.
+    pub label: Option<String>,
     /// The type after `->`.
     pub return_type: Type,
     /// The alternatives separated by `|`.
@@ -342,6 +346,17 @@ impl Parse for Rule {
             Vec::new()
         };
 
+        // `rule name # "a shared struct" -> T = …`: the rule's own label,
+        // inherited by every call site. It must be read before the `->`,
+        // because after it a variant label would be ambiguous with it.
+        let label = if input.peek(Token![#]) {
+            let _ = input.parse::<Token![#]>()?;
+            let lit: syn::LitStr = input.parse()?;
+            Some(lit.value())
+        } else {
+            None
+        };
+
         let return_type = if input.peek(Token![->]) {
             let _ = input.parse::<Token![->]>()?;
             input.parse::<Type>()?
@@ -366,6 +381,7 @@ impl Parse for Rule {
             name,
             generics,
             params,
+            label,
             return_type,
             variants,
         })
@@ -402,9 +418,17 @@ impl ToTokens for Rule {
         // If we want to support round-tripping or accurate ToTokens, we should store capture_span in Rule.
         // But for now, just emitting = is standard. If the variants use it, fine.
 
+        let label_tokens = match &self.label {
+            Some(l) => {
+                let lit = syn::LitStr::new(l, proc_macro2::Span::call_site());
+                quote! { # #lit }
+            }
+            None => quote! {},
+        };
+
         tokens.append_all(quote! {
             #(#attrs)*
-            #vis rule #name #generics #params_tokens -> #ret = #variants_tokens
+            #vis rule #name #generics #params_tokens #label_tokens -> #ret = #variants_tokens
         });
     }
 }

@@ -19,8 +19,10 @@ complete list is in [`syn-grammar/CHANGELOG.md`](../../syn-grammar/CHANGELOG.md)
   `imports`. `parser::InheritanceSpec` is gone; `grammar Foo : Base` is
   rejected by the parser with a message that names `import Base as base;`
   as the replacement.
-- **`Rule`** gains `return_type_kind` and `is_lexical`; `params` is
-  `Vec<RuleParameter>` instead of `Vec<(Ident, Option<Type>)>`.
+- **`Rule`** gains `return_type_kind`, `is_lexical` and `label`; `params` is
+  `Vec<RuleParameter>` instead of `Vec<(Ident, Option<Type>)>`. `label` carries
+  the name a rule gives itself for error messages
+  (`rule x # "a thing" -> …`), which every call site inherits.
 - **`ModelPattern::RuleCall`** carries `rule_path: syn::Path` instead of
   `rule_name: Ident`. New variants are `LexicalScope` and `SpacedScope`
   (19 in total).
